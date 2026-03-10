@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mining Tycoon</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>⛏️ Mining Tycoon</h1>
+        <p>Real-time game dashboard</p>
+      </header>
+
+      <main>
+        <!-- Connection & Controls -->
+        <section class="card">
+          <h2>Connection & Controls</h2>
+          <div class="form-group">
+            <label>Backend URL:</label>
+            <input id="base-url" type="text" value="http://127.0.0.1:8000" />
+          </div>
+          <div class="form-group">
+            <label>Player Name:</label>
+            <input
+              id="player-name"
+              type="text"
+              value="Player"
+              placeholder="e.g., Alice"
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Game Duration (seconds):</label>
+              <input
+                id="game-duration"
+                type="number"
+                value="300"
+                min="10"
+                max="3600"
+              />
+            </div>
+            <div class="form-group">
+              <label>Enrollment Window (seconds):</label>
+              <input
+                id="enrollment-window"
+                type="number"
+                value="60"
+                min="5"
+                max="600"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Game ID:</label>
+            <input id="game-id" type="text" placeholder="e.g., game-123" />
+          </div>
+          <div class="form-group">
+            <label>Player ID:</label>
+            <input id="player-id" type="text" placeholder="e.g., player-456" />
+          </div>
+          <div class="button-group">
+            <button id="new-game-btn" class="btn-primary">+ New Game</button>
+            <button id="start-btn" class="btn-secondary">Start Stream</button>
+            <button id="stop-btn" class="btn-secondary">Stop Stream</button>
+          </div>
+          <div id="new-game-status" class="status-message"></div>
+        </section>
+
+        <!-- Game Status -->
+        <section class="card">
+          <h2>Game Status</h2>
+          <div class="status-row">
+            <div class="status-item">
+              <span class="label">Connection:</span>
+              <span id="conn-status" class="badge badge-gray">Idle</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Game:</span>
+              <span id="game-status" class="badge badge-gray">—</span>
+            </div>
+          </div>
+          <div id="meta-debug" class="meta-debug">
+            contract v— · meta_hash —
+          </div>
+          <div class="countdown-container">
+            <div id="countdown-label" class="countdown-label">
+              Time Remaining
+            </div>
+            <div id="countdown" class="countdown">—</div>
+          </div>
+        </section>
+
+        <!-- Player State -->
+        <section class="card">
+          <h2>Player State</h2>
+          <div id="player-state">
+            <p class="placeholder">Waiting for game data...</p>
+          </div>
+        </section>
+
+        <!-- Upgrades -->
+        <section class="card">
+          <h2>Upgrades</h2>
+          <div id="upgrades">
+            <p class="placeholder">Waiting for game data...</p>
+          </div>
+        </section>
+
+        <!-- Leaderboard -->
+        <section class="card">
+          <h2>
+            Leaderboard
+            <span
+              class="leaderboard-info"
+              title="Score represents your current token balance; it may drop when you spend tokens on upgrades"
+              >(?)</span
+            >
+          </h2>
+          <div id="leaderboard">
+            <p class="placeholder">Waiting for game data...</p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
