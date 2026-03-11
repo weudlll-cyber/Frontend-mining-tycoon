@@ -883,6 +883,23 @@ function saveSettings() {
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
 }
 
+// Defensive UI guard: keep main form inputs editable even if browser/autofill
+// or extension state accidentally toggles readOnly/disabled flags.
+function ensureInputsEditable() {
+  [
+    baseUrlInput,
+    playerNameInput,
+    gameDurationInput,
+    enrollmentWindowInput,
+    gameIdInput,
+    playerIdInput,
+  ].forEach((el) => {
+    if (!el) return;
+    el.disabled = false;
+    el.readOnly = false;
+  });
+}
+
 function loadSettings() {
   const savedBaseUrl = getStorageItem(STORAGE_KEYS.baseUrl);
   const savedPlayerName = getStorageItem(STORAGE_KEYS.playerName);
@@ -1119,6 +1136,7 @@ stopBtn.addEventListener('click', () => {
   newGameBtn.disabled = false;
   startBtn.disabled = false;
   stopBtn.disabled = false;
+  ensureInputsEditable();
 });
 
 async function createNewGameAndJoin() {
@@ -1229,6 +1247,7 @@ async function createNewGameAndJoin() {
 
     showNewGameStatus('Game created and joined. Starting stream...', 'success');
     stopBtn.disabled = false;
+    ensureInputsEditable();
     startStream(gameId, playerId);
   } catch (error) {
     console.error('Error creating game and joining:', error);
@@ -1237,6 +1256,7 @@ async function createNewGameAndJoin() {
     newGameBtn.disabled = false;
     startBtn.disabled = false;
     stopBtn.disabled = false;
+    ensureInputsEditable();
   }
 }
 
@@ -1250,6 +1270,7 @@ gameIdInput.addEventListener('change', saveSettings);
 playerIdInput.addEventListener('change', saveSettings);
 
 document.addEventListener('DOMContentLoaded', async () => {
+  ensureInputsEditable();
   loadSettings();
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
