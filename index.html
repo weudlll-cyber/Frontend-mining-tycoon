@@ -8,38 +8,75 @@
   </head>
   <body>
     <div id="app">
-      <header>
+      <header class="hero-header">
         <h1>⛏️ Mining Tycoon</h1>
-        <p>Real-time game dashboard</p>
+        <p>Setup at the top. Live game board below.</p>
       </header>
 
-      <main>
+      <main class="app-layout">
         <!-- Connection & Controls -->
-        <section class="card">
-          <h2>Connection & Controls</h2>
-          <div class="form-group">
-            <label>Backend URL:</label>
-            <input id="base-url" type="text" value="http://127.0.0.1:8000" />
+        <section class="card setup-card" id="setup-panel">
+          <div class="section-title-row">
+            <div>
+              <h2>Game Setup</h2>
+              <p class="section-subtitle">
+                Start or reconnect here, then work from the live board below.
+              </p>
+            </div>
+            <a class="jump-link" href="#live-board">Jump to Live Board</a>
           </div>
-          <div class="form-group">
-            <label>Player Name:</label>
-            <input
-              id="player-name"
-              type="text"
-              value="Player"
-              placeholder="e.g., Alice"
-            />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Game Duration (seconds):</label>
+          <div class="setup-grid">
+            <div class="form-group form-span-2">
+              <label>Backend URL:</label>
+              <input id="base-url" type="text" value="http://127.0.0.1:8000" />
+            </div>
+            <div class="form-group form-span-2">
+              <label>Player Name:</label>
               <input
-                id="game-duration"
-                type="number"
-                value="300"
-                min="10"
-                max="3600"
+                id="player-name"
+                type="text"
+                value="Player"
+                placeholder="e.g., Alice"
               />
+            </div>
+            <!-- P2.4: Duration selector (presets + custom) -->
+            <div class="form-group form-span-2">
+              <label>Game Duration:</label>
+              <div class="duration-selector">
+                <select id="duration-preset">
+                  <option value="5m">5 minutes</option>
+                  <option value="10m">10 minutes</option>
+                  <option value="15m">15 minutes</option>
+                  <option value="20m">20 minutes</option>
+                  <option value="30m" selected>30 minutes</option>
+                  <option value="60m">60 minutes</option>
+                  <option value="6h">6 hours</option>
+                  <option value="12h">12 hours</option>
+                  <option value="24h">24 hours</option>
+                  <option value="3d">3 days</option>
+                  <option value="7d">7 days</option>
+                  <option value="custom">Custom…</option>
+                </select>
+                <div
+                  id="duration-custom-input"
+                  class="duration-custom-input"
+                  style="display: none"
+                >
+                  <input
+                    id="duration-custom-value"
+                    type="number"
+                    placeholder="e.g., 120"
+                    min="60"
+                    max="2592000"
+                  />
+                  <select id="duration-custom-unit">
+                    <option value="seconds">seconds</option>
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label>Enrollment Window (seconds):</label>
@@ -51,76 +88,132 @@
                 max="600"
               />
             </div>
+            <!-- P2.4: Optional advanced overrides (collapsed by default) -->
+            <div class="form-group form-span-2">
+              <label>
+                <input type="checkbox" id="show-advanced-overrides" />
+                Advanced Overrides (optional)
+              </label>
+            </div>
+            <div
+              id="advanced-overrides"
+              class="advanced-overrides"
+              style="display: none"
+            >
+              <div class="form-group">
+                <label>Anchor Token:</label>
+                <select id="anchor-token">
+                  <option value="">— Use recommendation —</option>
+                  <option value="spring">spring</option>
+                  <option value="summer">summer</option>
+                  <option value="autumn">autumn</option>
+                  <option value="winter">winter</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Anchor Tokens/sec:</label>
+                <input
+                  id="anchor-rate"
+                  type="number"
+                  placeholder="e.g., 5.0"
+                  step="0.1"
+                  min="0"
+                />
+              </div>
+              <div class="form-group">
+                <label>Season Cycles:</label>
+                <input
+                  id="season-cycles"
+                  type="number"
+                  placeholder="e.g., 1"
+                  step="1"
+                  min="1"
+                />
+              </div>
+              <div
+                id="derived-emission-preview"
+                class="derived-emission-preview"
+                style="display: none"
+              ></div>
+            </div>
+            <div class="form-group form-span-3">
+              <label>Game ID:</label>
+              <input id="game-id" type="text" placeholder="e.g., game-123" />
+            </div>
+            <div class="form-group form-span-3">
+              <label>Player ID:</label>
+              <input
+                id="player-id"
+                type="text"
+                placeholder="e.g., player-456"
+              />
+            </div>
           </div>
-          <div class="form-group">
-            <label>Game ID:</label>
-            <input id="game-id" type="text" placeholder="e.g., game-123" />
-          </div>
-          <div class="form-group">
-            <label>Player ID:</label>
-            <input id="player-id" type="text" placeholder="e.g., player-456" />
-          </div>
-          <div class="button-group">
-            <button id="new-game-btn" class="btn-primary">+ New Game</button>
-            <button id="start-btn" class="btn-secondary">Start Stream</button>
-            <button id="stop-btn" class="btn-secondary">Stop Stream</button>
+          <div class="setup-actions">
+            <div class="button-group">
+              <button id="new-game-btn" class="btn-primary">+ New Game</button>
+              <button id="start-btn" class="btn-secondary">Start Stream</button>
+              <button id="stop-btn" class="btn-secondary">Stop Stream</button>
+            </div>
           </div>
           <div id="new-game-status" class="status-message"></div>
         </section>
 
-        <!-- Game Status -->
-        <section class="card">
-          <h2>Game Status</h2>
-          <div class="status-row">
-            <div class="status-item">
-              <span class="label">Connection:</span>
-              <span id="conn-status" class="badge badge-gray">Idle</span>
+        <section class="dashboard-shell" id="live-board">
+          <!-- Game Status -->
+          <section class="card status-card">
+            <h2>Game Status</h2>
+            <div class="status-row">
+              <div class="status-item">
+                <span class="label">Connection:</span>
+                <span id="conn-status" class="badge badge-gray">Idle</span>
+              </div>
+              <div class="status-item">
+                <span class="label">Game:</span>
+                <span id="game-status" class="badge badge-gray">—</span>
+              </div>
             </div>
-            <div class="status-item">
-              <span class="label">Game:</span>
-              <span id="game-status" class="badge badge-gray">—</span>
+            <div id="meta-debug" class="meta-debug">
+              contract v— · meta_hash —
             </div>
-          </div>
-          <div id="meta-debug" class="meta-debug">
-            contract v— · meta_hash —
-          </div>
-          <div class="countdown-container">
-            <div id="countdown-label" class="countdown-label">
-              Time Remaining
+            <div class="countdown-container">
+              <div id="countdown-label" class="countdown-label">
+                Time Remaining
+              </div>
+              <div id="countdown" class="countdown">—</div>
             </div>
-            <div id="countdown" class="countdown">—</div>
-          </div>
-        </section>
+          </section>
 
-        <!-- Player State -->
-        <section class="card">
-          <h2>Player State</h2>
-          <div id="player-state">
-            <p class="placeholder">Waiting for game data...</p>
-          </div>
-        </section>
+          <!-- Player State -->
+          <section class="card player-card">
+            <h2>Player State</h2>
+            <div id="player-state">
+              <p class="placeholder">Waiting for game data...</p>
+            </div>
+          </section>
 
-        <!-- Upgrades -->
-        <section class="card">
-          <h2>Upgrades</h2>
-          <div id="upgrades">
-            <p class="placeholder">Waiting for game data...</p>
-          </div>
-        </section>
+          <!-- Upgrades -->
+          <section class="card upgrades-card">
+            <h2>Upgrades</h2>
+            <div id="upgrades">
+              <p class="placeholder">Waiting for game data...</p>
+            </div>
+          </section>
 
-        <!-- Leaderboard -->
-        <section class="card">
-          <h2>
-            Leaderboard
-            <span
-              class="leaderboard-info"
-              title="Score represents your current token balance; it may drop when you spend tokens on upgrades"
-              >(?)</span
-            >
-          </h2>
-          <div id="leaderboard">
-            <p class="placeholder">Waiting for game data...</p>
-          </div>
+          <!-- Leaderboard -->
+          <section class="card leaderboard-card">
+            <h2>
+              Leaderboard
+              <span
+                class="leaderboard-info"
+                title="Score represents your current token balance; it may drop when you spend tokens on upgrades"
+                >(?)</span
+              >
+            </h2>
+            <div id="leaderboard">
+              <p class="placeholder">Waiting for game data...</p>
+            </div>
+          </section>
         </section>
       </main>
     </div>

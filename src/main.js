@@ -9,19 +9,110 @@ Entry points / public functions:
 - DOMContentLoaded bootstrap, start/stop/new-game handlers, fetchMetaSnapshot.
 Dependencies:
 - Browser fetch/EventSource/localStorage APIs and backend HTTP endpoints.
-Last updated: 2026-03-10
+Last updated: 2026-03-12
 Author/Owner: Frontend Team
+
+Manual QA (P2 Seasonal Oracle)
+1) Create game and join player.
+2) Confirm 4 balances are visible (spring/summer/autumn/winter).
+3) Confirm oracle prices are visible.
+4) Select upgrade_type=efficiency, target_token=summer, pay_token=winter.
+5) Submit upgrade; verify winter balance decreases and summer efficiency increases after refresh.
+6) Switch pay_token and verify preview updates.
+7) Force unsupported api_contract_version (> max) and verify upgrades are disabled with out-of-date message.
 */
 
 import './style.css';
+import {
+  DEFAULT_TOKEN_NAMES,
+  normalizeTokenNames,
+  computePayCostPreview,
+} from './utils/token-utils.js';
+import { clearNode } from './utils/dom-utils.js';
+import {
+  STORAGE_KEYS,
+  getPlayerTokenStorageKey,
+  setStorageItem,
+  getStorageItem,
+  normalizeBaseUrl,
+  getGameMetaHashStorageKey,
+  markGameMetaSeen,
+  cleanupGameMetaCache,
+} from './utils/storage-utils.js';
+import {
+  computeTokenHalvingCount,
+  computeCurrentHalvingMonth,
+  computeMostRecentPastHalving,
+  deriveLastHalvingNoticeUpdate,
+  halvingKey,
+  LAST_HALVING_NOTICE_SECONDS,
+  shouldShowTokenHalvingIndicator,
+} from './halving.js';
+import { setBadgeStatus } from './ui/badge.js';
+import {
+  initCountdown,
+  startCountdownTimer,
+  startEnrollmentCountdown,
+  stopCountdownTimer,
+  clearCountdownInterval,
+} from './ui/countdown.js';
+import {
+  initHalvingDisplay,
+  handleLastHalvingStateUpdate,
+  resetTransientHalvingState,
+  stopNextHalvingCountdown,
+  computeNextHalvingHint,
+  resolveNextHalvingTarget,
+  shouldResetNextHalvingCountdownTarget,
+} from './ui/halving-display.js';
+import {
+  initMetaManager,
+  getGameMeta,
+  isContractVersionSupported,
+  isActiveContractSupported,
+  getActiveMetaHash,
+  setActiveMetaHashFromStorage,
+  getActiveContractVersion,
+  getActiveUpgradeDefinitions,
+  shortMetaHash,
+  setActiveMeta as setActiveMetaState,
+  fetchMetaSnapshot,
+} from './meta/meta-manager.js';
+import {
+  initPlayerView,
+  renderPlayerState,
+} from './ui/player-view.js';
+import {
+  initUpgradePanel,
+  renderUpgradeMetrics as renderUpgradePanelMetrics,
+  getSelectedTokens,
+} from './ui/upgrade-panel.js';
 
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
 const playerNameInput = document.getElementById('player-name');
-const gameDurationInput = document.getElementById('game-duration');
+const durationPresetInput = document.getElementById('duration-preset');
+const durationCustomInput = document.getElementById('duration-custom-input');
+const durationCustomValueInput = document.getElementById(
+  'duration-custom-value'
+);
+const durationCustomUnitInput = document.getElementById('duration-custom-unit');
 const enrollmentWindowInput = document.getElementById('enrollment-window');
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
+
+function setActiveMeta(meta) {
+  initializeModules();
+  setActiveMetaState(meta);
+}
+const showAdvancedCheckbox = document.getElementById('show-advanced-overrides');
+const advancedOverridesDiv = document.getElementById('advanced-overrides');
+const anchorTokenInput = document.getElementById('anchor-token');
+const anchorRateInput = document.getElementById('anchor-rate');
+const seasonCyclesInput = document.getElementById('season-cycles');
+const derivedEmissionPreviewEl = document.getElementById(
+  'derived-emission-preview'
+);
 
 // DOM elements - buttons
 const newGameBtn = document.getElementById('new-game-btn');
@@ -35,93 +126,78 @@ const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
 const newGameStatusEl = document.getElementById('new-game-status');
 const metaDebugEl = document.getElementById('meta-debug');
+const liveBoardEl = document.getElementById('live-board');
 
 // DOM elements - player and leaderboard
 const playerStateEl = document.getElementById('player-state');
 const leaderboardEl = document.getElementById('leaderboard');
 const upgradesEl = document.getElementById('upgrades');
+const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
 
 let eventSource = null;
-let intentionalClose = false;
-let countdownInterval = null;
-let lastGameData = null;
 let waitingTimer = null;
+let intentionalClose = false;
 let payloadLogged = false;
+let lastGameData = null;
+let modulesInitialized = false;
 
-let globalMeta = null;
-const gameMetaById = new Map();
-let activeMetaHash = null;
-let activeContractVersion = null;
-let activeUpgradeDefinitions = null;
-let activeContractSupported = true;
-let contractUnsupportedToastShown = false;
-const metaChangeToastShownForGame = new Set();
+// P2.4: Duration resolution helper
+function resolveDurationSeconds() {
+  const preset = durationPresetInput.value;
+  if (preset === 'custom') {
+    const customValue = parseInt(durationCustomValueInput.value, 10);
+    const unit = durationCustomUnitInput.value || 'seconds';
+    if (!Number.isFinite(customValue) || customValue <= 0) {
+      throw new Error('Custom duration must be a positive number');
+    }
+    let seconds = customValue;
+    if (unit === 'minutes') seconds = customValue * 60;
+    else if (unit === 'hours') seconds = customValue * 3600;
+    else if (unit === 'days') seconds = customValue * 86400;
 
-const metaFetchState = {
-  global: { inFlight: null, lastFetchedAt: 0, lastResult: null },
-  byGame: new Map(),
-};
-
-const META_HASH_PREFIX_LENGTH = 8;
-const GAME_META_CACHE_MAX_ENTRIES = 20;
-const GAME_META_CACHE_TTL_DAYS = 30;
-const GAME_META_CACHE_TTL_MS = GAME_META_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
-const META_FETCH_THROTTLE_MS = 1500;
-const SUPPORTED_CONTRACT_VERSION_MIN = 1;
-const SUPPORTED_CONTRACT_VERSION_MAX = 1;
-
-// localStorage helpers
-const STORAGE_KEYS = {
-  baseUrl: 'mining-tycoon:baseUrl',
-  playerName: 'mining-tycoon:playerName',
-  gameDuration: 'mining-tycoon:gameDuration',
-  enrollmentWindow: 'mining-tycoon:enrollmentWindow',
-  gameId: 'mining-tycoon:gameId',
-  playerId: 'mining-tycoon:playerId',
-  globalMetaHash: 'mining-tycoon:globalMetaHash',
-  gameMetaSeenAt: 'mining-tycoon:gameMetaSeenAt',
-};
-
-/**
- * Return the localStorage key for the player session token.
- * Scoped by both game and player so tokens from different sessions don't collide.
- */
-function getPlayerTokenStorageKey(gameId, playerId) {
-  return `mining-tycoon:playerToken:${gameId}:${playerId}`;
+    const MIN_SECONDS = 60;
+    const MAX_SECONDS = 30 * 24 * 3600;
+    if (seconds < MIN_SECONDS || seconds > MAX_SECONDS) {
+      throw new Error(
+        `Duration must be between ${MIN_SECONDS}s and ${MAX_SECONDS}s`
+      );
+    }
+    return { mode: 'custom', customSeconds: seconds };
+  }
+  // Preset mode (including default)
+  return { mode: 'preset', preset };
 }
 
-function setStorageItem(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    console.warn(`localStorage set failed for key ${key}:`, e);
+// P2.4: Collect optional overrides from advanced form
+function collectAdvancedOverrides() {
+  const overrides = {};
+  const anchorToken = anchorTokenInput.value.trim();
+  if (anchorToken) {
+    overrides.emission_anchor_token = anchorToken;
   }
+  const anchorRate = parseFloat(anchorRateInput.value);
+  if (Number.isFinite(anchorRate) && anchorRate > 0) {
+    overrides.emission_anchor_tokens_per_second = anchorRate;
+  }
+  const seasonCycles = parseInt(seasonCyclesInput.value, 10);
+  if (Number.isFinite(seasonCycles) && seasonCycles > 0) {
+    overrides.season_cycles_per_game = seasonCycles;
+  }
+  return overrides;
 }
 
-function getStorageItem(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    console.warn(`localStorage get failed for key ${key}:`, e);
-    return null;
-  }
-}
-
-function normalizeBaseUrl(rawValue) {
-  const trimmed = (rawValue || '').trim().replace(/\/+$/, '');
-  let parsed;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    throw new Error(
-      'Invalid backend URL. Use http://host:port or https://host:port.'
-    );
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Backend URL must use http or https.');
-  }
-  return parsed.toString().replace(/\/+$/, '');
-}
+/*
+Manual QA Checklist for P2.4 Duration Presets & Overrides:
+1) Create game with preset "10m" → verify meta shows duration_preset=10m and game_duration_seconds=600
+2) Create game with custom "120" minutes → verify duration_custom_seconds=7200 (= 2 hours)
+3) Leave advanced overrides blank → backend chooses recommendations, meta shows them
+4) Fill anchor_token="summer" and anchor_rate="8.5" → backend respects, meta shows them
+5) Fill season_cycles="2" → meta shows the override applied
+6) Verify meta info displays in debug line: "Duration: 10m | Emission: spring @ 5.0/s | Cycles: 1"
+7) Ensure UI still works if meta fields absent (fallback gracefully)
+8) Check localStorage persists duration preset/custom choices across page reload
+9) Verify no innerHTML used in duration UI (all createElement/textContent)
+*/
 
 function getNormalizedBaseUrlOrNull({ notify = true } = {}) {
   try {
@@ -134,640 +210,75 @@ function getNormalizedBaseUrlOrNull({ notify = true } = {}) {
   }
 }
 
-function getGameMetaHashStorageKey(gameId) {
-  return `mining-tycoon:gameMetaHash:${gameId}`;
-}
-
-/** List all per-game meta hash cache keys currently present in localStorage. */
-function listGameMetaKeys() {
-  const prefix = 'mining-tycoon:gameMetaHash:';
-  const keys = [];
-  try {
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        keys.push(key);
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to list game meta cache keys:', e);
-  }
-  return keys;
-}
-
-function readGameMetaSeenMap() {
-  try {
-    const raw = getStorageItem(STORAGE_KEYS.gameMetaSeenAt);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-      return {};
-    return parsed;
-  } catch {
-    // Backward compatible fallback if old/corrupt metadata exists.
-    return {};
-  }
-}
-
-function writeGameMetaSeenMap(mapObj) {
-  setStorageItem(STORAGE_KEYS.gameMetaSeenAt, JSON.stringify(mapObj));
-}
-
-function markGameMetaSeen(gameId) {
-  if (gameId === null || gameId === undefined || gameId === '') return;
-  const gameIdStr = String(gameId);
-  const seenMap = readGameMetaSeenMap();
-  seenMap[gameIdStr] = Date.now();
-  writeGameMetaSeenMap(seenMap);
-}
-
-/**
- * Enforce retention rules for per-game meta hash cache:
- * - Drop entries older than TTL days.
- * - Keep only the N most recently seen game entries.
- */
-function cleanupGameMetaCache() {
-  const keys = listGameMetaKeys();
-  if (keys.length === 0) {
-    return;
-  }
-
-  const now = Date.now();
-  const prefix = 'mining-tycoon:gameMetaHash:';
-  const seenMap = readGameMetaSeenMap();
-
-  const entries = keys.map((key) => {
-    const gameId = key.slice(prefix.length);
-    const rawSeenAt = seenMap[gameId];
-    const seenAt = Number.isFinite(rawSeenAt)
-      ? rawSeenAt
-      : Number.parseInt(rawSeenAt || '0', 10);
-    return {
-      key,
-      gameId,
-      seenAt: Number.isFinite(seenAt) ? seenAt : 0,
-    };
-  });
-
-  // TTL-based cleanup for entries with known timestamps.
-  const ttlCutoff = now - GAME_META_CACHE_TTL_MS;
-  let removedByTtl = 0;
-  entries.forEach((entry) => {
-    if (entry.seenAt > 0 && entry.seenAt < ttlCutoff) {
-      try {
-        localStorage.removeItem(entry.key);
-        delete seenMap[entry.gameId];
-        removedByTtl += 1;
-      } catch (e) {
-        console.warn(
-          'Failed to remove stale game meta cache entry:',
-          entry.key,
-          e
-        );
-      }
-    }
-  });
-
-  const remainingKeys = listGameMetaKeys();
-  const remainingEntries = remainingKeys.map((key) => {
-    const gameId = key.slice(prefix.length);
-    const rawSeenAt = seenMap[gameId];
-    const seenAt = Number.isFinite(rawSeenAt)
-      ? rawSeenAt
-      : Number.parseInt(rawSeenAt || '0', 10);
-    return {
-      key,
-      gameId,
-      seenAt: Number.isFinite(seenAt) ? seenAt : 0,
-    };
-  });
-
-  // Keep only the most recent N entries.
-  remainingEntries.sort((a, b) => b.seenAt - a.seenAt);
-  let removedByCount = 0;
-  if (remainingEntries.length > GAME_META_CACHE_MAX_ENTRIES) {
-    const staleByCount = remainingEntries.slice(GAME_META_CACHE_MAX_ENTRIES);
-    staleByCount.forEach((entry) => {
-      try {
-        localStorage.removeItem(entry.key);
-        delete seenMap[entry.gameId];
-        removedByCount += 1;
-      } catch (e) {
-        console.warn(
-          'Failed to remove overflow game meta cache entry:',
-          entry.key,
-          e
-        );
-      }
-    });
-  }
-
-  // Remove seen-map metadata for missing hash keys.
-  const remainingGameIds = new Set(
-    listGameMetaKeys().map((key) => key.slice(prefix.length))
-  );
-  Object.keys(seenMap).forEach((gameId) => {
-    if (!remainingGameIds.has(gameId)) {
-      delete seenMap[gameId];
-    }
-  });
-
-  writeGameMetaSeenMap(seenMap);
-
-  if (removedByTtl > 0 || removedByCount > 0) {
-    console.debug(
-      `[meta-cache] cleanup removed ${removedByTtl} by TTL and ${removedByCount} by max-count; kept ${remainingGameIds.size}`
-    );
-  }
-}
-
-function shortMetaHash(hash) {
-  if (!hash || typeof hash !== 'string') return '-';
-  return hash.slice(0, META_HASH_PREFIX_LENGTH);
-}
-
 function renderMetaDebugLine() {
   if (!metaDebugEl) return;
+  const activeContractVersion = getActiveContractVersion();
+  const activeMetaHash = getActiveMetaHash();
   const versionText = Number.isInteger(activeContractVersion)
     ? `v${activeContractVersion}`
     : 'v-';
-  metaDebugEl.textContent = `contract ${versionText} | meta_hash ${shortMetaHash(activeMetaHash)}`;
-}
 
-function isContractVersionSupported(version) {
-  return (
-    Number.isInteger(version) &&
-    version >= SUPPORTED_CONTRACT_VERSION_MIN &&
-    version <= SUPPORTED_CONTRACT_VERSION_MAX
-  );
-}
+  let text = `contract ${versionText} | meta_hash ${shortMetaHash(activeMetaHash)}`;
 
-function getMetaFetchEntry(gameId = null) {
-  if (gameId === null || gameId === undefined || gameId === '') {
-    return metaFetchState.global;
-  }
-  const gameIdStr = String(gameId);
-  if (!metaFetchState.byGame.has(gameIdStr)) {
-    metaFetchState.byGame.set(gameIdStr, {
-      inFlight: null,
-      lastFetchedAt: 0,
-      lastResult: null,
-    });
-  }
-  return metaFetchState.byGame.get(gameIdStr);
-}
+  const gameId = gameIdInput?.value;
+  if (gameId) {
+    const gameMeta = getGameMeta(gameId);
+    if (gameMeta && gameMeta.game_duration_seconds) {
+      const durationSec = gameMeta.game_duration_seconds;
+      let durationLabel = '';
+      if (durationSec < 60) durationLabel = `${durationSec}s`;
+      else if (durationSec < 3600)
+        durationLabel = `${Math.round(durationSec / 60)}m`;
+      else if (durationSec < 86400)
+        durationLabel = `${Math.round(durationSec / 3600)}h`;
+      else durationLabel = `${Math.round(durationSec / 86400)}d`;
 
-function getCachedMetaHash(gameId = null) {
-  if (gameId === null || gameId === undefined || gameId === '') {
-    return globalMeta?.meta_hash || getStorageItem(STORAGE_KEYS.globalMetaHash);
-  }
+      text += ` | Duration: ${durationLabel}`;
 
-  const gameIdStr = String(gameId);
-  return (
-    gameMetaById.get(gameIdStr)?.meta_hash ||
-    getStorageItem(getGameMetaHashStorageKey(gameIdStr))
-  );
-}
-
-async function fetchMetaWithOptionalEtag(
-  url,
-  cachedMetaHash,
-  fallbackMeta = null
-) {
-  const headers = {};
-  if (cachedMetaHash) {
-    headers['If-None-Match'] = cachedMetaHash;
-  }
-
-  const response = await fetch(url, { headers });
-
-  if (response.status === 304) {
-    if (fallbackMeta) {
-      return { meta: fallbackMeta, notModified: true };
-    }
-
-    // Backward compatible fallback: if we only had a hash but no body, refetch once.
-    const fullResponse = await fetch(url);
-    if (!fullResponse.ok) {
-      throw new Error(
-        `Meta fetch failed: ${fullResponse.status} ${fullResponse.statusText}`
-      );
-    }
-    return { meta: await fullResponse.json(), notModified: false };
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Meta fetch failed: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return { meta: await response.json(), notModified: false };
-}
-
-function persistMetaHash(meta, gameId = null) {
-  if (!meta || typeof meta.meta_hash !== 'string' || !meta.meta_hash) return;
-  try {
-    if (gameId === null || gameId === undefined || gameId === '') {
-      setStorageItem(STORAGE_KEYS.globalMetaHash, meta.meta_hash);
-    } else {
-      setStorageItem(getGameMetaHashStorageKey(gameId), meta.meta_hash);
-      markGameMetaSeen(gameId);
-      cleanupGameMetaCache();
-    }
-  } catch (e) {
-    console.warn('Failed to persist meta_hash:', e);
-  }
-}
-
-function setActiveMeta(meta) {
-  if (!meta || typeof meta !== 'object') return;
-  activeMetaHash =
-    typeof meta.meta_hash === 'string' && meta.meta_hash
-      ? meta.meta_hash
-      : null;
-  activeContractVersion = Number.isInteger(meta.api_contract_version)
-    ? meta.api_contract_version
-    : null;
-  activeContractSupported = isContractVersionSupported(activeContractVersion);
-  activeUpgradeDefinitions =
-    meta.upgrade_definitions && typeof meta.upgrade_definitions === 'object'
-      ? meta.upgrade_definitions
-      : null;
-
-  if (!activeContractSupported && !contractUnsupportedToastShown) {
-    showToast(
-      `Unsupported contract version v${activeContractVersion}. Upgrades are disabled.`,
-      'error'
-    );
-    contractUnsupportedToastShown = true;
-  }
-
-  renderMetaDebugLine();
-}
-
-async function fetchMetaSnapshot(baseUrl, gameId = null, options = {}) {
-  // Dedupe in-flight requests and throttle repeated reconnect bursts.
-  const normalizedBase = normalizeBaseUrl(baseUrl);
-  const { force = false } = options;
-
-  const fetchEntry = getMetaFetchEntry(gameId);
-  if (!force) {
-    const ageMs = Date.now() - fetchEntry.lastFetchedAt;
-    if (fetchEntry.inFlight) {
-      return fetchEntry.inFlight;
-    }
-    if (fetchEntry.lastResult && ageMs >= 0 && ageMs < META_FETCH_THROTTLE_MS) {
-      return fetchEntry.lastResult;
-    }
-  }
-
-  const task = (async () => {
-    const cachedGlobalHash = getCachedMetaHash(null);
-    try {
-      const globalResult = await fetchMetaWithOptionalEtag(
-        `${normalizedBase}/meta`,
-        cachedGlobalHash,
-        globalMeta
-      );
-      if (!globalResult.notModified) {
-        globalMeta = globalResult.meta;
-        persistMetaHash(globalMeta, null);
-      }
-    } catch (e) {
-      console.warn('Unable to fetch /meta:', e);
-    }
-
-    if (gameId === null || gameId === undefined || gameId === '') {
-      if (globalMeta) {
-        // Skip re-render on 304 by only applying on changed payload.
-        const latestGlobalHash = globalMeta.meta_hash || null;
-        if (latestGlobalHash !== activeMetaHash || !activeContractVersion) {
-          setActiveMeta(globalMeta);
-        }
-      }
-      fetchEntry.lastFetchedAt = Date.now();
-      fetchEntry.lastResult = globalMeta;
-      return globalMeta;
-    }
-
-    const gameIdStr = String(gameId);
-    const previousMeta = gameMetaById.get(gameIdStr) || null;
-    const cachedGameHash = getCachedMetaHash(gameIdStr);
-
-    const gameResult = await fetchMetaWithOptionalEtag(
-      `${normalizedBase}/games/${encodeURIComponent(gameIdStr)}/meta`,
-      cachedGameHash,
-      previousMeta
-    );
-
-    const gameMeta = gameResult.meta;
-    const previousHash = previousMeta?.meta_hash || null;
-    const nextHash = gameMeta?.meta_hash || null;
-
-    if (!gameResult.notModified) {
-      gameMetaById.set(gameIdStr, gameMeta);
-      persistMetaHash(gameMeta, gameIdStr);
-
-      if (previousHash && nextHash && previousHash !== nextHash) {
-        console.info(
-          `[meta] meta_hash changed for game ${gameIdStr}: ${shortMetaHash(previousHash)} -> ${shortMetaHash(nextHash)}`
-        );
-
-        if (!metaChangeToastShownForGame.has(gameIdStr)) {
-          showToast('Game rules updated - refreshing upgrades...', 'info');
-          metaChangeToastShownForGame.add(gameIdStr);
-        }
+      if (gameMeta.emission_anchor_token) {
+        const rate = gameMeta.emission_anchor_tokens_per_second || '?';
+        text += ` | Emission: ${gameMeta.emission_anchor_token} @ ${rate}/s`;
       }
 
-      setActiveMeta(gameMeta);
-
-      if (
-        previousHash &&
-        nextHash &&
-        previousHash !== nextHash &&
-        lastGameData
-      ) {
-        renderUpgradeMetrics(lastGameData);
+      if (gameMeta.season_cycles_per_game) {
+        text += ` | Cycles: ${gameMeta.season_cycles_per_game}`;
       }
     }
-
-    fetchEntry.lastFetchedAt = Date.now();
-    fetchEntry.lastResult = gameMeta;
-    return gameMeta;
-  })();
-
-  fetchEntry.inFlight = task;
-  try {
-    return await task;
-  } finally {
-    fetchEntry.inFlight = null;
   }
+
+  metaDebugEl.textContent = text;
 }
 
-function setBadgeStatus(element, status) {
-  element.className = 'badge';
-  switch (status) {
-    case 'connected':
-    case 'running':
-      element.classList.add('badge-green');
-      element.textContent = status === 'connected' ? 'Connected' : 'Running';
-      break;
-    case 'reconnecting':
-      element.classList.add('badge-yellow');
-      element.textContent = 'Reconnecting';
-      break;
-    case 'waiting':
-      element.classList.add('badge-yellow');
-      element.textContent = 'Waiting for first event...';
-      break;
-    case 'finished':
-      element.classList.add('badge-blue');
-      element.textContent = 'Finished';
-      break;
-    default:
-      element.classList.add('badge-gray');
-      element.textContent = 'Idle';
-  }
-}
+function renderDerivedEmissionPreview() {
+  if (!derivedEmissionPreviewEl) return;
 
-function formatCountdown(seconds) {
-  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
-    return '-';
-  }
-  const s = Math.max(0, Math.floor(seconds));
-  return String(s).padStart(2, '0');
-}
-
-function updateCountdown() {
-  if (!lastGameData || lastGameData.seconds_remaining === null) {
-    countdownEl.textContent = '-';
+  const gameId = gameIdInput?.value;
+  if (!gameId) {
+    derivedEmissionPreviewEl.style.display = 'none';
     return;
   }
 
-  const elapsed = (Date.now() - lastGameData.timestamp) / 1000;
-  const remaining = Math.max(0, lastGameData.seconds_remaining - elapsed);
-  countdownEl.textContent = formatCountdown(remaining);
-}
-
-function updateEnrollmentCountdown() {
-  if (!lastGameData || lastGameData.enrollment_seconds_remaining === null) {
-    countdownEl.textContent = '-';
+  const gameMeta = getGameMeta(gameId);
+  if (!gameMeta || !gameMeta.derived_emission_rates_per_second) {
+    derivedEmissionPreviewEl.style.display = 'none';
     return;
   }
 
-  const elapsed = (Date.now() - lastGameData.timestamp) / 1000;
-  const remaining = Math.max(
-    0,
-    lastGameData.enrollment_seconds_remaining - elapsed
-  );
-  countdownEl.textContent = formatCountdown(remaining);
-}
+  const rates = gameMeta.derived_emission_rates_per_second;
+  const hasAllTokens = PLAYER_STATE_TOKENS.every((token) => token in rates);
 
-function startCountdownTimer() {
-  if (countdownInterval) clearInterval(countdownInterval);
-  updateCountdown();
-  countdownInterval = setInterval(updateCountdown, 100);
-}
-
-function startEnrollmentCountdown() {
-  if (countdownInterval) clearInterval(countdownInterval);
-  updateEnrollmentCountdown();
-  countdownInterval = setInterval(updateEnrollmentCountdown, 100);
-}
-
-function stopCountdownTimer() {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
-  countdownLabelEl.textContent = 'Time Remaining';
-  countdownEl.textContent = '-';
-}
-
-function calculateCurrentMiningRate(playerState) {
-  if (!playerState) return 0;
-  const mining = playerState.mining || {};
-  const baseRate = 1.0;
-  const hashrate = mining.hashrate || 1.0;
-  const efficiency = mining.efficiency || 1.0;
-  return baseRate * hashrate * efficiency;
-}
-
-function renderPlayerState(data) {
-  if (!data) {
-    playerStateEl.innerHTML =
-      '<p class="placeholder">Waiting for game data...</p>';
+  if (!hasAllTokens) {
+    derivedEmissionPreviewEl.style.display = 'none';
     return;
   }
 
-  let html = '';
-  const metrics = data.upgrade_metrics || {};
-  const currentRate =
-    typeof metrics.output_per_second === 'number'
-      ? metrics.output_per_second
-      : calculateCurrentMiningRate(data.player_state);
+  const ratesList = PLAYER_STATE_TOKENS.map((token) => {
+    const rate = Number(rates[token]).toFixed(2);
+    return `${token} ${rate}`;
+  }).join(', ');
 
-  html += `<div class="state-stat">
-    <span class="state-stat-label">Output Rate</span>
-    <span class="state-stat-value highlight">${currentRate.toFixed(2)} tokens/s</span>
-  </div>`;
-
-  if (data.player_tokens !== undefined) {
-    html += `<div class="state-stat">
-      <span class="state-stat-label">Tokens</span>
-      <span class="state-stat-value">${Math.floor(data.player_tokens)}</span>
-    </div>`;
-  }
-
-  if (data.player_mining_rate !== undefined) {
-    html += `<div class="state-stat">
-      <span class="state-stat-label">Mining Rate</span>
-      <span class="state-stat-value">${data.player_mining_rate.toFixed(2)} tokens/s</span>
-    </div>`;
-  }
-
-  if (data.player_cumulative_mined !== undefined) {
-    html += `<div class="state-stat">
-      <span class="state-stat-label">Total Mined</span>
-      <span class="state-stat-value">${Math.floor(data.player_cumulative_mined)}</span>
-    </div>`;
-  }
-
-  if (!html) {
-    html = '<p class="placeholder">Waiting for player data...</p>';
-  }
-
-  playerStateEl.innerHTML = html;
-}
-
-function renderLeaderboard(data) {
-  if (!data) {
-    leaderboardEl.innerHTML =
-      '<p class="placeholder">Waiting for game data...</p>';
-    return;
-  }
-
-  const leaderboard = data.leaderboard_top_5 || data.leaderboard || [];
-
-  if (!leaderboard || leaderboard.length === 0) {
-    leaderboardEl.innerHTML =
-      '<p class="placeholder">Waiting for leaderboard data...</p>';
-    return;
-  }
-
-  const topFive = leaderboard.slice(0, 5);
-
-  let html = '<table class="leaderboard-table"><thead><tr>';
-  html += '<th>Rank</th>';
-  html += '<th>Player</th>';
-  html += '<th style="text-align: right;">Mined</th>';
-  html += '</tr></thead><tbody>';
-
-  topFive.forEach((player, index) => {
-    const rank = index + 1;
-    const name = player.name || player.player_id || '-';
-    const tokens = Math.floor(player.score || 0);
-    html += '<tr>';
-    html += `<td><span class="leaderboard-rank">#${rank}</span></td>`;
-    html += `<td><span class="leaderboard-name">${escapeHtml(name)}</span></td>`;
-    html += `<td><span class="leaderboard-score">${tokens}</span></td>`;
-    html += '</tr>';
-  });
-
-  html += '</tbody></table>';
-  leaderboardEl.innerHTML = html;
-}
-
-function formatCost(cost) {
-  if (cost == null) return '-';
-  if (typeof cost === 'object') {
-    const parts = [];
-    for (const [k, v] of Object.entries(cost)) {
-      parts.push(`${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`);
-    }
-    return parts.join(', ');
-  }
-  if (typeof cost === 'number') {
-    return cost.toString();
-  }
-  return String(cost);
-}
-
-function renderUpgradeMetrics(data) {
-  if (!data || !data.upgrade_metrics) {
-    upgradesEl.innerHTML =
-      '<p class="placeholder">Waiting for upgrade data...</p>';
-    return;
-  }
-
-  const metrics = data.upgrade_metrics;
-  const upgrades = metrics.upgrades || {};
-  const playerState = data.player_state || {};
-  const upgradeLevels = playerState.upgrade_levels || {};
-  let html = '';
-
-  if (typeof metrics.output_per_second === 'number') {
-    html += `<div class="state-stat">
-      <span class="state-stat-label">Current Output</span>
-      <span class="state-stat-value highlight">${metrics.output_per_second.toFixed(2)} tokens/s</span>
-    </div>`;
-  }
-
-  const defaultUpgradeOrder = ['hashrate', 'efficiency', 'cooling'];
-  const supportedUpgradeTypes = activeUpgradeDefinitions
-    ? Object.keys(activeUpgradeDefinitions)
-    : defaultUpgradeOrder;
-
-  supportedUpgradeTypes.forEach((type) => {
-    const info = upgrades[type];
-    const definition = activeUpgradeDefinitions?.[type];
-    if (!info && !definition) return;
-
-    const level = upgradeLevels[type] || 0;
-    const title =
-      definition?.display_name || type.charAt(0).toUpperCase() + type.slice(1);
-
-    html += '<div class="upgrade-section">';
-    html += `<h3>${escapeHtml(title)} Upgrade <span class="upgrade-level">Level ${level}</span></h3>`;
-
-    if (definition?.effect_summary) {
-      html += `<div class="upgrade-stat">Effect: <span class="upgrade-current">${escapeHtml(definition.effect_summary)}</span></div>`;
-    }
-
-    html += `<div class="upgrade-stat">Cost: <span class="upgrade-cost">${escapeHtml(formatCost(info?.cost_to_next))}</span></div>`;
-
-    if (info && info.delta_output !== undefined) {
-      html += `<div class="upgrade-stat">Output Increase: <span class="upgrade-benefit">+${info.delta_output.toFixed(2)} tokens/s</span></div>`;
-    }
-    if (info && info.output_after !== undefined) {
-      html += `<div class="upgrade-stat">Output After: <span class="upgrade-current">${info.output_after.toFixed(2)} tokens/s</span></div>`;
-    }
-    if (info && info.breakeven_seconds !== undefined) {
-      html += `<div class="upgrade-stat">Breakeven: <span class="upgrade-roi">${info.breakeven_seconds.toFixed(1)}s</span></div>`;
-    }
-
-    const disabledAttrs = activeContractSupported
-      ? ''
-      : ' disabled title="Unsupported API contract version. Upgrades disabled."';
-    html += `<button class="btn-upgrade" data-upgrade="${type}" data-level="${level}"${disabledAttrs}>Upgrade -> Level ${level + 1}</button>`;
-    html += '</div>';
-  });
-
-  if (!html) {
-    html = '<p class="placeholder">No upgrade data available</p>';
-  }
-
-  upgradesEl.innerHTML = html;
-
-  const upgradeButtons = upgradesEl.querySelectorAll('.btn-upgrade');
-  upgradeButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const upgradeType = button.dataset.upgrade;
-      const nextLevel = parseInt(button.dataset.level, 10) + 1;
-      performUpgrade(upgradeType, nextLevel);
-    });
-  });
+  derivedEmissionPreviewEl.textContent = `Derived Rates: ${ratesList} /s`;
+  derivedEmissionPreviewEl.style.display = 'block';
 }
 
 function showToast(message, type = 'info') {
@@ -777,81 +288,92 @@ function showToast(message, type = 'info') {
   document.body.appendChild(toast);
 
   setTimeout(() => toast.classList.add('show'), 10);
-
   setTimeout(() => {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
 
-async function performUpgrade(upgradeType, nextLevel) {
-  if (!activeContractSupported) {
-    showToast(
-      'Unsupported contract version. Upgrade actions are disabled.',
-      'error'
-    );
+function setLiveSessionActive(isActive) {
+  document.body.classList.toggle('live-session', Boolean(isActive));
+}
+
+function scrollToLiveBoard() {
+  if (!liveBoardEl) return;
+  const reducedMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  liveBoardEl.scrollIntoView({
+    behavior: reducedMotion ? 'auto' : 'smooth',
+    block: 'start',
+  });
+}
+
+function renderLeaderboard(data) {
+  clearNode(leaderboardEl);
+
+  if (!data) {
+    const placeholder = document.createElement('p');
+    placeholder.className = 'placeholder';
+    placeholder.textContent = 'Waiting for game data...';
+    leaderboardEl.appendChild(placeholder);
     return;
   }
 
-  if (!lastGameData || !lastGameData.game_id || !lastGameData.player_id) {
-    console.error('No game or player data available for upgrade');
+  const leaderboard = data.leaderboard_top_5 || data.leaderboard || [];
+  if (!leaderboard.length) {
+    const placeholder = document.createElement('p');
+    placeholder.className = 'placeholder';
+    placeholder.textContent = 'Waiting for leaderboard data...';
+    leaderboardEl.appendChild(placeholder);
     return;
   }
 
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
-  const gameId = lastGameData.game_id;
-  const playerId = lastGameData.player_id;
+  const table = document.createElement('table');
+  table.className = 'leaderboard-table';
 
-  const playerToken = getStorageItem(
-    getPlayerTokenStorageKey(gameId, playerId)
-  );
-  const upgradeHeaders = { 'Content-Type': 'application/json' };
-  if (playerToken) {
-    upgradeHeaders['X-Player-Token'] = playerToken;
-  }
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/upgrade`,
-      {
-        method: 'POST',
-        headers: upgradeHeaders,
-        body: JSON.stringify({ upgrade_type: upgradeType }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || `Upgrade failed: ${response.status}`);
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Rank', 'Player', 'Mined'].forEach((label) => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    if (label === 'Mined') {
+      th.style.textAlign = 'right';
     }
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
 
-    await response.json();
-    const upgradeName =
-      upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1);
-    showToast(`Upgraded ${upgradeName} to level ${nextLevel}`, 'success');
-  } catch (error) {
-    console.error('Upgrade error:', error);
-    showToast(`Upgrade failed: ${error.message}`, 'error');
-  }
-}
+  const tbody = document.createElement('tbody');
+  leaderboard.slice(0, 5).forEach((player, index) => {
+    const row = document.createElement('tr');
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+    const rankCell = document.createElement('td');
+    const rank = document.createElement('span');
+    rank.className = 'leaderboard-rank';
+    rank.textContent = `#${index + 1}`;
+    rankCell.appendChild(rank);
 
-function showNewGameStatus(message, type = 'info') {
-  newGameStatusEl.textContent = message;
-  newGameStatusEl.className = `status-message ${type}`;
-}
+    const playerCell = document.createElement('td');
+    const name = document.createElement('span');
+    name.className = 'leaderboard-name';
+    name.textContent = player.name || player.player_id || '-';
+    playerCell.appendChild(name);
 
-function clearNewGameStatus() {
-  newGameStatusEl.textContent = '';
-  newGameStatusEl.className = 'status-message empty';
+    const scoreCell = document.createElement('td');
+    scoreCell.style.textAlign = 'right';
+    const score = document.createElement('span');
+    score.className = 'leaderboard-score';
+    score.textContent = String(Math.floor(player.score || 0));
+    scoreCell.appendChild(score);
+
+    row.append(rankCell, playerCell, scoreCell);
+    tbody.appendChild(row);
+  });
+
+  table.append(thead, tbody);
+  leaderboardEl.appendChild(table);
 }
 
 async function getErrorMessageFromResponse(response, fallbackMessage) {
@@ -869,19 +391,139 @@ async function getErrorMessageFromResponse(response, fallbackMessage) {
         : null;
     return { detail, code };
   } catch {
-    // Ignore parse errors and use fallback.
+    return { detail: fallbackMessage, code: null };
   }
-  return { detail: fallbackMessage, code: null };
+}
+
+async function performUpgrade(upgradeType, nextLevel) {
+  if (!isActiveContractSupported()) {
+    showToast(
+      'Unsupported contract version. Upgrade actions are disabled.',
+      'error'
+    );
+    return;
+  }
+
+  if (!lastGameData?.game_id || !lastGameData?.player_id) {
+    console.error('No game or player data available for upgrade');
+    return;
+  }
+
+  const baseUrl = getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    return;
+  }
+
+  const gameId = lastGameData.game_id;
+  const playerId = lastGameData.player_id;
+  const playerToken = getStorageItem(
+    getPlayerTokenStorageKey(gameId, playerId)
+  );
+  const { targetToken, payToken } = getSelectedTokens();
+  const headers = { 'Content-Type': 'application/json' };
+  if (playerToken) {
+    headers['X-Player-Token'] = playerToken;
+  }
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/upgrade`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          upgrade_type: upgradeType,
+          target_token: targetToken,
+          pay_token: payToken,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const { detail } = await getErrorMessageFromResponse(
+        response,
+        `Upgrade failed: ${response.status} ${response.statusText}`
+      );
+      throw new Error(detail);
+    }
+
+    await response.json();
+    showToast(
+      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${nextLevel}`,
+      'success'
+    );
+  } catch (error) {
+    console.error('Upgrade error:', error);
+    showToast(`Upgrade failed: ${error.message}`, 'error');
+  }
+}
+
+function showNewGameStatus(message, type = 'info') {
+  newGameStatusEl.textContent = message;
+  newGameStatusEl.className = `status-message ${type}`;
+}
+
+function clearNewGameStatus() {
+  newGameStatusEl.textContent = '';
+  newGameStatusEl.className = 'status-message empty';
 }
 
 function saveSettings() {
   setStorageItem(STORAGE_KEYS.baseUrl, baseUrlInput.value);
   setStorageItem(STORAGE_KEYS.playerName, playerNameInput.value);
-  setStorageItem(STORAGE_KEYS.gameDuration, gameDurationInput.value);
+  setStorageItem(STORAGE_KEYS.durationPreset, durationPresetInput.value);
+  setStorageItem(
+    STORAGE_KEYS.durationCustomValue,
+    durationCustomValueInput.value
+  );
+  setStorageItem(
+    STORAGE_KEYS.durationCustomUnit,
+    durationCustomUnitInput.value
+  );
   setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
   setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
 }
+
+function initializeModules() {
+  if (modulesInitialized) {
+    return;
+  }
+
+  initCountdown(
+    { countdownEl, countdownLabelEl },
+    { get: () => lastGameData }
+  );
+  initHalvingDisplay({ getActiveGameMeta: getGameMeta });
+  initMetaManager({
+    onMetaChanged() {
+      renderMetaDebugLine();
+      renderDerivedEmissionPreview();
+      if (lastGameData) {
+        renderUpgradeMetrics(lastGameData);
+      }
+    },
+    showToast,
+  });
+  initPlayerView({ playerStateEl, getActiveGameMeta: getGameMeta });
+  initUpgradePanel({
+    upgradesEl,
+    getActiveGameMeta: getGameMeta,
+    isActiveContractSupported,
+    getActiveUpgradeDefinitions,
+    performUpgrade,
+  });
+
+  modulesInitialized = true;
+}
+
+function renderUpgradeMetrics(data) {
+  initializeModules();
+  renderUpgradePanelMetrics(data, getGameMeta);
+}
+
+
+
 
 // Defensive UI guard: keep main form inputs editable even if browser/autofill
 // or extension state accidentally toggles readOnly/disabled flags.
@@ -889,10 +531,15 @@ function ensureInputsEditable() {
   [
     baseUrlInput,
     playerNameInput,
-    gameDurationInput,
+    durationPresetInput,
+    durationCustomValueInput,
+    durationCustomUnitInput,
     enrollmentWindowInput,
     gameIdInput,
     playerIdInput,
+    anchorTokenInput,
+    anchorRateInput,
+    seasonCyclesInput,
   ].forEach((el) => {
     if (!el) return;
     el.disabled = false;
@@ -903,18 +550,33 @@ function ensureInputsEditable() {
 function loadSettings() {
   const savedBaseUrl = getStorageItem(STORAGE_KEYS.baseUrl);
   const savedPlayerName = getStorageItem(STORAGE_KEYS.playerName);
-  const savedGameDuration = getStorageItem(STORAGE_KEYS.gameDuration);
+  const savedDurationPreset = getStorageItem(STORAGE_KEYS.durationPreset);
+  const savedDurationCustomValue = getStorageItem(
+    STORAGE_KEYS.durationCustomValue
+  );
+  const savedDurationCustomUnit = getStorageItem(
+    STORAGE_KEYS.durationCustomUnit
+  );
   const savedEnrollmentWindow = getStorageItem(STORAGE_KEYS.enrollmentWindow);
   const savedGameId = getStorageItem(STORAGE_KEYS.gameId);
   const savedPlayerId = getStorageItem(STORAGE_KEYS.playerId);
 
   if (savedBaseUrl) baseUrlInput.value = savedBaseUrl;
   if (savedPlayerName) playerNameInput.value = savedPlayerName;
-  if (savedGameDuration) gameDurationInput.value = savedGameDuration;
+  if (savedDurationPreset) durationPresetInput.value = savedDurationPreset;
+  if (savedDurationCustomValue)
+    durationCustomValueInput.value = savedDurationCustomValue;
+  if (savedDurationCustomUnit)
+    durationCustomUnitInput.value = savedDurationCustomUnit;
   if (savedEnrollmentWindow)
     enrollmentWindowInput.value = savedEnrollmentWindow;
   if (savedGameId) gameIdInput.value = savedGameId;
   if (savedPlayerId) playerIdInput.value = savedPlayerId;
+
+  // Update visibility of custom duration input
+  if (durationPresetInput.value === 'custom') {
+    durationCustomInput.style.display = 'flex';
+  }
 
   try {
     const loadedGameId = gameIdInput.value;
@@ -922,7 +584,7 @@ function loadSettings() {
       ? getStorageItem(getGameMetaHashStorageKey(loadedGameId))
       : null;
     const globalHash = getStorageItem(STORAGE_KEYS.globalMetaHash);
-    activeMetaHash = gameHash || globalHash || null;
+    setActiveMetaHashFromStorage(gameHash || globalHash || null);
   } catch (e) {
     console.warn('localStorage meta_hash load failed:', e);
   }
@@ -933,6 +595,8 @@ function loadSettings() {
 function updateUI(data) {
   lastGameData = data;
   lastGameData.timestamp = Date.now();
+  setLiveSessionActive(true);
+  handleLastHalvingStateUpdate(data);
 
   if (data.game_status) {
     setBadgeStatus(gameStatusEl, data.game_status);
@@ -946,6 +610,7 @@ function updateUI(data) {
     } else if (data.game_status === 'finished') {
       countdownLabelEl.textContent = 'Time Remaining';
       stopCountdownTimer();
+      stopNextHalvingCountdown();
     }
   }
 
@@ -954,15 +619,36 @@ function updateUI(data) {
   renderLeaderboard(data);
 }
 
+function clearWaitingTimer() {
+  if (waitingTimer) {
+    clearTimeout(waitingTimer);
+    waitingTimer = null;
+  }
+}
+
+// resetTransientHalvingState is imported from ./ui/halving-display.js
+
+function closeEventSourceIfOpen() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+}
+
+function stopLiveTimersAndHalving() {
+  clearCountdownInterval();
+  stopNextHalvingCountdown();
+  clearWaitingTimer();
+  resetTransientHalvingState();
+}
+
 function startStream(gameId, playerId) {
   console.log('Starting SSE stream...');
 
   if (eventSource) {
     intentionalClose = true;
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (waitingTimer) clearTimeout(waitingTimer);
-    eventSource.close();
-    eventSource = null;
+    stopLiveTimersAndHalving();
+    closeEventSourceIfOpen();
   }
 
   const base = getNormalizedBaseUrlOrNull();
@@ -1032,10 +718,7 @@ function startStream(gameId, playerId) {
     };
 
     eventSource.onmessage = (e) => {
-      if (waitingTimer) {
-        clearTimeout(waitingTimer);
-        waitingTimer = null;
-      }
+      clearWaitingTimer();
 
       setBadgeStatus(connStatusEl, 'connected');
 
@@ -1062,21 +745,16 @@ function startStream(gameId, playerId) {
 
       if (data && data.game_status === 'finished') {
         intentionalClose = true;
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        if (countdownInterval) clearInterval(countdownInterval);
-        if (waitingTimer) clearTimeout(waitingTimer);
+        closeEventSourceIfOpen();
+        clearCountdownInterval();
+        stopNextHalvingCountdown();
+        clearWaitingTimer();
         startBtn.disabled = false;
       }
     };
 
     eventSource.onerror = () => {
-      if (waitingTimer) {
-        clearTimeout(waitingTimer);
-        waitingTimer = null;
-      }
+      clearWaitingTimer();
 
       if (!intentionalClose) {
         setBadgeStatus(connStatusEl, 'reconnecting');
@@ -1089,63 +767,57 @@ function startStream(gameId, playerId) {
   }); // end buildSseUrl().then(...)
 } // end startStream
 
-startBtn.addEventListener('click', async () => {
-  const gameId = gameIdInput.value;
-  const playerId = playerIdInput.value;
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
+if (startBtn) {
+  startBtn.addEventListener('click', async () => {
+    const gameId = gameIdInput.value;
+    const playerId = playerIdInput.value;
+    const baseUrl = getNormalizedBaseUrlOrNull();
+    if (!baseUrl) {
+      return;
+    }
 
-  cleanupGameMetaCache();
-  markGameMetaSeen(gameId);
+    cleanupGameMetaCache();
+    markGameMetaSeen(gameId);
 
-  try {
-    await fetchMetaSnapshot(baseUrl, gameId);
-  } catch (e) {
-    console.warn('Initial meta fetch failed before stream start:', e);
-  }
+    try {
+      await fetchMetaSnapshot(baseUrl, gameId);
+    } catch (e) {
+      console.warn('Initial meta fetch failed before stream start:', e);
+    }
 
-  startStream(gameId, playerId);
-});
+    startStream(gameId, playerId);
+    scrollToLiveBoard();
+  });
+}
 
-stopBtn.addEventListener('click', () => {
-  if (eventSource) {
+if (stopBtn) {
+  stopBtn.addEventListener('click', () => {
     intentionalClose = true;
-    eventSource.close();
-    eventSource = null;
-  }
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
-  if (waitingTimer) {
-    clearTimeout(waitingTimer);
-    waitingTimer = null;
-  }
-  setBadgeStatus(connStatusEl, 'idle');
-  setBadgeStatus(gameStatusEl, 'idle');
-  stopCountdownTimer();
-  lastGameData = null;
-  playerStateEl.innerHTML =
-    '<p class="placeholder">Waiting for game data...</p>';
-  leaderboardEl.innerHTML =
-    '<p class="placeholder">Waiting for game data...</p>';
-  upgradesEl.innerHTML =
-    '<p class="placeholder">Waiting for upgrade data...</p>';
-  newGameBtn.disabled = false;
-  startBtn.disabled = false;
-  stopBtn.disabled = false;
-  ensureInputsEditable();
-});
+    closeEventSourceIfOpen();
+    stopLiveTimersAndHalving();
+    setBadgeStatus(connStatusEl, 'idle');
+    setBadgeStatus(gameStatusEl, 'idle');
+    stopCountdownTimer();
+    lastGameData = null;
+    playerStateEl.innerHTML =
+      '<p class="placeholder">Waiting for game data...</p>';
+    leaderboardEl.innerHTML =
+      '<p class="placeholder">Waiting for game data...</p>';
+    upgradesEl.innerHTML =
+      '<p class="placeholder">Waiting for upgrade data...</p>';
+    newGameBtn.disabled = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = false;
+    ensureInputsEditable();
+    setLiveSessionActive(false);
+  });
+}
 
 async function createNewGameAndJoin() {
   if (eventSource) {
     intentionalClose = true;
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (waitingTimer) clearTimeout(waitingTimer);
-    eventSource.close();
-    eventSource = null;
+    stopLiveTimersAndHalving();
+    closeEventSourceIfOpen();
   }
 
   newGameBtn.disabled = true;
@@ -1166,20 +838,44 @@ async function createNewGameAndJoin() {
     return;
   }
   const playerName = playerNameInput.value.trim() || 'Player';
-  const gameDuration = parseInt(gameDurationInput.value, 10) || 300;
   const enrollmentWindow = parseInt(enrollmentWindowInput.value, 10) || 60;
 
   cleanupGameMetaCache();
 
   try {
+    // P2.4: Resolve duration and collect overrides
+    let durationPayload;
+    try {
+      const durationResolution = resolveDurationSeconds();
+      if (durationResolution.mode === 'custom') {
+        durationPayload = {
+          duration_mode: 'custom',
+          duration_custom_seconds: durationResolution.customSeconds,
+        };
+      } else {
+        durationPayload = {
+          duration_mode: 'preset',
+          duration_preset: durationResolution.preset,
+        };
+      }
+    } catch (e) {
+      throw new Error(`Invalid duration: ${e.message}`);
+    }
+
+    const overrides = collectAdvancedOverrides();
+
+    // Build game creation payload
+    const gamePayload = {
+      enrollment_window_seconds: enrollmentWindow,
+      ...durationPayload,
+      ...overrides,
+    };
+
     showNewGameStatus('Creating game...', 'info');
     const gameResponse = await fetch(`${baseUrl}/games`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        real_duration_seconds: gameDuration,
-        enrollment_window_seconds: enrollmentWindow,
-      }),
+      body: JSON.stringify(gamePayload),
     });
 
     if (!gameResponse.ok) {
@@ -1249,9 +945,10 @@ async function createNewGameAndJoin() {
     stopBtn.disabled = false;
     ensureInputsEditable();
     startStream(gameId, playerId);
+    scrollToLiveBoard();
   } catch (error) {
     console.error('Error creating game and joining:', error);
-    showNewGameStatus(`Error: ${escapeHtml(error.message)}`, 'error');
+    showNewGameStatus(`Error: ${error.message}`, 'error');
     showToast(`Error: ${error.message}`, 'error');
     newGameBtn.disabled = false;
     startBtn.disabled = false;
@@ -1260,16 +957,45 @@ async function createNewGameAndJoin() {
   }
 }
 
-newGameBtn.addEventListener('click', createNewGameAndJoin);
+if (newGameBtn) {
+  newGameBtn.addEventListener('click', createNewGameAndJoin);
+}
 
-baseUrlInput.addEventListener('change', saveSettings);
-playerNameInput.addEventListener('change', saveSettings);
-gameDurationInput.addEventListener('change', saveSettings);
-enrollmentWindowInput.addEventListener('change', saveSettings);
-gameIdInput.addEventListener('change', saveSettings);
-playerIdInput.addEventListener('change', saveSettings);
+// P2.4: Duration preset and advanced overrides event listeners
+if (durationPresetInput) {
+  durationPresetInput.addEventListener('change', () => {
+    if (durationPresetInput.value === 'custom') {
+      durationCustomInput.style.display = 'flex';
+      durationCustomValueInput.focus();
+    } else {
+      durationCustomInput.style.display = 'none';
+    }
+    saveSettings();
+  });
+}
+
+if (showAdvancedCheckbox) {
+  showAdvancedCheckbox.addEventListener('change', () => {
+    advancedOverridesDiv.style.display = showAdvancedCheckbox.checked
+      ? 'block'
+      : 'none';
+  });
+}
+
+baseUrlInput?.addEventListener('change', saveSettings);
+playerNameInput?.addEventListener('change', saveSettings);
+durationPresetInput?.addEventListener('change', saveSettings);
+durationCustomValueInput?.addEventListener('change', saveSettings);
+durationCustomUnitInput?.addEventListener('change', saveSettings);
+enrollmentWindowInput?.addEventListener('change', saveSettings);
+gameIdInput?.addEventListener('change', saveSettings);
+playerIdInput?.addEventListener('change', saveSettings);
+anchorTokenInput?.addEventListener('change', saveSettings);
+anchorRateInput?.addEventListener('change', saveSettings);
+seasonCyclesInput?.addEventListener('change', saveSettings);
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initializeModules();
   ensureInputsEditable();
   loadSettings();
   cleanupGameMetaCache();
@@ -1285,3 +1011,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Initial meta fetch failed:', e);
   }
 });
+
+export {
+  computeNextHalvingHint,
+  computeMostRecentPastHalving,
+  deriveLastHalvingNoticeUpdate,
+  halvingKey,
+  LAST_HALVING_NOTICE_SECONDS,
+  shouldResetNextHalvingCountdownTarget,
+  computeCurrentHalvingMonth,
+  computeTokenHalvingCount,
+  shouldShowTokenHalvingIndicator,
+  computePayCostPreview,
+  resolveNextHalvingTarget,
+  isContractVersionSupported,
+  normalizeTokenNames,
+  renderUpgradeMetrics,
+  setActiveMeta,
+};
