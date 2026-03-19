@@ -571,14 +571,62 @@ body {
   line-height: 1.25;
 }
 
+.upgrade-compact-layout {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.upgrade-header-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(5.2rem, 1.4fr) minmax(2rem, 0.45fr) minmax(3.2rem, 0.7fr)
+    minmax(3.6rem, 0.8fr) minmax(2.8rem, 0.6fr) minmax(4.4rem, 0.9fr);
+  gap: 0.05rem 0.4rem;
+  align-items: center;
+  min-width: 0;
+}
+
 .upgrade-header-cell {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.015em;
-  padding-bottom: 0.15rem;
+  line-height: 1.05;
+}
+
+.upgrade-header-cell--line-1 {
+  grid-row: 1;
+}
+
+.upgrade-header-cell--line-2 {
+  grid-row: 2;
+  padding-bottom: 0.12rem;
   border-bottom: 1px solid var(--border-light);
+}
+
+.upgrade-header-cell--col-1 {
+  grid-column: 1;
+}
+
+.upgrade-header-cell--col-2 {
+  grid-column: 2;
+}
+
+.upgrade-header-cell--col-3 {
+  grid-column: 3;
+}
+
+.upgrade-header-cell--col-4 {
+  grid-column: 4;
+}
+
+.upgrade-header-cell--col-5 {
+  grid-column: 5;
+}
+
+.upgrade-header-cell--col-6 {
+  grid-column: 6;
 }
 
 .upgrade-row-cell {
@@ -1806,6 +1854,13 @@ button {
       minmax(4.6rem, 1.2fr) minmax(1.8rem, 0.45fr) minmax(2.8rem, 0.7fr)
       minmax(3.1rem, 0.75fr) minmax(2.4rem, 0.6fr) minmax(4rem, 0.9fr);
     gap: 0.2rem 0.28rem;
+  }
+
+  .upgrade-header-grid {
+    grid-template-columns:
+      minmax(4.6rem, 1.2fr) minmax(1.8rem, 0.45fr) minmax(2.8rem, 0.7fr)
+      minmax(3.1rem, 0.75fr) minmax(2.4rem, 0.6fr) minmax(4rem, 0.9fr);
+    gap: 0.04rem 0.28rem;
   }
 
   .upgrade-stat,

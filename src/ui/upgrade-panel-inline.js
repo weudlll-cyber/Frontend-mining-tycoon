@@ -1,6 +1,8 @@
 /*
 File: src/ui/upgrade-panel-inline.js
 Purpose: Inline upgrade rendering for season cards in a compact row-based layout.
+Context: Header is intentionally two-line to prevent overlap in dense season cards while preserving single-line data rows.
+Constraints: Must remain display-only and use safe DOM APIs (textContent/createElement).
 Call initInlineUpgrades() once with required dependencies before use.
 Renders upgrades directly into season .season-upgrades containers.
 */
@@ -62,25 +64,55 @@ export function renderInlineSeasonUpgrades(
   );
 
   // Build compact row-based layout
-  const grid = document.createElement('div');
-  grid.className = 'upgrade-compact-grid';
+  const layout = document.createElement('div');
+  layout.className = 'upgrade-compact-layout';
 
-  // Build headers with optional tooltips
+  const headerGrid = document.createElement('div');
+  headerGrid.className = 'upgrade-header-grid';
+
+  const dataGrid = document.createElement('div');
+  dataGrid.className = 'upgrade-compact-grid';
+
+  // Header is rendered in two lines to keep labels readable in the fixed-height season card layout.
   const headers = [
-    { label: 'Upgrade', tooltip: null },
-    { label: 'Level', tooltip: 'Current upgrade level for this type' },
-    { label: 'Cost', tooltip: null },
-    { label: 'Δ Output/s', tooltip: 'Incremental output increase per second' },
     {
-      label: 'Breakeven',
-      tooltip: 'Seconds until upgrade pays back via increased output',
+      label: 'Upgrade',
+      tooltip: null,
+      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-1',
     },
-    { label: 'Action', tooltip: null },
+    {
+      label: 'Level',
+      tooltip: 'Current upgrade level for this type',
+      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-2',
+    },
+    {
+      label: 'Cost',
+      tooltip: null,
+      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-3',
+    },
+    {
+      label: 'Δ Out/s',
+      tooltip: 'Incremental output increase per second',
+      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-4',
+    },
+    {
+      label: 'BE',
+      tooltip: 'Seconds until upgrade pays back via increased output',
+      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-5',
+    },
+    {
+      label: 'Action',
+      tooltip: null,
+      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-6',
+    },
   ];
 
   headers.forEach((header) => {
     const headerCell = document.createElement('div');
     headerCell.className = 'upgrade-header-cell';
+    if (header.className) {
+      headerCell.className += ` ${header.className}`;
+    }
     headerCell.title = header.tooltip || '';
     headerCell.textContent = header.label;
     if (header.tooltip) {
@@ -89,7 +121,7 @@ export function renderInlineSeasonUpgrades(
         `${header.label}: ${header.tooltip}`
       );
     }
-    grid.appendChild(headerCell);
+    headerGrid.appendChild(headerCell);
   });
 
   supportedUpgradeTypes.forEach((type) => {
@@ -104,19 +136,19 @@ export function renderInlineSeasonUpgrades(
     typeCell.className = 'upgrade-row-cell upgrade-row-type';
     typeCell.dataset.upgradeType = type;
     typeCell.textContent = title;
-    grid.appendChild(typeCell);
+    dataGrid.appendChild(typeCell);
 
     const levelCell = document.createElement('div');
     levelCell.className = 'upgrade-row-cell upgrade-row-level';
     levelCell.textContent = String(level);
-    grid.appendChild(levelCell);
+    dataGrid.appendChild(levelCell);
 
     const costCell = document.createElement('div');
     costCell.className = 'upgrade-row-cell upgrade-row-cost';
     costCell.dataset.upgradeType = type;
     costCell.textContent =
       info?.cost_to_next !== undefined ? formatCost(info.cost_to_next) : '—';
-    grid.appendChild(costCell);
+    dataGrid.appendChild(costCell);
 
     const outputCell = document.createElement('div');
     outputCell.className = 'upgrade-row-cell upgrade-row-benefit';
@@ -125,7 +157,7 @@ export function renderInlineSeasonUpgrades(
       info?.delta_output !== undefined
         ? `+${info.delta_output.toFixed(2)}/s`
         : '—';
-    grid.appendChild(outputCell);
+    dataGrid.appendChild(outputCell);
 
     const breakevenCell = document.createElement('div');
     breakevenCell.className = 'upgrade-row-cell upgrade-row-breakeven';
@@ -133,7 +165,7 @@ export function renderInlineSeasonUpgrades(
       info?.breakeven_seconds !== undefined
         ? `${info.breakeven_seconds.toFixed(1)}s`
         : '—';
-    grid.appendChild(breakevenCell);
+    dataGrid.appendChild(breakevenCell);
 
     // Upgrade button
     const button = document.createElement('button');
@@ -152,13 +184,16 @@ export function renderInlineSeasonUpgrades(
       const token = button.dataset.token;
       _performUpgrade?.(upgradeType, nextLevel, token);
     });
-    grid.appendChild(button);
+    dataGrid.appendChild(button);
   });
+
+  layout.appendChild(headerGrid);
+  layout.appendChild(dataGrid);
 
   // Clear and populate container
   clearElementChildren(upgradesContainer);
   if (supportedUpgradeTypes.length > 0) {
-    upgradesContainer.appendChild(grid);
+    upgradesContainer.appendChild(layout);
   } else {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder';

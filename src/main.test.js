@@ -988,13 +988,17 @@ describe('Seasonal Oracle inline upgrade module', () => {
       mockGetGameMeta()
     );
 
-    const grid = upgradesContainer.querySelector('.upgrade-compact-grid');
-    expect(grid).not.toBeNull();
+    const layout = upgradesContainer.querySelector('.upgrade-compact-layout');
+    const headerGrid = upgradesContainer.querySelector('.upgrade-header-grid');
+    const dataGrid = upgradesContainer.querySelector('.upgrade-compact-grid');
+    expect(layout).not.toBeNull();
+    expect(headerGrid).not.toBeNull();
+    expect(dataGrid).not.toBeNull();
     expect(upgradesContainer.textContent).toContain('Upgrade');
     expect(upgradesContainer.textContent).toContain('Level');
     expect(upgradesContainer.textContent).toContain('Cost');
-    expect(upgradesContainer.textContent).toContain('Δ Output/s');
-    expect(upgradesContainer.textContent).toContain('Breakeven');
+    expect(upgradesContainer.textContent).toContain('Δ Out/s');
+    expect(upgradesContainer.textContent).toContain('BE');
 
     // one compact row per type
     const typeCells = upgradesContainer.querySelectorAll('.upgrade-row-type');
@@ -1129,9 +1133,9 @@ describe('Seasonal Oracle inline upgrade module', () => {
 
     // Check for compact metric display
     expect(upgradesContainer.textContent).toContain('Cost');
-    expect(upgradesContainer.textContent).toContain('Δ Output/s');
+    expect(upgradesContainer.textContent).toContain('Δ Out/s');
     expect(upgradesContainer.textContent).toContain('+5.50/s');
-    expect(upgradesContainer.textContent).toContain('Breakeven');
+    expect(upgradesContainer.textContent).toContain('BE');
   });
 
   it('disables upgrade button when contract is not supported', async () => {
