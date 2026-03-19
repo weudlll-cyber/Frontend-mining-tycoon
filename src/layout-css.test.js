@@ -1,3 +1,10 @@
+/*
+File: src/layout-css.test.js
+Purpose: Enforce desktop no-page-scroll and internal-scroll layout invariants.
+Role in system: Regression guard for LOCKED_DECISIONS UI constraints.
+Invariants/Security: Verifies CSS contract only; no runtime DOM injection or behavior mutation.
+*/
+
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';

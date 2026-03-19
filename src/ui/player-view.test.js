@@ -1,3 +1,10 @@
+/*
+File: src/ui/player-view.test.js
+Purpose: Verify read-only analytics matrix and footer rendering behavior.
+Role in system: Regression coverage for player-state visibility and tooltip wiring.
+Invariants/Security: Preserves oracle/fee-spread visibility and safe text-only rendering patterns.
+*/
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   initPlayerView,

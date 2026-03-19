@@ -1,3 +1,10 @@
+/*
+File: src/security-rendering.test.js
+Purpose: Guard safe rendering posture across runtime entrypoints.
+Role in system: Prevent regressions to unsafe DOM APIs in core frontend modules.
+Invariants/Security: Blocks untrusted innerHTML usage and enforces text-based rendering patterns.
+*/
+
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
