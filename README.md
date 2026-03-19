@@ -69,7 +69,11 @@ If port `5173` is already used, Vite automatically selects the next free port.
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
-- click `Start Async Session`
+- select `Round Type = Async (host)` in Setup
+- set `Enrollment Window (seconds)` and `Session Duration`
+- keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
+- click `+ New Game`
+- if auto-start is disabled, click `Start Session (Async)`
 - wait for inline status `Async session started.`
 - the app switches to `/sessions/{session_id}/stream` automatically
 
@@ -224,9 +228,27 @@ Setup panel placement (desktop):
 
 ```text
 Primary Actions
-[ + New Game ] [ Start Stream ] [ Start Async Session ] [ Stop Stream ]
+[ + New Game ] [ Start Stream ] [ Start Session (Async) ] [ Stop Stream ]
                  (enabled after async session exists)
 ```
+
+### Create Async Round From UI (Host Setup)
+
+Use this host-like flow directly in Setup (no overlays):
+
+```text
+Round Type: [Sync] [Async (host)]
+Async controls: Enrollment Window (seconds) | Session Duration (5m/10m/15m/custom)
+[x] Auto-start async session after game creation and join
+```
+
+When `+ New Game` is clicked with `Async (host)` selected:
+
+1. `POST /games` with `round_type="asynchronous"`, enrollment window, and duration preset.
+2. `POST /games/{id}/join` with player name.
+3. If auto-start is enabled, `POST /games/{id}/sessions` and switch to session-scoped SSE.
+
+Inline diagnostics chips in Setup (`Async`, `Window`, `Joined`, `SessionAPI`, `NoSession`, `Auth`) show which predicate is blocking readiness.
 
 Frontend call chain for async rounds:
 
