@@ -1,30 +1,74 @@
 /*
 File: src/ui/player-view.js
-Purpose: Player state panel — builds the per-token output grid, balances block, and oracle-prices block.
-All functions that write to the playerStateEl container live here.
-Call initPlayerView() once with required dependencies before use.
+Purpose: Compact player-state matrix renderer with optional non-blocking micro-tooltips.
 */
 
-import {
-  createStaticValueRow,
-  setTextNodeValue,
-  formatTokenAmount,
-} from '../utils/dom-utils.js';
+import { setTextNodeValue } from '../utils/dom-utils.js';
 import { clearNode } from '../utils/dom-utils.js';
-import { normalizeTokenNames } from '../utils/token-utils.js';
-import { shouldShowTokenHalvingIndicator } from '../halving.js';
+import {
+  normalizeTokenNames,
+  formatCompactNumber,
+} from '../utils/token-utils.js';
 import {
   resolveNextHalvingTarget,
   shouldResetNextHalvingCountdownTarget,
   startNextHalvingCountdown,
   stopNextHalvingCountdown,
   getHalvingCountdownTarget,
-  setHalvingCountdownTextNode,
   getLastHalvingNotice,
+  formatCountdownClock,
 } from './halving-display.js';
+import { initMicroTooltips } from './micro-tooltip.js';
 
 let _playerStateEl = null;
 let _getActiveGameMeta = null;
+let _disposeTooltips = null;
+
+const TOKEN_LABELS = {
+  spring: 'SPR',
+  summer: 'SUM',
+  autumn: 'AUT',
+  winter: 'WIN',
+};
+
+function format2(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : '-';
+}
+
+function format4(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(4) : '-';
+}
+
+/**
+ * Format a number compactly (k/M/B) for display, keeping full value for tooltip.
+ * Returns { display, full } for use in cells with tooltip support.
+ */
+function formatCompactDisplay(value) {
+  return formatCompactNumber(value, { decimalsSmall: 2, decimalsLarge: 2 });
+}
+
+/**
+ * Update a text node with compact display format.
+ * Stores full value in data attribute for tooltip extraction.
+ */
+function setCompactNodeValue(textNode, cell, value) {
+  const { display, full } = formatCompactDisplay(value);
+  setTextNodeValue(textNode, display);
+  if (cell && full !== '—') {
+    cell.dataset.fullValue = full;
+  }
+}
+
+function toTokenLabel(token) {
+  return (
+    TOKEN_LABELS[token] ||
+    String(token || '')
+      .slice(0, 3)
+      .toUpperCase()
+  );
+}
 
 /** @param {{ playerStateEl: HTMLElement, getActiveGameMeta: (gameId: string) => object|null }} deps */
 export function initPlayerView(deps) {
@@ -32,22 +76,28 @@ export function initPlayerView(deps) {
   _getActiveGameMeta = deps.getActiveGameMeta;
 }
 
-// DOM ref cache for the current player panel build
 const _uiRefs = {
   built: false,
   tokenNamesKey: '',
   outputRateNodes: {},
-  outputHalvingNodes: {},
-  outputTotalNode: null,
-  outputTotalSuffixNode: null,
-  nextHalvingNode: null,
-  lastHalvingNode: null,
-  lastHalvingLine: null,
-  cumulativeMinedNode: null,
   balanceNodes: {},
   oraclePriceNodes: {},
-  oracleFeeNode: null,
-  oracleSpreadNode: null,
+  outputCells: {},
+  balanceCells: {},
+  priceCells: {},
+  outputTotalNode: null,
+  balanceTotalNode: null,
+  oracleTotalNode: null,
+  outputTotalCell: null,
+  balanceTotalCell: null,
+  oracleTotalCell: null,
+  footerContentNode: null,
+  tooltipNodes: {
+    output: null,
+    balance: null,
+    price: null,
+    footer: null,
+  },
 };
 
 export function calculateCurrentMiningRate(playerState) {
@@ -59,20 +109,82 @@ export function calculateCurrentMiningRate(playerState) {
   return baseRate * hashrate * efficiency;
 }
 
+/**
+ * Creates a label cell (left-aligned, no icon) for matrix rows.
+ * Icon is placed in a separate cell at the end of the row.
+ */
+function createLabelCell({ rowKey, labelText }) {
+  const labelCell = document.createElement('div');
+  labelCell.className = 'ps-cell ps-label-cell ps-row-label';
+  labelCell.dataset.row = rowKey;
+
+  const text = document.createElement('span');
+  text.className = 'ps-label-text';
+  text.textContent = labelText;
+
+  labelCell.appendChild(text);
+  return labelCell;
+}
+
+/**
+ * Creates an icon cell with tooltip trigger for placement at end of row/footer.
+ * Returns { iconCell, trigger, bubbleNode } for external positioning.
+ */
+function createIconCell({ rowKey, tooltipId, tooltipText }) {
+  const iconCell = document.createElement('div');
+  iconCell.className = 'ps-cell ps-icon-cell';
+  iconCell.dataset.row = rowKey;
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'ps-tip-trigger';
+  trigger.setAttribute('aria-label', `${rowKey} info`);
+  trigger.setAttribute('aria-describedby', tooltipId);
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.textContent = 'ⓘ';
+  trigger.dataset.tooltipId = tooltipId;
+
+  const bubble = document.createElement('span');
+  bubble.className = 'ps-tip-bubble';
+  bubble.id = tooltipId;
+  bubble.setAttribute('role', 'tooltip');
+  const bubbleNode = document.createTextNode(tooltipText);
+  bubble.appendChild(bubbleNode);
+
+  iconCell.appendChild(trigger);
+  iconCell.dataset.bubbleId = tooltipId;
+
+  return { iconCell, trigger, bubble, bubbleNode };
+}
+
 export function resetPlayerStateView() {
   _uiRefs.built = false;
   _uiRefs.tokenNamesKey = '';
   _uiRefs.outputRateNodes = {};
-  _uiRefs.outputHalvingNodes = {};
-  _uiRefs.outputTotalNode = null;
-  _uiRefs.outputTotalSuffixNode = null;
-  _uiRefs.nextHalvingNode = null;
-  _uiRefs.lastHalvingNode = null;
-  _uiRefs.cumulativeMinedNode = null;
   _uiRefs.balanceNodes = {};
   _uiRefs.oraclePriceNodes = {};
-  _uiRefs.oracleFeeNode = null;
-  _uiRefs.oracleSpreadNode = null;
+  _uiRefs.outputCells = {};
+  _uiRefs.balanceCells = {};
+  _uiRefs.priceCells = {};
+  _uiRefs.outputTotalNode = null;
+  _uiRefs.balanceTotalNode = null;
+  _uiRefs.oracleTotalNode = null;
+  _uiRefs.outputTotalCell = null;
+  _uiRefs.balanceTotalCell = null;
+  _uiRefs.oracleTotalCell = null;
+  _uiRefs.footerContentNode = null;
+  _uiRefs.tooltipNodes = {
+    output: null,
+    balance: null,
+    price: null,
+    footer: null,
+  };
+
+  if (_disposeTooltips) {
+    _disposeTooltips();
+    _disposeTooltips = null;
+  }
+
   clearNode(_playerStateEl);
   const placeholder = document.createElement('p');
   placeholder.className = 'placeholder';
@@ -86,156 +198,218 @@ function ensurePlayerStateView(tokenNames) {
     return _uiRefs;
   }
 
+  if (_disposeTooltips) {
+    _disposeTooltips();
+    _disposeTooltips = null;
+  }
+
   clearNode(_playerStateEl);
 
-  const outputBlock = document.createElement('div');
-  outputBlock.className = 'oracle-block';
-  const outputTitle = document.createElement('h3');
-  outputTitle.textContent = 'Per-Token Output';
-  outputBlock.appendChild(outputTitle);
+  const matrix = document.createElement('div');
+  matrix.className = 'ps-matrix';
 
-  const outputGrid = document.createElement('div');
-  outputGrid.className = 'output-token-grid';
+  // Header row: Metric | SPR | SUM | AUT | WIN | Σ | Icon
+  const headLabel = document.createElement('div');
+  headLabel.className = 'ps-cell ps-head-label';
+  headLabel.textContent = 'Metric';
+  matrix.appendChild(headLabel);
+
+  tokenNames.forEach((token) => {
+    const head = document.createElement('div');
+    head.className = 'ps-cell ps-head-token';
+    head.dataset.token = token;
+    head.textContent = toTokenLabel(token);
+    matrix.appendChild(head);
+  });
+
+  const sigmaHead = document.createElement('div');
+  sigmaHead.className = 'ps-cell ps-head-token ps-head-sigma';
+  sigmaHead.dataset.token = 'sigma';
+  sigmaHead.textContent = 'Σ';
+  matrix.appendChild(sigmaHead);
+
+  // Icon column header (empty)
+  const headIcon = document.createElement('div');
+  headIcon.className = 'ps-cell ps-head-icon';
+  matrix.appendChild(headIcon);
+
+  // OUTPUT ROW
+  const outputLabelCell = createLabelCell({
+    rowKey: 'output',
+    labelText: 'Out/s',
+  });
+  matrix.appendChild(outputLabelCell);
+
   const outputRateNodes = {};
-  const outputHalvingNodes = {};
+  const outputCells = {};
   tokenNames.forEach((token) => {
-    const line = document.createElement('div');
-    line.className = 'output-token-line';
-
-    const name = document.createElement('span');
-    name.className = 'state-stat-label';
-    name.textContent = token.toUpperCase();
-
-    const val = document.createElement('span');
-    val.className = 'state-stat-value highlight';
-
-    const rateSpan = document.createElement('span');
-    rateSpan.id = `output-rate-${token}`;
-    const rateTextNode = document.createTextNode('-');
-    rateSpan.appendChild(rateTextNode);
-
-    const unit = document.createTextNode(' /s');
-
-    const halvingSpan = document.createElement('span');
-    halvingSpan.className = 'output-halving-indicator';
-    halvingSpan.id = `output-halving-${token}`;
-    const halvingTextNode = document.createTextNode('');
-    halvingSpan.appendChild(halvingTextNode);
-
-    val.appendChild(rateSpan);
-    val.appendChild(unit);
-    val.appendChild(halvingSpan);
-
-    line.appendChild(name);
-    line.appendChild(val);
-    outputGrid.appendChild(line);
-
-    outputRateNodes[token] = rateTextNode;
-    outputHalvingNodes[token] = halvingTextNode;
+    const cell = document.createElement('div');
+    cell.className = 'ps-cell ps-value';
+    cell.dataset.row = 'output';
+    cell.dataset.token = token;
+    const node = document.createTextNode('-');
+    cell.appendChild(node);
+    matrix.appendChild(cell);
+    outputRateNodes[token] = node;
+    outputCells[token] = cell;
   });
-  outputBlock.appendChild(outputGrid);
 
-  const totalLine = document.createElement('div');
-  totalLine.className = 'oracle-hint output-total-line';
-  totalLine.appendChild(document.createTextNode('Total: '));
-  const totalSpan = document.createElement('span');
-  totalSpan.id = 'output-total-value';
-  const totalTextNode = document.createTextNode('-');
-  totalSpan.appendChild(totalTextNode);
-  totalLine.appendChild(totalSpan);
-  totalLine.appendChild(document.createTextNode(' /s'));
-  const totalSuffix = document.createElement('span');
-  totalSuffix.id = 'output-total-suffix';
-  const totalSuffixNode = document.createTextNode('');
-  totalSuffix.appendChild(totalSuffixNode);
-  totalLine.appendChild(totalSuffix);
-  outputBlock.appendChild(totalLine);
+  const outputTotalCell = document.createElement('div');
+  outputTotalCell.className = 'ps-cell ps-value ps-cell-total';
+  outputTotalCell.dataset.row = 'output';
+  const outputTotalNode = document.createTextNode('-');
+  outputTotalCell.appendChild(outputTotalNode);
+  matrix.appendChild(outputTotalCell);
 
-  const nextHalvingLine = document.createElement('div');
-  nextHalvingLine.className = 'oracle-hint';
-  const nextHalvingSpan = document.createElement('span');
-  nextHalvingSpan.id = 'next-halving-value';
-  const nextHalvingNode = document.createTextNode('No further halvings');
-  nextHalvingSpan.appendChild(nextHalvingNode);
-  nextHalvingLine.appendChild(nextHalvingSpan);
-  outputBlock.appendChild(nextHalvingLine);
+  const outputIcon = createIconCell({
+    rowKey: 'output',
+    tooltipId: 'ps-tip-output',
+    tooltipText:
+      'Mining output rate per token from tracks/events/halvings. Precision: pending.',
+  });
+  matrix.appendChild(outputIcon.iconCell);
+  let tooltipsToMount = [outputIcon];
 
-  const lastHalvingLine = document.createElement('div');
-  lastHalvingLine.className = 'oracle-hint';
-  const lastHalvingSpan = document.createElement('span');
-  lastHalvingSpan.id = 'last-halving-value';
-  const lastHalvingNode = document.createTextNode('');
-  lastHalvingSpan.appendChild(lastHalvingNode);
-  lastHalvingLine.appendChild(lastHalvingSpan);
-  lastHalvingLine.style.display = 'none';
-  outputBlock.appendChild(lastHalvingLine);
+  // BALANCE ROW
+  const balanceLabelCell = createLabelCell({
+    rowKey: 'balance',
+    labelText: 'Bal',
+  });
+  matrix.appendChild(balanceLabelCell);
 
-  _playerStateEl.appendChild(outputBlock);
-
-  const cumulative = createStaticValueRow('Cumulative Mined', 'state-stat-value');
-  cumulative.value.id = 'cumulative-mined-value';
-  _playerStateEl.appendChild(cumulative.row);
-
-  const balanceBlock = document.createElement('div');
-  balanceBlock.className = 'oracle-block';
-  const balanceTitle = document.createElement('h3');
-  balanceTitle.textContent = 'Seasonal Balances';
-  balanceBlock.appendChild(balanceTitle);
   const balanceNodes = {};
+  const balanceCells = {};
   tokenNames.forEach((token) => {
-    const row = createStaticValueRow(token.toUpperCase(), 'state-stat-value');
-    row.value.id = `balance-${token}-value`;
-    balanceNodes[token] = row.valueTextNode;
-    balanceBlock.appendChild(row.row);
+    const cell = document.createElement('div');
+    cell.className = 'ps-cell ps-value';
+    cell.dataset.row = 'balance';
+    cell.dataset.token = token;
+    const node = document.createTextNode('-');
+    cell.appendChild(node);
+    matrix.appendChild(cell);
+    balanceNodes[token] = node;
+    balanceCells[token] = cell;
   });
-  _playerStateEl.appendChild(balanceBlock);
 
-  const oracleBlock = document.createElement('div');
-  oracleBlock.className = 'oracle-block';
-  const oracleTitle = document.createElement('h3');
-  oracleTitle.textContent = 'Oracle Prices';
-  oracleBlock.appendChild(oracleTitle);
+  const balanceTotalCell = document.createElement('div');
+  balanceTotalCell.className = 'ps-cell ps-value ps-cell-total';
+  balanceTotalCell.dataset.row = 'balance';
+  const balanceTotalNode = document.createTextNode('-');
+  balanceTotalCell.appendChild(balanceTotalNode);
+  matrix.appendChild(balanceTotalCell);
+
+  const balanceIcon = createIconCell({
+    rowKey: 'balance',
+    tooltipId: 'ps-tip-balance',
+    tooltipText: 'Current seasonal balances. Precision: pending.',
+  });
+  matrix.appendChild(balanceIcon.iconCell);
+  tooltipsToMount.push(balanceIcon);
+
+  // PRICE ROW
+  const priceLabelCell = createLabelCell({
+    rowKey: 'price',
+    labelText: 'Price',
+  });
+  matrix.appendChild(priceLabelCell);
+
   const oraclePriceNodes = {};
+  const priceCells = {};
   tokenNames.forEach((token) => {
-    const row = createStaticValueRow(`P_${token}`, 'state-stat-value');
-    row.value.id = `oracle-price-${token}-value`;
-    oraclePriceNodes[token] = row.valueTextNode;
-    oracleBlock.appendChild(row.row);
+    const cell = document.createElement('div');
+    cell.className = 'ps-cell ps-value';
+    cell.dataset.row = 'price';
+    cell.dataset.token = token;
+    const node = document.createTextNode('-');
+    cell.appendChild(node);
+    matrix.appendChild(cell);
+    oraclePriceNodes[token] = node;
+    priceCells[token] = cell;
   });
 
-  const hint = document.createElement('div');
-  hint.className = 'oracle-hint';
-  hint.appendChild(document.createTextNode('fee='));
-  const feeSpan = document.createElement('span');
-  feeSpan.id = 'oracle-fee-value';
-  const feeNode = document.createTextNode('-');
-  feeSpan.appendChild(feeNode);
-  hint.appendChild(feeSpan);
-  hint.appendChild(document.createTextNode(' | spread='));
-  const spreadSpan = document.createElement('span');
-  spreadSpan.id = 'oracle-spread-value';
-  const spreadNode = document.createTextNode('-');
-  spreadSpan.appendChild(spreadNode);
-  hint.appendChild(spreadSpan);
-  oracleBlock.appendChild(hint);
-  _playerStateEl.appendChild(oracleBlock);
+  const oracleTotalCell = document.createElement('div');
+  oracleTotalCell.className = 'ps-cell ps-value ps-cell-total';
+  oracleTotalCell.dataset.row = 'price';
+  const oracleTotalNode = document.createTextNode('-');
+  oracleTotalCell.appendChild(oracleTotalNode);
+  matrix.appendChild(oracleTotalCell);
+
+  const priceIcon = createIconCell({
+    rowKey: 'price',
+    tooltipId: 'ps-tip-price',
+    tooltipText:
+      'Oracle prices used for conversion and scoring. Precision: pending.',
+  });
+  matrix.appendChild(priceIcon.iconCell);
+  tooltipsToMount.push(priceIcon);
+
+  // FOOTER (single line: "Next halving HH:MM (TOKEN) | Mined XXX | fee X / spread Y" or "No further halvings | Mined XXX | fee X / spread Y")
+  const footer = document.createElement('div');
+  footer.className = 'ps-footer';
+
+  // Single footer content node
+  const footerContentSpan = document.createElement('span');
+  footerContentSpan.className = 'ps-footer-content';
+  const footerContentNode = document.createTextNode(
+    'No further halvings | Mined — | fee — / spread —'
+  );
+  footerContentSpan.appendChild(footerContentNode);
+  footer.appendChild(footerContentSpan);
+
+  const footerIcon = createIconCell({
+    rowKey: 'footer',
+    tooltipId: 'ps-tip-footer',
+    tooltipText:
+      'Next Halving: when the next mining reward halves. Mined: total tokens earned so far. Fee: transaction cost to convert between tokens (%). Spread: price gap between oracle buy/sell rates (%).',
+  });
+  footer.appendChild(footerIcon.iconCell);
+  tooltipsToMount.push(footerIcon);
+
+  _playerStateEl.append(matrix, footer);
+
+  // Mount all tooltip bubbles to tooltip-layer for clipping prevention
+  const tooltipLayer = document.getElementById('tooltip-layer');
+  if (tooltipLayer) {
+    tooltipsToMount.forEach((tooltip) => {
+      tooltipLayer.appendChild(tooltip.bubble);
+    });
+  }
+
+  _disposeTooltips = initMicroTooltips(_playerStateEl);
+
+  _disposeTooltips = initMicroTooltips(_playerStateEl);
 
   _uiRefs.built = true;
   _uiRefs.tokenNamesKey = key;
   _uiRefs.outputRateNodes = outputRateNodes;
-  _uiRefs.outputHalvingNodes = outputHalvingNodes;
-  _uiRefs.outputTotalNode = totalTextNode;
-  _uiRefs.outputTotalSuffixNode = totalSuffixNode;
-  _uiRefs.nextHalvingNode = nextHalvingNode;
-  _uiRefs.lastHalvingNode = lastHalvingNode;
-  _uiRefs.lastHalvingLine = lastHalvingLine;
-  _uiRefs.cumulativeMinedNode = cumulative.valueTextNode;
   _uiRefs.balanceNodes = balanceNodes;
   _uiRefs.oraclePriceNodes = oraclePriceNodes;
-  _uiRefs.oracleFeeNode = feeNode;
-  _uiRefs.oracleSpreadNode = spreadNode;
+  _uiRefs.outputCells = outputCells;
+  _uiRefs.balanceCells = balanceCells;
+  _uiRefs.priceCells = priceCells;
+  _uiRefs.outputTotalNode = outputTotalNode;
+  _uiRefs.balanceTotalNode = balanceTotalNode;
+  _uiRefs.oracleTotalNode = oracleTotalNode;
+  _uiRefs.outputTotalCell = outputTotalCell;
+  _uiRefs.balanceTotalCell = balanceTotalCell;
+  _uiRefs.oracleTotalCell = oracleTotalCell;
+  _uiRefs.footerContentNode = footerContentNode;
+  _uiRefs.tooltipNodes = {
+    output: outputIcon.bubbleNode,
+    balance: balanceIcon.bubbleNode,
+    price: priceIcon.bubbleNode,
+    footer: footerIcon.bubbleNode,
+  };
 
   return _uiRefs;
+}
+
+function updatePrecisionTooltip(node, label, tokenNames, values) {
+  if (!node) return;
+  const details = tokenNames
+    .map((token) => `${toTokenLabel(token)} ${format4(values?.[token])}`)
+    .join(' | ');
+  setTextNodeValue(node, `${label} Precision: ${details || 'unavailable'}.`);
 }
 
 export function renderPlayerState(data) {
@@ -258,117 +432,149 @@ export function renderPlayerState(data) {
   const oraclePrices =
     activeGameMeta?.oracle_prices || data.oracle_prices || null;
   const metrics = data.upgrade_metrics || {};
-  const currentRate =
-    typeof metrics.output_per_second === 'number'
-      ? metrics.output_per_second
-      : calculateCurrentMiningRate(playerState);
   const outputRatePerToken = data.output_rate_per_token || null;
+  const fallbackRate =
+    typeof metrics.output_per_second === 'number'
+      ? Number(metrics.output_per_second)
+      : calculateCurrentMiningRate(playerState);
 
-  let hasPerTokenRates = false;
+  let outputTotal = 0;
+  let hasOutput = false;
   tokenNames.forEach((token) => {
     const rawRate = Number(outputRatePerToken?.[token]);
     if (Number.isFinite(rawRate)) {
-      hasPerTokenRates = true;
-      setTextNodeValue(refs.outputRateNodes[token], rawRate.toFixed(2));
+      hasOutput = true;
+      outputTotal += rawRate;
+      setCompactNodeValue(
+        refs.outputRateNodes[token],
+        refs.outputCells[token],
+        rawRate
+      );
     } else {
       setTextNodeValue(refs.outputRateNodes[token], '-');
     }
+  });
+  setCompactNodeValue(
+    refs.outputTotalNode,
+    refs.outputTotalCell,
+    hasOutput ? outputTotal : fallbackRate
+  );
 
-    const isPostHalvingWindow =
-      Number.isFinite(rawRate) &&
-      shouldShowTokenHalvingIndicator(token, data.current_sim_month);
-    if (isPostHalvingWindow) {
-      const prevRate = rawRate * 2;
-      setTextNodeValue(
-        refs.outputHalvingNodes[token],
-        ` \u219350% (was ${prevRate.toFixed(2)} /s)`
+  let balanceTotal = 0;
+  tokenNames.forEach((token) => {
+    const rawBalance = Number(balances[token]);
+    if (Number.isFinite(rawBalance)) {
+      balanceTotal += rawBalance;
+      setCompactNodeValue(
+        refs.balanceNodes[token],
+        refs.balanceCells[token],
+        rawBalance
       );
     } else {
-      setTextNodeValue(refs.outputHalvingNodes[token], '');
+      setTextNodeValue(refs.balanceNodes[token], '-');
     }
   });
+  setCompactNodeValue(
+    refs.balanceTotalNode,
+    refs.balanceTotalCell,
+    balanceTotal
+  );
 
-  if (hasPerTokenRates) {
-    const total = tokenNames.reduce(
-      (sum, token) => sum + Number(outputRatePerToken?.[token] || 0),
-      0
-    );
-    setTextNodeValue(refs.outputTotalNode, total.toFixed(2));
-    setTextNodeValue(refs.outputTotalSuffixNode, '');
-  } else {
-    setTextNodeValue(refs.outputTotalNode, currentRate.toFixed(2));
-    setTextNodeValue(refs.outputTotalSuffixNode, ' (fallback)');
-  }
+  let priceTotal = 0;
+  let priceCount = 0;
+  tokenNames.forEach((token) => {
+    const rawPrice = Number(oraclePrices?.[token]);
+    if (Number.isFinite(rawPrice)) {
+      priceTotal += rawPrice;
+      priceCount += 1;
+      setCompactNodeValue(
+        refs.oraclePriceNodes[token],
+        refs.priceCells[token],
+        rawPrice
+      );
+    } else {
+      setTextNodeValue(refs.oraclePriceNodes[token], '-');
+    }
+  });
+  const avgPrice = priceCount ? priceTotal / priceCount : null;
+  setCompactNodeValue(refs.oracleTotalNode, refs.oracleTotalCell, avgPrice);
 
   const nextHalvingTarget = resolveNextHalvingTarget({
     data,
     activeGameMeta,
     tokenNames,
   });
+  // Build footer content as single line
+  let halvinPart = 'No further halvings';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
     const shouldReset = shouldResetNextHalvingCountdownTarget(
       prev,
       nextHalvingTarget
     );
-
     if (shouldReset) {
       startNextHalvingCountdown({
         token: nextHalvingTarget.token,
         halvingMonth: nextHalvingTarget.halvingMonth,
         halvingAtUnix: nextHalvingTarget.halvingAtUnix,
-        textNode: refs.nextHalvingNode,
+        textNode: null, // No separate text node; footer handles halving display
       });
-    } else {
-      setHalvingCountdownTextNode(refs.nextHalvingNode);
     }
+    const nowUnix = Date.now() / 1000;
+    const remainingSeconds = Math.max(
+      0,
+      nextHalvingTarget.halvingAtUnix - nowUnix
+    );
+    const countdownText = formatCountdownClock(remainingSeconds);
+    halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
   } else {
     stopNextHalvingCountdown();
-    setTextNodeValue(refs.nextHalvingNode, 'No further halvings');
   }
+
+  const minedPart =
+    playerState.cumulative_mined !== undefined
+      ? format2(playerState.cumulative_mined)
+      : '—';
+
+  const fee = Number(data.conversion_fee_rate);
+  const spread = Number(data.oracle_spread);
+  const feeSpreadPart = `${format2(fee)} / ${format2(spread)}`;
+
+  // Combine into single footer string
+  const footerText = `${halvinPart} | Mined ${minedPart} | fee ${feeSpreadPart}`;
+  setTextNodeValue(refs.footerContentNode, footerText);
 
   const lastHalvingNotice = getLastHalvingNotice();
   if (lastHalvingNotice) {
     setTextNodeValue(
-      refs.lastHalvingNode,
-      `Last halving: ${lastHalvingNotice.token.toUpperCase()} (-50% production)`
+      refs.tooltipNodes.output,
+      `Mining output rate per token. Last halving: ${lastHalvingNotice.token.toUpperCase()} halved. Precision: pending.`
     );
-    refs.lastHalvingLine.style.display = '';
-  } else {
-    setTextNodeValue(refs.lastHalvingNode, '');
-    refs.lastHalvingLine.style.display = 'none';
   }
 
-  setTextNodeValue(
-    refs.cumulativeMinedNode,
-    playerState.cumulative_mined !== undefined
-      ? formatTokenAmount(playerState.cumulative_mined)
-      : '-'
+  // Update precision tooltips for matrix rows
+  updatePrecisionTooltip(
+    refs.tooltipNodes.output,
+    'Mining output rate per token from tracks/events/halvings.',
+    tokenNames,
+    outputRatePerToken
+  );
+  updatePrecisionTooltip(
+    refs.tooltipNodes.balance,
+    'Current seasonal balances.',
+    tokenNames,
+    balances
+  );
+  updatePrecisionTooltip(
+    refs.tooltipNodes.price,
+    'Oracle prices used for conversion and scoring.',
+    tokenNames,
+    oraclePrices
   );
 
-  tokenNames.forEach((token) => {
-    setTextNodeValue(
-      refs.balanceNodes[token],
-      formatTokenAmount(balances[token])
-    );
-  });
-
-  tokenNames.forEach((token) => {
-    const oracleValue =
-      oraclePrices && typeof oraclePrices === 'object'
-        ? formatTokenAmount(oraclePrices[token])
-        : '-';
-    setTextNodeValue(refs.oraclePriceNodes[token], oracleValue);
-  });
-
-  const fee = data.conversion_fee_rate;
-  const spread = data.oracle_spread;
+  // Update footer tooltip with all details
   setTextNodeValue(
-    refs.oracleFeeNode,
-    Number.isFinite(Number(fee)) ? Number(fee).toFixed(4) : '-'
-  );
-  setTextNodeValue(
-    refs.oracleSpreadNode,
-    Number.isFinite(Number(spread)) ? Number(spread).toFixed(4) : '-'
+    refs.tooltipNodes.footer,
+    `Halving: next mining reward halve | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
   );
 }

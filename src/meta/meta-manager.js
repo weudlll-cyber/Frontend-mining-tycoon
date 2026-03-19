@@ -117,7 +117,9 @@ function getMetaFetchEntry(gameId = null) {
 
 function getCachedMetaHash(gameId = null) {
   if (gameId === null || gameId === undefined || gameId === '') {
-    return _globalMeta?.meta_hash || getStorageItem(STORAGE_KEYS.globalMetaHash);
+    return (
+      _globalMeta?.meta_hash || getStorageItem(STORAGE_KEYS.globalMetaHash)
+    );
   }
   const gameIdStr = String(gameId);
   return (
@@ -141,7 +143,11 @@ function persistMetaHash(meta, gameId = null) {
   }
 }
 
-async function fetchMetaWithOptionalEtag(url, cachedMetaHash, fallbackMeta = null) {
+async function fetchMetaWithOptionalEtag(
+  url,
+  cachedMetaHash,
+  fallbackMeta = null
+) {
   const headers = {};
   if (cachedMetaHash) {
     headers['If-None-Match'] = cachedMetaHash;
@@ -209,11 +215,7 @@ export async function fetchMetaSnapshot(baseUrl, gameId = null, options = {}) {
   if (!force) {
     const ageMs = Date.now() - fetchEntry.lastFetchedAt;
     if (fetchEntry.inFlight) return fetchEntry.inFlight;
-    if (
-      fetchEntry.lastResult &&
-      ageMs >= 0 &&
-      ageMs < META_FETCH_THROTTLE_MS
-    ) {
+    if (fetchEntry.lastResult && ageMs >= 0 && ageMs < META_FETCH_THROTTLE_MS) {
       return fetchEntry.lastResult;
     }
   }

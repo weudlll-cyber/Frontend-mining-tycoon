@@ -4,10 +4,7 @@ Purpose: Upgrade panel UI — builds the controls/select elements once, then upd
 Call initUpgradePanel() once with required dependencies before use.
 */
 
-import {
-  clearElementChildren,
-  formatCost,
-} from '../utils/dom-utils.js';
+import { clearElementChildren, formatCost } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
 import { computePayCostPreview } from '../utils/token-utils.js';
 
@@ -58,7 +55,11 @@ export function getSelectedTokens() {
   };
 }
 
-function syncSelectOptions(selectEl, values, getLabel = (value) => String(value)) {
+function syncSelectOptions(
+  selectEl,
+  values,
+  getLabel = (value) => String(value)
+) {
   if (!selectEl) return;
   const previousValue = selectEl.value;
   clearElementChildren(selectEl);
@@ -357,8 +358,9 @@ export function updateUpgradePanelDynamic(data, activeGameMeta) {
 }
 
 export function renderUpgradeMetrics(data, getActiveGameMetaFn) {
-  const activeGameMeta = (getActiveGameMetaFn ?? _getActiveGameMeta)?.(
-    String(data?.game_id || '')
-  ) || null;
+  const activeGameMeta =
+    (getActiveGameMetaFn ?? _getActiveGameMeta)?.(
+      String(data?.game_id || '')
+    ) || null;
   updateUpgradePanelDynamic(data, activeGameMeta);
 }
