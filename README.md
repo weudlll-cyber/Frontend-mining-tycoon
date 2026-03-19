@@ -162,6 +162,12 @@ npm run build
 
 Run all important frontend checks manually:
 
+Recommended one-liner:
+
+```bash
+npm run check:all
+```
+
 ```bash
 npm run lint
 npm run format:check

@@ -2,6 +2,19 @@
 
 Describe what changed and why.
 
+## MUST PASS BEFORE MERGE
+
+- [ ] Invariant compliance checked against `LOCKED_DECISIONS.md`.
+- [ ] Security posture preserved (no unsafe DOM patterns; no untrusted `innerHTML`).
+- [ ] Tests were updated/added when behavior changed.
+- [ ] Docs were updated when UI/behavior contract changed (`README.md`, `PROJECT_BASELINE.md`, and related docs as needed).
+- [ ] Commands run successfully:
+	- [ ] `npm run lint`
+	- [ ] `npm run format:check`
+	- [ ] `npm run test -- --run`
+	- [ ] `npm run build`
+	- [ ] `npm audit --omit=dev`
+
 ## Invariant Compliance
 
 - [ ] I verified this PR does not violate LOCKED_DECISIONS.md.
@@ -25,6 +38,8 @@ If any invariant above is intentionally changed, this PR MUST:
 1. Update LOCKED_DECISIONS.md first.
 2. Add an explicit REDESIGN DECISION note in LOCKED_DECISIONS.md.
 3. Then update dependent docs/tests/code to match the redesign.
+
+If any locked invariant is violated, this PR must first add a REDESIGN DECISION to LOCKED_DECISIONS.md.
 
 PRs that violate an invariant without this sequence MUST NOT be merged.
 
