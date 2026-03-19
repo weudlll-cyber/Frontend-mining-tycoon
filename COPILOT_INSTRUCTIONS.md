@@ -56,7 +56,47 @@ Cross-repo rule:
 - Encode/normalize IDs and URLs.
 - Keep security posture consistent so `SECURITY_AUDIT.md` remains accurate/green.
 
-## 5) Code Readability & Commenting Standards (Required)
+## 5) Commenting Requirements (MUST - All Files)
+
+### 5.1) File-level start comment (required in every source file)
+
+Every source file must start with a short top-of-file comment block that covers:
+- file purpose and responsibilities
+- module role in system data-flow (upstream/downstream context)
+- important constraints (invariants, UI rules, determinism)
+- security notes when applicable
+
+Example:
+
+```js
+/**
+ * File: player-view.js
+ * Purpose: Renders the Player State analytics matrix (read-only).
+ * Context: Must respect LOCKED_DECISIONS invariants; frontend is display-only.
+ * Notes: Uses safe DOM patterns (textContent/createElement).
+ */
+```
+
+### 5.2) Inline comments (required for non-trivial logic)
+
+- Explain WHY a calculation, layout choice, or fallback exists.
+- Clarify data-flow, edge cases, and invariant-preserving logic.
+- Do not add trivial commentary (for example, "increment i").
+
+### 5.3) Comment quality
+
+- Keep comments factual, concise, and aligned with current behavior.
+- Remove outdated/misleading comments during edits.
+- Do not add noisy or unnecessary comments.
+
+### 5.4) Apply to all future changes
+
+- New files must include required file-level start comments.
+- Modified files must gain/update comments where logic is non-obvious.
+- Large refactors require comprehensive comment updates.
+- PRs missing required commenting compliance are incomplete.
+
+## 6) Code Readability & Commenting Standards (Required)
 
 For every source file touched or created:
 - Keep/update a short file-level start comment explaining:
@@ -71,7 +111,7 @@ For every source file touched or created:
 - Explain why decisions exist, not trivial what statements.
 - Prefer clear, maintainable code over clever/compact code.
 
-## 6) After Every Change (Required Process)
+## 7) After Every Change (Required Process)
 
 - Evaluate test impact; add/update Vitest tests for changed behavior.
 - Evaluate documentation impact:
@@ -89,7 +129,7 @@ If backend files are touched in the same task, also run backend gates before pus
 - `python -m unittest discover -s tests -q`
 - `python -m pip_audit -r requirements.txt`
 
-## 7) Required Output Format
+## 8) Required Output Format
 
 Every completed task/PR summary must include:
 1. Summary of changes
@@ -100,7 +140,7 @@ Every completed task/PR summary must include:
 6. Docs updated (or explicit reason none)
 7. Confirmation all quality gates passed
 
-## 8) Scope Discipline
+## 9) Scope Discipline
 
 - Keep changes minimal, safe, and reviewable.
 - Prefer small focused commits.

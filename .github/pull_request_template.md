@@ -17,6 +17,13 @@ Describe what changed and why.
 	- [ ] `npm run build`
 	- [ ] `npm audit --omit=dev`
 
+## Commenting Compliance (Mandatory)
+
+- [ ] File-level start comment present for all created/modified files
+- [ ] Inline comments added/updated where logic is not obvious
+- [ ] No outdated comments present
+- [ ] Comments explain WHY decisions exist (not WHAT code does)
+
 ## Invariant Compliance
 
 - [ ] I verified this PR does not violate LOCKED_DECISIONS.md.

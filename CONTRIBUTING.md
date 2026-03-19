@@ -15,6 +15,20 @@ Before opening a PR:
 	- keep file-level responsibility headers accurate in touched source files
 	- add concise inline WHY comments for non-trivial logic/edge cases
 
+## Commenting Compliance
+
+Mandatory for all new or significantly modified source files:
+- Include a top-of-file comment block describing:
+	- file purpose/responsibilities
+	- module/system role and data-flow context
+	- important constraints/invariants
+	- security notes when applicable
+- Add or update inline comments for non-trivial logic where intent is not obvious.
+- Comments must explain WHY decisions exist, not restate WHAT code already says.
+- Remove outdated or misleading comments as part of the same change.
+
+PRs that do not satisfy commenting compliance are incomplete.
+
 ## Quality Gates
 
 All of the following must pass before merge:
