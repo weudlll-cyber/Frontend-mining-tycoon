@@ -231,7 +231,10 @@ export function renderInlineSeasonUpgrades(
   if (supportedUpgradeTypes.length > 0) {
     upgradesContainer.appendChild(layout);
     const dispose = initMicroTooltips(upgradesContainer);
-    _inlineTooltipStateByContainer.set(upgradesContainer, { dispose, bubbleIds });
+    _inlineTooltipStateByContainer.set(upgradesContainer, {
+      dispose,
+      bubbleIds,
+    });
   } else {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder';

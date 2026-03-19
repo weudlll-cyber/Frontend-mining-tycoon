@@ -200,7 +200,7 @@ function setSetupCollapsedWithSource(isCollapsed, source = 'system') {
 export function toggleSetupCollapsed() {
   const shouldCollapse = Boolean(
     !_refs?.setupShellEl ||
-      !_refs.setupShellEl.classList.contains('setup-collapsed')
+    !_refs.setupShellEl.classList.contains('setup-collapsed')
   );
   setSetupCollapsedWithSource(shouldCollapse, 'user');
 }

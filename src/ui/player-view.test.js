@@ -154,7 +154,9 @@ describe('player state matrix', () => {
     const line2Text = line2?.textContent || '';
     expect(line1Text).toContain('No further halvings');
     expect(line1Text).toContain('Mined 123.45');
-    expect(line2Text).toMatch(/Fee 0\.0(23|24) \/ 0\.0(12|13)|Fee 0\.02 \/ 0\.01/);
+    expect(line2Text).toMatch(
+      /Fee 0\.0(23|24) \/ 0\.0(12|13)|Fee 0\.02 \/ 0\.01/
+    );
     expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
   });
 

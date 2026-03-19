@@ -367,7 +367,9 @@ function ensurePlayerStateView(tokenNames) {
 
   const footerLine1 = document.createElement('div');
   footerLine1.className = 'ps-footer-line ps-footer-line-1';
-  const footerLine1Node = document.createTextNode('No further halvings | Mined —');
+  const footerLine1Node = document.createTextNode(
+    'No further halvings | Mined —'
+  );
   footerLine1.appendChild(footerLine1Node);
 
   const footerLine2 = document.createElement('div');
