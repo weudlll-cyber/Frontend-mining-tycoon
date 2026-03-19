@@ -152,7 +152,10 @@ import {
   initSessionActions,
   createAsyncSession,
   getSessionStreamTicket,
+  probeRequirePlayerAuth,
+  probeSessionSupport,
 } from './services/session-actions.js';
+import { debugLog } from './utils/debug-log.js';
 
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
@@ -164,12 +167,26 @@ const durationCustomValueInput = document.getElementById(
 );
 const durationCustomUnitInput = document.getElementById('duration-custom-unit');
 const enrollmentWindowInput = document.getElementById('enrollment-window');
+const roundTypeSyncInput = document.getElementById('round-type-sync');
+const roundTypeAsyncInput = document.getElementById('round-type-async');
+const asyncHostControlsEl = document.getElementById('async-host-controls');
+const asyncHostDurationPresetInput = document.getElementById(
+  'async-duration-preset'
+);
+const asyncHostDurationCustomEl = document.getElementById(
+  'async-duration-custom-wrap'
+);
+const asyncHostDurationCustomMinutesInput = document.getElementById(
+  'async-duration-custom-minutes'
+);
+const asyncHostAutoStartCheckbox = document.getElementById('async-auto-start');
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
 
 function setActiveMeta(meta) {
   initializeModules();
   setActiveMetaState(meta);
+  void refreshAsyncDiagnostics({ force: true });
 }
 const showAdvancedCheckbox = document.getElementById('show-advanced-overrides');
 const advancedOverridesDiv = document.getElementById('advanced-overrides');
@@ -232,6 +249,11 @@ const editableInputs = [
   durationCustomValueInput,
   durationCustomUnitInput,
   enrollmentWindowInput,
+  roundTypeSyncInput,
+  roundTypeAsyncInput,
+  asyncHostDurationPresetInput,
+  asyncHostDurationCustomMinutesInput,
+  asyncHostAutoStartCheckbox,
   gameIdInput,
   playerIdInput,
   anchorTokenInput,
@@ -248,6 +270,12 @@ let sessionStartSupported = true;
 let setupRoundModeOverride = null;
 let activeSession = null;
 let sessionElapsedInterval = null;
+let asyncWindowOpen = null;
+let asyncRequirePlayerAuth = 'unknown';
+let asyncSessionSupportProbe = null;
+let asyncDiagnosticsProbeKey = '';
+let asyncDiagnosticsProbeInFlight = null;
+let selectedSetupRoundType = 'sync';
 
 function getRoundModeFromMeta(meta) {
   const raw = String(meta?.round_mode || meta?.round_type || '')
@@ -255,6 +283,52 @@ function getRoundModeFromMeta(meta) {
     .toLowerCase();
   if (raw === 'async' || raw === 'asynchronous') return 'async';
   return 'sync';
+}
+
+function getSelectedRoundType() {
+  if (selectedSetupRoundType === 'async' || selectedSetupRoundType === 'sync') {
+    return selectedSetupRoundType;
+  }
+  return roundTypeAsyncInput?.checked ? 'async' : 'sync';
+}
+
+function getAsyncDurationPreset() {
+  const selectedPreset = String(asyncHostDurationPresetInput?.value || '10m');
+  if (selectedPreset !== 'custom') {
+    return selectedPreset;
+  }
+
+  const customMinutes = Number(asyncHostDurationCustomMinutesInput?.value);
+  if (!Number.isFinite(customMinutes) || customMinutes <= 0) {
+    return null;
+  }
+  return `${Math.floor(customMinutes)}m`;
+}
+
+function shouldAutoStartAsyncSession() {
+  return Boolean(asyncHostAutoStartCheckbox?.checked);
+}
+
+function updateAsyncHostControlsVisibility() {
+  const isAsyncHost = getSelectedRoundType() === 'async';
+  if (asyncHostControlsEl) {
+    asyncHostControlsEl.hidden = !isAsyncHost;
+  }
+  if (asyncHostDurationCustomEl && asyncHostDurationPresetInput) {
+    asyncHostDurationCustomEl.hidden =
+      asyncHostDurationPresetInput.value !== 'custom';
+  }
+}
+
+function setSelectedRoundType(roundType) {
+  selectedSetupRoundType = roundType === 'async' ? 'async' : 'sync';
+  if (roundTypeSyncInput) {
+    roundTypeSyncInput.checked = selectedSetupRoundType === 'sync';
+  }
+  if (roundTypeAsyncInput) {
+    roundTypeAsyncInput.checked = selectedSetupRoundType === 'async';
+  }
+  updateAsyncHostControlsVisibility();
 }
 
 function getSessionSupportFromMeta(meta) {
@@ -284,21 +358,114 @@ function getSessionSupportFromMeta(meta) {
 
 function getCurrentRoundContext() {
   const gameMeta = getGameMeta(gameIdInput?.value);
+  const selectedRoundType = getSelectedRoundType();
+  const metaRoundMode = getRoundModeFromMeta(gameMeta);
+  const shouldPreferHostSelection =
+    selectedRoundType === 'async' &&
+    !isStreamActive &&
+    (latestGameStatus === null ||
+      latestGameStatus === 'idle' ||
+      latestGameStatus === 'enrolling');
   const roundMode =
     setupRoundModeOverride === 'async' || setupRoundModeOverride === 'sync'
       ? setupRoundModeOverride
-      : getRoundModeFromMeta(gameMeta);
+      : shouldPreferHostSelection
+        ? 'async'
+        : gameMeta
+          ? metaRoundMode
+          : selectedRoundType;
   const supportFromMeta = getSessionSupportFromMeta(gameMeta);
+  const supportFromProbe =
+    typeof asyncSessionSupportProbe === 'boolean'
+      ? asyncSessionSupportProbe
+      : null;
   const supportsSessionStart =
     roundMode !== 'async'
       ? false
       : supportFromMeta === null
-        ? sessionStartSupported
+        ? supportFromProbe === null
+          ? sessionStartSupported
+          : supportFromProbe
         : supportFromMeta;
   return {
     roundMode,
     supportsSessionStart,
   };
+}
+
+function resolveAsyncWindowOpen(meta) {
+  if (typeof meta?.window_open === 'boolean') {
+    return meta.window_open;
+  }
+  return null;
+}
+
+async function refreshAsyncDiagnostics({ force = false } = {}) {
+  const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
+  const gameId = String(gameIdInput?.value || '').trim();
+  const playerId = String(playerIdInput?.value || '').trim();
+  const gameMeta = getGameMeta(gameId);
+  const roundMode = getRoundModeFromMeta(gameMeta);
+
+  asyncWindowOpen = resolveAsyncWindowOpen(gameMeta);
+
+  if (!baseUrl || !gameId || roundMode !== 'async') {
+    asyncSessionSupportProbe = null;
+    asyncRequirePlayerAuth = 'unknown';
+    updateSetupActionsState();
+    return;
+  }
+
+  const probeKey = `${baseUrl}|${gameId}|${playerId}`;
+  if (
+    !force &&
+    probeKey === asyncDiagnosticsProbeKey &&
+    !asyncDiagnosticsProbeInFlight
+  ) {
+    updateSetupActionsState();
+    return;
+  }
+
+  if (asyncDiagnosticsProbeInFlight && !force) {
+    return;
+  }
+
+  asyncDiagnosticsProbeKey = probeKey;
+  asyncDiagnosticsProbeInFlight = (async () => {
+    const [sessionSupportResult, authResult] = await Promise.all([
+      probeSessionSupport({ gameId, playerId }),
+      playerId
+        ? probeRequirePlayerAuth({ gameId, playerId })
+        : Promise.resolve({ value: 'unknown', reason: 'missing-player-id' }),
+    ]);
+
+    asyncSessionSupportProbe =
+      typeof sessionSupportResult?.supported === 'boolean'
+        ? sessionSupportResult.supported
+        : null;
+    asyncRequirePlayerAuth =
+      authResult?.value === true || authResult?.value === false
+        ? authResult.value
+        : 'unknown';
+
+    debugLog('async-diagnostics', 'probe results', {
+      gameId,
+      roundMode,
+      windowOpen: asyncWindowOpen,
+      sessionApiSupported: asyncSessionSupportProbe,
+      requirePlayerAuth: asyncRequirePlayerAuth,
+      sessionProbeCode: sessionSupportResult?.code ?? null,
+      authProbeCode: authResult?.code ?? null,
+    });
+  })()
+    .catch(() => {
+      asyncSessionSupportProbe = null;
+      asyncRequirePlayerAuth = 'unknown';
+    })
+    .finally(() => {
+      asyncDiagnosticsProbeInFlight = null;
+      updateSetupActionsState();
+    });
 }
 
 function syncSetupShellState() {
@@ -309,8 +476,13 @@ function syncSetupShellState() {
     latestGameStatus,
     roundMode: roundContext.roundMode,
     sessionStartSupported: roundContext.supportsSessionStart,
+    sessionApiSupported: asyncSessionSupportProbe,
+    asyncWindowOpen,
+    requirePlayerAuth: asyncRequirePlayerAuth,
     sessionActive: Boolean(activeSession?.sessionId),
     sessionId: activeSession?.sessionId || null,
+    hostRoundType: getSelectedRoundType(),
+    asyncHostAutoStart: shouldAutoStartAsyncSession(),
   });
 }
 
@@ -359,8 +531,13 @@ function setSetupStateForTests({
   gameStatus,
   setupBusy,
   roundMode,
+  hostRoundType,
+  asyncAutoStart,
   supportsSessionStart,
   sessionId,
+  windowOpen,
+  sessionApiSupported,
+  requirePlayerAuth,
 } = {}) {
   if (typeof streamActive === 'boolean') {
     isStreamActive = streamActive;
@@ -376,8 +553,30 @@ function setSetupStateForTests({
   } else {
     setupRoundModeOverride = null;
   }
+  if (hostRoundType === 'sync' || hostRoundType === 'async') {
+    setSelectedRoundType(hostRoundType);
+  }
+  if (typeof asyncAutoStart === 'boolean' && asyncHostAutoStartCheckbox) {
+    asyncHostAutoStartCheckbox.checked = asyncAutoStart;
+  }
   if (typeof supportsSessionStart === 'boolean') {
     sessionStartSupported = supportsSessionStart;
+  }
+  if (typeof windowOpen === 'boolean' || windowOpen === null) {
+    asyncWindowOpen = windowOpen;
+  }
+  if (
+    typeof sessionApiSupported === 'boolean' ||
+    sessionApiSupported === null
+  ) {
+    asyncSessionSupportProbe = sessionApiSupported;
+  }
+  if (
+    requirePlayerAuth === true ||
+    requirePlayerAuth === false ||
+    requirePlayerAuth === 'unknown'
+  ) {
+    asyncRequirePlayerAuth = requirePlayerAuth;
   }
   if (sessionId === null) {
     activeSession = null;
@@ -621,11 +820,25 @@ function saveSettings() {
     durationCustomUnitInput.value
   );
   setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
+  setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
+  setStorageItem(
+    STORAGE_KEYS.asyncDurationPreset,
+    asyncHostDurationPresetInput?.value || '10m'
+  );
+  setStorageItem(
+    STORAGE_KEYS.asyncDurationCustomMinutes,
+    asyncHostDurationCustomMinutesInput?.value || '10'
+  );
+  setStorageItem(
+    STORAGE_KEYS.asyncAutoStart,
+    shouldAutoStartAsyncSession() ? 'true' : 'false'
+  );
   setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
 
   renderDebugContext();
   updateSetupActionsState();
+  void refreshAsyncDiagnostics({ force: true });
 }
 
 function initializeModules() {
@@ -655,6 +868,27 @@ function initializeModules() {
     jumpLiveBtnEl,
     jumpLiveBtnSetupEl,
     onStartAsyncSession: handleStartAsyncSession,
+    roundTypeSyncInput,
+    roundTypeAsyncInput,
+    asyncHostControlsEl,
+    asyncHostDurationPresetInput,
+    asyncHostDurationCustomEl,
+    asyncHostDurationCustomMinutesInput,
+    asyncHostAutoStartCheckbox,
+    onHostRoundTypeChanged(nextRoundType) {
+      setSelectedRoundType(nextRoundType);
+      updateSetupActionsState();
+      saveSettings();
+    },
+    onHostAsyncDurationChanged() {
+      updateAsyncHostControlsVisibility();
+      updateSetupActionsState();
+      saveSettings();
+    },
+    onHostAutoStartChanged() {
+      updateSetupActionsState();
+      saveSettings();
+    },
     liveBoardEl,
     editableInputs,
   });
@@ -679,6 +913,7 @@ function initializeModules() {
       if (lastGameData) {
         renderUpgradeMetrics(lastGameData);
       }
+      void refreshAsyncDiagnostics({ force: true });
     },
     showToast,
   });
@@ -761,7 +996,10 @@ function initializeModules() {
     clearNewGameStatus,
     showNewGameStatus,
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
-    getEnrollmentWindow: () => parseInt(enrollmentWindowInput.value, 10) || 60,
+    getEnrollmentWindow: () => parseInt(enrollmentWindowInput.value, 10) || 600,
+    getSelectedRoundType,
+    getAsyncDurationPreset,
+    shouldAutoStartAsyncSession,
     cleanupGameMetaCache,
     resolveDurationSeconds,
     collectAdvancedOverrides,
@@ -777,6 +1015,7 @@ function initializeModules() {
     saveSettings,
     ensureInputsEditable,
     startLiveStream,
+    autoStartAsyncSession: startAsyncSessionForGame,
     setSetupCollapsed,
     scrollToLiveBoard,
   });
@@ -824,6 +1063,14 @@ function loadSettings() {
     STORAGE_KEYS.durationCustomUnit
   );
   const savedEnrollmentWindow = getStorageItem(STORAGE_KEYS.enrollmentWindow);
+  const savedRoundType = getStorageItem(STORAGE_KEYS.roundType);
+  const savedAsyncDurationPreset = getStorageItem(
+    STORAGE_KEYS.asyncDurationPreset
+  );
+  const savedAsyncDurationCustomMinutes = getStorageItem(
+    STORAGE_KEYS.asyncDurationCustomMinutes
+  );
+  const savedAsyncAutoStart = getStorageItem(STORAGE_KEYS.asyncAutoStart);
   const savedGameId = getStorageItem(STORAGE_KEYS.gameId);
   const savedPlayerId = getStorageItem(STORAGE_KEYS.playerId);
 
@@ -836,8 +1083,20 @@ function loadSettings() {
     durationCustomUnitInput.value = savedDurationCustomUnit;
   if (savedEnrollmentWindow)
     enrollmentWindowInput.value = savedEnrollmentWindow;
+  if (savedAsyncDurationPreset && asyncHostDurationPresetInput) {
+    asyncHostDurationPresetInput.value = savedAsyncDurationPreset;
+  }
+  if (savedAsyncDurationCustomMinutes && asyncHostDurationCustomMinutesInput) {
+    asyncHostDurationCustomMinutesInput.value = savedAsyncDurationCustomMinutes;
+  }
+  if (savedAsyncAutoStart !== null && asyncHostAutoStartCheckbox) {
+    asyncHostAutoStartCheckbox.checked = savedAsyncAutoStart !== 'false';
+  }
   if (savedGameId) gameIdInput.value = savedGameId;
   if (savedPlayerId) playerIdInput.value = savedPlayerId;
+
+  setSelectedRoundType(savedRoundType === 'async' ? 'async' : 'sync');
+  updateAsyncHostControlsVisibility();
 
   // Update visibility of custom duration input
   if (durationPresetInput.value === 'custom') {
@@ -858,12 +1117,14 @@ function loadSettings() {
   renderMetaDebugLine();
   renderDebugContext();
   updateSetupActionsState();
+  void refreshAsyncDiagnostics({ force: true });
 }
 
 function updateUI(data) {
   lastGameData = data;
   lastGameData.timestamp = Date.now();
   latestGameStatus = data?.game_status || null;
+  void refreshAsyncDiagnostics();
 
   if (
     activeSession?.sessionId &&
@@ -924,38 +1185,36 @@ async function startLiveStream(gameId, playerId, options = {}) {
   });
 }
 
-async function handleStartAsyncSession() {
-  const gameId = gameIdInput.value;
-  const playerId = playerIdInput.value;
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
-
+async function startAsyncSessionForGame({ gameId, playerId }) {
   setStartSessionStatus('Starting async session...', 'info');
   isSetupBusy = true;
   updateSetupActionsState();
+  void refreshAsyncDiagnostics({ force: true });
 
-  // WHY: Session creation is an explicit user step before switching transport to the session-scoped stream.
+  // WHY: Session creation is explicit and backend-authoritative; stream transport must only switch after valid session metadata.
   const result = await createAsyncSession({ gameId, playerId });
   if (!result.ok) {
     isSetupBusy = false;
     updateSetupActionsState();
+
     if (result.code === 'MALFORMED_SESSION_RESPONSE') {
-      // WHY: A malformed 200 must never switch transport, otherwise async intent can silently drift onto legacy stream.
-      setStartSessionStatus(
-        'Session could not be started (malformed response).',
-        'error'
-      );
-      return;
+      const malformedMessage =
+        'Session could not be started (malformed response).';
+      setStartSessionStatus(malformedMessage, 'error');
+      return {
+        ok: false,
+        code: result.code,
+        message: malformedMessage,
+      };
     }
+
     if (result.kind === 'policy-closed') {
       setStartSessionStatus(result.message, 'warning');
-      return;
+      return { ok: false, kind: result.kind, message: result.message };
     }
 
     setStartSessionStatus(result.message, 'error');
-    return;
+    return { ok: false, kind: result.kind, message: result.message };
   }
 
   activeSession = {
@@ -973,6 +1232,18 @@ async function handleStartAsyncSession() {
   await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
   setSetupCollapsed(true);
   scrollToLiveBoard();
+  return { ok: true, sessionId: result.sessionId };
+}
+
+async function handleStartAsyncSession() {
+  const gameId = gameIdInput.value;
+  const playerId = playerIdInput.value;
+  const baseUrl = getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    return;
+  }
+
+  await startAsyncSessionForGame({ gameId, playerId });
 }
 
 if (startBtn) {
@@ -1084,6 +1355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
+  void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
 });
 

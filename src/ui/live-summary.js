@@ -16,10 +16,12 @@ import {
   normalizeTokenNames,
   formatCompactNumber,
 } from '../utils/token-utils.js';
+import { debugLog } from '../utils/debug-log.js';
 
 let _refs = null;
 let _getGameMeta = null;
 let _defaultTokenNames = [];
+let _lastAsyncBadgeStateKey = '';
 
 export function initLiveSummary(deps) {
   _refs = deps;
@@ -47,6 +49,8 @@ export function renderAsyncSessionBadge({
   roundMode = 'sync',
   sessionActive = false,
   sessionSupported = true,
+  asyncReady = false,
+  asyncAvailability = null,
 } = {}) {
   const badgeEl = _refs?.asyncSessionStatusEl;
   if (!badgeEl) return;
@@ -57,6 +61,11 @@ export function renderAsyncSessionBadge({
     badgeEl.textContent = 'Async: n/a';
     badgeEl.classList.remove('badge-blue', 'badge-yellow', 'badge-green');
     badgeEl.classList.add('badge-gray');
+    const stateKey = 'sync-hidden';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog('async-badge', 'hidden for sync round');
+    }
     return;
   }
 
@@ -71,17 +80,52 @@ export function renderAsyncSessionBadge({
   if (sessionActive) {
     badgeEl.textContent = 'Async: Session Active';
     badgeEl.classList.add('badge-green');
+    const stateKey = 'async-active';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog('async-badge', 'rendered active badge', {
+        roundMode,
+        sessionActive,
+      });
+    }
     return;
   }
 
   if (!sessionSupported) {
     badgeEl.textContent = 'Async: Legacy View';
     badgeEl.classList.add('badge-yellow');
+    const stateKey = 'async-legacy';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog('async-badge', 'rendered legacy fallback badge', {
+        sessionSupported,
+      });
+    }
     return;
   }
 
-  badgeEl.textContent = 'Async: Session Ready';
-  badgeEl.classList.add('badge-blue');
+  if (asyncReady) {
+    badgeEl.textContent = 'Async: Session Ready';
+    badgeEl.classList.add('badge-blue');
+    const stateKey = 'async-ready';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog(
+        'async-badge',
+        'rendered session ready badge',
+        asyncAvailability
+      );
+    }
+    return;
+  }
+
+  badgeEl.textContent = 'Async: Session Blocked';
+  badgeEl.classList.add('badge-gray');
+  const stateKey = `async-blocked-${JSON.stringify(asyncAvailability || {})}`;
+  if (_lastAsyncBadgeStateKey !== stateKey) {
+    _lastAsyncBadgeStateKey = stateKey;
+    debugLog('async-badge', 'rendered blocked badge', asyncAvailability);
+  }
 }
 
 export function computePortfolioValue(

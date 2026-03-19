@@ -1,6 +1,11 @@
 /*
 File: src/utils/storage-utils.js
 Purpose: LocalStorage and backend URL helpers for frontend session/meta cache state.
+Role in system:
+- Keeps client-side persistence deterministic and scoped to setup/session metadata.
+Invariants:
+- Storage failures must remain non-fatal to gameplay.
+- Keys remain namespaced to avoid collisions and accidental authority leaks.
 Key responsibilities:
 - Encapsulate localStorage read/write safety wrappers.
 - Manage per-game meta hash cache keys and retention cleanup.
@@ -25,6 +30,10 @@ export const STORAGE_KEYS = {
   durationCustomValue: 'mining-tycoon:durationCustomValue',
   durationCustomUnit: 'mining-tycoon:durationCustomUnit',
   enrollmentWindow: 'mining-tycoon:enrollmentWindow',
+  roundType: 'mining-tycoon:roundType',
+  asyncDurationPreset: 'mining-tycoon:asyncDurationPreset',
+  asyncDurationCustomMinutes: 'mining-tycoon:asyncDurationCustomMinutes',
+  asyncAutoStart: 'mining-tycoon:asyncAutoStart',
   gameId: 'mining-tycoon:gameId',
   playerId: 'mining-tycoon:playerId',
   globalMetaHash: 'mining-tycoon:globalMetaHash',
