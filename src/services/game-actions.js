@@ -96,6 +96,65 @@ export async function performUpgrade(upgradeType, nextLevel, targetToken) {
   }
 }
 
+export async function startRoundSession(roundId, playerId) {
+  const baseUrl = _deps.getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    return { sessionId: null, unsupported: false };
+  }
+
+  const encodedRoundId = encodeURIComponent(roundId);
+  const playerToken = _deps.getStorageItem(
+    _deps.getPlayerTokenStorageKey(roundId, playerId)
+  );
+  const headers = { 'Content-Type': 'application/json' };
+  if (playerToken) {
+    headers['X-Player-Token'] = playerToken;
+  }
+
+  const endpoints = [
+    `${baseUrl}/rounds/${encodedRoundId}/sessions`,
+    `${baseUrl}/games/${encodedRoundId}/sessions`,
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ player_id: playerId }),
+      });
+
+      if (response.status === 404 || response.status === 405) {
+        continue;
+      }
+
+      if (!response.ok) {
+        const { detail } = await getErrorMessageFromResponse(
+          response,
+          `Session start failed: ${response.status} ${response.statusText}`
+        );
+        throw new Error(detail);
+      }
+
+      const sessionData = await response.json();
+      const sessionId = sessionData?.session_id || sessionData?.id || null;
+      if (!sessionId) {
+        throw new Error(
+          'Session start succeeded but no session_id was returned'
+        );
+      }
+
+      return { sessionId, unsupported: false };
+    } catch (error) {
+      console.error('Session start error:', error);
+      _deps.showToast(`Session start failed: ${error.message}`, 'error');
+      return { sessionId: null, unsupported: false };
+    }
+  }
+
+  return { sessionId: null, unsupported: true };
+}
+
 export async function createNewGameAndJoin() {
   if (_deps.hasOpenStream()) {
     _deps.stopActiveStream();
@@ -215,7 +274,9 @@ export async function createNewGameAndJoin() {
     );
     _deps.onSetupBusyChange(false);
     _deps.ensureInputsEditable();
-    _deps.startStream(gameId, playerId);
+    await _deps.startLiveStream(gameId, playerId, {
+      forceSessionAttempt: true,
+    });
     _deps.setSetupCollapsed(true);
     _deps.scrollToLiveBoard();
   } catch (error) {

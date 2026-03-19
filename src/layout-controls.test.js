@@ -21,9 +21,14 @@ function buildDomFixture() {
           <button id="jump-live-btn-setup" type="button">Jump to Live Board</button>
           <section id="setup-panel">
             <div class="setup-actions">
+              <div class="setup-actions-header">
+                <h3>Primary Actions</h3>
+                <span id="round-mode-badge">Round: Sync</span>
+              </div>
               <div class="button-group">
                 <button id="new-game-btn" class="btn-primary" type="button">+ New Game</button>
                 <button id="start-btn" class="btn-secondary" type="button">Start Stream</button>
+                <button id="start-session-btn" class="btn-secondary" type="button" hidden>Start Session</button>
                 <button id="stop-btn" class="btn-secondary" type="button">Stop Stream</button>
               </div>
               <p id="setup-actions-note"></p>
@@ -149,7 +154,11 @@ describe('layout controls', () => {
 
     expect(document.getElementById('new-game-btn')).not.toBeNull();
     expect(document.getElementById('start-btn')).not.toBeNull();
+    expect(document.getElementById('start-session-btn')).not.toBeNull();
     expect(document.getElementById('stop-btn')).not.toBeNull();
+    expect(document.getElementById('round-mode-badge')?.textContent).toContain(
+      'Round: Sync'
+    );
   });
 
   it('disables New Game while running and keeps it enabled when not running', async () => {
@@ -173,6 +182,7 @@ describe('layout controls', () => {
     const gameIdInput = document.getElementById('game-id');
     const newGameBtn = document.getElementById('new-game-btn');
     const startBtn = document.getElementById('start-btn');
+    const startSessionBtn = document.getElementById('start-session-btn');
     const stopBtn = document.getElementById('stop-btn');
 
     gameIdInput.value = '';
@@ -186,6 +196,7 @@ describe('layout controls', () => {
     module.setSetupStateForTests({ streamActive: false, gameStatus: 'idle' });
     module.updateSetupActionsState();
     expect(startBtn.disabled).toBe(false);
+    expect(startSessionBtn.hidden).toBe(true);
     expect(stopBtn.disabled).toBe(true);
 
     module.setSetupStateForTests({ streamActive: true, gameStatus: 'idle' });

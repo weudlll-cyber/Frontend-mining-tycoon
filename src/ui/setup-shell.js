@@ -8,6 +8,8 @@ let _state = {
   isStreamActive: false,
   isSetupBusy: false,
   latestGameStatus: null,
+  roundMode: 'sync',
+  sessionStartSupported: true,
 };
 
 export function initSetupShell(deps) {
@@ -25,11 +27,30 @@ function hasActiveGame() {
   return Boolean(_refs?.gameIdInput?.value && _refs.gameIdInput.value.trim());
 }
 
+function hasActivePlayer() {
+  return Boolean(
+    _refs?.playerIdInput?.value && _refs.playerIdInput.value.trim()
+  );
+}
+
+function updateRoundModeBadge() {
+  if (!_refs?.roundModeBadgeEl) return;
+  const roundMode = _state.roundMode === 'async' ? 'async' : 'sync';
+  const badge = _refs.roundModeBadgeEl;
+  badge.textContent = roundMode === 'async' ? 'Round: Async' : 'Round: Sync';
+  badge.classList.toggle('round-mode-badge--async', roundMode === 'async');
+  badge.classList.toggle('round-mode-badge--sync', roundMode !== 'async');
+}
+
 export function updateSetupActionsState() {
   if (!_refs) return;
 
   const gameRunning = _state.latestGameStatus === 'running';
   const gameExists = hasActiveGame();
+  const playerExists = hasActivePlayer();
+  const isAsyncRound = _state.roundMode === 'async';
+
+  updateRoundModeBadge();
 
   if (_refs.newGameBtn) {
     _refs.newGameBtn.disabled = _state.isSetupBusy || gameRunning;
@@ -38,6 +59,17 @@ export function updateSetupActionsState() {
   if (_refs.startBtn) {
     _refs.startBtn.disabled =
       _state.isSetupBusy || !gameExists || _state.isStreamActive;
+  }
+
+  if (_refs.startSessionBtn) {
+    _refs.startSessionBtn.hidden = !isAsyncRound;
+    _refs.startSessionBtn.disabled =
+      _state.isSetupBusy ||
+      !isAsyncRound ||
+      !gameExists ||
+      !playerExists ||
+      _state.isStreamActive ||
+      !_state.sessionStartSupported;
   }
 
   if (_refs.stopBtn) {
@@ -57,6 +89,12 @@ export function updateSetupActionsState() {
     return;
   }
 
+  if (isAsyncRound && !_state.sessionStartSupported) {
+    _refs.setupActionsNoteEl.textContent =
+      'Async round detected but session start is unavailable on this backend. Start Stream uses legacy game stream fallback.';
+    return;
+  }
+
   if (!gameExists) {
     _refs.setupActionsNoteEl.textContent =
       'Create a game first, then Start Stream to join the live board.';
@@ -69,8 +107,9 @@ export function updateSetupActionsState() {
     return;
   }
 
-  _refs.setupActionsNoteEl.textContent =
-    'Ready: start stream or create a new game.';
+  _refs.setupActionsNoteEl.textContent = isAsyncRound
+    ? 'Ready: start a session for async round streaming.'
+    : 'Ready: start stream or create a new game.';
 }
 
 export function setSetupStateForTests(partial = {}) {

@@ -138,6 +138,7 @@ import {
   initGameActions,
   performUpgrade,
   createNewGameAndJoin,
+  startRoundSession,
 } from './services/game-actions.js';
 
 // DOM elements - inputs
@@ -169,6 +170,7 @@ const derivedEmissionPreviewEl = document.getElementById(
 // DOM elements - buttons
 const newGameBtn = document.getElementById('new-game-btn');
 const startBtn = document.getElementById('start-btn');
+const startSessionBtn = document.getElementById('start-session-btn');
 const stopBtn = document.getElementById('stop-btn');
 
 // DOM elements - status displays
@@ -178,6 +180,7 @@ const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
 const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
+const roundModeBadgeEl = document.getElementById('round-mode-badge');
 const metaDebugEl = document.getElementById('meta-debug');
 const liveBoardEl = document.getElementById('live-board');
 const setupShellEl = document.getElementById('setup-shell');
@@ -224,11 +227,64 @@ let modulesInitialized = false;
 let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
+let sessionStartSupported = true;
+
+function getRoundModeFromMeta(meta) {
+  const raw = String(meta?.round_mode || meta?.round_type || '')
+    .trim()
+    .toLowerCase();
+  return raw === 'async' ? 'async' : 'sync';
+}
+
+function getSessionSupportFromMeta(meta) {
+  if (!meta) return null;
+  if (
+    meta.supports_round_sessions === true ||
+    meta.supports_session_stream === true ||
+    meta.supports_async_sessions === true
+  ) {
+    return true;
+  }
+  if (
+    meta.supports_round_sessions === false ||
+    meta.supports_session_stream === false
+  ) {
+    return false;
+  }
+  const capabilityLists = [];
+  if (Array.isArray(meta.capabilities)) capabilityLists.push(meta.capabilities);
+  if (Array.isArray(meta.features)) capabilityLists.push(meta.features);
+  const capabilityMatch = capabilityLists
+    .flat()
+    .map((entry) => String(entry).toLowerCase())
+    .some((entry) => entry.includes('session'));
+  return capabilityMatch ? true : null;
+}
+
+function getCurrentRoundContext() {
+  const gameMeta = getGameMeta(gameIdInput?.value);
+  const roundMode = getRoundModeFromMeta(gameMeta);
+  const supportFromMeta = getSessionSupportFromMeta(gameMeta);
+  const supportsSessionStart =
+    roundMode !== 'async'
+      ? false
+      : supportFromMeta === null
+        ? sessionStartSupported
+        : supportFromMeta;
+  return {
+    roundMode,
+    supportsSessionStart,
+  };
+}
+
 function syncSetupShellState() {
+  const roundContext = getCurrentRoundContext();
   setSetupShellState({
     isStreamActive,
     isSetupBusy,
     latestGameStatus,
+    roundMode: roundContext.roundMode,
+    sessionStartSupported: roundContext.supportsSessionStart,
   });
 }
 
@@ -495,10 +551,13 @@ function initializeModules() {
 
   initSetupShell({
     gameIdInput,
+    playerIdInput,
     newGameBtn,
     startBtn,
+    startSessionBtn,
     stopBtn,
     setupActionsNoteEl,
+    roundModeBadgeEl,
     debugBackendUrlEl,
     debugGameIdEl,
     debugPlayerIdEl,
@@ -621,7 +680,7 @@ function initializeModules() {
     fetchMetaSnapshot,
     saveSettings,
     ensureInputsEditable,
-    startStream,
+    startLiveStream,
     setSetupCollapsed,
     scrollToLiveBoard,
   });
@@ -735,6 +794,30 @@ function updateUI(data) {
   updateSetupActionsState();
 }
 
+async function startLiveStream(gameId, playerId, options = {}) {
+  const roundContext = getCurrentRoundContext();
+  let sessionId = null;
+  if (roundContext.roundMode === 'async' && roundContext.supportsSessionStart) {
+    const sessionResult = await startRoundSession(gameId, playerId);
+    if (sessionResult.sessionId) {
+      sessionId = sessionResult.sessionId;
+      sessionStartSupported = true;
+    } else if (sessionResult.unsupported) {
+      sessionStartSupported = false;
+      showToast(
+        'Session start unavailable on this backend. Falling back to game stream.',
+        'info'
+      );
+    }
+  }
+
+  startStream(gameId, playerId, {
+    sessionId,
+    roundMode: roundContext.roundMode,
+    forceSessionAttempt: Boolean(options.forceSessionAttempt),
+  });
+}
+
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
     const gameId = gameIdInput.value;
@@ -753,7 +836,31 @@ if (startBtn) {
       console.warn('Initial meta fetch failed before stream start:', e);
     }
 
-    startStream(gameId, playerId);
+    await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
+    setSetupCollapsed(true);
+    scrollToLiveBoard();
+  });
+}
+
+if (startSessionBtn) {
+  startSessionBtn.addEventListener('click', async () => {
+    const gameId = gameIdInput.value;
+    const playerId = playerIdInput.value;
+    const baseUrl = getNormalizedBaseUrlOrNull();
+    if (!baseUrl) {
+      return;
+    }
+
+    cleanupGameMetaCache();
+    markGameMetaSeen(gameId);
+
+    try {
+      await fetchMetaSnapshot(baseUrl, gameId);
+    } catch (e) {
+      console.warn('Initial meta fetch failed before session start:', e);
+    }
+
+    await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
     setSetupCollapsed(true);
     scrollToLiveBoard();
   });

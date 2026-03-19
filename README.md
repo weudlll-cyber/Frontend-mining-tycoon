@@ -76,7 +76,7 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
-- **Primary Setup Actions always visible**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`; actions may be disabled by state but are never hidden.
+- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and is disabled when backend session-start support is unavailable (with automatic fallback to legacy game stream).
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
     - Season header with emoji icon

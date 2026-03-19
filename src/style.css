@@ -280,6 +280,36 @@ body {
   color: var(--text-secondary);
 }
 
+.setup-actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.round-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border-light);
+}
+
+.round-mode-badge--sync {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.round-mode-badge--async {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .setup-actions-note {
   margin: 0;
   font-size: 0.8rem;

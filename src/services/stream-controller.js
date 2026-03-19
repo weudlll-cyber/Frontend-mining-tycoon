@@ -39,7 +39,7 @@ export function hasOpenStream() {
   return Boolean(_eventSource);
 }
 
-export function startStream(gameId, playerId) {
+export function startStream(gameId, playerId, streamContext = {}) {
   _deps.onStreamStateChange(true);
   _deps.updateSetupActionsState();
 
@@ -59,17 +59,25 @@ export function startStream(gameId, playerId) {
   void _deps.connectChat();
 
   async function buildSseUrl() {
-    const baseStreamUrl = `${base}/games/${encodeURIComponent(gameId)}/stream?player_id=${encodeURIComponent(playerId)}`;
+    const sessionId = streamContext?.sessionId;
+    const encodedGameId = encodeURIComponent(gameId);
+    const encodedPlayerId = encodeURIComponent(playerId);
+    const encodedSessionId = encodeURIComponent(sessionId || '');
+    const baseStreamUrl = sessionId
+      ? `${base}/sessions/${encodedSessionId}/stream?player_id=${encodedPlayerId}`
+      : `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;
+
+    const ticketUrl = sessionId
+      ? `${base}/sessions/${encodedSessionId}/sse-ticket?player_id=${encodedPlayerId}`
+      : `${base}/games/${encodedGameId}/sse-ticket?player_id=${encodedPlayerId}`;
+
     const playerToken = _deps.getStorageItem(
       _deps.getPlayerTokenStorageKey(gameId, playerId)
     );
     try {
-      const ticketResp = await fetch(
-        `${base}/games/${encodeURIComponent(gameId)}/sse-ticket?player_id=${encodeURIComponent(playerId)}`,
-        {
-          headers: playerToken ? { 'X-Player-Token': playerToken } : {},
-        }
-      );
+      const ticketResp = await fetch(ticketUrl, {
+        headers: playerToken ? { 'X-Player-Token': playerToken } : {},
+      });
       if (ticketResp.ok) {
         const ticketData = await ticketResp.json();
         if (ticketData.ticket) {
@@ -79,6 +87,12 @@ export function startStream(gameId, playerId) {
     } catch {
       // Dev mode can still fall back to a ticketless stream URL.
     }
+
+    // Fallback for backends that do not support session streams yet.
+    if (sessionId) {
+      return `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;
+    }
+
     return baseStreamUrl;
   }
 

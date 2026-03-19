@@ -466,7 +466,10 @@ export function renderPlayerState(data) {
         rawRate
       );
     } else {
-      clearCompactCellValue(refs.outputRateNodes[token], refs.outputCells[token]);
+      clearCompactCellValue(
+        refs.outputRateNodes[token],
+        refs.outputCells[token]
+      );
     }
   });
   setCompactNodeValue(
@@ -504,7 +507,10 @@ export function renderPlayerState(data) {
         rawPrice
       );
     } else {
-      clearCompactCellValue(refs.oraclePriceNodes[token], refs.priceCells[token]);
+      clearCompactCellValue(
+        refs.oraclePriceNodes[token],
+        refs.priceCells[token]
+      );
     }
   });
   setTextNodeValue(refs.oracleTotalNode, '—');
