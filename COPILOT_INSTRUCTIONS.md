@@ -16,6 +16,18 @@ If a requested change would violate any locked invariant:
 - Require an explicit REDESIGN DECISION in `LOCKED_DECISIONS.md` first.
 - Do not implement violating code/docs changes before that.
 
+## 1.1) Cross-Repo Canonical Context (Frontend + Backend)
+
+When a task touches full-stack behavior, also read backend canonical docs:
+- `C:\Users\weudl\Mining tycoon\README.md`
+- `C:\Users\weudl\Mining tycoon\REQUIREMENTS.md`
+- `C:\Users\weudl\Mining tycoon\SECURITY.md`
+- `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md`
+
+Cross-repo rule:
+- Keep frontend and backend contracts aligned; do not change one side in ways that silently break the other.
+- If contracts diverge, update docs/tests on both sides or stop and raise change-control requirements.
+
 ## 2) Architecture & Gameplay Invariants (Must Preserve)
 
 - Backend remains authoritative and deterministic; frontend remains display/intent only.
@@ -71,6 +83,11 @@ For every source file touched or created:
   - `npm run test -- --run`
   - `npm run build`
   - `npm audit --omit=dev`
+
+If backend files are touched in the same task, also run backend gates before push:
+- `python -m ruff check app tests scripts`
+- `python -m unittest discover -s tests -q`
+- `python -m pip_audit -r requirements.txt`
 
 ## 7) Required Output Format
 
