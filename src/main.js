@@ -110,6 +110,7 @@ import {
 import {
   initSeasonCards,
   formatRemainingMmSs,
+  formatDurationCompact,
   classifyHalvingSeverity,
   applyHalvingTextAndSeverity,
   syncSeasonHalvingTicker,
@@ -855,6 +856,7 @@ export {
   normalizeTokenNames,
   formatCompactNumber,
   formatRemainingMmSs,
+  formatDurationCompact,
   classifyHalvingSeverity,
   applyHalvingTextAndSeverity,
   syncSeasonHalvingTicker,

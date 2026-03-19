@@ -812,6 +812,27 @@ describe('Seasonal Oracle season card rendering', () => {
     expect(halvingEl.textContent).toMatch(/^\d{2}:\d{2}$/);
   });
 
+  it('formats long halving countdowns with compact hour/day labels', async () => {
+    const module = await loadMainModule();
+
+    expect(module.formatDurationCompact(59)).toBe('00:59');
+    expect(module.formatDurationCompact(3600)).toBe('1h 00m');
+    expect(module.formatDurationCompact(3661)).toBe('1h 01m');
+    expect(module.formatDurationCompact(86400)).toBe('1d 0h');
+  });
+
+  it('applies compact halving text for long-running season countdowns', async () => {
+    const module = await loadMainModule();
+    const halvingEl = document.createElement('span');
+    halvingEl.className = 'season-halving';
+
+    module.applyHalvingTextAndSeverity(
+      halvingEl,
+      Date.now() / 1000 + 3 * 3600 + 5 * 60
+    );
+    expect(halvingEl.textContent).toMatch(/^3h 0[45]m$/);
+  });
+
   it('applies warning/critical color classes only at threshold windows', async () => {
     const module = await loadMainModule();
     const halvingEl = document.createElement('span');

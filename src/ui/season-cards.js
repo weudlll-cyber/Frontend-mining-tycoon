@@ -23,6 +23,27 @@ export function formatRemainingMmSs(targetUnix, nowUnix = Date.now() / 1000) {
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
+export function formatDurationCompact(totalSeconds) {
+  const remaining = Math.max(0, Math.ceil(Number(totalSeconds)));
+  if (!Number.isFinite(remaining)) return '—';
+
+  if (remaining < 3600) {
+    const mm = Math.floor(remaining / 60);
+    const ss = remaining % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  }
+
+  if (remaining < 86400) {
+    const hours = Math.floor(remaining / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+  }
+
+  const days = Math.floor(remaining / 86400);
+  const hours = Math.floor((remaining % 86400) / 3600);
+  return `${days}d ${hours}h`;
+}
+
 export function classifyHalvingSeverity(remainingSeconds) {
   const remaining = Number(remainingSeconds);
   if (!Number.isFinite(remaining)) return 'normal';
@@ -45,7 +66,7 @@ export function applyHalvingTextAndSeverity(halvingEl, targetUnix) {
 
   const nowUnix = Date.now() / 1000;
   const remaining = Math.max(0, Math.ceil(Number(targetUnix) - nowUnix));
-  halvingEl.textContent = formatRemainingMmSs(targetUnix, nowUnix);
+  halvingEl.textContent = formatDurationCompact(remaining);
 
   const severity = classifyHalvingSeverity(remaining);
   halvingEl.classList.toggle('season-halving--warning', severity === 'warning');
