@@ -76,7 +76,8 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
-- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and is disabled when backend session-start support is unavailable (with automatic fallback to legacy game stream).
+- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds during pre-play window states and is disabled with inline text `Async sessions not supported by backend (using legacy live view).` when session endpoints are unavailable.
+- **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Session Ready` or `Async: Legacy View`).
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
     - Season header with emoji icon
@@ -97,7 +98,9 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
       - **Compact number formatting**: Large values (≥1000) display as compact notation (1.23k, 1.23M, 1.23B) to prevent grid overflow and maintain scanability. Exact full values are available in tooltips on hover/focus/tap.
       - Numeric column uses monospace tabular fonts for visual alignment and prevents overflow with `min-width: 0; overflow: hidden; text-overflow: ellipsis`
       - Icon column on the right (one ⓘ per row) for optional precision tooltips showing exact values to 4 decimals
-    - **Footer metrics** on a single line: Next H | Mined | fee/spread | ⓘ
+    - **Footer metrics** on deliberate two lines:
+      - Line 1: Next halving | Mined
+      - Line 2: Fee X / Y with anchored ⓘ tooltip
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
     - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
 - **Bottom Bar**: 

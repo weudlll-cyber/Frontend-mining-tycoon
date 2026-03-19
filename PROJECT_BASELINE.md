@@ -138,6 +138,10 @@ Frontend structure is modular:
 - Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
 - Halving display module: calculates and renders halving schedules and countdowns per token.
+
+Frontend session-mode readiness:
+- Setup shell surfaces round mode (`sync` / `async`) and async session support state without blocking gameplay.
+- If async session start endpoints are unavailable, frontend degrades to legacy live stream view with explicit status text; backend remains authoritative.
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
