@@ -1,6 +1,11 @@
 /*
 File: src/style.css
 Purpose: Global layout, dashboard, and component styles with no-page-scroll desktop constraints.
+Role in system:
+- Preserves the locked inline dashboard layout while allowing internal panel scrolling only.
+Invariants:
+- No page scroll on desktop core gameplay view.
+- Inline status elements must remain non-blocking and must not introduce overlay behavior.
 */
 
 * {
@@ -319,6 +324,25 @@ body {
   margin: 0;
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.setup-session-status {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.setup-session-status--success {
+  color: #166534;
+}
+
+.setup-session-status--warning {
+  color: #92400e;
+}
+
+.setup-session-status--error {
+  color: #b91c1c;
 }
 
 .dashboard-shell {

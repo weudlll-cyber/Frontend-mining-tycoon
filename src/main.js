@@ -5,6 +5,14 @@ Key responsibilities:
 - Manage SSE lifecycle and reconnect behavior.
 - Fetch/cache meta contracts with ETag, dedupe/throttle, and retention cleanup.
 - Render state/leaderboard/upgrades and enforce contract-version safety gates.
+- Drive explicit async session creation and session-scoped stream orchestration.
+Invariants:
+- Frontend remains display/intent only; backend stays authoritative for deterministic session policy and timing.
+- No overlays/modals for core gameplay; inline status only.
+- Desktop core view must avoid page scroll; only internal panels may scroll.
+Security notes:
+- Use safe DOM APIs only and never render untrusted HTML.
+- Encode ids in URLs and never surface player tokens in UI.
 Entry points / public functions:
 - DOMContentLoaded bootstrap, start/stop/new-game handlers, fetchMetaSnapshot.
 Dependencies:
@@ -102,6 +110,7 @@ import {
   computePortfolioValue,
   renderQuickStats as renderLiveQuickStats,
   renderPortfolioValue as renderLivePortfolioValue,
+  renderAsyncSessionBadge,
 } from './ui/live-summary.js';
 import {
   initLeaderboard,
@@ -138,8 +147,12 @@ import {
   initGameActions,
   performUpgrade,
   createNewGameAndJoin,
-  startRoundSession,
 } from './services/game-actions.js';
+import {
+  initSessionActions,
+  createAsyncSession,
+  getSessionStreamTicket,
+} from './services/session-actions.js';
 
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
@@ -182,15 +195,18 @@ const asyncSessionStatusEl = document.getElementById('async-session-status');
 const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
 const roundModeBadgeEl = document.getElementById('round-mode-badge');
+const startSessionStatusEl = document.getElementById('start-session-status');
 const metaDebugEl = document.getElementById('meta-debug');
 const liveBoardEl = document.getElementById('live-board');
 const setupShellEl = document.getElementById('setup-shell');
 const setupToggleBtnEl = document.getElementById('setup-toggle-btn');
 const jumpLiveBtnEl = document.getElementById('jump-live-btn');
 const jumpLiveBtnSetupEl = document.getElementById('jump-live-btn-setup');
+const debugDetailsEl = document.getElementById('debug-details');
 const debugBackendUrlEl = document.getElementById('debug-backend-url');
 const debugGameIdEl = document.getElementById('debug-game-id');
 const debugPlayerIdEl = document.getElementById('debug-player-id');
+const debugSessionIdEl = document.getElementById('debug-session-id');
 const chatPanelEl = document.getElementById('chat-panel');
 const chatToggleBtnEl = document.getElementById('chat-toggle-btn');
 const chatMessagesEl = document.getElementById('chat-messages');
@@ -230,12 +246,15 @@ let isSetupBusy = false;
 let latestGameStatus = null;
 let sessionStartSupported = true;
 let setupRoundModeOverride = null;
+let activeSession = null;
+let sessionElapsedInterval = null;
 
 function getRoundModeFromMeta(meta) {
   const raw = String(meta?.round_mode || meta?.round_type || '')
     .trim()
     .toLowerCase();
-  return raw === 'async' ? 'async' : 'sync';
+  if (raw === 'async' || raw === 'asynchronous') return 'async';
+  return 'sync';
 }
 
 function getSessionSupportFromMeta(meta) {
@@ -290,7 +309,43 @@ function syncSetupShellState() {
     latestGameStatus,
     roundMode: roundContext.roundMode,
     sessionStartSupported: roundContext.supportsSessionStart,
+    sessionActive: Boolean(activeSession?.sessionId),
+    sessionId: activeSession?.sessionId || null,
   });
+}
+
+function setStartSessionStatus(message = '', type = 'info') {
+  if (!startSessionStatusEl) return;
+  startSessionStatusEl.textContent = message;
+  startSessionStatusEl.className = message
+    ? `setup-session-status setup-session-status--${type}`
+    : 'setup-session-status';
+}
+
+function stopSessionElapsedTimer() {
+  if (sessionElapsedInterval) {
+    clearInterval(sessionElapsedInterval);
+    sessionElapsedInterval = null;
+  }
+}
+
+function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
+  if (!Number.isFinite(sessionStartUnix)) return;
+  stopSessionElapsedTimer();
+
+  const update = () => {
+    const nowSeconds = Date.now() / 1000;
+    const elapsed = Math.max(
+      Number(initialElapsedSeconds) || 0,
+      nowSeconds - Number(sessionStartUnix)
+    );
+    // WHY: Once the backend session exists, the primary timer should reflect session-relative age.
+    countdownLabelEl.textContent = 'Session Elapsed';
+    countdownEl.textContent = formatRemainingMmSs(elapsed);
+  };
+
+  update();
+  sessionElapsedInterval = setInterval(update, 500);
 }
 
 function updateSetupActionsState() {
@@ -305,6 +360,7 @@ function setSetupStateForTests({
   setupBusy,
   roundMode,
   supportsSessionStart,
+  sessionId,
 } = {}) {
   if (typeof streamActive === 'boolean') {
     isStreamActive = streamActive;
@@ -322,6 +378,15 @@ function setSetupStateForTests({
   }
   if (typeof supportsSessionStart === 'boolean') {
     sessionStartSupported = supportsSessionStart;
+  }
+  if (sessionId === null) {
+    activeSession = null;
+  } else if (sessionId !== undefined) {
+    activeSession = {
+      sessionId,
+      sessionStartUnix: activeSession?.sessionStartUnix || null,
+      requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
+    };
   }
   updateSetupActionsState();
 }
@@ -578,13 +643,18 @@ function initializeModules() {
     setupActionsNoteEl,
     roundModeBadgeEl,
     asyncSessionStatusEl,
+    renderAsyncSessionBadge,
+    startSessionStatusEl,
+    debugDetailsEl,
     debugBackendUrlEl,
     debugGameIdEl,
     debugPlayerIdEl,
+    debugSessionIdEl,
     setupShellEl,
     setupToggleBtnEl,
     jumpLiveBtnEl,
     jumpLiveBtnSetupEl,
+    onStartAsyncSession: handleStartAsyncSession,
     liveBoardEl,
     editableInputs,
   });
@@ -596,6 +666,7 @@ function initializeModules() {
     myRankEl,
     topScoreEl,
     portfolioValueEl,
+    asyncSessionStatusEl,
     getGameMeta,
     defaultTokenNames: PLAYER_STATE_TOKENS,
   });
@@ -652,10 +723,15 @@ function initializeModules() {
     connectChat,
     getStorageItem,
     getPlayerTokenStorageKey,
+    getSessionStreamTicket,
     setBadgeStatus,
     connStatusEl,
     fetchMetaSnapshot,
     onData: updateUI,
+    onSessionStreamError(message) {
+      setStartSessionStatus(message, 'error');
+      showToast(message, 'error');
+    },
     disconnectChat,
     onGameStatusChange(next) {
       latestGameStatus = next;
@@ -703,6 +779,11 @@ function initializeModules() {
     startLiveStream,
     setSetupCollapsed,
     scrollToLiveBoard,
+  });
+  initSessionActions({
+    getNormalizedBaseUrlOrNull,
+    getStorageItem,
+    getPlayerTokenStorageKey,
   });
 
   modulesInitialized = true;
@@ -783,6 +864,21 @@ function updateUI(data) {
   lastGameData = data;
   lastGameData.timestamp = Date.now();
   latestGameStatus = data?.game_status || null;
+
+  if (
+    activeSession?.sessionId &&
+    Number.isFinite(activeSession?.sessionStartUnix)
+  ) {
+    const streamSession = data?.session || null;
+    const elapsedFromPayload = Number(streamSession?.session_elapsed_seconds);
+    startSessionElapsedTimer(
+      Number(activeSession.sessionStartUnix),
+      Number.isFinite(elapsedFromPayload) ? elapsedFromPayload : 0
+    );
+  } else {
+    stopSessionElapsedTimer();
+  }
+
   setLiveSessionActive(true);
   handleLastHalvingStateUpdate(data);
 
@@ -790,7 +886,10 @@ function updateUI(data) {
     setBadgeStatus(gameStatusEl, data.game_status);
     autoCollapseSetupForLiveState(data.game_status);
 
-    if (data.game_status === 'enrolling') {
+    if (activeSession?.sessionId) {
+      // WHY: Once session-active, the user-visible primary timer reflects session age.
+      startSessionElapsedTimer(Number(activeSession.sessionStartUnix), 0);
+    } else if (data.game_status === 'enrolling') {
       countdownLabelEl.textContent = 'Game starts in';
       startEnrollmentCountdown();
     } else if (data.game_status === 'running') {
@@ -815,27 +914,57 @@ function updateUI(data) {
 }
 
 async function startLiveStream(gameId, playerId, options = {}) {
-  const roundContext = getCurrentRoundContext();
-  let sessionId = null;
-  if (roundContext.roundMode === 'async' && roundContext.supportsSessionStart) {
-    const sessionResult = await startRoundSession(gameId, playerId);
-    if (sessionResult.sessionId) {
-      sessionId = sessionResult.sessionId;
-      sessionStartSupported = true;
-    } else if (sessionResult.unsupported) {
-      sessionStartSupported = false;
-      showToast(
-        'Session start unavailable on this backend. Falling back to game stream.',
-        'info'
-      );
-    }
-  }
+  const sessionId = activeSession?.sessionId || null;
 
   startStream(gameId, playerId, {
     sessionId,
-    roundMode: roundContext.roundMode,
+    requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
+    roundMode: getCurrentRoundContext().roundMode,
     forceSessionAttempt: Boolean(options.forceSessionAttempt),
   });
+}
+
+async function handleStartAsyncSession() {
+  const gameId = gameIdInput.value;
+  const playerId = playerIdInput.value;
+  const baseUrl = getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    return;
+  }
+
+  setStartSessionStatus('Starting async session...', 'info');
+  isSetupBusy = true;
+  updateSetupActionsState();
+
+  // WHY: Session creation is an explicit user step before switching transport to the session-scoped stream.
+  const result = await createAsyncSession({ gameId, playerId });
+  if (!result.ok) {
+    isSetupBusy = false;
+    updateSetupActionsState();
+    if (result.kind === 'policy-closed') {
+      setStartSessionStatus(result.message, 'warning');
+      return;
+    }
+
+    setStartSessionStatus(result.message, 'error');
+    return;
+  }
+
+  activeSession = {
+    sessionId: result.sessionId,
+    sessionStartUnix: Number(result.sessionStartUnix) || null,
+    requiresPlayerAuth: Boolean(result.requiresPlayerAuth),
+  };
+  sessionStartSupported = true;
+  renderDebugContext();
+  setStartSessionStatus('Async session started.', 'success');
+
+  isSetupBusy = false;
+  updateSetupActionsState();
+
+  await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
+  setSetupCollapsed(true);
+  scrollToLiveBoard();
 }
 
 if (startBtn) {
@@ -862,30 +991,6 @@ if (startBtn) {
   });
 }
 
-if (startSessionBtn) {
-  startSessionBtn.addEventListener('click', async () => {
-    const gameId = gameIdInput.value;
-    const playerId = playerIdInput.value;
-    const baseUrl = getNormalizedBaseUrlOrNull();
-    if (!baseUrl) {
-      return;
-    }
-
-    cleanupGameMetaCache();
-    markGameMetaSeen(gameId);
-
-    try {
-      await fetchMetaSnapshot(baseUrl, gameId);
-    } catch (e) {
-      console.warn('Initial meta fetch failed before session start:', e);
-    }
-
-    await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
-    setSetupCollapsed(true);
-    scrollToLiveBoard();
-  });
-}
-
 if (stopBtn) {
   stopBtn.addEventListener('click', () => {
     isStreamActive = false;
@@ -893,6 +998,7 @@ if (stopBtn) {
     closeEventSourceIfOpen();
     stopLiveTimersAndHalving();
     disconnectChat();
+    stopSessionElapsedTimer();
     setBadgeStatus(connStatusEl, 'idle');
     setBadgeStatus(gameStatusEl, 'idle');
     stopCountdownTimer();
@@ -905,12 +1011,18 @@ if (stopBtn) {
     resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
     ensureInputsEditable();
     setLiveSessionActive(false);
+    setStartSessionStatus('', 'info');
     updateSetupActionsState();
   });
 }
 
 if (newGameBtn) {
-  newGameBtn.addEventListener('click', createNewGameAndJoin);
+  newGameBtn.addEventListener('click', () => {
+    activeSession = null;
+    setStartSessionStatus('', 'info');
+    stopSessionElapsedTimer();
+    createNewGameAndJoin();
+  });
 }
 
 // P2.4: Duration preset and advanced overrides event listeners
@@ -995,6 +1107,7 @@ export {
   setActiveMeta,
   setSetupStateForTests,
   updateSetupActionsState,
+  handleStartAsyncSession,
   setSetupCollapsed,
   toggleSetupCollapsed,
   autoCollapseSetupForLiveState,

@@ -1,6 +1,14 @@
 /*
 File: src/services/stream-controller.js
 Purpose: Own SSE lifecycle, reconnect state, and timer cleanup around live game streaming.
+Role in system:
+- Switches between legacy game streams and session-scoped streams based on explicit session context from the orchestrator.
+Invariants:
+- Session streams must not silently fall back to legacy game streams once a session exists.
+- Ticket query parameter is used only for authenticated session streams.
+Security notes:
+- Parse SSE payloads defensively.
+- Never append sensitive query params unless the backend requires the short-lived ticket flow.
 */
 
 let _deps = null;
@@ -67,104 +75,111 @@ export function startStream(gameId, playerId, streamContext = {}) {
       ? `${base}/sessions/${encodedSessionId}/stream?player_id=${encodedPlayerId}`
       : `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;
 
-    const ticketUrl = sessionId
-      ? `${base}/sessions/${encodedSessionId}/sse-ticket?player_id=${encodedPlayerId}`
-      : `${base}/games/${encodedGameId}/sse-ticket?player_id=${encodedPlayerId}`;
+    if (!sessionId) {
+      return baseStreamUrl;
+    }
 
-    const playerToken = _deps.getStorageItem(
-      _deps.getPlayerTokenStorageKey(gameId, playerId)
-    );
-    try {
-      const ticketResp = await fetch(ticketUrl, {
-        headers: playerToken ? { 'X-Player-Token': playerToken } : {},
+    // WHY: Authenticated session streams require a short-lived ticket because EventSource cannot send custom headers.
+    if (streamContext?.requiresPlayerAuth) {
+      const ticketResult = await _deps.getSessionStreamTicket({
+        gameId,
+        playerId,
+        requirePlayerAuth: true,
       });
-      if (ticketResp.ok) {
-        const ticketData = await ticketResp.json();
-        if (ticketData.ticket) {
-          return `${baseStreamUrl}&ticket=${encodeURIComponent(ticketData.ticket)}`;
-        }
+      if (!ticketResult?.ok || !ticketResult.ticket) {
+        throw new Error(
+          ticketResult?.message ||
+            'Unable to open authenticated session stream.'
+        );
       }
-    } catch {
-      // Dev mode can still fall back to a ticketless stream URL.
+      return `${baseStreamUrl}&ticket=${encodeURIComponent(ticketResult.ticket)}`;
     }
 
-    // Fallback for backends that do not support session streams yet.
-    if (sessionId) {
-      return `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;
-    }
-
+    // WHY: Once a session exists, staying on the session transport preserves backend-authoritative context and avoids silent drift.
     return baseStreamUrl;
   }
 
   _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
   _intentionalClose = false;
 
-  buildSseUrl().then((url) => {
-    _eventSource = new EventSource(url);
+  buildSseUrl()
+    .then((url) => {
+      _eventSource = new EventSource(url);
 
-    _eventSource.onopen = () => {
-      _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
-      _deps.updateSetupActionsState();
+      _eventSource.onopen = () => {
+        _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
+        _deps.updateSetupActionsState();
 
-      _waitingTimer = setTimeout(() => {
-        if (_eventSource && _eventSource.readyState === EventSource.OPEN) {
-          _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
-        }
-      }, 3000);
+        _waitingTimer = setTimeout(() => {
+          if (_eventSource && _eventSource.readyState === EventSource.OPEN) {
+            _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
+          }
+        }, 3000);
 
-      _deps
-        .fetchMetaSnapshot(base, gameId)
-        .catch((err) => console.warn('Meta refresh on connect failed:', err));
-    };
+        _deps
+          .fetchMetaSnapshot(base, gameId)
+          .catch((err) => console.warn('Meta refresh on connect failed:', err));
+      };
 
-    _eventSource.onmessage = (event) => {
-      clearWaitingTimer();
-      _deps.setBadgeStatus(_deps.connStatusEl, 'connected');
-
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch {
-        console.error('Failed to parse SSE data:', event.data);
-        return;
-      }
-
-      if (!_payloadLogged) {
-        console.log('SSE payload keys:', Object.keys(data));
-        if (data.upgrade_metrics) {
-          console.log('upgrade_metrics structure:', data.upgrade_metrics);
-        }
-        if (data.player_state) {
-          console.log('player_state keys:', Object.keys(data.player_state));
-        }
-        _payloadLogged = true;
-      }
-
-      _deps.onData(data);
-
-      if (data?.game_status === 'finished') {
-        _intentionalClose = true;
-        _deps.onStreamStateChange(false);
-        closeEventSourceIfOpen();
-        _deps.clearCountdownInterval();
-        _deps.stopNextHalvingCountdown();
+      _eventSource.onmessage = (event) => {
         clearWaitingTimer();
-        _deps.disconnectChat();
-        _deps.updateSetupActionsState();
-      }
-    };
+        _deps.setBadgeStatus(_deps.connStatusEl, 'connected');
 
-    _eventSource.onerror = () => {
-      clearWaitingTimer();
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          console.error('Failed to parse SSE data:', event.data);
+          return;
+        }
 
-      if (!_intentionalClose) {
-        _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
-        console.log('Connection error, readyState:', _eventSource?.readyState);
-      } else {
-        _deps.onStreamStateChange(false);
-        _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
-        _deps.updateSetupActionsState();
-      }
-    };
-  });
+        if (!_payloadLogged) {
+          console.log('SSE payload keys:', Object.keys(data));
+          if (data.upgrade_metrics) {
+            console.log('upgrade_metrics structure:', data.upgrade_metrics);
+          }
+          if (data.player_state) {
+            console.log('player_state keys:', Object.keys(data.player_state));
+          }
+          _payloadLogged = true;
+        }
+
+        _deps.onData(data);
+
+        if (data?.game_status === 'finished') {
+          _intentionalClose = true;
+          _deps.onStreamStateChange(false);
+          closeEventSourceIfOpen();
+          _deps.clearCountdownInterval();
+          _deps.stopNextHalvingCountdown();
+          clearWaitingTimer();
+          _deps.disconnectChat();
+          _deps.updateSetupActionsState();
+        }
+      };
+
+      _eventSource.onerror = () => {
+        clearWaitingTimer();
+
+        if (!_intentionalClose) {
+          _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
+          console.log(
+            'Connection error, readyState:',
+            _eventSource?.readyState
+          );
+        } else {
+          _deps.onStreamStateChange(false);
+          _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
+          _deps.updateSetupActionsState();
+        }
+      };
+    })
+    .catch((error) => {
+      _deps.onStreamStateChange(false);
+      _deps.updateSetupActionsState();
+      _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
+      _deps.onSessionStreamError?.(
+        error?.message || 'Unable to start session stream.'
+      );
+    });
 }

@@ -1,9 +1,14 @@
 /*
 File: src/ui/setup-shell.js
 Purpose: Manage setup-shell visibility and setup action state while preserving user intent.
+Role in system:
+- Keeps setup actions explicit while leaving all session policy enforcement to the backend.
 Constraints:
 - Setup must not flicker-close from repeated SSE updates once the user re-opens it.
 - Async session discoverability must remain explicit with non-blocking status messaging.
+- Frontend remains intent/display only; server policy decides session eligibility.
+Security notes:
+- Render status via textContent only.
 */
 
 let _refs = null;
@@ -13,6 +18,8 @@ let _state = {
   latestGameStatus: null,
   roundMode: 'sync',
   sessionStartSupported: true,
+  sessionActive: false,
+  sessionId: null,
   userOpenedSetup: false,
   didAutoCloseAtPlayStart: false,
   previousGameStatus: null,
@@ -49,27 +56,12 @@ function updateRoundModeBadge() {
 }
 
 function updateAsyncSessionStatusBadge() {
-  if (!_refs?.asyncSessionStatusEl) return;
-
-  const isAsyncRound = _state.roundMode === 'async';
-  const badge = _refs.asyncSessionStatusEl;
-  if (!isAsyncRound) {
-    badge.hidden = true;
-    badge.textContent = 'Async: n/a';
-    badge.classList.remove('badge-yellow', 'badge-blue');
-    badge.classList.add('badge-gray');
-    return;
-  }
-
-  badge.hidden = false;
-  badge.classList.remove('badge-gray', 'badge-blue', 'badge-yellow');
-  if (_state.sessionStartSupported) {
-    badge.textContent = 'Async: Session Ready';
-    badge.classList.add('badge-blue');
-  } else {
-    badge.textContent = 'Async: Legacy View';
-    badge.classList.add('badge-yellow');
-  }
+  if (typeof _refs?.renderAsyncSessionBadge !== 'function') return;
+  _refs.renderAsyncSessionBadge({
+    roundMode: _state.roundMode,
+    sessionActive: _state.sessionActive,
+    sessionSupported: _state.sessionStartSupported,
+  });
 }
 
 export function updateSetupActionsState() {
@@ -93,8 +85,14 @@ export function updateSetupActionsState() {
   }
 
   if (_refs.startBtn) {
+    const requiresSessionStart =
+      isAsyncRound && _state.sessionStartSupported && !_state.sessionActive;
+    // WHY: Async rounds must complete the explicit session-start step before the stream transport can open.
     _refs.startBtn.disabled =
-      _state.isSetupBusy || !gameExists || _state.isStreamActive;
+      _state.isSetupBusy ||
+      !gameExists ||
+      _state.isStreamActive ||
+      requiresSessionStart;
   }
 
   if (_refs.startSessionBtn) {
@@ -105,6 +103,7 @@ export function updateSetupActionsState() {
       !isRoundWindowOpen ||
       !gameExists ||
       !playerExists ||
+      _state.sessionActive ||
       _state.isStreamActive ||
       !_state.sessionStartSupported;
     _refs.startSessionBtn.title = !_state.sessionStartSupported
@@ -132,6 +131,18 @@ export function updateSetupActionsState() {
   if (isAsyncRound && !_state.sessionStartSupported) {
     _refs.setupActionsNoteEl.textContent =
       'Async sessions not supported by backend (using legacy live view).';
+    return;
+  }
+
+  if (isAsyncRound && _state.sessionActive) {
+    _refs.setupActionsNoteEl.textContent =
+      'Async session active. Use Start Stream to reconnect the session view.';
+    return;
+  }
+
+  if (isAsyncRound && _state.sessionStartSupported) {
+    _refs.setupActionsNoteEl.textContent =
+      'Start Async Session first, then stream uses the session-scoped channel.';
     return;
   }
 
@@ -168,6 +179,11 @@ export function renderDebugContext() {
   }
   if (_refs.debugPlayerIdEl) {
     _refs.debugPlayerIdEl.textContent = _refs.playerIdInput?.value || '—';
+  }
+  if (_refs.debugSessionIdEl) {
+    const debugOpen = Boolean(_refs.debugDetailsEl?.open);
+    _refs.debugSessionIdEl.textContent =
+      debugOpen && _state.sessionId ? String(_state.sessionId) : '—';
   }
 }
 
@@ -261,6 +277,11 @@ export function initializeHeaderInteractions() {
   _refs.setupToggleBtnEl?.addEventListener('click', toggleSetupCollapsed);
   _refs.jumpLiveBtnEl?.addEventListener('click', scrollToLiveBoard);
   _refs.jumpLiveBtnSetupEl?.addEventListener('click', scrollToLiveBoard);
+  _refs.startSessionBtn?.addEventListener('click', () => {
+    if (_refs.startSessionBtn.disabled) return;
+    _refs.onStartAsyncSession?.();
+  });
+  _refs.debugDetailsEl?.addEventListener('toggle', renderDebugContext);
 }
 
 export function ensureInputsEditable() {

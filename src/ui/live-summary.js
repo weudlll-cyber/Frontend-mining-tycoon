@@ -1,6 +1,15 @@
 /*
 File: src/ui/live-summary.js
 Purpose: Render top-line score stats and bottom-bar portfolio value.
+Role in system:
+- Renders compact read-only summary values and session status without changing gameplay state.
+Invariants:
+- Summary remains backend-driven and display-only.
+- Async session state is displayed inline only; no popup affordances.
+Security notes:
+- Render text only; no untrusted HTML.
+Session model relation:
+- Renders the visible async session badge in the header summary line.
 */
 
 import {
@@ -32,6 +41,47 @@ function formatPortfolioValue(value) {
     decimalsLarge: 2,
   });
   return display;
+}
+
+export function renderAsyncSessionBadge({
+  roundMode = 'sync',
+  sessionActive = false,
+  sessionSupported = true,
+} = {}) {
+  const badgeEl = _refs?.asyncSessionStatusEl;
+  if (!badgeEl) return;
+
+  const isAsyncRound = roundMode === 'async';
+  if (!isAsyncRound) {
+    badgeEl.hidden = true;
+    badgeEl.textContent = 'Async: n/a';
+    badgeEl.classList.remove('badge-blue', 'badge-yellow', 'badge-green');
+    badgeEl.classList.add('badge-gray');
+    return;
+  }
+
+  badgeEl.hidden = false;
+  badgeEl.classList.remove(
+    'badge-gray',
+    'badge-blue',
+    'badge-yellow',
+    'badge-green'
+  );
+
+  if (sessionActive) {
+    badgeEl.textContent = 'Async: Session Active';
+    badgeEl.classList.add('badge-green');
+    return;
+  }
+
+  if (!sessionSupported) {
+    badgeEl.textContent = 'Async: Legacy View';
+    badgeEl.classList.add('badge-yellow');
+    return;
+  }
+
+  badgeEl.textContent = 'Async: Session Ready';
+  badgeEl.classList.add('badge-blue');
 }
 
 export function computePortfolioValue(

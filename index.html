@@ -1,3 +1,10 @@
+<!--
+File: index.html
+Purpose: Static application shell for the Mining Tycoon frontend.
+Role in system: Hosts the inline dashboard, setup panel, debug disclosure, and live summary regions wired by src/main.js.
+Invariants: No modal shell markup for gameplay; async-session status and debug session id stay inline and non-sensitive.
+Security notes: Static DOM scaffold only; runtime text is populated with safe DOM APIs.
+-->
 <!doctype html>
 <html lang="en">
   <head>
@@ -82,6 +89,10 @@
               <div class="debug-row">
                 <span class="debug-label">Player ID</span>
                 <span id="debug-player-id" class="debug-value">—</span>
+              </div>
+              <div class="debug-row">
+                <span class="debug-label">Session ID</span>
+                <span id="debug-session-id" class="debug-value">—</span>
               </div>
             </div>
           </details>
@@ -259,12 +270,17 @@
                     Start Stream
                   </button>
                   <button id="start-session-btn" class="btn-secondary" hidden>
-                    Start Session
+                    Start Async Session
                   </button>
                   <button id="stop-btn" class="btn-secondary">
                     Stop Stream
                   </button>
                 </div>
+                <p
+                  id="start-session-status"
+                  class="setup-session-status"
+                  aria-live="polite"
+                ></p>
                 <p
                   id="setup-actions-note"
                   class="setup-actions-note"
