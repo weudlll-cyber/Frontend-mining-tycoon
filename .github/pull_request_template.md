@@ -4,10 +4,12 @@ Describe what changed and why.
 
 ## MUST PASS BEFORE MERGE
 
+- [ ] Canonical docs reviewed before implementation (`LOCKED_DECISIONS.md`, `PROJECT_BASELINE.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY_AUDIT.md`).
 - [ ] Invariant compliance checked against `LOCKED_DECISIONS.md`.
 - [ ] Security posture preserved (no unsafe DOM patterns; no untrusted `innerHTML`).
 - [ ] Tests were updated/added when behavior changed.
 - [ ] Docs were updated when UI/behavior contract changed (`README.md`, `PROJECT_BASELINE.md`, and related docs as needed).
+- [ ] Readability standards preserved (file-level responsibility comments and non-trivial inline WHY comments where needed).
 - [ ] Commands run successfully:
 	- [ ] `npm run lint`
 	- [ ] `npm run format:check`
