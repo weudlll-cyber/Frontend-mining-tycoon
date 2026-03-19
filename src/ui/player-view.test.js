@@ -160,6 +160,40 @@ describe('player state matrix', () => {
     expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
   });
 
+  it('preserves next-halving information in running footer and footer tooltip', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      current_sim_month: 1,
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 42,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const line1 = document.querySelector('.ps-footer-line-1');
+    const line2 = document.querySelector('.ps-footer-line-2');
+    expect(line1).not.toBeNull();
+    expect(line2).not.toBeNull();
+
+    const line1Text = line1?.textContent || '';
+    expect(line1Text).toContain('Next halving');
+    expect(line1Text).toContain('Mined 42.00');
+
+    const footerTrigger = line2?.querySelector('.ps-tip-trigger');
+    expect(footerTrigger).not.toBeNull();
+
+    const tooltipId = footerTrigger?.getAttribute('aria-describedby');
+    expect(tooltipId).toBeTruthy();
+    const footerTooltip = tooltipId ? document.getElementById(tooltipId) : null;
+    expect(footerTooltip).not.toBeNull();
+    expect(footerTooltip?.textContent || '').toContain('Halving: Next halving');
+  });
+
   it('renders tooltip triggers with aria-describedby and tooltip role', () => {
     renderPlayerState({
       game_id: 'g1',
