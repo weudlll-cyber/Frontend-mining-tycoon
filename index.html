@@ -69,6 +69,15 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             >
           </div>
 
+          <div id="async-score-lines" class="async-score-lines" hidden>
+            <span id="this-session-score" class="summary-item"
+              >This session: —</span
+            >
+            <span id="best-round-score" class="summary-item"
+              >Best this round: —</span
+            >
+          </div>
+
           <details id="debug-details" class="debug-details">
             <summary>Debug</summary>
             <div class="debug-grid">
@@ -175,7 +184,11 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   hidden
                 >
                   <div class="async-host-row" aria-live="polite">
-                    <label class="async-host-field" for="enrollment-window">
+                    <label
+                      class="async-host-field"
+                      for="enrollment-window"
+                      hidden
+                    >
                       <span>Enrollment Window (seconds)</span>
                       <input
                         id="enrollment-window"
@@ -183,15 +196,20 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                         value="600"
                         min="5"
                         max="3600"
+                        disabled
                       />
                     </label>
                     <label class="async-host-field" for="async-duration-preset">
-                      <span>Session Duration</span>
+                      <span>Round Duration</span>
                       <select id="async-duration-preset">
                         <option value="5m">5m</option>
                         <option value="10m" selected>10m</option>
                         <option value="15m">15m</option>
-                        <option value="custom">Custom…</option>
+                        <option value="60m">1h</option>
+                        <option value="3h">3h</option>
+                        <option value="6h">6h</option>
+                        <option value="12h">12h</option>
+                        <option value="24h">24h</option>
                       </select>
                     </label>
                     <label
@@ -200,13 +218,14 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       for="async-duration-custom-minutes"
                       hidden
                     >
-                      <span>Custom Minutes</span>
+                      <span>Session Duration</span>
                       <input
                         id="async-duration-custom-minutes"
                         type="number"
                         value="10"
                         min="1"
                         max="240"
+                        disabled
                       />
                     </label>
                     <label class="async-host-checkbox" for="async-auto-start">

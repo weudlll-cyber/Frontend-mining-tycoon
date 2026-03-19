@@ -77,9 +77,16 @@ export function startStream(gameId, playerId, streamContext = {}) {
 
   async function buildSseUrl() {
     const sessionId = streamContext?.sessionId;
+    const isAsyncRound =
+      String(streamContext?.roundMode || '').toLowerCase() === 'async';
     const encodedGameId = encodeURIComponent(gameId);
     const encodedPlayerId = encodeURIComponent(playerId);
     const encodedSessionId = encodeURIComponent(sessionId || '');
+
+    if (isAsyncRound && !sessionId) {
+      throw new Error('Async session required before starting stream.');
+    }
+
     const baseStreamUrl = sessionId
       ? `${base}/sessions/${encodedSessionId}/stream?player_id=${encodedPlayerId}`
       : `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;

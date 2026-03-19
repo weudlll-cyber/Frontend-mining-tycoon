@@ -126,6 +126,14 @@ body {
   letter-spacing: 0.04em;
 }
 
+.async-score-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 .debug-details {
   border-top: 1px dashed var(--border-light);
   padding-top: 0.3rem;
@@ -1496,6 +1504,18 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   row-gap: 0.1rem;
+}
+
+.ps-session-scores {
+  margin-top: 0.45rem;
+  display: grid;
+  row-gap: 0.08rem;
+}
+
+.ps-session-score-line {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
 }
 
 .ps-footer-line {

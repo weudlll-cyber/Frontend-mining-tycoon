@@ -45,6 +45,12 @@ function formatPortfolioValue(value) {
   return display;
 }
 
+function formatExactScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return Math.floor(numeric).toLocaleString();
+}
+
 export function renderAsyncSessionBadge({
   roundMode = 'sync',
   sessionActive = false,
@@ -91,41 +97,48 @@ export function renderAsyncSessionBadge({
     return;
   }
 
-  if (!sessionSupported) {
-    badgeEl.textContent = 'Async: Legacy View';
-    badgeEl.classList.add('badge-yellow');
-    const stateKey = 'async-legacy';
-    if (_lastAsyncBadgeStateKey !== stateKey) {
-      _lastAsyncBadgeStateKey = stateKey;
-      debugLog('async-badge', 'rendered legacy fallback badge', {
-        sessionSupported,
-      });
-    }
-    return;
-  }
-
-  if (asyncReady) {
-    badgeEl.textContent = 'Async: Session Ready';
-    badgeEl.classList.add('badge-blue');
-    const stateKey = 'async-ready';
-    if (_lastAsyncBadgeStateKey !== stateKey) {
-      _lastAsyncBadgeStateKey = stateKey;
-      debugLog(
-        'async-badge',
-        'rendered session ready badge',
-        asyncAvailability
-      );
-    }
-    return;
-  }
-
-  badgeEl.textContent = 'Async: Session Blocked';
-  badgeEl.classList.add('badge-gray');
-  const stateKey = `async-blocked-${JSON.stringify(asyncAvailability || {})}`;
+  badgeEl.textContent = 'Async: Ready';
+  badgeEl.classList.add(asyncReady ? 'badge-blue' : 'badge-gray');
+  badgeEl.title = sessionSupported
+    ? asyncReady
+      ? 'Ready to start an async session.'
+      : 'Not ready yet. Check async diagnostics chips in setup.'
+    : 'Backend session endpoint unavailable.';
+  const stateKey = `async-ready-${asyncReady ? 'true' : 'false'}-${JSON.stringify(asyncAvailability || {})}`;
   if (_lastAsyncBadgeStateKey !== stateKey) {
     _lastAsyncBadgeStateKey = stateKey;
-    debugLog('async-badge', 'rendered blocked badge', asyncAvailability);
+    debugLog('async-badge', 'rendered ready badge', {
+      asyncReady,
+      sessionSupported,
+      asyncAvailability,
+    });
   }
+}
+
+export function renderAsyncScoreLines(data) {
+  const thisSessionEl = _refs?.thisSessionScoreEl;
+  const bestRoundEl = _refs?.bestRoundScoreEl;
+  const wrapperEl = _refs?.asyncScoreLinesEl;
+  if (!thisSessionEl || !bestRoundEl || !wrapperEl) return;
+
+  const isAsync =
+    String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
+  wrapperEl.hidden = !isAsync;
+  if (!isAsync) {
+    thisSessionEl.textContent = 'This session: —';
+    bestRoundEl.textContent = 'Best this round: —';
+    thisSessionEl.removeAttribute('title');
+    bestRoundEl.removeAttribute('title');
+    return;
+  }
+
+  const thisSession = Number(data?.current_session_score);
+  const bestRound = Number(data?.player_best_of_score);
+
+  thisSessionEl.textContent = `This session: ${formatScore(thisSession)}`;
+  bestRoundEl.textContent = `Best this round: ${formatScore(bestRound)}`;
+  thisSessionEl.title = `Exact value: ${formatExactScore(thisSession)}`;
+  bestRoundEl.title = `Exact value: ${formatExactScore(bestRound)}`;
 }
 
 export function computePortfolioValue(

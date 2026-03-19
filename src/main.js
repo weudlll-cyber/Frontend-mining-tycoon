@@ -111,6 +111,7 @@ import {
   renderQuickStats as renderLiveQuickStats,
   renderPortfolioValue as renderLivePortfolioValue,
   renderAsyncSessionBadge,
+  renderAsyncScoreLines,
 } from './ui/live-summary.js';
 import {
   initLeaderboard,
@@ -241,6 +242,9 @@ const myScoreEl = document.getElementById('my-score');
 const myRankEl = document.getElementById('my-rank');
 const topScoreEl = document.getElementById('top-score');
 const portfolioValueEl = document.getElementById('portfolio-value');
+const asyncScoreLinesEl = document.getElementById('async-score-lines');
+const thisSessionScoreEl = document.getElementById('this-session-score');
+const bestRoundScoreEl = document.getElementById('best-round-score');
 const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
 const editableInputs = [
   baseUrlInput,
@@ -294,15 +298,17 @@ function getSelectedRoundType() {
 
 function getAsyncDurationPreset() {
   const selectedPreset = String(asyncHostDurationPresetInput?.value || '10m');
-  if (selectedPreset !== 'custom') {
-    return selectedPreset;
-  }
-
-  const customMinutes = Number(asyncHostDurationCustomMinutesInput?.value);
-  if (!Number.isFinite(customMinutes) || customMinutes <= 0) {
-    return null;
-  }
-  return `${Math.floor(customMinutes)}m`;
+  const allowed = new Set([
+    '5m',
+    '10m',
+    '15m',
+    '60m',
+    '3h',
+    '6h',
+    '12h',
+    '24h',
+  ]);
+  return allowed.has(selectedPreset) ? selectedPreset : '10m';
 }
 
 function shouldAutoStartAsyncSession() {
@@ -314,9 +320,8 @@ function updateAsyncHostControlsVisibility() {
   if (asyncHostControlsEl) {
     asyncHostControlsEl.hidden = !isAsyncHost;
   }
-  if (asyncHostDurationCustomEl && asyncHostDurationPresetInput) {
-    asyncHostDurationCustomEl.hidden =
-      asyncHostDurationPresetInput.value !== 'custom';
+  if (asyncHostDurationCustomEl) {
+    asyncHostDurationCustomEl.hidden = true;
   }
 }
 
@@ -394,6 +399,9 @@ function getCurrentRoundContext() {
 }
 
 function resolveAsyncWindowOpen(meta) {
+  if (getRoundModeFromMeta(meta) === 'async') {
+    return true;
+  }
   if (typeof meta?.window_open === 'boolean') {
     return meta.window_open;
   }
@@ -900,6 +908,9 @@ function initializeModules() {
     myRankEl,
     topScoreEl,
     portfolioValueEl,
+    asyncScoreLinesEl,
+    thisSessionScoreEl,
+    bestRoundScoreEl,
     asyncSessionStatusEl,
     getGameMeta,
     defaultTokenNames: PLAYER_STATE_TOKENS,
@@ -996,7 +1007,8 @@ function initializeModules() {
     clearNewGameStatus,
     showNewGameStatus,
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
-    getEnrollmentWindow: () => parseInt(enrollmentWindowInput.value, 10) || 600,
+    getEnrollmentWindow: () =>
+      parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
     getSelectedRoundType,
     getAsyncDurationPreset,
     shouldAutoStartAsyncSession,
@@ -1168,6 +1180,7 @@ function updateUI(data) {
   renderUpgradeMetrics(data);
   renderLeaderboard(data);
   renderQuickStats(data);
+  renderAsyncScoreLines(data);
   renderPortfolioValue(data);
   renderEventBanner(data);
   annotateAffectedValues(data);
@@ -1287,6 +1300,7 @@ if (stopBtn) {
     if (myScoreEl) myScoreEl.textContent = '—';
     if (myRankEl) myRankEl.textContent = '—';
     if (topScoreEl) topScoreEl.textContent = '—';
+    renderAsyncScoreLines(null);
     resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
     ensureInputsEditable();
     setLiveSessionActive(false);

@@ -21,8 +21,13 @@ export function initSessionActions(deps) {
 }
 
 function parseValidSessionResponse(payload) {
+  const sessionIdRaw = payload?.session_id;
   const sessionId =
-    typeof payload?.session_id === 'string' ? payload.session_id.trim() : '';
+    typeof sessionIdRaw === 'number'
+      ? String(sessionIdRaw)
+      : typeof sessionIdRaw === 'string'
+        ? sessionIdRaw.trim()
+        : '';
   const sessionStartUnix = Number(payload?.session_start_unix);
   const sessionDurationSec = Number(payload?.session_duration_sec);
 

@@ -182,7 +182,6 @@ export async function createNewGameAndJoin() {
   }
 
   const playerName = _deps.getPlayerName();
-  const enrollmentWindow = _deps.getEnrollmentWindow();
   const selectedRoundType = _deps.getSelectedRoundType?.() || 'sync';
   const shouldAutoStartAsyncSession =
     _deps.shouldAutoStartAsyncSession?.() !== false;
@@ -191,11 +190,13 @@ export async function createNewGameAndJoin() {
 
   try {
     let durationPayload;
+    let asyncRoundPreset = null;
     if (isAsyncHostRound) {
       const asyncPreset = _deps.getAsyncDurationPreset?.();
       if (!asyncPreset) {
-        throw new Error('Invalid async session duration preset.');
+        throw new Error('Invalid async round duration preset.');
       }
+      asyncRoundPreset = asyncPreset;
       durationPayload = {
         duration_mode: 'preset',
         duration_preset: asyncPreset,
@@ -221,12 +222,16 @@ export async function createNewGameAndJoin() {
 
     const overrides = _deps.collectAdvancedOverrides();
     const gamePayload = {
-      enrollment_window_seconds: enrollmentWindow,
+      enrollment_window_seconds: _deps.getEnrollmentWindow(),
       ...durationPayload,
       ...overrides,
     };
     if (isAsyncHostRound) {
       gamePayload.round_type = 'asynchronous';
+      gamePayload.enrollment_window_seconds = 0;
+      gamePayload.duration_mode = 'preset';
+      gamePayload.duration_preset = asyncRoundPreset;
+      delete gamePayload.duration_custom_seconds;
     }
 
     _deps.showNewGameStatus('Creating game...', 'info');

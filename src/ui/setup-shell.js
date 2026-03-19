@@ -74,7 +74,6 @@ function updateAsyncSessionStatusBadge() {
   const availability = getAsyncAvailability();
   const isAsyncReady =
     availability.isAsyncRound &&
-    availability.isWindowOpen === true &&
     availability.isJoined &&
     availability.backendSessionSupport === true &&
     availability.hasNoActiveSession;
@@ -89,12 +88,11 @@ function updateAsyncSessionStatusBadge() {
 }
 
 function getAsyncAvailability() {
+  const isAsyncRound = _state.roundMode === 'async';
   return {
-    isAsyncRound: _state.roundMode === 'async',
-    isWindowOpen:
-      typeof _state.asyncWindowOpen === 'boolean'
-        ? _state.asyncWindowOpen
-        : null,
+    isAsyncRound,
+    // WHY: Backend async model has no enrollment window; keep this diagnostic predicate always satisfied in async mode.
+    isWindowOpen: isAsyncRound ? true : null,
     isJoined: hasActivePlayer(),
     backendSessionSupport:
       typeof _state.sessionApiSupported === 'boolean'
@@ -178,11 +176,9 @@ export function updateSetupActionsState() {
   const isAsyncRound = availability.isAsyncRound;
   const isSessionReady =
     availability.isAsyncRound &&
-    availability.isWindowOpen === true &&
     availability.isJoined &&
     availability.backendSessionSupport === true &&
     availability.hasNoActiveSession;
-  const isWindowBlocked = availability.isWindowOpen === false;
   const isSessionApiBlocked =
     availability.backendSessionSupport === false ||
     !_state.sessionStartSupported;
@@ -196,9 +192,8 @@ export function updateSetupActionsState() {
   }
 
   if (_refs.startBtn) {
-    const requiresSessionStart =
-      isAsyncRound && _state.sessionStartSupported && !_state.sessionActive;
-    // WHY: Async rounds must complete the explicit session-start step before the stream transport can open.
+    // WHY: Async rounds must always open a session-scoped stream and cannot use the legacy game stream.
+    const requiresSessionStart = isAsyncRound && !_state.sessionActive;
     _refs.startBtn.disabled =
       _state.isSetupBusy ||
       !gameExists ||
@@ -214,11 +209,10 @@ export function updateSetupActionsState() {
       !gameExists ||
       !availability.isJoined ||
       !availability.hasNoActiveSession ||
-      isWindowBlocked ||
       _state.isStreamActive ||
       isSessionApiBlocked;
     _refs.startSessionBtn.title = !_state.sessionStartSupported
-      ? 'Async sessions not supported by backend (using legacy live view).'
+      ? 'Async session endpoint is unavailable on backend.'
       : '';
   }
 
@@ -241,7 +235,7 @@ export function updateSetupActionsState() {
 
   if (isAsyncRound && !_state.sessionStartSupported) {
     _refs.setupActionsNoteEl.textContent =
-      'Async sessions not supported by backend (using legacy live view).';
+      'Async session endpoint is unavailable on backend.';
     return;
   }
 
