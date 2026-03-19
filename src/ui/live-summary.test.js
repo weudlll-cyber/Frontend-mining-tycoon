@@ -40,4 +40,50 @@ describe('live-summary async badge', () => {
     expect(badge.textContent).toContain('Async: Session Active');
     expect(badge.classList.contains('badge-green')).toBe(true);
   });
+
+  it('shows Session Blocked badge when async predicates are not all true', () => {
+    const badge = document.getElementById('async-session-status');
+
+    renderAsyncSessionBadge({
+      roundMode: 'async',
+      sessionActive: false,
+      sessionSupported: true,
+      asyncReady: false,
+      asyncAvailability: {
+        isAsyncRound: true,
+        isWindowOpen: null,
+        isJoined: false,
+        backendSessionSupport: true,
+        hasNoActiveSession: true,
+        requireAuth: 'unknown',
+      },
+    });
+
+    expect(badge.hidden).toBe(false);
+    expect(badge.textContent).toContain('Async: Session Blocked');
+    expect(badge.classList.contains('badge-gray')).toBe(true);
+  });
+
+  it('shows Session Ready only when asyncReady is true', () => {
+    const badge = document.getElementById('async-session-status');
+
+    renderAsyncSessionBadge({
+      roundMode: 'async',
+      sessionActive: false,
+      sessionSupported: true,
+      asyncReady: true,
+      asyncAvailability: {
+        isAsyncRound: true,
+        isWindowOpen: true,
+        isJoined: true,
+        backendSessionSupport: true,
+        hasNoActiveSession: true,
+        requireAuth: true,
+      },
+    });
+
+    expect(badge.hidden).toBe(false);
+    expect(badge.textContent).toContain('Async: Session Ready');
+    expect(badge.classList.contains('badge-blue')).toBe(true);
+  });
 });

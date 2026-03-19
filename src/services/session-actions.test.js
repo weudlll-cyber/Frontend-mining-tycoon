@@ -4,7 +4,12 @@ Purpose: Validate auth-aware async session request construction and policy error
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { initSessionActions, createAsyncSession } from './session-actions.js';
+import {
+  initSessionActions,
+  createAsyncSession,
+  probeRequirePlayerAuth,
+  probeSessionSupport,
+} from './session-actions.js';
 
 describe('session-actions', () => {
   beforeEach(() => {
@@ -124,5 +129,63 @@ describe('session-actions', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('MALFORMED_SESSION_RESPONSE');
     expect(result.message).toContain('malformed response');
+  });
+
+  it('probeRequirePlayerAuth returns true on 401 ticket probe', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+    });
+
+    const result = await probeRequirePlayerAuth({ gameId: '1', playerId: '2' });
+    expect(result.value).toBe(true);
+    expect(result.code).toBe(401);
+  });
+
+  it('probeRequirePlayerAuth returns unknown on unsupported ticket endpoint', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 404,
+      ok: false,
+    });
+
+    const result = await probeRequirePlayerAuth({ gameId: '1', playerId: '2' });
+    expect(result.value).toBe('unknown');
+    expect(result.code).toBe(404);
+  });
+
+  it('probeSessionSupport returns false for 404 capability response', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 404,
+      ok: false,
+    });
+
+    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
+    expect(result.supported).toBe(false);
+    expect(result.code).toBe(404);
+  });
+
+  it('probeSessionSupport returns true when POST dry-run reaches endpoint', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 405,
+        ok: false,
+      })
+      .mockResolvedValueOnce({
+        status: 422,
+        ok: false,
+      });
+
+    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
+    expect(result.supported).toBe(true);
+    expect(result.code).toBe(422);
   });
 });

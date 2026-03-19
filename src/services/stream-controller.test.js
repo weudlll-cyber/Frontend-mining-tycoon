@@ -134,4 +134,37 @@ describe('stream-controller session SSE routing', () => {
     expect(deps.onSessionStreamError).toHaveBeenCalledTimes(1);
     expect(deps.onStreamStateChange).toHaveBeenCalledWith(false);
   });
+
+  it('uses legacy game stream when no session exists', async () => {
+    const deps = {
+      clearCountdownInterval: vi.fn(),
+      stopNextHalvingCountdown: vi.fn(),
+      stopSeasonHalvingTimers: vi.fn(),
+      resetTransientHalvingState: vi.fn(),
+      onStreamStateChange: vi.fn(),
+      updateSetupActionsState: vi.fn(),
+      getNormalizedBaseUrlOrNull: vi.fn(() => 'http://127.0.0.1:8000'),
+      connectChat: vi.fn(),
+      getStorageItem: vi.fn(),
+      getPlayerTokenStorageKey: vi.fn(),
+      getSessionStreamTicket: vi.fn(async () => ({ ok: true, ticket: null })),
+      setBadgeStatus: vi.fn(),
+      connStatusEl: {},
+      fetchMetaSnapshot: vi.fn(async () => ({})),
+      onData: vi.fn(),
+      onSessionStreamError: vi.fn(),
+      disconnectChat: vi.fn(),
+    };
+
+    initStreamController(deps);
+    startStream('123', '44', {
+      sessionId: null,
+      requiresPlayerAuth: false,
+    });
+    await flush();
+
+    expect(urls.length).toBe(1);
+    expect(urls[0]).toContain('/games/123/stream?player_id=44');
+    expect(urls[0]).not.toContain('/sessions/');
+  });
 });
