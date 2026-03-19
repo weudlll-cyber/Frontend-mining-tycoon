@@ -1,3 +1,8 @@
+/*
+File: src/layout-controls.test.js
+Purpose: Guard setup action visibility/state rules across sync and async round flows.
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 function buildDomFixture() {
@@ -61,6 +66,7 @@ function buildDomFixture() {
       <div id="game-status"></div>
       <div id="countdown"></div>
       <div id="countdown-label"></div>
+      <div id="async-session-status" class="badge badge-gray" hidden></div>
       <div id="new-game-status"></div>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
@@ -212,5 +218,42 @@ describe('layout controls', () => {
     expect(document.getElementById('new-game-btn')).not.toBeNull();
     expect(document.getElementById('start-btn')).not.toBeNull();
     expect(document.getElementById('stop-btn')).not.toBeNull();
+  });
+
+  it('shows async Start Session with disabled fallback message when unsupported', async () => {
+    const module = await loadMainModule();
+    const startSessionBtn = document.getElementById('start-session-btn');
+    const noteEl = document.getElementById('setup-actions-note');
+    const asyncStatusBadge = document.getElementById('async-session-status');
+
+    module.setActiveMeta({ round_mode: 'async', token_names: ['spring'] });
+    module.setSetupStateForTests({
+      streamActive: false,
+      gameStatus: 'enrolling',
+      roundMode: 'async',
+      supportsSessionStart: false,
+    });
+
+    expect(startSessionBtn.hidden).toBe(false);
+    expect(startSessionBtn.disabled).toBe(true);
+    expect(noteEl.textContent).toContain('Async sessions not supported');
+    expect(asyncStatusBadge.hidden).toBe(false);
+    expect(asyncStatusBadge.textContent).toContain('Legacy View');
+  });
+
+  it('shows enabled async Start Session when backend support is available', async () => {
+    const module = await loadMainModule();
+    const startSessionBtn = document.getElementById('start-session-btn');
+
+    module.setActiveMeta({ round_mode: 'async', token_names: ['spring'] });
+    module.setSetupStateForTests({
+      streamActive: false,
+      gameStatus: 'enrolling',
+      roundMode: 'async',
+      supportsSessionStart: true,
+    });
+
+    expect(startSessionBtn.hidden).toBe(false);
+    expect(startSessionBtn.disabled).toBe(false);
   });
 });

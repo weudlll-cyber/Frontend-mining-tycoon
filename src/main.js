@@ -178,6 +178,7 @@ const connStatusEl = document.getElementById('conn-status');
 const gameStatusEl = document.getElementById('game-status');
 const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
+const asyncSessionStatusEl = document.getElementById('async-session-status');
 const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
 const roundModeBadgeEl = document.getElementById('round-mode-badge');
@@ -228,6 +229,7 @@ let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
 let sessionStartSupported = true;
+let setupRoundModeOverride = null;
 
 function getRoundModeFromMeta(meta) {
   const raw = String(meta?.round_mode || meta?.round_type || '')
@@ -263,7 +265,10 @@ function getSessionSupportFromMeta(meta) {
 
 function getCurrentRoundContext() {
   const gameMeta = getGameMeta(gameIdInput?.value);
-  const roundMode = getRoundModeFromMeta(gameMeta);
+  const roundMode =
+    setupRoundModeOverride === 'async' || setupRoundModeOverride === 'sync'
+      ? setupRoundModeOverride
+      : getRoundModeFromMeta(gameMeta);
   const supportFromMeta = getSessionSupportFromMeta(gameMeta);
   const supportsSessionStart =
     roundMode !== 'async'
@@ -294,7 +299,13 @@ function updateSetupActionsState() {
   updateSetupShellActions();
 }
 
-function setSetupStateForTests({ streamActive, gameStatus, setupBusy } = {}) {
+function setSetupStateForTests({
+  streamActive,
+  gameStatus,
+  setupBusy,
+  roundMode,
+  supportsSessionStart,
+} = {}) {
   if (typeof streamActive === 'boolean') {
     isStreamActive = streamActive;
   }
@@ -303,6 +314,14 @@ function setSetupStateForTests({ streamActive, gameStatus, setupBusy } = {}) {
   }
   if (typeof setupBusy === 'boolean') {
     isSetupBusy = setupBusy;
+  }
+  if (roundMode === 'sync' || roundMode === 'async') {
+    setupRoundModeOverride = roundMode;
+  } else {
+    setupRoundModeOverride = null;
+  }
+  if (typeof supportsSessionStart === 'boolean') {
+    sessionStartSupported = supportsSessionStart;
   }
   updateSetupActionsState();
 }
@@ -558,6 +577,7 @@ function initializeModules() {
     stopBtn,
     setupActionsNoteEl,
     roundModeBadgeEl,
+    asyncSessionStatusEl,
     debugBackendUrlEl,
     debugGameIdEl,
     debugPlayerIdEl,

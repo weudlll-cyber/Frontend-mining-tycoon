@@ -1,6 +1,9 @@
 /*
 File: src/ui/setup-shell.js
-Purpose: Manage setup-shell visibility, setup action button state, and header navigation.
+Purpose: Manage setup-shell visibility and setup action state while preserving user intent.
+Constraints:
+- Setup must not flicker-close from repeated SSE updates once the user re-opens it.
+- Async session discoverability must remain explicit with non-blocking status messaging.
 */
 
 let _refs = null;
@@ -10,6 +13,9 @@ let _state = {
   latestGameStatus: null,
   roundMode: 'sync',
   sessionStartSupported: true,
+  userOpenedSetup: false,
+  didAutoCloseAtPlayStart: false,
+  previousGameStatus: null,
 };
 
 export function initSetupShell(deps) {
@@ -42,6 +48,30 @@ function updateRoundModeBadge() {
   badge.classList.toggle('round-mode-badge--sync', roundMode !== 'async');
 }
 
+function updateAsyncSessionStatusBadge() {
+  if (!_refs?.asyncSessionStatusEl) return;
+
+  const isAsyncRound = _state.roundMode === 'async';
+  const badge = _refs.asyncSessionStatusEl;
+  if (!isAsyncRound) {
+    badge.hidden = true;
+    badge.textContent = 'Async: n/a';
+    badge.classList.remove('badge-yellow', 'badge-blue');
+    badge.classList.add('badge-gray');
+    return;
+  }
+
+  badge.hidden = false;
+  badge.classList.remove('badge-gray', 'badge-blue', 'badge-yellow');
+  if (_state.sessionStartSupported) {
+    badge.textContent = 'Async: Session Ready';
+    badge.classList.add('badge-blue');
+  } else {
+    badge.textContent = 'Async: Legacy View';
+    badge.classList.add('badge-yellow');
+  }
+}
+
 export function updateSetupActionsState() {
   if (!_refs) return;
 
@@ -49,8 +79,14 @@ export function updateSetupActionsState() {
   const gameExists = hasActiveGame();
   const playerExists = hasActivePlayer();
   const isAsyncRound = _state.roundMode === 'async';
+  const isRoundWindowOpen =
+    !_state.isStreamActive &&
+    (_state.latestGameStatus === 'idle' ||
+      _state.latestGameStatus === 'enrolling' ||
+      _state.latestGameStatus === null);
 
   updateRoundModeBadge();
+  updateAsyncSessionStatusBadge();
 
   if (_refs.newGameBtn) {
     _refs.newGameBtn.disabled = _state.isSetupBusy || gameRunning;
@@ -66,10 +102,14 @@ export function updateSetupActionsState() {
     _refs.startSessionBtn.disabled =
       _state.isSetupBusy ||
       !isAsyncRound ||
+      !isRoundWindowOpen ||
       !gameExists ||
       !playerExists ||
       _state.isStreamActive ||
       !_state.sessionStartSupported;
+    _refs.startSessionBtn.title = !_state.sessionStartSupported
+      ? 'Async sessions not supported by backend (using legacy live view).'
+      : '';
   }
 
   if (_refs.stopBtn) {
@@ -91,7 +131,7 @@ export function updateSetupActionsState() {
 
   if (isAsyncRound && !_state.sessionStartSupported) {
     _refs.setupActionsNoteEl.textContent =
-      'Async round detected but session start is unavailable on this backend. Start Stream uses legacy game stream fallback.';
+      'Async sessions not supported by backend (using legacy live view).';
     return;
   }
 
@@ -132,7 +172,16 @@ export function renderDebugContext() {
 }
 
 export function setSetupCollapsed(isCollapsed) {
+  return setSetupCollapsedWithSource(isCollapsed, 'system');
+}
+
+function setSetupCollapsedWithSource(isCollapsed, source = 'system') {
   if (!_refs?.setupShellEl) return;
+
+  // Preserve user preference so SSE updates do not repeatedly override explicit opens.
+  if (source === 'user') {
+    _state.userOpenedSetup = !isCollapsed;
+  }
 
   _refs.setupShellEl.classList.toggle('setup-collapsed', isCollapsed);
   _refs.setupShellEl.classList.toggle('setup-open', !isCollapsed);
@@ -149,18 +198,37 @@ export function setSetupCollapsed(isCollapsed) {
 }
 
 export function toggleSetupCollapsed() {
-  const shouldCollapse =
+  const shouldCollapse = Boolean(
     !_refs?.setupShellEl ||
-    !_refs.setupShellEl.classList.contains('setup-collapsed');
-  setSetupCollapsed(shouldCollapse);
+      !_refs.setupShellEl.classList.contains('setup-collapsed')
+  );
+  setSetupCollapsedWithSource(shouldCollapse, 'user');
 }
 
 export function autoCollapseSetupForLiveState(
   gameStatus = _state.latestGameStatus
 ) {
-  if (gameStatus === 'running' || gameStatus === 'finished') {
-    setSetupCollapsed(true);
+  const previous = _state.previousGameStatus;
+  _state.previousGameStatus = gameStatus;
+
+  if (gameStatus !== 'running') {
+    _state.didAutoCloseAtPlayStart = false;
+    return;
   }
+
+  const enteredRunning = previous !== 'running';
+  if (!enteredRunning || _state.didAutoCloseAtPlayStart) {
+    return;
+  }
+
+  // Auto-close only once at pre-play -> running transition, unless user explicitly opened setup.
+  if (_state.userOpenedSetup) {
+    _state.didAutoCloseAtPlayStart = true;
+    return;
+  }
+
+  setSetupCollapsedWithSource(true, 'system');
+  _state.didAutoCloseAtPlayStart = true;
 }
 
 export function scrollToLiveBoard() {

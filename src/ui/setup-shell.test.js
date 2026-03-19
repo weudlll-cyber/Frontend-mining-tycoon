@@ -1,7 +1,15 @@
+/*
+File: src/ui/setup-shell.test.js
+Purpose: Verify setup-shell guards that preserve user intent and async session discoverability states.
+*/
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   initSetupShell,
+  setSetupCollapsed,
   setSetupShellState,
+  autoCollapseSetupForLiveState,
+  toggleSetupCollapsed,
   updateSetupActionsState,
 } from './setup-shell.js';
 
@@ -14,7 +22,10 @@ function buildFixture() {
     <button id="start-session-btn" type="button" hidden>Start Session</button>
     <button id="stop-btn" type="button">Stop Stream</button>
     <span id="round-mode-badge">Round: Sync</span>
+    <span id="async-session-status" hidden>Async: n/a</span>
     <p id="setup-actions-note"></p>
+    <section id="setup-shell" class="setup-shell setup-open"></section>
+    <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
   `;
 
   initSetupShell({
@@ -25,7 +36,10 @@ function buildFixture() {
     startSessionBtn: document.getElementById('start-session-btn'),
     stopBtn: document.getElementById('stop-btn'),
     roundModeBadgeEl: document.getElementById('round-mode-badge'),
+    asyncSessionStatusEl: document.getElementById('async-session-status'),
     setupActionsNoteEl: document.getElementById('setup-actions-note'),
+    setupShellEl: document.getElementById('setup-shell'),
+    setupToggleBtnEl: document.getElementById('setup-toggle-btn'),
   });
 }
 
@@ -45,10 +59,13 @@ describe('setup shell async readiness', () => {
     updateSetupActionsState();
 
     const badge = document.getElementById('round-mode-badge');
+    const asyncStatus = document.getElementById('async-session-status');
     const startSessionBtn = document.getElementById('start-session-btn');
     const note = document.getElementById('setup-actions-note');
 
     expect(badge?.textContent).toContain('Round: Async');
+    expect(asyncStatus?.hidden).toBe(false);
+    expect(asyncStatus?.textContent).toContain('Session Ready');
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
     expect(note?.textContent).toContain('start a session');
@@ -65,10 +82,42 @@ describe('setup shell async readiness', () => {
     updateSetupActionsState();
 
     const startSessionBtn = document.getElementById('start-session-btn');
+    const asyncStatus = document.getElementById('async-session-status');
     const note = document.getElementById('setup-actions-note');
 
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(true);
-    expect(note?.textContent).toContain('legacy game stream fallback');
+    expect(asyncStatus?.textContent).toContain('Legacy View');
+    expect(note?.textContent).toContain('legacy live view');
+  });
+
+  it('auto-closes only once when entering running if user did not reopen setup', () => {
+    const setupShell = document.getElementById('setup-shell');
+
+    setSetupCollapsed(false);
+    setSetupShellState({ latestGameStatus: 'enrolling' });
+    autoCollapseSetupForLiveState('enrolling');
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
+
+    autoCollapseSetupForLiveState('running');
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(true);
+
+    setSetupCollapsed(false);
+    autoCollapseSetupForLiveState('running');
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
+  });
+
+  it('keeps setup open during repeated running updates after user expands it', () => {
+    const setupShell = document.getElementById('setup-shell');
+
+    setSetupCollapsed(true);
+    toggleSetupCollapsed();
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
+
+    autoCollapseSetupForLiveState('running');
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
+
+    autoCollapseSetupForLiveState('running');
+    expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
   });
 });
