@@ -10,6 +10,8 @@ import {
   setSetupShellState,
   autoCollapseSetupForLiveState,
   toggleSetupCollapsed,
+  initializeHeaderInteractions,
+  renderDebugContext,
   updateSetupActionsState,
 } from './setup-shell.js';
 
@@ -24,9 +26,45 @@ function buildFixture() {
     <span id="round-mode-badge">Round: Sync</span>
     <span id="async-session-status" hidden>Async: n/a</span>
     <p id="setup-actions-note"></p>
+    <p id="start-session-status"></p>
     <section id="setup-shell" class="setup-shell setup-open"></section>
     <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
+    <details id="debug-details"><summary>Debug</summary></details>
+    <span id="debug-backend-url">—</span>
+    <span id="debug-game-id">—</span>
+    <span id="debug-player-id">—</span>
+    <span id="debug-session-id">—</span>
   `;
+
+  const onStartAsyncSession = async () => {
+    await fetch('/games/game-1/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'async', player_id: 'player-1' }),
+    });
+  };
+
+  const renderAsyncSessionBadge = ({
+    roundMode,
+    sessionActive,
+    sessionSupported,
+  }) => {
+    const badge = document.getElementById('async-session-status');
+    if (!badge) return;
+    if (roundMode !== 'async') {
+      badge.hidden = true;
+      badge.textContent = 'Async: n/a';
+      return;
+    }
+    badge.hidden = false;
+    if (sessionActive) {
+      badge.textContent = 'Async: Session Active';
+    } else if (!sessionSupported) {
+      badge.textContent = 'Async: Legacy View';
+    } else {
+      badge.textContent = 'Async: Session Ready';
+    }
+  };
 
   initSetupShell({
     gameIdInput: document.getElementById('game-id'),
@@ -38,9 +76,19 @@ function buildFixture() {
     roundModeBadgeEl: document.getElementById('round-mode-badge'),
     asyncSessionStatusEl: document.getElementById('async-session-status'),
     setupActionsNoteEl: document.getElementById('setup-actions-note'),
+    startSessionStatusEl: document.getElementById('start-session-status'),
     setupShellEl: document.getElementById('setup-shell'),
     setupToggleBtnEl: document.getElementById('setup-toggle-btn'),
+    onStartAsyncSession,
+    debugDetailsEl: document.getElementById('debug-details'),
+    debugBackendUrlEl: document.getElementById('debug-backend-url'),
+    debugGameIdEl: document.getElementById('debug-game-id'),
+    debugPlayerIdEl: document.getElementById('debug-player-id'),
+    debugSessionIdEl: document.getElementById('debug-session-id'),
+    renderAsyncSessionBadge,
   });
+
+  initializeHeaderInteractions();
 }
 
 beforeEach(() => {
@@ -68,7 +116,59 @@ describe('setup shell async readiness', () => {
     expect(asyncStatus?.textContent).toContain('Session Ready');
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
-    expect(note?.textContent).toContain('start a session');
+    expect(document.getElementById('start-btn')?.disabled).toBe(true);
+    expect(note?.textContent).toContain('Start Async Session first');
+  });
+
+  it('keeps Start Async Session disabled until player join is complete', () => {
+    const playerIdInput = document.getElementById('player-id');
+    const startSessionBtn = document.getElementById('start-session-btn');
+    playerIdInput.value = '';
+
+    setSetupShellState({
+      isSetupBusy: false,
+      isStreamActive: false,
+      latestGameStatus: 'enrolling',
+      roundMode: 'async',
+      sessionStartSupported: true,
+      sessionActive: false,
+    });
+    updateSetupActionsState();
+
+    expect(startSessionBtn?.hidden).toBe(false);
+    expect(startSessionBtn?.disabled).toBe(true);
+  });
+
+  it('clicking Start Async Session triggers session POST callback', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = async () => ({ ok: true, json: async () => ({}) });
+    globalThis.fetch = fetchMock;
+
+    setSetupShellState({
+      isSetupBusy: false,
+      isStreamActive: false,
+      latestGameStatus: 'enrolling',
+      roundMode: 'async',
+      sessionStartSupported: true,
+      sessionActive: false,
+    });
+    updateSetupActionsState();
+
+    const startSessionBtn = document.getElementById('start-session-btn');
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, init });
+      return { ok: true, json: async () => ({}) };
+    };
+
+    startSessionBtn?.click();
+    await Promise.resolve();
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(String(calls[0].url)).toContain('/games/game-1/sessions');
+    expect(calls[0].init?.method).toBe('POST');
+
+    globalThis.fetch = originalFetch;
   });
 
   it('shows fallback note and disables start-session when unsupported', () => {
@@ -119,5 +219,18 @@ describe('setup shell async readiness', () => {
 
     autoCollapseSetupForLiveState('running');
     expect(setupShell?.classList.contains('setup-collapsed')).toBe(false);
+  });
+
+  it('shows session id in debug only when debug panel is open', () => {
+    const debugDetailsEl = document.getElementById('debug-details');
+    const debugSessionIdEl = document.getElementById('debug-session-id');
+
+    setSetupShellState({ sessionId: 77 });
+    renderDebugContext();
+    expect(debugSessionIdEl?.textContent).toBe('—');
+
+    debugDetailsEl.open = true;
+    debugDetailsEl.dispatchEvent(new Event('toggle'));
+    expect(debugSessionIdEl?.textContent).toBe('77');
   });
 });
