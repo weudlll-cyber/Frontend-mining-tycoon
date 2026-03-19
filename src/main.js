@@ -941,6 +941,14 @@ async function handleStartAsyncSession() {
   if (!result.ok) {
     isSetupBusy = false;
     updateSetupActionsState();
+    if (result.code === 'MALFORMED_SESSION_RESPONSE') {
+      // WHY: A malformed 200 must never switch transport, otherwise async intent can silently drift onto legacy stream.
+      setStartSessionStatus(
+        'Session could not be started (malformed response).',
+        'error'
+      );
+      return;
+    }
     if (result.kind === 'policy-closed') {
       setStartSessionStatus(result.message, 'warning');
       return;

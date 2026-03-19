@@ -18,6 +18,28 @@ export function initSessionActions(deps) {
   _deps = deps;
 }
 
+function parseValidSessionResponse(payload) {
+  const sessionId =
+    typeof payload?.session_id === 'string' ? payload.session_id.trim() : '';
+  const sessionStartUnix = Number(payload?.session_start_unix);
+  const sessionDurationSec = Number(payload?.session_duration_sec);
+
+  const isSessionIdValid = sessionId.length > 0;
+  const isStartValid = Number.isFinite(sessionStartUnix);
+  const isDurationValid =
+    Number.isFinite(sessionDurationSec) && sessionDurationSec > 0;
+
+  if (!isSessionIdValid || !isStartValid || !isDurationValid) {
+    return null;
+  }
+
+  return {
+    sessionId,
+    sessionStartUnix,
+    sessionDurationSec,
+  };
+}
+
 async function parseErrorDetail(response, fallback) {
   try {
     const payload = await response.json();
@@ -132,10 +154,21 @@ export async function createAsyncSession({ gameId, playerId }) {
     }
 
     const payload = await response.json();
+    const validSession = parseValidSessionResponse(payload);
+    if (!validSession) {
+      return {
+        ok: false,
+        kind: 'http',
+        code: 'MALFORMED_SESSION_RESPONSE',
+        message: 'Session could not be started (malformed response).',
+      };
+    }
+
     return {
       ok: true,
-      sessionId: payload?.session_id ?? null,
-      sessionStartUnix: Number(payload?.session_start_unix) || null,
+      sessionId: validSession.sessionId,
+      sessionStartUnix: validSession.sessionStartUnix,
+      sessionDurationSec: validSession.sessionDurationSec,
       requiresPlayerAuth: requirePlayerAuth,
       raw: payload,
     };
