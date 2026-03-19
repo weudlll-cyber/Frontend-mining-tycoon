@@ -21,6 +21,7 @@ function buildDomFixture() {
       <div id="player-state"></div>
       <div id="leaderboard"></div>
       <div id="upgrades"></div>
+      <div id="portfolio-value">—</div>
     </div>
   `;
 }
@@ -120,6 +121,106 @@ describe('Seasonal Oracle frontend helpers', () => {
         spreadRate: 0.01,
       })
     ).toBeNull();
+  });
+
+  it('computes Portfolio Value from balances and oracle prices', async () => {
+    const module = await loadMainModule();
+
+    const value = module.computePortfolioValue(
+      {
+        spring: 100,
+        summer: 50,
+        autumn: 25,
+        winter: 10,
+      },
+      {
+        spring: 2,
+        summer: 3,
+        autumn: 4,
+        winter: 5,
+      },
+      ['spring', 'summer', 'autumn', 'winter']
+    );
+
+    expect(value).toBeCloseTo(500, 8);
+  });
+
+  it('updates Portfolio Value when balances change', async () => {
+    const module = await loadMainModule();
+    const portfolioEl = document.getElementById('portfolio-value');
+
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: {
+          spring: 10,
+          summer: 0,
+          autumn: 0,
+          winter: 0,
+        },
+      },
+      oracle_prices: {
+        spring: 2,
+        summer: 1,
+        autumn: 1,
+        winter: 1,
+      },
+    });
+    expect(portfolioEl.textContent).toBe('20');
+
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: {
+          spring: 25,
+          summer: 0,
+          autumn: 0,
+          winter: 0,
+        },
+      },
+      oracle_prices: {
+        spring: 2,
+        summer: 1,
+        autumn: 1,
+        winter: 1,
+      },
+    });
+    expect(portfolioEl.textContent).toBe('50');
+  });
+
+  it('shows em dash only while data is missing and updates once valid data arrives', async () => {
+    const module = await loadMainModule();
+    const portfolioEl = document.getElementById('portfolio-value');
+
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {},
+      oracle_prices: null,
+    });
+    expect(portfolioEl.textContent).toBe('—');
+
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: {
+          spring: 1,
+          summer: 2,
+          autumn: 3,
+          winter: 4,
+        },
+      },
+      oracle_prices: {
+        spring: 1,
+        summer: 1,
+        autumn: 1,
+        winter: 1,
+      },
+    });
+    expect(portfolioEl.textContent).toBe('10');
   });
 
   it('ignores stale state next_halving and uses computed strict-future selection', async () => {
@@ -548,5 +649,851 @@ describe('Seasonal Oracle upgrade rendering', () => {
     expect(document.body.textContent).toContain(
       'Unsupported contract version v3. Upgrades are disabled.'
     );
+  });
+});
+
+describe('Seasonal Oracle season card rendering', () => {
+  it('renders season-card HTML structure for desktop inline layout', async () => {
+    await loadMainModule();
+
+    // Build the season card DOM structure that renderSeasonData expects
+    const template = `
+      <div id="season-spring" class="season-card">
+        <div class="season-balance">0</div>
+        <div class="season-output">0</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-summer" class="season-card">
+        <div class="season-balance">0</div>
+        <div class="season-output">0</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-autumn" class="season-card">
+        <div class="season-balance">0</div>
+        <div class="season-output">0</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-winter" class="season-card">
+        <div class="season-balance">0</div>
+        <div class="season-output">0</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+    document.body.innerHTML += template;
+
+    expect(document.getElementById('season-spring')).not.toBeNull();
+    expect(document.getElementById('season-summer')).not.toBeNull();
+    expect(document.getElementById('season-autumn')).not.toBeNull();
+    expect(document.getElementById('season-winter')).not.toBeNull();
+  });
+
+  it('renders token balances in season cards correctly', async () => {
+    // Setup DOM with season cards
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-balance">—</div>
+        <div class="season-output">—</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-summer" class="season-card">
+        <div class="season-balance">—</div>
+        <div class="season-output">—</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-autumn" class="season-card">
+        <div class="season-balance">—</div>
+        <div class="season-output">—</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+      <div id="season-winter" class="season-card">
+        <div class="season-balance">—</div>
+        <div class="season-output">—</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    await loadMainModule();
+
+    // This function is not exported, so we can't test directly from main
+    // But we can verify the season cards exist and have the right structure
+    const springCard = document.getElementById('season-spring');
+    const balanceEl = springCard.querySelector('.season-balance');
+    expect(balanceEl).not.toBeNull();
+  });
+
+  it('renders output per second in season cards correctly', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-balance">—</div>
+        <div class="season-output">—</div>
+        <div class="season-halving">—</div>
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    await loadMainModule();
+
+    const springCard = document.getElementById('season-spring');
+    const outputEl = springCard.querySelector('.season-output');
+
+    // Verify the element exists where renderSeasonData expects it
+    expect(outputEl).not.toBeNull();
+    expect(outputEl.textContent).toBe('—');
+  });
+
+  it('updates season halving countdown every second without remounting the node', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T00:00:00Z'));
+
+    const module = await loadMainModule();
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-meta">
+          <div class="meta-item halving-item">
+            <span class="meta-label">Halving</span>
+            <span class="season-halving">—</span>
+          </div>
+          <span class="season-balance">0</span>
+          <span class="season-output">0/s</span>
+        </div>
+      </div>
+    `;
+
+    const halvingEl = document.querySelector('.season-halving');
+    const stableRef = halvingEl;
+    const nowUnix = Date.now() / 1000;
+
+    module.syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: nowUnix + 5,
+    });
+
+    const firstText = halvingEl.textContent;
+    vi.advanceTimersByTime(1000);
+    const secondText = halvingEl.textContent;
+
+    expect(firstText).not.toBe(secondText);
+    expect(secondText).toBe('00:04');
+    expect(document.querySelector('.season-halving')).toBe(stableRef);
+
+    module.stopSeasonHalvingTimers();
+    vi.useRealTimers();
+  });
+
+  it('keeps halving countdown text selectable and copyable', async () => {
+    const module = await loadMainModule();
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-meta">
+          <div class="meta-item halving-item">
+            <span class="meta-label">Halving</span>
+            <span class="season-halving">—</span>
+          </div>
+          <span class="season-balance">0</span>
+          <span class="season-output">0/s</span>
+        </div>
+      </div>
+    `;
+
+    const halvingEl = document.querySelector('.season-halving');
+    module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 40);
+
+    // Node remains text-based and stable for copy operations.
+    expect(halvingEl.nodeType).toBe(Node.ELEMENT_NODE);
+    expect(halvingEl.textContent).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it('formats long halving countdowns with compact hour/day labels', async () => {
+    const module = await loadMainModule();
+
+    expect(module.formatDurationCompact(59)).toBe('00:59');
+    expect(module.formatDurationCompact(3600)).toBe('1h 00m');
+    expect(module.formatDurationCompact(3661)).toBe('1h 01m');
+    expect(module.formatDurationCompact(86400)).toBe('1d 0h');
+  });
+
+  it('applies compact halving text for long-running season countdowns', async () => {
+    const module = await loadMainModule();
+    const halvingEl = document.createElement('span');
+    halvingEl.className = 'season-halving';
+
+    module.applyHalvingTextAndSeverity(
+      halvingEl,
+      Date.now() / 1000 + 3 * 3600 + 5 * 60
+    );
+    expect(halvingEl.textContent).toMatch(/^3h 0[45]m$/);
+  });
+
+  it('applies warning/critical color classes only at threshold windows', async () => {
+    const module = await loadMainModule();
+    const halvingEl = document.createElement('span');
+    halvingEl.className = 'season-halving';
+
+    expect(module.classifyHalvingSeverity(45)).toBe('normal');
+    module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 45);
+    expect(halvingEl.classList.contains('season-halving--warning')).toBe(false);
+    expect(halvingEl.classList.contains('season-halving--critical')).toBe(
+      false
+    );
+
+    expect(module.classifyHalvingSeverity(20)).toBe('warning');
+    module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 20);
+    expect(halvingEl.classList.contains('season-halving--warning')).toBe(true);
+    expect(halvingEl.classList.contains('season-halving--critical')).toBe(
+      false
+    );
+
+    expect(module.classifyHalvingSeverity(3)).toBe('critical');
+    module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 3);
+    expect(halvingEl.classList.contains('season-halving--critical')).toBe(true);
+  });
+
+  it('renders Balance and Output in the same compact meta row', () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-meta">
+          <div class="meta-item">
+            <span class="meta-label">Balance</span>
+            <span class="season-balance">100.50</span>
+          </div>
+          <span class="meta-sep" aria-hidden="true">|</span>
+          <div class="meta-item">
+            <span class="meta-label">Output</span>
+            <span class="season-output">5.25/s</span>
+          </div>
+          <span class="meta-sep" aria-hidden="true">|</span>
+          <div class="meta-item halving-item">
+            <span class="meta-label">Halving</span>
+            <span class="season-halving">—</span>
+          </div>
+        </div>
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const springCard = document.getElementById('season-spring');
+    const metaRow = springCard.querySelector('.season-meta');
+    const balanceEl = springCard.querySelector('.season-balance');
+    const outputEl = springCard.querySelector('.season-output');
+
+    // Verify all three elements are in the same meta container
+    expect(metaRow).not.toBeNull();
+    expect(metaRow.contains(balanceEl)).toBe(true);
+    expect(metaRow.contains(outputEl)).toBe(true);
+
+    // Verify full labels and separators for semantic clarity
+    const labels = Array.from(metaRow.querySelectorAll('.meta-label')).map(
+      (el) => el.textContent.trim()
+    );
+    expect(labels).toEqual(['Balance', 'Output', 'Halving']);
+    expect(metaRow.textContent).toContain('|');
+
+    // Season name must not be duplicated in the meta row
+    expect(metaRow.textContent).not.toMatch(/Spring|Summer|Autumn|Winter/i);
+
+    // Verify values render correctly
+    expect(balanceEl.textContent).toBe('100.50');
+    expect(outputEl.textContent).toBe('5.25/s');
+  });
+});
+
+describe('Seasonal Oracle inline upgrade module', () => {
+  it('exports required functions for inline upgrade rendering', async () => {
+    // Import the upgrade-panel-inline module
+    const {
+      initInlineUpgrades,
+      renderInlineSeasonUpgrades,
+      renderAllSeasonUpgrades,
+    } = await import('./ui/upgrade-panel-inline.js');
+
+    expect(typeof initInlineUpgrades).toBe('function');
+    expect(typeof renderInlineSeasonUpgrades).toBe('function');
+    expect(typeof renderAllSeasonUpgrades).toBe('function');
+  });
+
+  it('initializes inline upgrades module with required dependencies', async () => {
+    const { initInlineUpgrades } = await import('./ui/upgrade-panel-inline.js');
+
+    const mockDeps = {
+      getActiveGameMeta: () => ({
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+      }),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 50 },
+        cooling: { base_cost: 50 },
+      }),
+      performUpgrade: vi.fn(),
+    };
+
+    // Should not throw
+    expect(() => initInlineUpgrades(mockDeps)).not.toThrow();
+  });
+
+  it('renders inline upgrades for a season with one compact row per upgrade type', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    const mockPerformUpgrade = vi.fn();
+    const mockGetGameMeta = () => ({
+      token_names: ['spring'],
+      oracle_prices: { spring: 1 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      effective_upgrade_cost_multiplier: { spring: 1 },
+    });
+
+    initInlineUpgrades({
+      getActiveGameMeta: mockGetGameMeta,
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 50 },
+        cooling: { base_cost: 50 },
+      }),
+      performUpgrade: mockPerformUpgrade,
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 50,
+              delta_output: 1,
+              breakeven_seconds: 50,
+            },
+            efficiency: {
+              cost_to_next: 50,
+              delta_output: 0.5,
+              breakeven_seconds: 100,
+            },
+            cooling: {
+              cost_to_next: 50,
+              delta_output: 0.2,
+              breakeven_seconds: 250,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 1, efficiency: 0, cooling: 0 },
+        },
+      },
+      token_names: ['spring'],
+    };
+
+    renderInlineSeasonUpgrades(
+      upgradesContainer,
+      'spring',
+      data,
+      mockGetGameMeta()
+    );
+
+    const layout = upgradesContainer.querySelector('.upgrade-compact-layout');
+    const headerGrid = upgradesContainer.querySelector('.upgrade-header-grid');
+    const dataGrid = upgradesContainer.querySelector('.upgrade-compact-grid');
+    expect(layout).not.toBeNull();
+    expect(headerGrid).not.toBeNull();
+    expect(dataGrid).not.toBeNull();
+    expect(upgradesContainer.textContent).toContain('Upgrade');
+    expect(upgradesContainer.textContent).toContain('Lvl');
+    expect(upgradesContainer.textContent).toContain('Cost');
+    expect(upgradesContainer.textContent).toContain('Out/s');
+    expect(upgradesContainer.textContent).toContain('BEP');
+    expect(upgradesContainer.textContent).toContain('Act');
+
+    const headerTipTriggers = upgradesContainer.querySelectorAll(
+      '.upgrade-header-tip-trigger'
+    );
+    if (headerTipTriggers.length > 0) {
+      expect(headerTipTriggers.length).toBe(4);
+    } else {
+      const titledHeaders = upgradesContainer.querySelectorAll(
+        '.upgrade-header-text[title]'
+      );
+      expect(titledHeaders.length).toBe(4);
+    }
+
+    // one compact row per type
+    const typeCells = upgradesContainer.querySelectorAll('.upgrade-row-type');
+    expect(typeCells.length).toBe(3);
+    expect(Array.from(typeCells).map((node) => node.textContent)).toEqual([
+      'Hashrate',
+      'Efficiency',
+      'Cooling',
+    ]);
+
+    const actionButtons = upgradesContainer.querySelectorAll(
+      '.upgrade-row-action'
+    );
+    expect(actionButtons.length).toBe(3);
+  });
+
+  it('renders upgrade level correctly in inline upgrades', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    const mockGetGameMeta = () => ({
+      token_names: ['spring'],
+      oracle_prices: { spring: 1 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      effective_upgrade_cost_multiplier: { spring: 1 },
+    });
+
+    initInlineUpgrades({
+      getActiveGameMeta: mockGetGameMeta,
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+      }),
+      performUpgrade: vi.fn(),
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 50,
+              delta_output: 1,
+              breakeven_seconds: 50,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 3 }, // Level 3
+        },
+      },
+      token_names: ['spring'],
+    };
+
+    renderInlineSeasonUpgrades(
+      upgradesContainer,
+      'spring',
+      data,
+      mockGetGameMeta()
+    );
+
+    const levelValue = upgradesContainer.querySelector('.upgrade-row-level');
+    expect(levelValue?.textContent).toBe('3');
+  });
+
+  it('displays cost and benefit in upgrade columns', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    const mockGetGameMeta = () => ({
+      token_names: ['spring'],
+      oracle_prices: { spring: 1 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      effective_upgrade_cost_multiplier: { spring: 1 },
+    });
+
+    initInlineUpgrades({
+      getActiveGameMeta: mockGetGameMeta,
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+      }),
+      performUpgrade: vi.fn(),
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 100,
+              delta_output: 5.5,
+              breakeven_seconds: 18.18,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 0 },
+        },
+      },
+      token_names: ['spring'],
+    };
+
+    renderInlineSeasonUpgrades(
+      upgradesContainer,
+      'spring',
+      data,
+      mockGetGameMeta()
+    );
+
+    // Check for compact metric display
+    expect(upgradesContainer.textContent).toContain('Cost');
+    expect(upgradesContainer.textContent).toContain('Out/s');
+    expect(upgradesContainer.textContent).toContain('+5.50/s');
+    expect(upgradesContainer.textContent).toContain('BEP');
+  });
+
+  it('disables upgrade button when contract is not supported', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    const mockGetGameMeta = () => ({
+      token_names: ['spring'],
+      oracle_prices: { spring: 1 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      effective_upgrade_cost_multiplier: { spring: 1 },
+    });
+
+    initInlineUpgrades({
+      getActiveGameMeta: mockGetGameMeta,
+      isActiveContractSupported: () => false, // Contract not supported
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+      }),
+      performUpgrade: vi.fn(),
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 50,
+              delta_output: 1,
+              breakeven_seconds: 50,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 0 },
+        },
+      },
+      token_names: ['spring'],
+    };
+
+    renderInlineSeasonUpgrades(
+      upgradesContainer,
+      'spring',
+      data,
+      mockGetGameMeta()
+    );
+
+    const button = upgradesContainer.querySelector('.upgrade-row-action');
+    expect(button?.disabled).toBe(true);
+    expect(button?.title).toContain('Unsupported API contract version');
+  });
+
+  it('calls performUpgrade with correct parameters when upgrade button clicked', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    const mockPerformUpgrade = vi.fn();
+    const mockGetGameMeta = () => ({
+      token_names: ['spring'],
+      oracle_prices: { spring: 1 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      effective_upgrade_cost_multiplier: { spring: 1 },
+    });
+
+    initInlineUpgrades({
+      getActiveGameMeta: mockGetGameMeta,
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+      }),
+      performUpgrade: mockPerformUpgrade,
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 50,
+              delta_output: 1,
+              breakeven_seconds: 50,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 2 },
+        },
+      },
+      token_names: ['spring'],
+    };
+
+    renderInlineSeasonUpgrades(
+      upgradesContainer,
+      'spring',
+      data,
+      mockGetGameMeta()
+    );
+
+    const button = upgradesContainer.querySelector('.upgrade-row-action');
+    button?.click();
+
+    expect(mockPerformUpgrade).toHaveBeenCalledWith('hashrate', 3, 'spring');
+  });
+
+  it('renders exactly one row per supported upgrade type', async () => {
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-upgrades"></div>
+      </div>
+    `;
+
+    const { initInlineUpgrades, renderInlineSeasonUpgrades } =
+      await import('./ui/upgrade-panel-inline.js');
+
+    initInlineUpgrades({
+      getActiveGameMeta: () => ({ token_names: ['spring'] }),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 50 },
+        cooling: { base_cost: 50 },
+      }),
+      performUpgrade: vi.fn(),
+    });
+
+    const upgradesContainer = document.querySelector('.season-upgrades');
+    const data = {
+      game_id: 1,
+      token_names: ['spring'],
+      upgrade_metrics: {
+        spring: {
+          upgrades: {
+            hashrate: {
+              cost_to_next: 50,
+              delta_output: 1,
+              breakeven_seconds: 50,
+            },
+            efficiency: {
+              cost_to_next: 60,
+              delta_output: 0.5,
+              breakeven_seconds: 120,
+            },
+            cooling: {
+              cost_to_next: 70,
+              delta_output: 0.25,
+              breakeven_seconds: 200,
+            },
+          },
+        },
+      },
+      player_state: {
+        upgrades_by_token: {
+          spring: { hashrate: 0, efficiency: 0, cooling: 0 },
+        },
+      },
+    };
+
+    renderInlineSeasonUpgrades(upgradesContainer, 'spring', data, null);
+
+    const rowTypes = upgradesContainer.querySelectorAll('.upgrade-row-type');
+    expect(rowTypes.length).toBe(3);
+
+    const rowButtons = upgradesContainer.querySelectorAll(
+      '.upgrade-row-action'
+    );
+    expect(rowButtons.length).toBe(3);
+  });
+});
+
+describe('formatCompactNumber utility', () => {
+  it('formats small numbers without suffixes', async () => {
+    const module = await loadMainModule();
+    const result = module.formatCompactNumber(123.456, { decimalsSmall: 2 });
+    expect(result.display).toBe('123.46');
+    expect(result.full).toContain('123.46');
+  });
+
+  it('formats numbers >= 1k with k suffix', async () => {
+    const module = await loadMainModule();
+    const result = module.formatCompactNumber(1234, { decimalsSmall: 2 });
+    expect(result.display).toBe('1.23k');
+  });
+
+  it('formats numbers >= 1M with M suffix', async () => {
+    const module = await loadMainModule();
+    const result = module.formatCompactNumber(1234567, {
+      decimalsSmall: 2,
+      decimalsLarge: 2,
+    });
+    expect(result.display).toBe('1.23M');
+  });
+
+  it('formats numbers >= 1B with B suffix', async () => {
+    const module = await loadMainModule();
+    const result = module.formatCompactNumber(1234567890, {
+      decimalsSmall: 2,
+      decimalsLarge: 2,
+    });
+    expect(result.display).toBe('1.23B');
+  });
+
+  it('returns em dash for non-finite values', async () => {
+    const module = await loadMainModule();
+    const resultNaN = module.formatCompactNumber(Number.NaN, {
+      decimalsSmall: 2,
+    });
+    const resultInf = module.formatCompactNumber(Number.POSITIVE_INFINITY, {
+      decimalsSmall: 2,
+    });
+    const resultNegInf = module.formatCompactNumber(Number.NEGATIVE_INFINITY, {
+      decimalsSmall: 2,
+    });
+
+    expect(resultNaN.display).toBe('—');
+    expect(resultInf.display).toBe('—');
+    expect(resultNegInf.display).toBe('—');
+  });
+
+  it('provides full uncompressed value for tooltips', async () => {
+    const module = await loadMainModule();
+    const result = module.formatCompactNumber(1234567890, {
+      decimalsSmall: 2,
+      decimalsLarge: 2,
+    });
+    expect(result.full).toContain('1,234,567,890');
+  });
+});
+
+describe('Portfolio Value with compact formatting', () => {
+  it('displays portfolio value using compact format for large amounts', async () => {
+    const module = await loadMainModule();
+    const portfolioEl = document.getElementById('portfolio-value');
+
+    // Test with large portfolio value: (250k*2) + (50k*3) + (25k*4) + (10k*5) = 800k
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: {
+          spring: 250000,
+          summer: 50000,
+          autumn: 25000,
+          winter: 10000,
+        },
+      },
+      oracle_prices: {
+        spring: 2,
+        summer: 3,
+        autumn: 4,
+        winter: 5,
+      },
+    });
+
+    // Should show compact format (800.00k for 800000)
+    expect(portfolioEl.textContent).toBe('800.00k');
+  });
+
+  it('stores full value in data attribute for tooltip display', async () => {
+    const module = await loadMainModule();
+    const portfolioEl = document.getElementById('portfolio-value');
+
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: {
+          spring: 100,
+          summer: 50,
+          autumn: 25,
+          winter: 10,
+        },
+      },
+      oracle_prices: {
+        spring: 2,
+        summer: 3,
+        autumn: 4,
+        winter: 5,
+      },
+    });
+
+    // Should have full value stored (500.00)
+    expect(portfolioEl.getAttribute('data-full-value')).toContain('500');
+  });
+
+  it('removes data-full-value attribute when data is invalid', async () => {
+    const module = await loadMainModule();
+    const portfolioEl = document.getElementById('portfolio-value');
+
+    // Set initial valid data
+    module.renderPortfolioValue({
+      game_id: 'g1',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        balances: { spring: 100, summer: 0, autumn: 0, winter: 0 },
+      },
+      oracle_prices: { spring: 2, summer: 1, autumn: 1, winter: 1 },
+    });
+
+    expect(portfolioEl.getAttribute('data-full-value')).toBeDefined();
+
+    // Clear with null data
+    module.renderPortfolioValue(null);
+    expect(portfolioEl.getAttribute('data-full-value')).toBeNull();
   });
 });

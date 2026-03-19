@@ -85,3 +85,77 @@ export function computePayCostPreview({
     ratio,
   };
 }
+
+/**
+ * Format a number for compact display with k/M/B suffixes.
+ * Returns { display, full } where display is the compact format and full is the uncompressed value.
+ *
+ * @param {number} value - The number to format
+ * @param {object} options - Formatting options
+ * @param {number} options.decimalsSmall - Decimals for values < 1M (default: 2)
+ * @param {number} options.decimalsLarge - Decimals for values >= 1M (default: 2)
+ * @returns {{ display: string, full: string }} - Object with display (compact) and full (uncompressed) strings
+ */
+export function formatCompactNumber(
+  value,
+  { decimalsSmall = 2, decimalsLarge = 2 } = {}
+) {
+  const num = Number(value);
+
+  // Handle invalid/edge cases
+  if (!Number.isFinite(num)) {
+    return { display: '—', full: '—' };
+  }
+
+  const abs = Math.abs(num);
+  const isNegative = num < 0 ? '-' : '';
+
+  // Format full value with locale
+  const fullFormatted = num.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.max(decimalsSmall, decimalsLarge),
+  });
+
+  // Below 1000, show as-is with decimalsSmall precision
+  if (abs < 1000) {
+    const display = num.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimalsSmall,
+    });
+    return { display, full: fullFormatted };
+  }
+
+  // 1000 to 999,999 -> k
+  if (abs < 1_000_000) {
+    const compact = (num / 1000).toFixed(decimalsSmall);
+    return {
+      display: `${isNegative}${compact}k`,
+      full: fullFormatted,
+    };
+  }
+
+  // 1M to 999M -> M
+  if (abs < 1_000_000_000) {
+    const compact = (num / 1_000_000).toFixed(decimalsLarge);
+    return {
+      display: `${isNegative}${compact}M`,
+      full: fullFormatted,
+    };
+  }
+
+  // 1B to 999B -> B
+  if (abs < 1_000_000_000_000) {
+    const compact = (num / 1_000_000_000).toFixed(decimalsLarge);
+    return {
+      display: `${isNegative}${compact}B`,
+      full: fullFormatted,
+    };
+  }
+
+  // 1T+ -> T
+  const compact = (num / 1_000_000_000_000).toFixed(decimalsLarge);
+  return {
+    display: `${isNegative}${compact}T`,
+    full: fullFormatted,
+  };
+}

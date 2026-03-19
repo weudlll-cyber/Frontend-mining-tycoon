@@ -5,6 +5,14 @@ Key responsibilities:
 - Manage SSE lifecycle and reconnect behavior.
 - Fetch/cache meta contracts with ETag, dedupe/throttle, and retention cleanup.
 - Render state/leaderboard/upgrades and enforce contract-version safety gates.
+- Drive explicit async session creation and session-scoped stream orchestration.
+Invariants:
+- Frontend remains display/intent only; backend stays authoritative for deterministic session policy and timing.
+- No overlays/modals for core gameplay; inline status only.
+- Desktop core view must avoid page scroll; only internal panels may scroll.
+Security notes:
+- Use safe DOM APIs only and never render untrusted HTML.
+- Encode ids in URLs and never surface player tokens in UI.
 Entry points / public functions:
 - DOMContentLoaded bootstrap, start/stop/new-game handlers, fetchMetaSnapshot.
 Dependencies:
@@ -25,8 +33,9 @@ Manual QA (P2 Seasonal Oracle)
 import './style.css';
 import {
   DEFAULT_TOKEN_NAMES,
-  normalizeTokenNames,
   computePayCostPreview,
+  formatCompactNumber,
+  normalizeTokenNames,
 } from './utils/token-utils.js';
 import { clearNode } from './utils/dom-utils.js';
 import {
@@ -66,6 +75,11 @@ import {
   shouldResetNextHalvingCountdownTarget,
 } from './ui/halving-display.js';
 import {
+  initEventDisplay,
+  renderEventBanner,
+  annotateAffectedValues,
+} from './ui/event-display.js';
+import {
   initMetaManager,
   getGameMeta,
   isContractVersionSupported,
@@ -78,15 +92,67 @@ import {
   setActiveMeta as setActiveMetaState,
   fetchMetaSnapshot,
 } from './meta/meta-manager.js';
+import { initPlayerView, renderPlayerState } from './ui/player-view.js';
 import {
-  initPlayerView,
-  renderPlayerState,
-} from './ui/player-view.js';
+  initSetupShell,
+  setSetupShellState,
+  updateSetupActionsState as updateSetupShellActions,
+  renderDebugContext as renderSetupDebugContext,
+  setSetupCollapsed as setSetupShellCollapsed,
+  toggleSetupCollapsed as toggleSetupShellCollapsed,
+  autoCollapseSetupForLiveState as autoCollapseSetupShellForLiveState,
+  scrollToLiveBoard as scrollSetupToLiveBoard,
+  initializeHeaderInteractions as initializeSetupHeaderInteractions,
+  ensureInputsEditable as ensureSetupInputsEditable,
+} from './ui/setup-shell.js';
+import {
+  initLiveSummary,
+  computePortfolioValue,
+  renderQuickStats as renderLiveQuickStats,
+  renderPortfolioValue as renderLivePortfolioValue,
+  renderAsyncSessionBadge,
+} from './ui/live-summary.js';
+import {
+  initLeaderboard,
+  renderLeaderboard as renderTopLeaderboard,
+} from './ui/leaderboard.js';
+import {
+  initSeasonCards,
+  formatRemainingMmSs,
+  formatDurationCompact,
+  classifyHalvingSeverity,
+  applyHalvingTextAndSeverity,
+  syncSeasonHalvingTicker,
+  stopSeasonHalvingTimers,
+  renderSeasonData as renderSeasonCardData,
+} from './ui/season-cards.js';
 import {
   initUpgradePanel,
   renderUpgradeMetrics as renderUpgradePanelMetrics,
   getSelectedTokens,
 } from './ui/upgrade-panel.js';
+import {
+  initInlineUpgrades,
+  renderAllSeasonUpgrades,
+} from './ui/upgrade-panel-inline.js';
+import { initChatPanel, connectChat, disconnectChat } from './ui/chat-panel.js';
+import {
+  initStreamController,
+  startStream,
+  stopLiveTimersAndHalving,
+  closeEventSourceIfOpen,
+  hasOpenStream,
+} from './services/stream-controller.js';
+import {
+  initGameActions,
+  performUpgrade,
+  createNewGameAndJoin,
+} from './services/game-actions.js';
+import {
+  initSessionActions,
+  createAsyncSession,
+  getSessionStreamTicket,
+} from './services/session-actions.js';
 
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
@@ -117,6 +183,7 @@ const derivedEmissionPreviewEl = document.getElementById(
 // DOM elements - buttons
 const newGameBtn = document.getElementById('new-game-btn');
 const startBtn = document.getElementById('start-btn');
+const startSessionBtn = document.getElementById('start-session-btn');
 const stopBtn = document.getElementById('stop-btn');
 
 // DOM elements - status displays
@@ -124,22 +191,205 @@ const connStatusEl = document.getElementById('conn-status');
 const gameStatusEl = document.getElementById('game-status');
 const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
+const asyncSessionStatusEl = document.getElementById('async-session-status');
 const newGameStatusEl = document.getElementById('new-game-status');
+const setupActionsNoteEl = document.getElementById('setup-actions-note');
+const roundModeBadgeEl = document.getElementById('round-mode-badge');
+const startSessionStatusEl = document.getElementById('start-session-status');
 const metaDebugEl = document.getElementById('meta-debug');
 const liveBoardEl = document.getElementById('live-board');
+const setupShellEl = document.getElementById('setup-shell');
+const setupToggleBtnEl = document.getElementById('setup-toggle-btn');
+const jumpLiveBtnEl = document.getElementById('jump-live-btn');
+const jumpLiveBtnSetupEl = document.getElementById('jump-live-btn-setup');
+const debugDetailsEl = document.getElementById('debug-details');
+const debugBackendUrlEl = document.getElementById('debug-backend-url');
+const debugGameIdEl = document.getElementById('debug-game-id');
+const debugPlayerIdEl = document.getElementById('debug-player-id');
+const debugSessionIdEl = document.getElementById('debug-session-id');
+const chatPanelEl = document.getElementById('chat-panel');
+const chatToggleBtnEl = document.getElementById('chat-toggle-btn');
+const chatMessagesEl = document.getElementById('chat-messages');
+const chatFormEl = document.getElementById('chat-form');
+const chatInputEl = document.getElementById('chat-input');
+const chatStatusEl = document.getElementById('chat-status');
 
 // DOM elements - player and leaderboard
 const playerStateEl = document.getElementById('player-state');
 const leaderboardEl = document.getElementById('leaderboard');
-const upgradesEl = document.getElementById('upgrades');
+const upgradesEl =
+  document.getElementById('upgrades') || document.createElement('div'); // Fallback for safety
+const seasonScrollEl = document.querySelector('.seasons-scroll');
+const myScoreEl = document.getElementById('my-score');
+const myRankEl = document.getElementById('my-rank');
+const topScoreEl = document.getElementById('top-score');
+const portfolioValueEl = document.getElementById('portfolio-value');
 const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
+const editableInputs = [
+  baseUrlInput,
+  playerNameInput,
+  durationPresetInput,
+  durationCustomValueInput,
+  durationCustomUnitInput,
+  enrollmentWindowInput,
+  gameIdInput,
+  playerIdInput,
+  anchorTokenInput,
+  anchorRateInput,
+  seasonCyclesInput,
+];
 
-let eventSource = null;
-let waitingTimer = null;
-let intentionalClose = false;
-let payloadLogged = false;
 let lastGameData = null;
 let modulesInitialized = false;
+let isStreamActive = false;
+let isSetupBusy = false;
+let latestGameStatus = null;
+let sessionStartSupported = true;
+let setupRoundModeOverride = null;
+let activeSession = null;
+let sessionElapsedInterval = null;
+
+function getRoundModeFromMeta(meta) {
+  const raw = String(meta?.round_mode || meta?.round_type || '')
+    .trim()
+    .toLowerCase();
+  if (raw === 'async' || raw === 'asynchronous') return 'async';
+  return 'sync';
+}
+
+function getSessionSupportFromMeta(meta) {
+  if (!meta) return null;
+  if (
+    meta.supports_round_sessions === true ||
+    meta.supports_session_stream === true ||
+    meta.supports_async_sessions === true
+  ) {
+    return true;
+  }
+  if (
+    meta.supports_round_sessions === false ||
+    meta.supports_session_stream === false
+  ) {
+    return false;
+  }
+  const capabilityLists = [];
+  if (Array.isArray(meta.capabilities)) capabilityLists.push(meta.capabilities);
+  if (Array.isArray(meta.features)) capabilityLists.push(meta.features);
+  const capabilityMatch = capabilityLists
+    .flat()
+    .map((entry) => String(entry).toLowerCase())
+    .some((entry) => entry.includes('session'));
+  return capabilityMatch ? true : null;
+}
+
+function getCurrentRoundContext() {
+  const gameMeta = getGameMeta(gameIdInput?.value);
+  const roundMode =
+    setupRoundModeOverride === 'async' || setupRoundModeOverride === 'sync'
+      ? setupRoundModeOverride
+      : getRoundModeFromMeta(gameMeta);
+  const supportFromMeta = getSessionSupportFromMeta(gameMeta);
+  const supportsSessionStart =
+    roundMode !== 'async'
+      ? false
+      : supportFromMeta === null
+        ? sessionStartSupported
+        : supportFromMeta;
+  return {
+    roundMode,
+    supportsSessionStart,
+  };
+}
+
+function syncSetupShellState() {
+  const roundContext = getCurrentRoundContext();
+  setSetupShellState({
+    isStreamActive,
+    isSetupBusy,
+    latestGameStatus,
+    roundMode: roundContext.roundMode,
+    sessionStartSupported: roundContext.supportsSessionStart,
+    sessionActive: Boolean(activeSession?.sessionId),
+    sessionId: activeSession?.sessionId || null,
+  });
+}
+
+function setStartSessionStatus(message = '', type = 'info') {
+  if (!startSessionStatusEl) return;
+  startSessionStatusEl.textContent = message;
+  startSessionStatusEl.className = message
+    ? `setup-session-status setup-session-status--${type}`
+    : 'setup-session-status';
+}
+
+function stopSessionElapsedTimer() {
+  if (sessionElapsedInterval) {
+    clearInterval(sessionElapsedInterval);
+    sessionElapsedInterval = null;
+  }
+}
+
+function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
+  if (!Number.isFinite(sessionStartUnix)) return;
+  stopSessionElapsedTimer();
+
+  const update = () => {
+    const nowSeconds = Date.now() / 1000;
+    const elapsed = Math.max(
+      Number(initialElapsedSeconds) || 0,
+      nowSeconds - Number(sessionStartUnix)
+    );
+    // WHY: Once the backend session exists, the primary timer should reflect session-relative age.
+    countdownLabelEl.textContent = 'Session Elapsed';
+    countdownEl.textContent = formatRemainingMmSs(elapsed);
+  };
+
+  update();
+  sessionElapsedInterval = setInterval(update, 500);
+}
+
+function updateSetupActionsState() {
+  initializeModules();
+  syncSetupShellState();
+  updateSetupShellActions();
+}
+
+function setSetupStateForTests({
+  streamActive,
+  gameStatus,
+  setupBusy,
+  roundMode,
+  supportsSessionStart,
+  sessionId,
+} = {}) {
+  if (typeof streamActive === 'boolean') {
+    isStreamActive = streamActive;
+  }
+  if (typeof gameStatus === 'string' || gameStatus === null) {
+    latestGameStatus = gameStatus;
+  }
+  if (typeof setupBusy === 'boolean') {
+    isSetupBusy = setupBusy;
+  }
+  if (roundMode === 'sync' || roundMode === 'async') {
+    setupRoundModeOverride = roundMode;
+  } else {
+    setupRoundModeOverride = null;
+  }
+  if (typeof supportsSessionStart === 'boolean') {
+    sessionStartSupported = supportsSessionStart;
+  }
+  if (sessionId === null) {
+    activeSession = null;
+  } else if (sessionId !== undefined) {
+    activeSession = {
+      sessionId,
+      sessionStartUnix: activeSession?.sessionStartUnix || null,
+      requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
+    };
+  }
+  updateSetupActionsState();
+}
 
 // P2.4: Duration resolution helper
 function resolveDurationSeconds() {
@@ -298,164 +548,54 @@ function setLiveSessionActive(isActive) {
   document.body.classList.toggle('live-session', Boolean(isActive));
 }
 
-function scrollToLiveBoard() {
-  if (!liveBoardEl) return;
-  const reducedMotion =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function renderDebugContext() {
+  initializeModules();
+  renderSetupDebugContext();
+}
 
-  liveBoardEl.scrollIntoView({
-    behavior: reducedMotion ? 'auto' : 'smooth',
-    block: 'start',
-  });
+function setSetupCollapsed(isCollapsed) {
+  initializeModules();
+  setSetupShellCollapsed(isCollapsed);
+}
+
+function toggleSetupCollapsed() {
+  initializeModules();
+  toggleSetupShellCollapsed();
+}
+
+function autoCollapseSetupForLiveState(gameStatus = null) {
+  initializeModules();
+  autoCollapseSetupShellForLiveState(gameStatus);
+}
+
+function scrollToLiveBoard() {
+  initializeModules();
+  scrollSetupToLiveBoard();
+}
+
+function initializeHeaderInteractions() {
+  initializeModules();
+  initializeSetupHeaderInteractions();
+}
+
+function renderQuickStats(data) {
+  initializeModules();
+  renderLiveQuickStats(data);
+}
+
+function renderPortfolioValue(data) {
+  initializeModules();
+  renderLivePortfolioValue(data);
 }
 
 function renderLeaderboard(data) {
-  clearNode(leaderboardEl);
-
-  if (!data) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'placeholder';
-    placeholder.textContent = 'Waiting for game data...';
-    leaderboardEl.appendChild(placeholder);
-    return;
-  }
-
-  const leaderboard = data.leaderboard_top_5 || data.leaderboard || [];
-  if (!leaderboard.length) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'placeholder';
-    placeholder.textContent = 'Waiting for leaderboard data...';
-    leaderboardEl.appendChild(placeholder);
-    return;
-  }
-
-  const table = document.createElement('table');
-  table.className = 'leaderboard-table';
-
-  const thead = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  ['Rank', 'Player', 'Mined'].forEach((label) => {
-    const th = document.createElement('th');
-    th.textContent = label;
-    if (label === 'Mined') {
-      th.style.textAlign = 'right';
-    }
-    headRow.appendChild(th);
-  });
-  thead.appendChild(headRow);
-
-  const tbody = document.createElement('tbody');
-  leaderboard.slice(0, 5).forEach((player, index) => {
-    const row = document.createElement('tr');
-
-    const rankCell = document.createElement('td');
-    const rank = document.createElement('span');
-    rank.className = 'leaderboard-rank';
-    rank.textContent = `#${index + 1}`;
-    rankCell.appendChild(rank);
-
-    const playerCell = document.createElement('td');
-    const name = document.createElement('span');
-    name.className = 'leaderboard-name';
-    name.textContent = player.name || player.player_id || '-';
-    playerCell.appendChild(name);
-
-    const scoreCell = document.createElement('td');
-    scoreCell.style.textAlign = 'right';
-    const score = document.createElement('span');
-    score.className = 'leaderboard-score';
-    score.textContent = String(Math.floor(player.score || 0));
-    scoreCell.appendChild(score);
-
-    row.append(rankCell, playerCell, scoreCell);
-    tbody.appendChild(row);
-  });
-
-  table.append(thead, tbody);
-  leaderboardEl.appendChild(table);
+  initializeModules();
+  renderTopLeaderboard(data);
 }
 
-async function getErrorMessageFromResponse(response, fallbackMessage) {
-  try {
-    const errorData = await response.json();
-    const detail =
-      errorData &&
-      typeof errorData.detail === 'string' &&
-      errorData.detail.trim()
-        ? errorData.detail
-        : fallbackMessage;
-    const code =
-      errorData && typeof errorData.code === 'string' && errorData.code
-        ? errorData.code
-        : null;
-    return { detail, code };
-  } catch {
-    return { detail: fallbackMessage, code: null };
-  }
-}
-
-async function performUpgrade(upgradeType, nextLevel) {
-  if (!isActiveContractSupported()) {
-    showToast(
-      'Unsupported contract version. Upgrade actions are disabled.',
-      'error'
-    );
-    return;
-  }
-
-  if (!lastGameData?.game_id || !lastGameData?.player_id) {
-    console.error('No game or player data available for upgrade');
-    return;
-  }
-
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
-
-  const gameId = lastGameData.game_id;
-  const playerId = lastGameData.player_id;
-  const playerToken = getStorageItem(
-    getPlayerTokenStorageKey(gameId, playerId)
-  );
-  const { targetToken, payToken } = getSelectedTokens();
-  const headers = { 'Content-Type': 'application/json' };
-  if (playerToken) {
-    headers['X-Player-Token'] = playerToken;
-  }
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/upgrade`,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          upgrade_type: upgradeType,
-          target_token: targetToken,
-          pay_token: payToken,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const { detail } = await getErrorMessageFromResponse(
-        response,
-        `Upgrade failed: ${response.status} ${response.statusText}`
-      );
-      throw new Error(detail);
-    }
-
-    await response.json();
-    showToast(
-      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${nextLevel}`,
-      'success'
-    );
-  } catch (error) {
-    console.error('Upgrade error:', error);
-    showToast(`Upgrade failed: ${error.message}`, 'error');
-  }
+function renderSeasonData(data) {
+  initializeModules();
+  renderSeasonCardData(data);
 }
 
 function showNewGameStatus(message, type = 'info') {
@@ -483,6 +623,9 @@ function saveSettings() {
   setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
   setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
+
+  renderDebugContext();
+  updateSetupActionsState();
 }
 
 function initializeModules() {
@@ -490,11 +633,45 @@ function initializeModules() {
     return;
   }
 
-  initCountdown(
-    { countdownEl, countdownLabelEl },
-    { get: () => lastGameData }
-  );
+  initSetupShell({
+    gameIdInput,
+    playerIdInput,
+    newGameBtn,
+    startBtn,
+    startSessionBtn,
+    stopBtn,
+    setupActionsNoteEl,
+    roundModeBadgeEl,
+    asyncSessionStatusEl,
+    renderAsyncSessionBadge,
+    startSessionStatusEl,
+    debugDetailsEl,
+    debugBackendUrlEl,
+    debugGameIdEl,
+    debugPlayerIdEl,
+    debugSessionIdEl,
+    setupShellEl,
+    setupToggleBtnEl,
+    jumpLiveBtnEl,
+    jumpLiveBtnSetupEl,
+    onStartAsyncSession: handleStartAsyncSession,
+    liveBoardEl,
+    editableInputs,
+  });
+  initCountdown({ countdownEl, countdownLabelEl }, { get: () => lastGameData });
   initHalvingDisplay({ getActiveGameMeta: getGameMeta });
+  initEventDisplay({ seasonScrollEl });
+  initLiveSummary({
+    myScoreEl,
+    myRankEl,
+    topScoreEl,
+    portfolioValueEl,
+    asyncSessionStatusEl,
+    getGameMeta,
+    defaultTokenNames: PLAYER_STATE_TOKENS,
+  });
+  initLeaderboard({ leaderboardEl });
+  initSeasonCards({ getGameMeta });
   initMetaManager({
     onMetaChanged() {
       renderMetaDebugLine();
@@ -513,6 +690,101 @@ function initializeModules() {
     getActiveUpgradeDefinitions,
     performUpgrade,
   });
+  initInlineUpgrades({
+    getActiveGameMeta: getGameMeta,
+    isActiveContractSupported,
+    getActiveUpgradeDefinitions,
+    performUpgrade,
+  });
+  initChatPanel({
+    panelEl: chatPanelEl,
+    toggleBtnEl: chatToggleBtnEl,
+    messagesEl: chatMessagesEl,
+    formEl: chatFormEl,
+    inputEl: chatInputEl,
+    statusEl: chatStatusEl,
+    getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
+    getGameId: () => gameIdInput.value,
+    getPlayerId: () => playerIdInput.value,
+    getPlayerToken: (gameId, playerId) =>
+      getStorageItem(getPlayerTokenStorageKey(gameId, playerId)),
+    showToast,
+  });
+  initStreamController({
+    clearCountdownInterval,
+    stopNextHalvingCountdown,
+    stopSeasonHalvingTimers,
+    resetTransientHalvingState,
+    onStreamStateChange(next) {
+      isStreamActive = next;
+    },
+    updateSetupActionsState,
+    getNormalizedBaseUrlOrNull,
+    connectChat,
+    getStorageItem,
+    getPlayerTokenStorageKey,
+    getSessionStreamTicket,
+    setBadgeStatus,
+    connStatusEl,
+    fetchMetaSnapshot,
+    onData: updateUI,
+    onSessionStreamError(message) {
+      setStartSessionStatus(message, 'error');
+      showToast(message, 'error');
+    },
+    disconnectChat,
+    onGameStatusChange(next) {
+      latestGameStatus = next;
+    },
+  });
+  initGameActions({
+    isActiveContractSupported,
+    showToast,
+    getLastGameData: () => lastGameData,
+    getNormalizedBaseUrlOrNull,
+    getStorageItem,
+    getPlayerTokenStorageKey,
+    getSelectedTokens,
+    disconnectChat,
+    hasOpenStream,
+    stopActiveStream() {
+      closeEventSourceIfOpen();
+      stopLiveTimersAndHalving();
+      isStreamActive = false;
+      latestGameStatus = null;
+      updateSetupActionsState();
+    },
+    onSetupBusyChange(next) {
+      isSetupBusy = next;
+      updateSetupActionsState();
+    },
+    clearNewGameStatus,
+    showNewGameStatus,
+    getPlayerName: () => playerNameInput.value.trim() || 'Player',
+    getEnrollmentWindow: () => parseInt(enrollmentWindowInput.value, 10) || 60,
+    cleanupGameMetaCache,
+    resolveDurationSeconds,
+    collectAdvancedOverrides,
+    setGameId(gameId) {
+      gameIdInput.value = gameId;
+    },
+    setPlayerId(playerId) {
+      playerIdInput.value = playerId;
+    },
+    setStorageItem,
+    markGameMetaSeen,
+    fetchMetaSnapshot,
+    saveSettings,
+    ensureInputsEditable,
+    startLiveStream,
+    setSetupCollapsed,
+    scrollToLiveBoard,
+  });
+  initSessionActions({
+    getNormalizedBaseUrlOrNull,
+    getStorageItem,
+    getPlayerTokenStorageKey,
+  });
 
   modulesInitialized = true;
 }
@@ -520,31 +792,25 @@ function initializeModules() {
 function renderUpgradeMetrics(data) {
   initializeModules();
   renderUpgradePanelMetrics(data, getGameMeta);
+  renderAllSeasonUpgrades(data, getGameMeta);
 }
 
+function createPlaceholder(message) {
+  const placeholder = document.createElement('p');
+  placeholder.className = 'placeholder';
+  placeholder.textContent = message;
+  return placeholder;
+}
 
-
-
-// Defensive UI guard: keep main form inputs editable even if browser/autofill
-// or extension state accidentally toggles readOnly/disabled flags.
 function ensureInputsEditable() {
-  [
-    baseUrlInput,
-    playerNameInput,
-    durationPresetInput,
-    durationCustomValueInput,
-    durationCustomUnitInput,
-    enrollmentWindowInput,
-    gameIdInput,
-    playerIdInput,
-    anchorTokenInput,
-    anchorRateInput,
-    seasonCyclesInput,
-  ].forEach((el) => {
-    if (!el) return;
-    el.disabled = false;
-    el.readOnly = false;
-  });
+  initializeModules();
+  ensureSetupInputsEditable();
+}
+
+function resetSectionPlaceholder(node, message) {
+  if (!node) return;
+  clearNode(node);
+  node.appendChild(createPlaceholder(message));
 }
 
 function loadSettings() {
@@ -590,18 +856,40 @@ function loadSettings() {
   }
 
   renderMetaDebugLine();
+  renderDebugContext();
+  updateSetupActionsState();
 }
 
 function updateUI(data) {
   lastGameData = data;
   lastGameData.timestamp = Date.now();
+  latestGameStatus = data?.game_status || null;
+
+  if (
+    activeSession?.sessionId &&
+    Number.isFinite(activeSession?.sessionStartUnix)
+  ) {
+    const streamSession = data?.session || null;
+    const elapsedFromPayload = Number(streamSession?.session_elapsed_seconds);
+    startSessionElapsedTimer(
+      Number(activeSession.sessionStartUnix),
+      Number.isFinite(elapsedFromPayload) ? elapsedFromPayload : 0
+    );
+  } else {
+    stopSessionElapsedTimer();
+  }
+
   setLiveSessionActive(true);
   handleLastHalvingStateUpdate(data);
 
   if (data.game_status) {
     setBadgeStatus(gameStatusEl, data.game_status);
+    autoCollapseSetupForLiveState(data.game_status);
 
-    if (data.game_status === 'enrolling') {
+    if (activeSession?.sessionId) {
+      // WHY: Once session-active, the user-visible primary timer reflects session age.
+      startSessionElapsedTimer(Number(activeSession.sessionStartUnix), 0);
+    } else if (data.game_status === 'enrolling') {
       countdownLabelEl.textContent = 'Game starts in';
       startEnrollmentCountdown();
     } else if (data.game_status === 'running') {
@@ -614,158 +902,70 @@ function updateUI(data) {
     }
   }
 
+  renderSeasonData(data);
   renderPlayerState(data);
   renderUpgradeMetrics(data);
   renderLeaderboard(data);
+  renderQuickStats(data);
+  renderPortfolioValue(data);
+  renderEventBanner(data);
+  annotateAffectedValues(data);
+  updateSetupActionsState();
 }
 
-function clearWaitingTimer() {
-  if (waitingTimer) {
-    clearTimeout(waitingTimer);
-    waitingTimer = null;
-  }
+async function startLiveStream(gameId, playerId, options = {}) {
+  const sessionId = activeSession?.sessionId || null;
+
+  startStream(gameId, playerId, {
+    sessionId,
+    requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
+    roundMode: getCurrentRoundContext().roundMode,
+    forceSessionAttempt: Boolean(options.forceSessionAttempt),
+  });
 }
 
-// resetTransientHalvingState is imported from ./ui/halving-display.js
-
-function closeEventSourceIfOpen() {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-}
-
-function stopLiveTimersAndHalving() {
-  clearCountdownInterval();
-  stopNextHalvingCountdown();
-  clearWaitingTimer();
-  resetTransientHalvingState();
-}
-
-function startStream(gameId, playerId) {
-  console.log('Starting SSE stream...');
-
-  if (eventSource) {
-    intentionalClose = true;
-    stopLiveTimersAndHalving();
-    closeEventSourceIfOpen();
-  }
-
-  const base = getNormalizedBaseUrlOrNull();
-  if (!base) {
+async function handleStartAsyncSession() {
+  const gameId = gameIdInput.value;
+  const playerId = playerIdInput.value;
+  const baseUrl = getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
     return;
   }
 
-  /**
-   * Obtain a short-lived SSE ticket.
-   * Required when REQUIRE_PLAYER_AUTH=true on the backend.
-   * In dev mode the endpoint still works but the ticket is optional.
-   * The ticket is placed in the URL rather than a header because
-   * browser EventSource cannot send custom request headers.
-   * Token-in-URL is justified here because:
-   *   - The ticket is HMAC-signed and expires in 60 s.
-   *   - The alternative (plain player_token in URL) would be permanent.
-   *   - The call is guarded by CORS and HTTPS in production.
-   */
-  async function buildSseUrl() {
-    const baseStreamUrl = `${base}/games/${encodeURIComponent(gameId)}/stream?player_id=${encodeURIComponent(playerId)}`;
-    const playerToken = getStorageItem(
-      getPlayerTokenStorageKey(gameId, playerId)
-    );
-    try {
-      const ticketResp = await fetch(
-        `${base}/games/${encodeURIComponent(gameId)}/sse-ticket?player_id=${encodeURIComponent(playerId)}`,
-        {
-          headers: playerToken ? { 'X-Player-Token': playerToken } : {},
-        }
-      );
-      if (ticketResp.ok) {
-        const ticketData = await ticketResp.json();
-        if (ticketData.ticket) {
-          return `${baseStreamUrl}&ticket=${encodeURIComponent(ticketData.ticket)}`;
-        }
-      }
-    } catch {
-      // Ticket fetch failed — fall back to no-ticket URL.
-      // This works in dev mode; in production the SSE endpoint will reject without a ticket.
+  setStartSessionStatus('Starting async session...', 'info');
+  isSetupBusy = true;
+  updateSetupActionsState();
+
+  // WHY: Session creation is an explicit user step before switching transport to the session-scoped stream.
+  const result = await createAsyncSession({ gameId, playerId });
+  if (!result.ok) {
+    isSetupBusy = false;
+    updateSetupActionsState();
+    if (result.kind === 'policy-closed') {
+      setStartSessionStatus(result.message, 'warning');
+      return;
     }
-    return baseStreamUrl;
+
+    setStartSessionStatus(result.message, 'error');
+    return;
   }
 
-  setBadgeStatus(connStatusEl, 'reconnecting');
-  startBtn.disabled = true;
-  intentionalClose = false;
+  activeSession = {
+    sessionId: result.sessionId,
+    sessionStartUnix: Number(result.sessionStartUnix) || null,
+    requiresPlayerAuth: Boolean(result.requiresPlayerAuth),
+  };
+  sessionStartSupported = true;
+  renderDebugContext();
+  setStartSessionStatus('Async session started.', 'success');
 
-  buildSseUrl().then((url) => {
-    console.log('SSE URL:', url.replace(/ticket=[^&]+/, 'ticket=[redacted]'));
+  isSetupBusy = false;
+  updateSetupActionsState();
 
-    eventSource = new EventSource(url);
-
-    eventSource.onopen = () => {
-      setBadgeStatus(connStatusEl, 'waiting');
-      startBtn.disabled = false;
-
-      waitingTimer = setTimeout(() => {
-        if (eventSource && eventSource.readyState === EventSource.OPEN) {
-          setBadgeStatus(connStatusEl, 'waiting');
-        }
-      }, 3000);
-
-      // Refresh capabilities on each reconnect and detect meta drift.
-      fetchMetaSnapshot(base, gameId).catch((err) =>
-        console.warn('Meta refresh on connect failed:', err)
-      );
-    };
-
-    eventSource.onmessage = (e) => {
-      clearWaitingTimer();
-
-      setBadgeStatus(connStatusEl, 'connected');
-
-      let data;
-      try {
-        data = JSON.parse(e.data);
-      } catch {
-        console.error('Failed to parse SSE data:', e.data);
-        return;
-      }
-
-      if (!payloadLogged) {
-        console.log('SSE payload keys:', Object.keys(data));
-        if (data.upgrade_metrics) {
-          console.log('upgrade_metrics structure:', data.upgrade_metrics);
-        }
-        if (data.player_state) {
-          console.log('player_state keys:', Object.keys(data.player_state));
-        }
-        payloadLogged = true;
-      }
-
-      updateUI(data);
-
-      if (data && data.game_status === 'finished') {
-        intentionalClose = true;
-        closeEventSourceIfOpen();
-        clearCountdownInterval();
-        stopNextHalvingCountdown();
-        clearWaitingTimer();
-        startBtn.disabled = false;
-      }
-    };
-
-    eventSource.onerror = () => {
-      clearWaitingTimer();
-
-      if (!intentionalClose) {
-        setBadgeStatus(connStatusEl, 'reconnecting');
-        console.log('Connection error, readyState:', eventSource?.readyState);
-      } else {
-        setBadgeStatus(connStatusEl, 'idle');
-        startBtn.disabled = false;
-      }
-    };
-  }); // end buildSseUrl().then(...)
-} // end startStream
+  await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
+  setSetupCollapsed(true);
+  scrollToLiveBoard();
+}
 
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
@@ -785,180 +985,44 @@ if (startBtn) {
       console.warn('Initial meta fetch failed before stream start:', e);
     }
 
-    startStream(gameId, playerId);
+    await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
+    setSetupCollapsed(true);
     scrollToLiveBoard();
   });
 }
 
 if (stopBtn) {
   stopBtn.addEventListener('click', () => {
-    intentionalClose = true;
+    isStreamActive = false;
+    latestGameStatus = null;
     closeEventSourceIfOpen();
     stopLiveTimersAndHalving();
+    disconnectChat();
+    stopSessionElapsedTimer();
     setBadgeStatus(connStatusEl, 'idle');
     setBadgeStatus(gameStatusEl, 'idle');
     stopCountdownTimer();
     lastGameData = null;
-    playerStateEl.innerHTML =
-      '<p class="placeholder">Waiting for game data...</p>';
-    leaderboardEl.innerHTML =
-      '<p class="placeholder">Waiting for game data...</p>';
-    upgradesEl.innerHTML =
-      '<p class="placeholder">Waiting for upgrade data...</p>';
-    newGameBtn.disabled = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = false;
+    resetSectionPlaceholder(playerStateEl, 'Waiting for game data...');
+    resetSectionPlaceholder(leaderboardEl, 'Waiting for game data...');
+    if (myScoreEl) myScoreEl.textContent = '—';
+    if (myRankEl) myRankEl.textContent = '—';
+    if (topScoreEl) topScoreEl.textContent = '—';
+    resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
     ensureInputsEditable();
     setLiveSessionActive(false);
+    setStartSessionStatus('', 'info');
+    updateSetupActionsState();
   });
 }
 
-async function createNewGameAndJoin() {
-  if (eventSource) {
-    intentionalClose = true;
-    stopLiveTimersAndHalving();
-    closeEventSourceIfOpen();
-  }
-
-  newGameBtn.disabled = true;
-  startBtn.disabled = true;
-  stopBtn.disabled = true;
-
-  clearNewGameStatus();
-
-  const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
-  if (!baseUrl) {
-    showNewGameStatus(
-      'Error: Invalid backend URL. Use http://host:port or https://host:port.',
-      'error'
-    );
-    newGameBtn.disabled = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = false;
-    return;
-  }
-  const playerName = playerNameInput.value.trim() || 'Player';
-  const enrollmentWindow = parseInt(enrollmentWindowInput.value, 10) || 60;
-
-  cleanupGameMetaCache();
-
-  try {
-    // P2.4: Resolve duration and collect overrides
-    let durationPayload;
-    try {
-      const durationResolution = resolveDurationSeconds();
-      if (durationResolution.mode === 'custom') {
-        durationPayload = {
-          duration_mode: 'custom',
-          duration_custom_seconds: durationResolution.customSeconds,
-        };
-      } else {
-        durationPayload = {
-          duration_mode: 'preset',
-          duration_preset: durationResolution.preset,
-        };
-      }
-    } catch (e) {
-      throw new Error(`Invalid duration: ${e.message}`);
-    }
-
-    const overrides = collectAdvancedOverrides();
-
-    // Build game creation payload
-    const gamePayload = {
-      enrollment_window_seconds: enrollmentWindow,
-      ...durationPayload,
-      ...overrides,
-    };
-
-    showNewGameStatus('Creating game...', 'info');
-    const gameResponse = await fetch(`${baseUrl}/games`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gamePayload),
-    });
-
-    if (!gameResponse.ok) {
-      const { detail } = await getErrorMessageFromResponse(
-        gameResponse,
-        `Game creation failed: ${gameResponse.status} ${gameResponse.statusText}`
-      );
-      throw new Error(detail);
-    }
-
-    const gameData = await gameResponse.json();
-    const gameId = gameData.game_id;
-
-    if (!gameId) {
-      throw new Error('No game_id returned from server');
-    }
-
-    gameIdInput.value = gameId;
-
-    showNewGameStatus('Joining game...', 'info');
-    const joinResponse = await fetch(
-      `${baseUrl}/games/${encodeURIComponent(gameId)}/join`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: playerName }),
-      }
-    );
-
-    if (!joinResponse.ok) {
-      const { detail, code } = await getErrorMessageFromResponse(
-        joinResponse,
-        `Join failed: ${joinResponse.status} ${joinResponse.statusText}`
-      );
-      if (code) {
-        console.debug('[join-policy] error code:', code);
-      }
-      throw new Error(detail);
-    }
-
-    const joinData = await joinResponse.json();
-    const playerId = joinData.player_id;
-
-    if (!playerId) {
-      throw new Error('No player_id returned from server');
-    }
-
-    playerIdInput.value = playerId;
-
-    // Store the player session token for authenticated requests (state, upgrade, SSE).
-    if (joinData.player_token) {
-      setStorageItem(
-        getPlayerTokenStorageKey(gameId, playerId),
-        joinData.player_token
-      );
-    }
-
-    markGameMetaSeen(gameId);
-    cleanupGameMetaCache();
-
-    // Prime capabilities from /meta and /games/{game_id}/meta.
-    await fetchMetaSnapshot(baseUrl, gameId);
-
-    saveSettings();
-
-    showNewGameStatus('Game created and joined. Starting stream...', 'success');
-    stopBtn.disabled = false;
-    ensureInputsEditable();
-    startStream(gameId, playerId);
-    scrollToLiveBoard();
-  } catch (error) {
-    console.error('Error creating game and joining:', error);
-    showNewGameStatus(`Error: ${error.message}`, 'error');
-    showToast(`Error: ${error.message}`, 'error');
-    newGameBtn.disabled = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = false;
-    ensureInputsEditable();
-  }
-}
-
 if (newGameBtn) {
-  newGameBtn.addEventListener('click', createNewGameAndJoin);
+  newGameBtn.addEventListener('click', () => {
+    activeSession = null;
+    setStartSessionStatus('', 'info');
+    stopSessionElapsedTimer();
+    createNewGameAndJoin();
+  });
 }
 
 // P2.4: Duration preset and advanced overrides event listeners
@@ -993,9 +1057,11 @@ playerIdInput?.addEventListener('change', saveSettings);
 anchorTokenInput?.addEventListener('change', saveSettings);
 anchorRateInput?.addEventListener('change', saveSettings);
 seasonCyclesInput?.addEventListener('change', saveSettings);
+gameIdInput?.addEventListener('input', updateSetupActionsState);
 
 document.addEventListener('DOMContentLoaded', async () => {
   initializeModules();
+  initializeHeaderInteractions();
   ensureInputsEditable();
   loadSettings();
   cleanupGameMetaCache();
@@ -1010,6 +1076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
+  updateSetupActionsState();
 });
 
 export {
@@ -1026,6 +1093,23 @@ export {
   resolveNextHalvingTarget,
   isContractVersionSupported,
   normalizeTokenNames,
+  formatCompactNumber,
+  formatRemainingMmSs,
+  formatDurationCompact,
+  classifyHalvingSeverity,
+  applyHalvingTextAndSeverity,
+  syncSeasonHalvingTicker,
+  stopSeasonHalvingTimers,
+  renderSeasonData,
+  computePortfolioValue,
+  renderPortfolioValue,
   renderUpgradeMetrics,
   setActiveMeta,
+  setSetupStateForTests,
+  updateSetupActionsState,
+  handleStartAsyncSession,
+  setSetupCollapsed,
+  toggleSetupCollapsed,
+  autoCollapseSetupForLiveState,
+  scrollToLiveBoard,
 };

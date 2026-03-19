@@ -6,12 +6,12 @@ describe('setupCounter', () => {
     const button = document.createElement('button');
 
     setupCounter(button);
-    expect(button.innerHTML).toBe('count is 0');
+    expect(button.textContent).toBe('count is 0');
 
     button.click();
-    expect(button.innerHTML).toBe('count is 1');
+    expect(button.textContent).toBe('count is 1');
 
     button.click();
-    expect(button.innerHTML).toBe('count is 2');
+    expect(button.textContent).toBe('count is 2');
   });
 });
