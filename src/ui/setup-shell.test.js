@@ -17,6 +17,19 @@ import {
 
 function buildFixture() {
   document.body.innerHTML = `
+    <label><input id="round-type-sync" name="round-type" type="radio" checked /> Sync</label>
+    <label><input id="round-type-async" name="round-type" type="radio" /> Async (host)</label>
+    <div id="async-host-controls" hidden>
+      <select id="async-duration-preset">
+        <option value="5m">5m</option>
+        <option value="10m" selected>10m</option>
+        <option value="custom">custom</option>
+      </select>
+      <div id="async-duration-custom-wrap" hidden>
+        <input id="async-duration-custom-minutes" value="10" />
+      </div>
+      <label><input id="async-auto-start" type="checkbox" checked /> Auto-start</label>
+    </div>
     <input id="game-id" value="game-1" />
     <input id="player-id" value="player-1" />
     <button id="new-game-btn" type="button">+ New Game</button>
@@ -80,6 +93,19 @@ function buildFixture() {
     setupShellEl: document.getElementById('setup-shell'),
     setupToggleBtnEl: document.getElementById('setup-toggle-btn'),
     onStartAsyncSession,
+    roundTypeSyncInput: document.getElementById('round-type-sync'),
+    roundTypeAsyncInput: document.getElementById('round-type-async'),
+    asyncHostControlsEl: document.getElementById('async-host-controls'),
+    asyncHostDurationPresetInput: document.getElementById(
+      'async-duration-preset'
+    ),
+    asyncHostDurationCustomEl: document.getElementById(
+      'async-duration-custom-wrap'
+    ),
+    asyncHostDurationCustomMinutesInput: document.getElementById(
+      'async-duration-custom-minutes'
+    ),
+    asyncHostAutoStartCheckbox: document.getElementById('async-auto-start'),
     debugDetailsEl: document.getElementById('debug-details'),
     debugBackendUrlEl: document.getElementById('debug-backend-url'),
     debugGameIdEl: document.getElementById('debug-game-id'),
@@ -103,6 +129,10 @@ describe('setup shell async readiness', () => {
       latestGameStatus: 'idle',
       roundMode: 'async',
       sessionStartSupported: true,
+      sessionApiSupported: true,
+      asyncWindowOpen: true,
+      requirePlayerAuth: false,
+      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -117,7 +147,7 @@ describe('setup shell async readiness', () => {
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
     expect(document.getElementById('start-btn')?.disabled).toBe(true);
-    expect(note?.textContent).toContain('Start Async Session first');
+    expect(note?.textContent).toContain('Start Session (Async) first');
   });
 
   it('keeps Start Async Session disabled until player join is complete', () => {
@@ -131,7 +161,10 @@ describe('setup shell async readiness', () => {
       latestGameStatus: 'enrolling',
       roundMode: 'async',
       sessionStartSupported: true,
+      sessionApiSupported: true,
+      asyncWindowOpen: true,
       sessionActive: false,
+      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -150,7 +183,10 @@ describe('setup shell async readiness', () => {
       latestGameStatus: 'enrolling',
       roundMode: 'async',
       sessionStartSupported: true,
+      sessionApiSupported: true,
+      asyncWindowOpen: true,
       sessionActive: false,
+      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -178,6 +214,9 @@ describe('setup shell async readiness', () => {
       latestGameStatus: 'idle',
       roundMode: 'async',
       sessionStartSupported: false,
+      sessionApiSupported: false,
+      asyncWindowOpen: true,
+      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -232,5 +271,52 @@ describe('setup shell async readiness', () => {
     debugDetailsEl.open = true;
     debugDetailsEl.dispatchEvent(new Event('toggle'));
     expect(debugSessionIdEl?.textContent).toBe('77');
+  });
+
+  it('renders gray diagnostic chip for each blocking async predicate', () => {
+    setSetupShellState({
+      isSetupBusy: false,
+      isStreamActive: false,
+      latestGameStatus: 'enrolling',
+      roundMode: 'async',
+      sessionStartSupported: true,
+      sessionApiSupported: false,
+      asyncWindowOpen: false,
+      requirePlayerAuth: 'unknown',
+      sessionActive: false,
+      sessionId: null,
+      hostRoundType: 'async',
+    });
+    updateSetupActionsState();
+
+    const chips = Array.from(
+      document.querySelectorAll('.async-diagnostic-chip--dim')
+    );
+    const chipsText = chips.map((chip) => chip.textContent || '');
+
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chipsText.join(' ')).toContain('Window');
+    expect(chipsText.join(' ')).toContain('SessionAPI');
+    expect(chipsText.join(' ')).toContain('Auth');
+  });
+
+  it('shows async host controls when round type is async and reveals custom duration input', () => {
+    const asyncControls = document.getElementById('async-host-controls');
+    const asyncDurationPreset = document.getElementById(
+      'async-duration-preset'
+    );
+    const customDurationWrap = document.getElementById(
+      'async-duration-custom-wrap'
+    );
+
+    setSetupShellState({ hostRoundType: 'async' });
+    updateSetupActionsState();
+    expect(asyncControls.hidden).toBe(false);
+
+    asyncDurationPreset.value = 'custom';
+    asyncDurationPreset.dispatchEvent(new Event('change'));
+    updateSetupActionsState();
+
+    expect(customDurationWrap.hidden).toBe(false);
   });
 });

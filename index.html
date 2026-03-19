@@ -141,8 +141,85 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     placeholder="e.g., Alice"
                   />
                 </div>
-                <!-- P2.4: Duration selector (presets + custom) -->
                 <div class="form-group form-span-2">
+                  <label>Round Type:</label>
+                  <div
+                    class="host-round-toggle"
+                    role="radiogroup"
+                    aria-label="Round Type"
+                  >
+                    <label class="host-round-option" for="round-type-sync">
+                      <input
+                        id="round-type-sync"
+                        name="round-type"
+                        type="radio"
+                        value="sync"
+                        checked
+                      />
+                      <span>Sync</span>
+                    </label>
+                    <label class="host-round-option" for="round-type-async">
+                      <input
+                        id="round-type-async"
+                        name="round-type"
+                        type="radio"
+                        value="async"
+                      />
+                      <span>Async (host)</span>
+                    </label>
+                  </div>
+                </div>
+                <div
+                  id="async-host-controls"
+                  class="form-group form-span-4 async-host-controls"
+                  hidden
+                >
+                  <div class="async-host-row" aria-live="polite">
+                    <label class="async-host-field" for="enrollment-window">
+                      <span>Enrollment Window (seconds)</span>
+                      <input
+                        id="enrollment-window"
+                        type="number"
+                        value="600"
+                        min="5"
+                        max="3600"
+                      />
+                    </label>
+                    <label class="async-host-field" for="async-duration-preset">
+                      <span>Session Duration</span>
+                      <select id="async-duration-preset">
+                        <option value="5m">5m</option>
+                        <option value="10m" selected>10m</option>
+                        <option value="15m">15m</option>
+                        <option value="custom">Custom…</option>
+                      </select>
+                    </label>
+                    <label
+                      id="async-duration-custom-wrap"
+                      class="async-host-field"
+                      for="async-duration-custom-minutes"
+                      hidden
+                    >
+                      <span>Custom Minutes</span>
+                      <input
+                        id="async-duration-custom-minutes"
+                        type="number"
+                        value="10"
+                        min="1"
+                        max="240"
+                      />
+                    </label>
+                    <label class="async-host-checkbox" for="async-auto-start">
+                      <input id="async-auto-start" type="checkbox" checked />
+                      <span
+                        >Auto-start async session after game creation and
+                        join</span
+                      >
+                    </label>
+                  </div>
+                </div>
+                <!-- P2.4: Duration selector (presets + custom) -->
+                <div class="form-group form-span-2" hidden>
                   <label>Game Duration:</label>
                   <div class="duration-selector">
                     <select id="duration-preset">
@@ -179,16 +256,6 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       </select>
                     </div>
                   </div>
-                </div>
-                <div class="form-group">
-                  <label>Enrollment Window (seconds):</label>
-                  <input
-                    id="enrollment-window"
-                    type="number"
-                    value="60"
-                    min="5"
-                    max="600"
-                  />
                 </div>
                 <!-- P2.4: Optional advanced overrides (collapsed by default) -->
                 <div class="form-group form-span-2">
@@ -270,7 +337,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     Start Stream
                   </button>
                   <button id="start-session-btn" class="btn-secondary" hidden>
-                    Start Async Session
+                    Start Session (Async)
                   </button>
                   <button id="stop-btn" class="btn-secondary">
                     Stop Stream

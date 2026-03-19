@@ -147,6 +147,7 @@ Frontend session-mode readiness:
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
 - After session creation, frontend switches to `/sessions/{session_id}/stream` and does not fallback to `/games/{id}/stream` while session context exists.
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
+- Setup now supports host-style async round creation controls (round type, window, duration, optional auto-start) for development/host contexts while keeping gameplay UI overlay-free.
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.

@@ -533,6 +533,7 @@ export function renderPlayerState(data) {
   });
   // Build footer content across two deliberate lines to avoid accidental wrapping behavior.
   let halvinPart = 'No further halvings';
+  let halvingTooltipPart = 'No further halvings in this round.';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
     const shouldReset = shouldResetNextHalvingCountdownTarget(
@@ -554,8 +555,14 @@ export function renderPlayerState(data) {
     );
     const countdownText = formatCountdownClock(remainingSeconds);
     halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${nextHalvingTarget.token.toUpperCase()} (month ${nextHalvingTarget.halvingMonth}).`;
   } else {
     stopNextHalvingCountdown();
+
+    const lastHalvingNotice = getLastHalvingNotice();
+    if (lastHalvingNotice) {
+      halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+    }
   }
 
   const minedPart =
@@ -569,14 +576,6 @@ export function renderPlayerState(data) {
 
   setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
-
-  const lastHalvingNotice = getLastHalvingNotice();
-  if (lastHalvingNotice) {
-    setTextNodeValue(
-      refs.tooltipNodes.output,
-      `Mining output rate per token. Last halving: ${lastHalvingNotice.token.toUpperCase()} halved. Precision: pending.`
-    );
-  }
 
   // Update precision tooltips for matrix rows
   updatePrecisionTooltip(
@@ -601,6 +600,6 @@ export function renderPlayerState(data) {
   // Update footer tooltip with all details
   setTextNodeValue(
     refs.tooltipNodes.footer,
-    `Halving: next mining reward halve | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
+    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
   );
 }

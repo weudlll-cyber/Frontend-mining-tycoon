@@ -1,3 +1,10 @@
+/*
+File: src/ui/event-display.test.js
+Purpose: Validate active-event banner and annotation rendering paths.
+Role in system: Regression coverage for event indicators in display-only frontend layers.
+Invariants/Security: Keeps event UX non-blocking and safely rendered via controlled DOM APIs.
+*/
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   initEventDisplay,

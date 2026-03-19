@@ -11,6 +11,8 @@ Security notes:
 - Never append sensitive query params unless the backend requires the short-lived ticket flow.
 */
 
+import { debugLog } from '../utils/debug-log.js';
+
 let _deps = null;
 let _eventSource = null;
 let _waitingTimer = null;
@@ -48,6 +50,13 @@ export function hasOpenStream() {
 }
 
 export function startStream(gameId, playerId, streamContext = {}) {
+  debugLog('stream', 'startStream invoked', {
+    gameId,
+    hasSessionId: Boolean(streamContext?.sessionId),
+    requiresPlayerAuth: Boolean(streamContext?.requiresPlayerAuth),
+    roundMode: streamContext?.roundMode || 'unknown',
+  });
+
   _deps.onStreamStateChange(true);
   _deps.updateSetupActionsState();
 
