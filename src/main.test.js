@@ -1016,10 +1016,23 @@ describe('Seasonal Oracle inline upgrade module', () => {
     expect(headerGrid).not.toBeNull();
     expect(dataGrid).not.toBeNull();
     expect(upgradesContainer.textContent).toContain('Upgrade');
-    expect(upgradesContainer.textContent).toContain('Level');
+    expect(upgradesContainer.textContent).toContain('Lvl');
     expect(upgradesContainer.textContent).toContain('Cost');
-    expect(upgradesContainer.textContent).toContain('Δ Out/s');
-    expect(upgradesContainer.textContent).toContain('BE');
+    expect(upgradesContainer.textContent).toContain('Out/s');
+    expect(upgradesContainer.textContent).toContain('BEP');
+    expect(upgradesContainer.textContent).toContain('Act');
+
+    const headerTipTriggers = upgradesContainer.querySelectorAll(
+      '.upgrade-header-tip-trigger'
+    );
+    if (headerTipTriggers.length > 0) {
+      expect(headerTipTriggers.length).toBe(4);
+    } else {
+      const titledHeaders = upgradesContainer.querySelectorAll(
+        '.upgrade-header-text[title]'
+      );
+      expect(titledHeaders.length).toBe(4);
+    }
 
     // one compact row per type
     const typeCells = upgradesContainer.querySelectorAll('.upgrade-row-type');
@@ -1154,9 +1167,9 @@ describe('Seasonal Oracle inline upgrade module', () => {
 
     // Check for compact metric display
     expect(upgradesContainer.textContent).toContain('Cost');
-    expect(upgradesContainer.textContent).toContain('Δ Out/s');
+    expect(upgradesContainer.textContent).toContain('Out/s');
     expect(upgradesContainer.textContent).toContain('+5.50/s');
-    expect(upgradesContainer.textContent).toContain('BE');
+    expect(upgradesContainer.textContent).toContain('BEP');
   });
 
   it('disables upgrade button when contract is not supported', async () => {

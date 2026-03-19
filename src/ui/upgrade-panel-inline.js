@@ -1,7 +1,7 @@
 /*
 File: src/ui/upgrade-panel-inline.js
 Purpose: Inline upgrade rendering for season cards in a compact row-based layout.
-Context: Header is intentionally two-line to prevent overlap in dense season cards while preserving single-line data rows.
+Context: Header uses compact one-line labels with micro-tooltips so data remains visible without horizontal card scrollbars.
 Constraints: Must remain display-only and use safe DOM APIs (textContent/createElement).
 Call initInlineUpgrades() once with required dependencies before use.
 Renders upgrades directly into season .season-upgrades containers.
@@ -9,11 +9,74 @@ Renders upgrades directly into season .season-upgrades containers.
 
 import { clearElementChildren, formatCost } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
+import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getActiveGameMeta = null;
 let _isActiveContractSupported = null;
 let _getActiveUpgradeDefinitions = null;
 let _performUpgrade = null;
+const _inlineTooltipStateByContainer = new WeakMap();
+
+function cleanupHeaderTooltipsForContainer(containerEl) {
+  const previous = _inlineTooltipStateByContainer.get(containerEl);
+  if (!previous) return;
+
+  previous.dispose?.();
+  const tooltipLayer = document.getElementById('tooltip-layer');
+  if (tooltipLayer) {
+    previous.bubbleIds.forEach((id) => {
+      const bubble = document.getElementById(id);
+      if (bubble && tooltipLayer.contains(bubble)) {
+        bubble.remove();
+      }
+    });
+  }
+
+  _inlineTooltipStateByContainer.delete(containerEl);
+}
+
+function createHeaderCell({ label, tooltip, uniquePrefix }) {
+  const cell = document.createElement('div');
+  cell.className = 'upgrade-header-cell';
+
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'upgrade-header-text';
+  labelSpan.textContent = label;
+  cell.appendChild(labelSpan);
+
+  if (!tooltip) {
+    return { cell, bubbleId: null };
+  }
+
+  const tooltipLayer = document.getElementById('tooltip-layer');
+  if (!tooltipLayer) {
+    labelSpan.title = tooltip;
+    return { cell, bubbleId: null };
+  }
+
+  const tipId = `ps-tip-upgrade-${uniquePrefix}-${label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')}`;
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'ps-tip-trigger upgrade-header-tip-trigger';
+  trigger.setAttribute('aria-label', tooltip);
+  trigger.setAttribute('aria-describedby', tipId);
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.dataset.tooltipId = tipId;
+  trigger.textContent = 'ⓘ';
+  cell.appendChild(trigger);
+
+  const bubble = document.createElement('span');
+  bubble.className = 'ps-tip-bubble';
+  bubble.id = tipId;
+  bubble.setAttribute('role', 'tooltip');
+  bubble.textContent = tooltip;
+
+  tooltipLayer.appendChild(bubble);
+
+  return { cell, bubbleId: tipId };
+}
 
 /**
  * @param {{
@@ -43,6 +106,7 @@ export function renderInlineSeasonUpgrades(
   data
 ) {
   if (!upgradesContainer) return;
+  cleanupHeaderTooltipsForContainer(upgradesContainer);
 
   const metrics = data?.upgrade_metrics || {};
   const playerState = data?.player_state || {};
@@ -63,7 +127,7 @@ export function renderInlineSeasonUpgrades(
       : true
   );
 
-  // Build compact row-based layout
+  // Compact one-line header preserves horizontal space without truncating numeric columns.
   const layout = document.createElement('div');
   layout.className = 'upgrade-compact-layout';
 
@@ -73,55 +137,27 @@ export function renderInlineSeasonUpgrades(
   const dataGrid = document.createElement('div');
   dataGrid.className = 'upgrade-compact-grid';
 
-  // Header is rendered in two lines to keep labels readable in the fixed-height season card layout.
+  // Abbreviations keep the header single-line; tooltips preserve clarity without widening columns.
   const headers = [
-    {
-      label: 'Upgrade',
-      tooltip: null,
-      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-1',
-    },
-    {
-      label: 'Level',
-      tooltip: 'Current upgrade level for this type',
-      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-2',
-    },
-    {
-      label: 'Cost',
-      tooltip: null,
-      className: 'upgrade-header-cell--line-1 upgrade-header-cell--col-3',
-    },
-    {
-      label: 'Δ Out/s',
-      tooltip: 'Incremental output increase per second',
-      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-4',
-    },
-    {
-      label: 'BE',
-      tooltip: 'Seconds until upgrade pays back via increased output',
-      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-5',
-    },
-    {
-      label: 'Action',
-      tooltip: null,
-      className: 'upgrade-header-cell--line-2 upgrade-header-cell--col-6',
-    },
+    { label: 'Upgrade', tooltip: null },
+    { label: 'Lvl', tooltip: 'Lvl = Level' },
+    { label: 'Cost', tooltip: null },
+    { label: 'Out/s', tooltip: 'Out/s = Output per second (delta)' },
+    { label: 'BEP', tooltip: 'BEP = Breakeven Period' },
+    { label: 'Act', tooltip: 'Act = Action' },
   ];
 
-  headers.forEach((header) => {
-    const headerCell = document.createElement('div');
-    headerCell.className = 'upgrade-header-cell';
-    if (header.className) {
-      headerCell.className += ` ${header.className}`;
+  const bubbleIds = [];
+
+  headers.forEach((header, index) => {
+    const { cell, bubbleId } = createHeaderCell({
+      ...header,
+      uniquePrefix: `${seasonToken}-${index}`,
+    });
+    if (bubbleId) {
+      bubbleIds.push(bubbleId);
     }
-    headerCell.title = header.tooltip || '';
-    headerCell.textContent = header.label;
-    if (header.tooltip) {
-      headerCell.setAttribute(
-        'aria-label',
-        `${header.label}: ${header.tooltip}`
-      );
-    }
-    headerGrid.appendChild(headerCell);
+    headerGrid.appendChild(cell);
   });
 
   supportedUpgradeTypes.forEach((type) => {
@@ -194,6 +230,8 @@ export function renderInlineSeasonUpgrades(
   clearElementChildren(upgradesContainer);
   if (supportedUpgradeTypes.length > 0) {
     upgradesContainer.appendChild(layout);
+    const dispose = initMicroTooltips(upgradesContainer);
+    _inlineTooltipStateByContainer.set(upgradesContainer, { dispose, bubbleIds });
   } else {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder';

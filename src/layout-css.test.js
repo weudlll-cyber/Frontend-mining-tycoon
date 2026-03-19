@@ -58,4 +58,11 @@ describe('dashboard layout css guardrails', () => {
     expect(css).toMatch(/\.season-halving\.season-halving--warning\s*\{/);
     expect(css).toMatch(/\.season-halving\.season-halving--critical\s*\{/);
   });
+
+  it('prevents horizontal scrollbar in season upgrade containers', () => {
+    const css = readStyleCss();
+
+    expect(css).toMatch(/\.season-upgrades\s*\{[\s\S]*?overflow-x:\s*hidden;/);
+    expect(css).toMatch(/\.upgrade-compact-grid\s*\{[\s\S]*?minmax\(0,/);
+  });
 });
