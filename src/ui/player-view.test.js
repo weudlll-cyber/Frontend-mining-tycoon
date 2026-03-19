@@ -240,6 +240,75 @@ describe('player state matrix', () => {
 
     expect(springPrice?.textContent).not.toBe('-');
     expect(winterPrice?.textContent).not.toBe('-');
+
+    const sigmaPrice = document.querySelector(
+      '.ps-cell[data-row="price"][data-token="sigma"]'
+    );
+    expect(sigmaPrice?.textContent.trim()).toBe('—');
+  });
+
+  it('uses payload oracle prices when metadata is unavailable', () => {
+    initPlayerView({
+      playerStateEl: document.getElementById('player-state'),
+      getActiveGameMeta: () => null,
+    });
+    resetPlayerStateView();
+
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      oracle_prices: {
+        spring: 9.9,
+        summer: 8.8,
+        autumn: 7.7,
+        winter: 6.6,
+      },
+      player_state: {
+        cumulative_mined: 10,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const springPrice = document.querySelector(
+      '.ps-cell[data-row="price"][data-token="spring"]'
+    );
+    expect(springPrice?.textContent.trim()).toBe('9.9');
+  });
+
+  it('falls back to player_state oracle prices when payload and metadata are absent', () => {
+    initPlayerView({
+      playerStateEl: document.getElementById('player-state'),
+      getActiveGameMeta: () => null,
+    });
+    resetPlayerStateView();
+
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 10,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+        oracle_prices: {
+          spring: 1.5,
+          summer: 2.5,
+          autumn: 3.5,
+          winter: 4.5,
+        },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const autumnPrice = document.querySelector(
+      '.ps-cell[data-row="price"][data-token="autumn"]'
+    );
+    expect(autumnPrice?.textContent.trim()).toBe('3.5');
   });
 
   it('renders numeric cells with compact format for large values', () => {

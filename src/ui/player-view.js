@@ -56,8 +56,19 @@ function formatCompactDisplay(value) {
 function setCompactNodeValue(textNode, cell, value) {
   const { display, full } = formatCompactDisplay(value);
   setTextNodeValue(textNode, display);
-  if (cell && full !== '—') {
-    cell.dataset.fullValue = full;
+  if (cell) {
+    if (full !== '—') {
+      cell.dataset.fullValue = full;
+    } else {
+      delete cell.dataset.fullValue;
+    }
+  }
+}
+
+function clearCompactCellValue(textNode, cell) {
+  setTextNodeValue(textNode, '-');
+  if (cell) {
+    delete cell.dataset.fullValue;
   }
 }
 
@@ -257,6 +268,7 @@ function ensurePlayerStateView(tokenNames) {
   const outputTotalCell = document.createElement('div');
   outputTotalCell.className = 'ps-cell ps-value ps-cell-total';
   outputTotalCell.dataset.row = 'output';
+  outputTotalCell.dataset.token = 'sigma';
   const outputTotalNode = document.createTextNode('-');
   outputTotalCell.appendChild(outputTotalNode);
   matrix.appendChild(outputTotalCell);
@@ -294,6 +306,7 @@ function ensurePlayerStateView(tokenNames) {
   const balanceTotalCell = document.createElement('div');
   balanceTotalCell.className = 'ps-cell ps-value ps-cell-total';
   balanceTotalCell.dataset.row = 'balance';
+  balanceTotalCell.dataset.token = 'sigma';
   const balanceTotalNode = document.createTextNode('-');
   balanceTotalCell.appendChild(balanceTotalNode);
   matrix.appendChild(balanceTotalCell);
@@ -330,6 +343,7 @@ function ensurePlayerStateView(tokenNames) {
   const oracleTotalCell = document.createElement('div');
   oracleTotalCell.className = 'ps-cell ps-value ps-cell-total';
   oracleTotalCell.dataset.row = 'price';
+  oracleTotalCell.dataset.token = 'sigma';
   const oracleTotalNode = document.createTextNode('-');
   oracleTotalCell.appendChild(oracleTotalNode);
   matrix.appendChild(oracleTotalCell);
@@ -374,8 +388,6 @@ function ensurePlayerStateView(tokenNames) {
       tooltipLayer.appendChild(tooltip.bubble);
     });
   }
-
-  _disposeTooltips = initMicroTooltips(_playerStateEl);
 
   _disposeTooltips = initMicroTooltips(_playerStateEl);
 
@@ -430,7 +442,10 @@ export function renderPlayerState(data) {
   const refs = ensurePlayerStateView(tokenNames);
   const balances = playerState.balances || playerState.tokens || {};
   const oraclePrices =
-    activeGameMeta?.oracle_prices || data.oracle_prices || null;
+    data.oracle_prices ||
+    activeGameMeta?.oracle_prices ||
+    playerState.oracle_prices ||
+    null;
   const metrics = data.upgrade_metrics || {};
   const outputRatePerToken = data.output_rate_per_token || null;
   const fallbackRate =
@@ -451,7 +466,7 @@ export function renderPlayerState(data) {
         rawRate
       );
     } else {
-      setTextNodeValue(refs.outputRateNodes[token], '-');
+      clearCompactCellValue(refs.outputRateNodes[token], refs.outputCells[token]);
     }
   });
   setCompactNodeValue(
@@ -471,7 +486,7 @@ export function renderPlayerState(data) {
         rawBalance
       );
     } else {
-      setTextNodeValue(refs.balanceNodes[token], '-');
+      clearCompactCellValue(refs.balanceNodes[token], refs.balanceCells[token]);
     }
   });
   setCompactNodeValue(
@@ -480,24 +495,20 @@ export function renderPlayerState(data) {
     balanceTotal
   );
 
-  let priceTotal = 0;
-  let priceCount = 0;
   tokenNames.forEach((token) => {
     const rawPrice = Number(oraclePrices?.[token]);
     if (Number.isFinite(rawPrice)) {
-      priceTotal += rawPrice;
-      priceCount += 1;
       setCompactNodeValue(
         refs.oraclePriceNodes[token],
         refs.priceCells[token],
         rawPrice
       );
     } else {
-      setTextNodeValue(refs.oraclePriceNodes[token], '-');
+      clearCompactCellValue(refs.oraclePriceNodes[token], refs.priceCells[token]);
     }
   });
-  const avgPrice = priceCount ? priceTotal / priceCount : null;
-  setCompactNodeValue(refs.oracleTotalNode, refs.oracleTotalCell, avgPrice);
+  setTextNodeValue(refs.oracleTotalNode, '—');
+  delete refs.oracleTotalCell.dataset.fullValue;
 
   const nextHalvingTarget = resolveNextHalvingTarget({
     data,
