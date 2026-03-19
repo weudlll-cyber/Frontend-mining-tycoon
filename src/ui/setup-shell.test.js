@@ -20,12 +20,21 @@ function buildFixture() {
     <label><input id="round-type-sync" name="round-type" type="radio" checked /> Sync</label>
     <label><input id="round-type-async" name="round-type" type="radio" /> Async (host)</label>
     <div id="async-host-controls" hidden>
+      <label id="async-enrollment-field" hidden>
+        <span>Enrollment Window (seconds)</span>
+        <input id="enrollment-window" type="number" value="600" disabled />
+      </label>
       <select id="async-duration-preset">
         <option value="5m">5m</option>
         <option value="10m" selected>10m</option>
-        <option value="custom">custom</option>
+        <option value="15m">15m</option>
+        <option value="60m">1h</option>
+        <option value="3h">3h</option>
+        <option value="6h">6h</option>
+        <option value="12h">12h</option>
+        <option value="24h">24h</option>
       </select>
-      <div id="async-duration-custom-wrap" hidden>
+      <div id="async-duration-custom-wrap" hidden aria-hidden="true">
         <input id="async-duration-custom-minutes" value="10" />
       </div>
       <label><input id="async-auto-start" type="checkbox" checked /> Auto-start</label>
@@ -73,9 +82,9 @@ function buildFixture() {
     if (sessionActive) {
       badge.textContent = 'Async: Session Active';
     } else if (!sessionSupported) {
-      badge.textContent = 'Async: Legacy View';
+      badge.textContent = 'Async: Ready';
     } else {
-      badge.textContent = 'Async: Session Ready';
+      badge.textContent = 'Async: Ready';
     }
   };
 
@@ -143,7 +152,7 @@ describe('setup shell async readiness', () => {
 
     expect(badge?.textContent).toContain('Round: Async');
     expect(asyncStatus?.hidden).toBe(false);
-    expect(asyncStatus?.textContent).toContain('Session Ready');
+    expect(asyncStatus?.textContent).toContain('Async: Ready');
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
     expect(document.getElementById('start-btn')?.disabled).toBe(true);
@@ -207,7 +216,7 @@ describe('setup shell async readiness', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('shows fallback note and disables start-session when unsupported', () => {
+  it('shows async endpoint warning and disables start-session when unsupported', () => {
     setSetupShellState({
       isSetupBusy: false,
       isStreamActive: false,
@@ -226,8 +235,8 @@ describe('setup shell async readiness', () => {
 
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(true);
-    expect(asyncStatus?.textContent).toContain('Legacy View');
-    expect(note?.textContent).toContain('legacy live view');
+    expect(asyncStatus?.textContent).toContain('Async: Ready');
+    expect(note?.textContent).toContain('endpoint is unavailable');
   });
 
   it('auto-closes only once when entering running if user did not reopen setup', () => {
@@ -295,16 +304,14 @@ describe('setup shell async readiness', () => {
     const chipsText = chips.map((chip) => chip.textContent || '');
 
     expect(chips.length).toBeGreaterThan(0);
-    expect(chipsText.join(' ')).toContain('Window');
+    expect(chipsText.join(' ')).not.toContain('Window');
     expect(chipsText.join(' ')).toContain('SessionAPI');
     expect(chipsText.join(' ')).toContain('Auth');
   });
 
-  it('shows async host controls when round type is async and reveals custom duration input', () => {
+  it('shows async host controls with enrollment/session-duration controls hidden', () => {
     const asyncControls = document.getElementById('async-host-controls');
-    const asyncDurationPreset = document.getElementById(
-      'async-duration-preset'
-    );
+    const enrollmentField = document.getElementById('async-enrollment-field');
     const customDurationWrap = document.getElementById(
       'async-duration-custom-wrap'
     );
@@ -312,11 +319,8 @@ describe('setup shell async readiness', () => {
     setSetupShellState({ hostRoundType: 'async' });
     updateSetupActionsState();
     expect(asyncControls.hidden).toBe(false);
-
-    asyncDurationPreset.value = 'custom';
-    asyncDurationPreset.dispatchEvent(new Event('change'));
-    updateSetupActionsState();
-
-    expect(customDurationWrap.hidden).toBe(false);
+    expect(enrollmentField.hidden).toBe(true);
+    expect(customDurationWrap.hidden).toBe(true);
+    expect(customDurationWrap.getAttribute('aria-hidden')).toBe('true');
   });
 });

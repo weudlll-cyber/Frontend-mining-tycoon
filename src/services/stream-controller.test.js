@@ -52,6 +52,7 @@ describe('stream-controller session SSE routing', () => {
     startStream('123', '44', {
       sessionId: 987,
       requiresPlayerAuth: false,
+      roundMode: 'async',
     });
     await flush();
 
@@ -89,6 +90,7 @@ describe('stream-controller session SSE routing', () => {
     startStream('123', '44', {
       sessionId: 765,
       requiresPlayerAuth: true,
+      roundMode: 'async',
     });
     await flush();
 
@@ -127,6 +129,7 @@ describe('stream-controller session SSE routing', () => {
     startStream('123', '44', {
       sessionId: 111,
       requiresPlayerAuth: true,
+      roundMode: 'async',
     });
     await flush();
 
@@ -135,7 +138,7 @@ describe('stream-controller session SSE routing', () => {
     expect(deps.onStreamStateChange).toHaveBeenCalledWith(false);
   });
 
-  it('uses legacy game stream when no session exists', async () => {
+  it('blocks async stream start when no session exists', async () => {
     const deps = {
       clearCountdownInterval: vi.fn(),
       stopNextHalvingCountdown: vi.fn(),
@@ -160,11 +163,44 @@ describe('stream-controller session SSE routing', () => {
     startStream('123', '44', {
       sessionId: null,
       requiresPlayerAuth: false,
+      roundMode: 'async',
+    });
+    await flush();
+
+    expect(urls.length).toBe(0);
+    expect(deps.onSessionStreamError).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses legacy game stream only for sync round without session', async () => {
+    const deps = {
+      clearCountdownInterval: vi.fn(),
+      stopNextHalvingCountdown: vi.fn(),
+      stopSeasonHalvingTimers: vi.fn(),
+      resetTransientHalvingState: vi.fn(),
+      onStreamStateChange: vi.fn(),
+      updateSetupActionsState: vi.fn(),
+      getNormalizedBaseUrlOrNull: vi.fn(() => 'http://127.0.0.1:8000'),
+      connectChat: vi.fn(),
+      getStorageItem: vi.fn(),
+      getPlayerTokenStorageKey: vi.fn(),
+      getSessionStreamTicket: vi.fn(async () => ({ ok: true, ticket: null })),
+      setBadgeStatus: vi.fn(),
+      connStatusEl: {},
+      fetchMetaSnapshot: vi.fn(async () => ({})),
+      onData: vi.fn(),
+      onSessionStreamError: vi.fn(),
+      disconnectChat: vi.fn(),
+    };
+
+    initStreamController(deps);
+    startStream('123', '44', {
+      sessionId: null,
+      requiresPlayerAuth: false,
+      roundMode: 'sync',
     });
     await flush();
 
     expect(urls.length).toBe(1);
     expect(urls[0]).toContain('/games/123/stream?player_id=44');
-    expect(urls[0]).not.toContain('/sessions/');
   });
 });

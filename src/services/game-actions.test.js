@@ -89,7 +89,7 @@ describe('game-actions async host flow', () => {
 
     expect(createCall[0]).toBe('http://127.0.0.1:8000/games');
     expect(createBody.round_type).toBe('asynchronous');
-    expect(createBody.enrollment_window_seconds).toBe(600);
+    expect(createBody.enrollment_window_seconds).toBe(0);
     expect(createBody.duration_mode).toBe('preset');
     expect(createBody.duration_preset).toBe('10m');
   });
@@ -149,6 +149,40 @@ describe('game-actions async host flow', () => {
     expect(deps.showNewGameStatus).toHaveBeenCalledWith(
       'Game created and joined. Start Session (Async) when ready.',
       'success'
+    );
+  });
+
+  it('fails inline and does not start stream when auto-start session response is malformed', async () => {
+    const deps = buildDeps({
+      shouldAutoStartAsyncSession: vi.fn(() => true),
+      autoStartAsyncSession: vi.fn(async () => ({
+        ok: false,
+        code: 'MALFORMED_SESSION_RESPONSE',
+        message: 'Session could not be started (malformed response).',
+      })),
+    });
+    initGameActions(deps);
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ game_id: 'g-9' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ player_id: 'p-9' }),
+      });
+
+    await createNewGameAndJoin();
+
+    expect(deps.autoStartAsyncSession).toHaveBeenCalledTimes(1);
+    expect(deps.startLiveStream).not.toHaveBeenCalled();
+    expect(deps.showNewGameStatus).toHaveBeenCalledWith(
+      'Session could not be started (malformed response).',
+      'error'
     );
   });
 });
