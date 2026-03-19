@@ -1,6 +1,7 @@
 /*
 File: src/ui/player-view.js
 Purpose: Compact player-state matrix renderer with optional non-blocking micro-tooltips.
+Constraints: Display-only analytics; backend remains source-of-truth for prices/balances/output.
 */
 
 import { setTextNodeValue } from '../utils/dom-utils.js';
@@ -102,7 +103,8 @@ const _uiRefs = {
   outputTotalCell: null,
   balanceTotalCell: null,
   oracleTotalCell: null,
-  footerContentNode: null,
+  footerLine1Node: null,
+  footerLine2Node: null,
   tooltipNodes: {
     output: null,
     balance: null,
@@ -183,7 +185,8 @@ export function resetPlayerStateView() {
   _uiRefs.outputTotalCell = null;
   _uiRefs.balanceTotalCell = null;
   _uiRefs.oracleTotalCell = null;
-  _uiRefs.footerContentNode = null;
+  _uiRefs.footerLine1Node = null;
+  _uiRefs.footerLine2Node = null;
   _uiRefs.tooltipNodes = {
     output: null,
     balance: null,
@@ -324,13 +327,14 @@ function ensurePlayerStateView(tokenNames) {
     rowKey: 'price',
     labelText: 'Price',
   });
+  priceLabelCell.classList.add('ps-row-price-label');
   matrix.appendChild(priceLabelCell);
 
   const oraclePriceNodes = {};
   const priceCells = {};
   tokenNames.forEach((token) => {
     const cell = document.createElement('div');
-    cell.className = 'ps-cell ps-value';
+    cell.className = 'ps-cell ps-value ps-value-price';
     cell.dataset.row = 'price';
     cell.dataset.token = token;
     const node = document.createTextNode('-');
@@ -341,7 +345,7 @@ function ensurePlayerStateView(tokenNames) {
   });
 
   const oracleTotalCell = document.createElement('div');
-  oracleTotalCell.className = 'ps-cell ps-value ps-cell-total';
+  oracleTotalCell.className = 'ps-cell ps-value ps-cell-total ps-value-price';
   oracleTotalCell.dataset.row = 'price';
   oracleTotalCell.dataset.token = 'sigma';
   const oracleTotalNode = document.createTextNode('-');
@@ -357,18 +361,19 @@ function ensurePlayerStateView(tokenNames) {
   matrix.appendChild(priceIcon.iconCell);
   tooltipsToMount.push(priceIcon);
 
-  // FOOTER (single line: "Next halving HH:MM (TOKEN) | Mined XXX | fee X / spread Y" or "No further halvings | Mined XXX | fee X / spread Y")
+  // Footer intentionally uses two rows so fee/spread tooltip does not drift onto a wrapped orphan line.
   const footer = document.createElement('div');
   footer.className = 'ps-footer';
 
-  // Single footer content node
-  const footerContentSpan = document.createElement('span');
-  footerContentSpan.className = 'ps-footer-content';
-  const footerContentNode = document.createTextNode(
-    'No further halvings | Mined — | fee — / spread —'
-  );
-  footerContentSpan.appendChild(footerContentNode);
-  footer.appendChild(footerContentSpan);
+  const footerLine1 = document.createElement('div');
+  footerLine1.className = 'ps-footer-line ps-footer-line-1';
+  const footerLine1Node = document.createTextNode('No further halvings | Mined —');
+  footerLine1.appendChild(footerLine1Node);
+
+  const footerLine2 = document.createElement('div');
+  footerLine2.className = 'ps-footer-line ps-footer-line-2';
+  const footerLine2Node = document.createTextNode('Fee — / —');
+  footerLine2.appendChild(footerLine2Node);
 
   const footerIcon = createIconCell({
     rowKey: 'footer',
@@ -376,7 +381,8 @@ function ensurePlayerStateView(tokenNames) {
     tooltipText:
       'Next Halving: when the next mining reward halves. Mined: total tokens earned so far. Fee: transaction cost to convert between tokens (%). Spread: price gap between oracle buy/sell rates (%).',
   });
-  footer.appendChild(footerIcon.iconCell);
+  footerLine2.appendChild(footerIcon.iconCell);
+  footer.append(footerLine1, footerLine2);
   tooltipsToMount.push(footerIcon);
 
   _playerStateEl.append(matrix, footer);
@@ -405,7 +411,8 @@ function ensurePlayerStateView(tokenNames) {
   _uiRefs.outputTotalCell = outputTotalCell;
   _uiRefs.balanceTotalCell = balanceTotalCell;
   _uiRefs.oracleTotalCell = oracleTotalCell;
-  _uiRefs.footerContentNode = footerContentNode;
+  _uiRefs.footerLine1Node = footerLine1Node;
+  _uiRefs.footerLine2Node = footerLine2Node;
   _uiRefs.tooltipNodes = {
     output: outputIcon.bubbleNode,
     balance: balanceIcon.bubbleNode,
@@ -441,6 +448,7 @@ export function renderPlayerState(data) {
   );
   const refs = ensurePlayerStateView(tokenNames);
   const balances = playerState.balances || playerState.tokens || {};
+  // Fallback order preserves fresh payload values first, then contract meta defaults, then player-state legacy fields.
   const oraclePrices =
     data.oracle_prices ||
     activeGameMeta?.oracle_prices ||
@@ -521,7 +529,7 @@ export function renderPlayerState(data) {
     activeGameMeta,
     tokenNames,
   });
-  // Build footer content as single line
+  // Build footer content across two deliberate lines to avoid accidental wrapping behavior.
   let halvinPart = 'No further halvings';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
@@ -557,9 +565,8 @@ export function renderPlayerState(data) {
   const spread = Number(data.oracle_spread);
   const feeSpreadPart = `${format2(fee)} / ${format2(spread)}`;
 
-  // Combine into single footer string
-  const footerText = `${halvinPart} | Mined ${minedPart} | fee ${feeSpreadPart}`;
-  setTextNodeValue(refs.footerContentNode, footerText);
+  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
+  setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
 
   const lastHalvingNotice = getLastHalvingNotice();
   if (lastHalvingNotice) {

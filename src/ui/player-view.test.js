@@ -128,7 +128,7 @@ describe('player state matrix', () => {
     expect(iconRows).toContain('price');
   });
 
-  it('renders footer with Next H, Mined, and fee/spread on one line', () => {
+  it('renders footer as two lines with fee/spread tooltip on line 2', () => {
     renderPlayerState({
       game_id: 'g1',
       game_status: 'idle',
@@ -145,15 +145,17 @@ describe('player state matrix', () => {
     const footer = document.querySelector('.ps-footer');
     expect(footer).not.toBeNull();
 
-    // Check for single-line footer content
-    const footerContent = footer.querySelector('.ps-footer-content');
-    expect(footerContent).not.toBeNull();
+    const line1 = footer.querySelector('.ps-footer-line-1');
+    const line2 = footer.querySelector('.ps-footer-line-2');
+    expect(line1).not.toBeNull();
+    expect(line2).not.toBeNull();
 
-    const footerText = footerContent.textContent;
-    expect(footerText).toContain('No further halvings');
-    expect(footerText).toContain('Mined 123.45');
-    expect(footerText).toMatch(/fee 0\.0(23|24)|0\.02/);
-    expect(footerText).toMatch(/spread 0\.0(12|13)|0\.01/);
+    const line1Text = line1?.textContent || '';
+    const line2Text = line2?.textContent || '';
+    expect(line1Text).toContain('No further halvings');
+    expect(line1Text).toContain('Mined 123.45');
+    expect(line2Text).toMatch(/Fee 0\.0(23|24) \/ 0\.0(12|13)|Fee 0\.02 \/ 0\.01/);
+    expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
   });
 
   it('renders tooltip triggers with aria-describedby and tooltip role', () => {
@@ -245,6 +247,17 @@ describe('player state matrix', () => {
       '.ps-cell[data-row="price"][data-token="sigma"]'
     );
     expect(sigmaPrice?.textContent.trim()).toBe('—');
+
+    const priceLabel = document.querySelector('.ps-row-price-label');
+    expect(priceLabel).not.toBeNull();
+    expect(priceLabel?.textContent).toContain('Price');
+    expect(priceLabel?.classList.contains('ps-row-price-label')).toBe(true);
+
+    const priceCells = document.querySelectorAll('.ps-value-price');
+    expect(priceCells.length).toBeGreaterThanOrEqual(5);
+    priceCells.forEach((cell) => {
+      expect(cell.hasAttribute('hidden')).toBe(false);
+    });
   });
 
   it('uses payload oracle prices when metadata is unavailable', () => {
