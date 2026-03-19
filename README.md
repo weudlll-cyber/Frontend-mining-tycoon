@@ -68,6 +68,11 @@ If port `5173` is already used, Vite automatically selects the next free port.
 - click `+ New Game`
 - click `Start Stream`
 
+For async rounds, use the explicit session action:
+- click `Start Async Session`
+- wait for inline status `Async session started.`
+- the app switches to `/sessions/{session_id}/stream` automatically
+
 ## UI Layout
 
 The dashboard uses an **inline 2-column layout** designed for desktop viewing without scrolling, with responsive adaptation for tablet and mobile.
@@ -77,7 +82,9 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
 - **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds during pre-play window states and is disabled with inline text `Async sessions not supported by backend (using legacy live view).` when session endpoints are unavailable.
+- **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
 - **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Session Ready` or `Async: Legacy View`).
+- **Session active badge**: After successful async start, the header summary line shows `Async: Session Active`.
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
     - Season header with emoji icon
@@ -199,6 +206,7 @@ Current CI pipeline runs:
 - `src/main.js`: thin orchestration entrypoint that wires modules together
 - `src/services/stream-controller.js`: SSE lifecycle, reconnect handling, and timer cleanup
 - `src/services/game-actions.js`: create/join flow and upgrade submission actions
+- `src/services/session-actions.js`: explicit async session start flow and auth-aware ticket retrieval
 - `src/ui/setup-shell.js`: setup panel state, action enablement, and header navigation
 - `src/ui/live-summary.js`: quick stats and portfolio-value rendering
 - `src/ui/leaderboard.js`: top-5 leaderboard rendering
@@ -209,6 +217,27 @@ Current CI pipeline runs:
 - `src/counter.test.js`: sample Vitest test
 
 ## Notes
+
+## Async Session Flow (Frontend)
+
+Setup panel placement (desktop):
+
+```text
+Primary Actions
+[ + New Game ] [ Start Stream ] [ Start Async Session ] [ Stop Stream ]
+                 (enabled after async session exists)
+```
+
+Frontend call chain for async rounds:
+
+1. `POST /games`
+2. `POST /games/{id}/join`
+3. `POST /games/{id}/sessions` with `mode: "async"`
+4. `GET /sessions/{session_id}/stream?player_id=...`
+
+Auth-aware behavior:
+- if player auth is required, frontend sends `X-Player-Token` for session start and ticket calls
+- session stream URL includes `ticket` query only for auth-required backends
 
 ## Chat (Minimal, Optional, Non-persistent)
 
