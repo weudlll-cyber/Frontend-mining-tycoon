@@ -1,6 +1,13 @@
 /*
 File: src/services/game-actions.js
 Purpose: Handle upgrade submissions and create-then-join game session flows.
+Role in system:
+- Orchestrates frontend intent calls for game creation/joining while backend remains authoritative.
+Invariants:
+- No modal or blocking UX side-effects; status remains inline.
+- Async session auto-start must never silently fallback to legacy stream on malformed session responses.
+Security notes:
+- Encode IDs in URLs and never surface or log token secrets.
 */
 
 let _deps = null;
@@ -175,34 +182,57 @@ export async function createNewGameAndJoin() {
   }
 
   const playerName = _deps.getPlayerName();
-  const enrollmentWindow = _deps.getEnrollmentWindow();
+  const selectedRoundType = _deps.getSelectedRoundType?.() || 'sync';
+  const shouldAutoStartAsyncSession =
+    _deps.shouldAutoStartAsyncSession?.() !== false;
+  const isAsyncHostRound = selectedRoundType === 'async';
   _deps.cleanupGameMetaCache();
 
   try {
     let durationPayload;
-    try {
-      const durationResolution = _deps.resolveDurationSeconds();
-      if (durationResolution.mode === 'custom') {
-        durationPayload = {
-          duration_mode: 'custom',
-          duration_custom_seconds: durationResolution.customSeconds,
-        };
-      } else {
-        durationPayload = {
-          duration_mode: 'preset',
-          duration_preset: durationResolution.preset,
-        };
+    let asyncRoundPreset = null;
+    if (isAsyncHostRound) {
+      const asyncPreset = _deps.getAsyncDurationPreset?.();
+      if (!asyncPreset) {
+        throw new Error('Invalid async round duration preset.');
       }
-    } catch (error) {
-      throw new Error(`Invalid duration: ${error.message}`);
+      asyncRoundPreset = asyncPreset;
+      durationPayload = {
+        duration_mode: 'preset',
+        duration_preset: asyncPreset,
+      };
+    } else {
+      try {
+        const durationResolution = _deps.resolveDurationSeconds();
+        if (durationResolution.mode === 'custom') {
+          durationPayload = {
+            duration_mode: 'custom',
+            duration_custom_seconds: durationResolution.customSeconds,
+          };
+        } else {
+          durationPayload = {
+            duration_mode: 'preset',
+            duration_preset: durationResolution.preset,
+          };
+        }
+      } catch (error) {
+        throw new Error(`Invalid duration: ${error.message}`);
+      }
     }
 
     const overrides = _deps.collectAdvancedOverrides();
     const gamePayload = {
-      enrollment_window_seconds: enrollmentWindow,
+      enrollment_window_seconds: _deps.getEnrollmentWindow(),
       ...durationPayload,
       ...overrides,
     };
+    if (isAsyncHostRound) {
+      gamePayload.round_type = 'asynchronous';
+      gamePayload.enrollment_window_seconds = 0;
+      gamePayload.duration_mode = 'preset';
+      gamePayload.duration_preset = asyncRoundPreset;
+      delete gamePayload.duration_custom_seconds;
+    }
 
     _deps.showNewGameStatus('Creating game...', 'info');
     const gameResponse = await fetch(`${baseUrl}/games`, {
@@ -267,6 +297,45 @@ export async function createNewGameAndJoin() {
     _deps.cleanupGameMetaCache();
     await _deps.fetchMetaSnapshot(baseUrl, gameId);
     _deps.saveSettings();
+
+    if (isAsyncHostRound && shouldAutoStartAsyncSession) {
+      _deps.showNewGameStatus(
+        'Game created and joined. Starting async session...',
+        'info'
+      );
+      // WHY: Host-style async flow explicitly creates a backend session before opening the stream transport.
+      const autoStartResult = await _deps.autoStartAsyncSession({
+        gameId,
+        playerId,
+      });
+      _deps.onSetupBusyChange(false);
+      _deps.ensureInputsEditable();
+
+      if (!autoStartResult?.ok) {
+        _deps.showNewGameStatus(
+          autoStartResult?.message ||
+            'Game created and joined. Async session could not be started.',
+          'error'
+        );
+        return;
+      }
+
+      _deps.showNewGameStatus(
+        'Game created, joined, and async session started.',
+        'success'
+      );
+      return;
+    }
+
+    if (isAsyncHostRound && !shouldAutoStartAsyncSession) {
+      _deps.showNewGameStatus(
+        'Game created and joined. Start Session (Async) when ready.',
+        'success'
+      );
+      _deps.onSetupBusyChange(false);
+      _deps.ensureInputsEditable();
+      return;
+    }
 
     _deps.showNewGameStatus(
       'Game created and joined. Starting stream...',

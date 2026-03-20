@@ -1,3 +1,10 @@
+/*
+File: src/main.test.js
+Purpose: Validate orchestration-level helper behavior and contract-safe frontend utilities.
+Role in system: Broad unit coverage for display/intent paths in main module without backend authority changes.
+Invariants/Security: Preserves deterministic helper behavior and safe rendering assumptions.
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 function buildDomFixture() {

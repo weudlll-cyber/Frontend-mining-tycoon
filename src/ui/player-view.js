@@ -111,6 +111,10 @@ const _uiRefs = {
     price: null,
     footer: null,
   },
+  thisSessionNode: null,
+  bestRoundNode: null,
+  thisSessionEl: null,
+  bestRoundEl: null,
 };
 
 export function calculateCurrentMiningRate(playerState) {
@@ -193,6 +197,10 @@ export function resetPlayerStateView() {
     price: null,
     footer: null,
   };
+  _uiRefs.thisSessionNode = null;
+  _uiRefs.bestRoundNode = null;
+  _uiRefs.thisSessionEl = null;
+  _uiRefs.bestRoundEl = null;
 
   if (_disposeTooltips) {
     _disposeTooltips();
@@ -387,7 +395,22 @@ function ensurePlayerStateView(tokenNames) {
   footer.append(footerLine1, footerLine2);
   tooltipsToMount.push(footerIcon);
 
-  _playerStateEl.append(matrix, footer);
+  const sessionScores = document.createElement('div');
+  sessionScores.className = 'ps-session-scores';
+
+  const thisSessionLine = document.createElement('div');
+  thisSessionLine.className = 'ps-session-score-line';
+  const thisSessionNode = document.createTextNode('This session: —');
+  thisSessionLine.appendChild(thisSessionNode);
+
+  const bestRoundLine = document.createElement('div');
+  bestRoundLine.className = 'ps-session-score-line';
+  const bestRoundNode = document.createTextNode('Best this round: —');
+  bestRoundLine.appendChild(bestRoundNode);
+
+  sessionScores.append(thisSessionLine, bestRoundLine);
+
+  _playerStateEl.append(matrix, sessionScores, footer);
 
   // Mount all tooltip bubbles to tooltip-layer for clipping prevention
   const tooltipLayer = document.getElementById('tooltip-layer');
@@ -421,6 +444,10 @@ function ensurePlayerStateView(tokenNames) {
     price: priceIcon.bubbleNode,
     footer: footerIcon.bubbleNode,
   };
+  _uiRefs.thisSessionNode = thisSessionNode;
+  _uiRefs.bestRoundNode = bestRoundNode;
+  _uiRefs.thisSessionEl = thisSessionLine;
+  _uiRefs.bestRoundEl = bestRoundLine;
 
   return _uiRefs;
 }
@@ -431,6 +458,18 @@ function updatePrecisionTooltip(node, label, tokenNames, values) {
     .map((token) => `${toTokenLabel(token)} ${format4(values?.[token])}`)
     .join(' | ');
   setTextNodeValue(node, `${label} Precision: ${details || 'unavailable'}.`);
+}
+
+function formatScoreLineValue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return { display: '—', exact: '—' };
+  }
+  const floored = Math.floor(numeric);
+  return {
+    display: floored.toLocaleString(),
+    exact: floored.toLocaleString(),
+  };
 }
 
 export function renderPlayerState(data) {
@@ -533,6 +572,7 @@ export function renderPlayerState(data) {
   });
   // Build footer content across two deliberate lines to avoid accidental wrapping behavior.
   let halvinPart = 'No further halvings';
+  let halvingTooltipPart = 'No further halvings in this round.';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
     const shouldReset = shouldResetNextHalvingCountdownTarget(
@@ -554,8 +594,14 @@ export function renderPlayerState(data) {
     );
     const countdownText = formatCountdownClock(remainingSeconds);
     halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${nextHalvingTarget.token.toUpperCase()} (month ${nextHalvingTarget.halvingMonth}).`;
   } else {
     stopNextHalvingCountdown();
+
+    const lastHalvingNotice = getLastHalvingNotice();
+    if (lastHalvingNotice) {
+      halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+    }
   }
 
   const minedPart =
@@ -567,16 +613,21 @@ export function renderPlayerState(data) {
   const spread = Number(data.oracle_spread);
   const feeSpreadPart = `${format2(fee)} / ${format2(spread)}`;
 
+  const thisSessionScore = formatScoreLineValue(data?.current_session_score);
+  const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
+  setTextNodeValue(
+    refs.thisSessionNode,
+    `This session: ${thisSessionScore.display}`
+  );
+  setTextNodeValue(
+    refs.bestRoundNode,
+    `Best this round: ${bestRoundScore.display}`
+  );
+  refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
+  refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
+
   setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
-
-  const lastHalvingNotice = getLastHalvingNotice();
-  if (lastHalvingNotice) {
-    setTextNodeValue(
-      refs.tooltipNodes.output,
-      `Mining output rate per token. Last halving: ${lastHalvingNotice.token.toUpperCase()} halved. Precision: pending.`
-    );
-  }
 
   // Update precision tooltips for matrix rows
   updatePrecisionTooltip(
@@ -601,6 +652,6 @@ export function renderPlayerState(data) {
   // Update footer tooltip with all details
   setTextNodeValue(
     refs.tooltipNodes.footer,
-    `Halving: next mining reward halve | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
+    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
   );
 }

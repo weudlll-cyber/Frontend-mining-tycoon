@@ -69,9 +69,19 @@ If port `5173` is already used, Vite automatically selects the next free port.
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
-- click `Start Async Session`
+- select `Round Type = Async (host)` in Setup
+- set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 24h)
+- keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
+- click `+ New Game`
+- if auto-start is disabled, click `Start Session (Async)`
 - wait for inline status `Async session started.`
 - the app switches to `/sessions/{session_id}/stream` automatically
+
+Simplified async model (backend-aligned):
+- Async rounds do not use enrollment windows; frontend always sends `enrollment_window_seconds=0`.
+- Async session duration is equal to selected round duration (single preset selector).
+- Players can run multiple async sessions in one round; backend computes authoritative best-of score.
+- Header and player analytics show both `This session` and `Best this round` values from backend payload.
 
 ## UI Layout
 
@@ -81,9 +91,10 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
-- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds during pre-play window states and is disabled with inline text `Async sessions not supported by backend (using legacy live view).` when session endpoints are unavailable.
+- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and `Start Stream` remains gated until a valid async session exists.
 - **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
-- **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Session Ready` or `Async: Legacy View`).
+- **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Ready` or `Async: Session Active`).
+- **Best-of visibility**: Async rounds display `This session` and `Best this round` values inline with exact-value tooltips.
 - **Session active badge**: After successful async start, the header summary line shows `Async: Session Active`.
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
@@ -224,9 +235,38 @@ Setup panel placement (desktop):
 
 ```text
 Primary Actions
-[ + New Game ] [ Start Stream ] [ Start Async Session ] [ Stop Stream ]
+[ + New Game ] [ Start Stream ] [ Start Session (Async) ] [ Stop Stream ]
                  (enabled after async session exists)
 ```
+
+### Create Async Round From UI (Host Setup)
+
+Use this host-like flow directly in Setup (no overlays):
+
+```text
+Round Type: [Sync] [Async (host)]
+Async controls: Round Duration (5m/10m/15m/1h/3h/6h/12h/24h)
+[x] Auto-start async session after game creation and join
+```
+
+When `+ New Game` is clicked with `Async (host)` selected:
+
+1. `POST /games` with `round_type="asynchronous"`, `enrollment_window_seconds=0`, and `duration_mode="preset"` plus selected duration preset.
+2. `POST /games/{id}/join` with player name.
+3. If auto-start is enabled, `POST /games/{id}/sessions` and switch to session-scoped SSE.
+
+Short request example:
+
+```json
+{
+  "round_type": "asynchronous",
+  "enrollment_window_seconds": 0,
+  "duration_mode": "preset",
+  "duration_preset": "10m"
+}
+```
+
+Inline diagnostics chips in Setup (`Async`, `Window`, `Joined`, `SessionAPI`, `NoSession`, `Auth`) show which predicate is blocking readiness.
 
 Frontend call chain for async rounds:
 

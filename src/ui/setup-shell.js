@@ -18,12 +18,26 @@ let _state = {
   latestGameStatus: null,
   roundMode: 'sync',
   sessionStartSupported: true,
+  sessionApiSupported: null,
+  asyncWindowOpen: null,
+  requirePlayerAuth: 'unknown',
   sessionActive: false,
   sessionId: null,
   userOpenedSetup: false,
   didAutoCloseAtPlayStart: false,
   previousGameStatus: null,
+  hostRoundType: 'sync',
+  asyncHostAutoStart: true,
 };
+
+const ASYNC_DIAGNOSTIC_CHIPS = [
+  { key: 'isAsyncRound', label: 'Async' },
+  { key: 'isWindowOpen', label: 'Window' },
+  { key: 'isJoined', label: 'Joined' },
+  { key: 'backendSessionSupport', label: 'SessionAPI' },
+  { key: 'hasNoActiveSession', label: 'NoSession' },
+  { key: 'requireAuth', label: 'Auth' },
+];
 
 export function initSetupShell(deps) {
   _refs = deps;
@@ -57,37 +71,129 @@ function updateRoundModeBadge() {
 
 function updateAsyncSessionStatusBadge() {
   if (typeof _refs?.renderAsyncSessionBadge !== 'function') return;
+  const availability = getAsyncAvailability();
+  const isAsyncReady =
+    availability.isAsyncRound &&
+    availability.isJoined &&
+    availability.backendSessionSupport === true &&
+    availability.hasNoActiveSession;
+
   _refs.renderAsyncSessionBadge({
     roundMode: _state.roundMode,
     sessionActive: _state.sessionActive,
     sessionSupported: _state.sessionStartSupported,
+    asyncReady: isAsyncReady,
+    asyncAvailability: availability,
+  });
+}
+
+function getAsyncAvailability() {
+  const isAsyncRound = _state.roundMode === 'async';
+  return {
+    isAsyncRound,
+    // WHY: Backend async model has no enrollment window; keep this diagnostic predicate always satisfied in async mode.
+    isWindowOpen: isAsyncRound ? true : null,
+    isJoined: hasActivePlayer(),
+    backendSessionSupport:
+      typeof _state.sessionApiSupported === 'boolean'
+        ? _state.sessionApiSupported
+        : _state.sessionStartSupported === true
+          ? true
+          : null,
+    hasNoActiveSession: !_state.sessionActive && !_state.sessionId,
+    requireAuth:
+      _state.requirePlayerAuth === true || _state.requirePlayerAuth === false
+        ? _state.requirePlayerAuth
+        : 'unknown',
+  };
+}
+
+function ensureAsyncDiagnosticsContainer() {
+  if (_refs?.asyncDiagnosticsEl) {
+    return _refs.asyncDiagnosticsEl;
+  }
+  const host = _refs?.roundModeBadgeEl?.parentElement;
+  if (!host || !_refs?.roundModeBadgeEl) {
+    return null;
+  }
+
+  const container = document.createElement('span');
+  container.className = 'async-diagnostics-chips';
+  container.setAttribute('aria-label', 'Async availability diagnostics');
+  host.appendChild(container);
+  _refs.asyncDiagnosticsEl = container;
+  return container;
+}
+
+function renderAsyncAvailabilityChips() {
+  const container = ensureAsyncDiagnosticsContainer();
+  if (!container) return;
+
+  const availability = getAsyncAvailability();
+  container.textContent = '';
+
+  ASYNC_DIAGNOSTIC_CHIPS.forEach((chipConfig) => {
+    const chip = document.createElement('span');
+    const chipValue = availability[chipConfig.key];
+    const isSatisfied =
+      chipConfig.key === 'requireAuth'
+        ? chipValue === true
+        : chipValue === true;
+    const icon = isSatisfied ? '✔' : '○';
+
+    chip.className = isSatisfied
+      ? 'async-diagnostic-chip async-diagnostic-chip--ok'
+      : 'async-diagnostic-chip async-diagnostic-chip--dim';
+    chip.textContent = `${icon} ${chipConfig.label}`;
+    chip.title = isSatisfied
+      ? `${chipConfig.key}: true`
+      : `${chipConfig.key}: ${chipValue === null ? 'unknown' : String(chipValue)}`;
+    container.appendChild(chip);
   });
 }
 
 export function updateSetupActionsState() {
   if (!_refs) return;
 
+  const hostRoundType = _state.hostRoundType === 'async' ? 'async' : 'sync';
+  const showAsyncHostControls = hostRoundType === 'async';
+
+  if (_refs.asyncHostControlsEl) {
+    _refs.asyncHostControlsEl.hidden = !showAsyncHostControls;
+  }
+  if (_refs.asyncHostAutoStartCheckbox) {
+    _refs.asyncHostAutoStartCheckbox.checked =
+      _state.asyncHostAutoStart !== false;
+  }
+  if (_refs.asyncHostDurationPresetInput && _refs.asyncHostDurationCustomEl) {
+    _refs.asyncHostDurationCustomEl.hidden =
+      _refs.asyncHostDurationPresetInput.value !== 'custom';
+  }
+
   const gameRunning = _state.latestGameStatus === 'running';
   const gameExists = hasActiveGame();
-  const playerExists = hasActivePlayer();
-  const isAsyncRound = _state.roundMode === 'async';
-  const isRoundWindowOpen =
-    !_state.isStreamActive &&
-    (_state.latestGameStatus === 'idle' ||
-      _state.latestGameStatus === 'enrolling' ||
-      _state.latestGameStatus === null);
+  const availability = getAsyncAvailability();
+  const isAsyncRound = availability.isAsyncRound;
+  const isSessionReady =
+    availability.isAsyncRound &&
+    availability.isJoined &&
+    availability.backendSessionSupport === true &&
+    availability.hasNoActiveSession;
+  const isSessionApiBlocked =
+    availability.backendSessionSupport === false ||
+    !_state.sessionStartSupported;
 
   updateRoundModeBadge();
   updateAsyncSessionStatusBadge();
+  renderAsyncAvailabilityChips();
 
   if (_refs.newGameBtn) {
     _refs.newGameBtn.disabled = _state.isSetupBusy || gameRunning;
   }
 
   if (_refs.startBtn) {
-    const requiresSessionStart =
-      isAsyncRound && _state.sessionStartSupported && !_state.sessionActive;
-    // WHY: Async rounds must complete the explicit session-start step before the stream transport can open.
+    // WHY: Async rounds must always open a session-scoped stream and cannot use the legacy game stream.
+    const requiresSessionStart = isAsyncRound && !_state.sessionActive;
     _refs.startBtn.disabled =
       _state.isSetupBusy ||
       !gameExists ||
@@ -100,14 +206,13 @@ export function updateSetupActionsState() {
     _refs.startSessionBtn.disabled =
       _state.isSetupBusy ||
       !isAsyncRound ||
-      !isRoundWindowOpen ||
       !gameExists ||
-      !playerExists ||
-      _state.sessionActive ||
+      !availability.isJoined ||
+      !availability.hasNoActiveSession ||
       _state.isStreamActive ||
-      !_state.sessionStartSupported;
+      isSessionApiBlocked;
     _refs.startSessionBtn.title = !_state.sessionStartSupported
-      ? 'Async sessions not supported by backend (using legacy live view).'
+      ? 'Async session endpoint is unavailable on backend.'
       : '';
   }
 
@@ -130,7 +235,7 @@ export function updateSetupActionsState() {
 
   if (isAsyncRound && !_state.sessionStartSupported) {
     _refs.setupActionsNoteEl.textContent =
-      'Async sessions not supported by backend (using legacy live view).';
+      'Async session endpoint is unavailable on backend.';
     return;
   }
 
@@ -141,8 +246,14 @@ export function updateSetupActionsState() {
   }
 
   if (isAsyncRound && _state.sessionStartSupported) {
+    if (!isSessionReady) {
+      _refs.setupActionsNoteEl.textContent =
+        'Async session gating active. Check header chips (gray chips show blocking predicates).';
+      return;
+    }
+
     _refs.setupActionsNoteEl.textContent =
-      'Start Async Session first, then stream uses the session-scoped channel.';
+      'Start Session (Async) first, then stream uses the session-scoped channel.';
     return;
   }
 
@@ -280,6 +391,28 @@ export function initializeHeaderInteractions() {
   _refs.startSessionBtn?.addEventListener('click', () => {
     if (_refs.startSessionBtn.disabled) return;
     _refs.onStartAsyncSession?.();
+  });
+  _refs.roundTypeSyncInput?.addEventListener('change', () => {
+    if (!_refs.roundTypeSyncInput.checked) return;
+    // WHY: Keep host round-type selection explicit in setup so create payload stays user-driven.
+    _refs.onHostRoundTypeChanged?.('sync');
+  });
+  _refs.roundTypeAsyncInput?.addEventListener('change', () => {
+    if (!_refs.roundTypeAsyncInput.checked) return;
+    _refs.onHostRoundTypeChanged?.('async');
+  });
+  _refs.asyncHostDurationPresetInput?.addEventListener('change', () => {
+    _refs.onHostAsyncDurationChanged?.(
+      _refs.asyncHostDurationPresetInput.value || '5m'
+    );
+  });
+  _refs.asyncHostDurationCustomMinutesInput?.addEventListener('change', () => {
+    _refs.onHostAsyncDurationChanged?.('custom');
+  });
+  _refs.asyncHostAutoStartCheckbox?.addEventListener('change', () => {
+    _refs.onHostAutoStartChanged?.(
+      Boolean(_refs.asyncHostAutoStartCheckbox.checked)
+    );
   });
   _refs.debugDetailsEl?.addEventListener('toggle', renderDebugContext);
 }

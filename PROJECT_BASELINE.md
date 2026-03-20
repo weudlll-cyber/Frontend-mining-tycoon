@@ -143,10 +143,12 @@ Frontend session-mode readiness:
 - Setup shell surfaces round mode (`sync` / `async`) and async session support state without blocking gameplay.
 - Async rounds now use an explicit user-triggered `Start Async Session` action in Setup before session-scoped streaming begins.
 - `Start Async Session` is enabled only when player join context exists, backend session support is available, and no session is active yet.
-- If async session start endpoints are unavailable, frontend degrades to legacy live stream view with explicit status text; backend remains authoritative.
+- Async rounds use a simplified host model: no enrollment window input, one round-duration preset selector, and optional auto-start.
+- Async create payload is fixed to `enrollment_window_seconds=0` with `duration_mode="preset"`.
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
-- After session creation, frontend switches to `/sessions/{session_id}/stream` and does not fallback to `/games/{id}/stream` while session context exists.
+- Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
+- Best-of visibility is surfaced inline: header and player analytics show `This session` and `Best this round` (read-only backend values).
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
