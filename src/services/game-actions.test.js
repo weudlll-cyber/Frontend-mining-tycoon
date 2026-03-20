@@ -35,6 +35,7 @@ function buildDeps(overrides = {}) {
     getEnrollmentWindow: vi.fn(() => 600),
     getSelectedRoundType: vi.fn(() => 'async'),
     getAsyncDurationPreset: vi.fn(() => '10m'),
+    getAsyncSessionDurationSeconds: vi.fn(() => 86400),
     shouldAutoStartAsyncSession: vi.fn(() => true),
     cleanupGameMetaCache: vi.fn(),
     resolveDurationSeconds: vi.fn(() => ({ mode: 'preset', preset: '30m' })),
@@ -62,7 +63,7 @@ describe('game-actions async host flow', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends async create payload with round_type, enrollment window, and duration preset', async () => {
+  it('sends async create payload with round_type, enrollment window, duration preset, and session duration', async () => {
     const deps = buildDeps({
       shouldAutoStartAsyncSession: vi.fn(() => false),
     });
@@ -92,6 +93,7 @@ describe('game-actions async host flow', () => {
     expect(createBody.enrollment_window_seconds).toBe(0);
     expect(createBody.duration_mode).toBe('preset');
     expect(createBody.duration_preset).toBe('10m');
+    expect(createBody.session_duration_seconds).toBe(86400);
   });
 
   it('auto-start ON triggers async session startup and avoids legacy start stream call', async () => {
