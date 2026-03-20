@@ -191,12 +191,18 @@ export async function createNewGameAndJoin() {
   try {
     let durationPayload;
     let asyncRoundPreset = null;
+    let asyncSessionDurationSeconds = null;
     if (isAsyncHostRound) {
       const asyncPreset = _deps.getAsyncDurationPreset?.();
       if (!asyncPreset) {
         throw new Error('Invalid async round duration preset.');
       }
+      const asyncSessionSeconds = _deps.getAsyncSessionDurationSeconds?.();
+      if (!Number.isFinite(asyncSessionSeconds) || asyncSessionSeconds <= 0) {
+        throw new Error('Invalid async session duration.');
+      }
       asyncRoundPreset = asyncPreset;
+      asyncSessionDurationSeconds = Math.floor(asyncSessionSeconds);
       durationPayload = {
         duration_mode: 'preset',
         duration_preset: asyncPreset,
@@ -231,6 +237,7 @@ export async function createNewGameAndJoin() {
       gamePayload.enrollment_window_seconds = 0;
       gamePayload.duration_mode = 'preset';
       gamePayload.duration_preset = asyncRoundPreset;
+      gamePayload.session_duration_seconds = asyncSessionDurationSeconds;
       delete gamePayload.duration_custom_seconds;
     }
 

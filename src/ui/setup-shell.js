@@ -157,6 +157,11 @@ export function updateSetupActionsState() {
 
   const hostRoundType = _state.hostRoundType === 'async' ? 'async' : 'sync';
   const showAsyncHostControls = hostRoundType === 'async';
+  const showSyncHostControls = !showAsyncHostControls;
+
+  if (_refs.syncHostControlsEl) {
+    _refs.syncHostControlsEl.hidden = !showSyncHostControls;
+  }
 
   if (_refs.asyncHostControlsEl) {
     _refs.asyncHostControlsEl.hidden = !showAsyncHostControls;
@@ -164,10 +169,6 @@ export function updateSetupActionsState() {
   if (_refs.asyncHostAutoStartCheckbox) {
     _refs.asyncHostAutoStartCheckbox.checked =
       _state.asyncHostAutoStart !== false;
-  }
-  if (_refs.asyncHostDurationPresetInput && _refs.asyncHostDurationCustomEl) {
-    _refs.asyncHostDurationCustomEl.hidden =
-      _refs.asyncHostDurationPresetInput.value !== 'custom';
   }
 
   const gameRunning = _state.latestGameStatus === 'running';
@@ -406,7 +407,7 @@ export function initializeHeaderInteractions() {
       _refs.asyncHostDurationPresetInput.value || '5m'
     );
   });
-  _refs.asyncHostDurationCustomMinutesInput?.addEventListener('change', () => {
+  _refs.asyncSessionDurationPresetInput?.addEventListener('change', () => {
     _refs.onHostAsyncDurationChanged?.('custom');
   });
   _refs.asyncHostAutoStartCheckbox?.addEventListener('change', () => {

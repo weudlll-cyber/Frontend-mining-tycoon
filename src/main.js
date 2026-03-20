@@ -170,15 +170,13 @@ const durationCustomUnitInput = document.getElementById('duration-custom-unit');
 const enrollmentWindowInput = document.getElementById('enrollment-window');
 const roundTypeSyncInput = document.getElementById('round-type-sync');
 const roundTypeAsyncInput = document.getElementById('round-type-async');
+const syncHostControlsEl = document.getElementById('sync-host-controls');
 const asyncHostControlsEl = document.getElementById('async-host-controls');
 const asyncHostDurationPresetInput = document.getElementById(
   'async-duration-preset'
 );
-const asyncHostDurationCustomEl = document.getElementById(
-  'async-duration-custom-wrap'
-);
-const asyncHostDurationCustomMinutesInput = document.getElementById(
-  'async-duration-custom-minutes'
+const asyncSessionDurationPresetInput = document.getElementById(
+  'async-session-duration-preset'
 );
 const asyncHostAutoStartCheckbox = document.getElementById('async-auto-start');
 const gameIdInput = document.getElementById('game-id');
@@ -256,7 +254,7 @@ const editableInputs = [
   roundTypeSyncInput,
   roundTypeAsyncInput,
   asyncHostDurationPresetInput,
-  asyncHostDurationCustomMinutesInput,
+  asyncSessionDurationPresetInput,
   asyncHostAutoStartCheckbox,
   gameIdInput,
   playerIdInput,
@@ -307,8 +305,23 @@ function getAsyncDurationPreset() {
     '6h',
     '12h',
     '24h',
+    '3d',
+    '7d',
   ]);
   return allowed.has(selectedPreset) ? selectedPreset : '10m';
+}
+
+function getAsyncSessionDurationSeconds() {
+  const selected = String(asyncSessionDurationPresetInput?.value || '24h');
+  const presetSeconds = {
+    '10m': 600,
+    '30m': 1800,
+    '60m': 3600,
+    '6h': 21600,
+    '12h': 43200,
+    '24h': 86400,
+  };
+  return presetSeconds[selected] || 86400;
 }
 
 function shouldAutoStartAsyncSession() {
@@ -317,11 +330,11 @@ function shouldAutoStartAsyncSession() {
 
 function updateAsyncHostControlsVisibility() {
   const isAsyncHost = getSelectedRoundType() === 'async';
+  if (syncHostControlsEl) {
+    syncHostControlsEl.hidden = isAsyncHost;
+  }
   if (asyncHostControlsEl) {
     asyncHostControlsEl.hidden = !isAsyncHost;
-  }
-  if (asyncHostDurationCustomEl) {
-    asyncHostDurationCustomEl.hidden = true;
   }
 }
 
@@ -835,7 +848,7 @@ function saveSettings() {
   );
   setStorageItem(
     STORAGE_KEYS.asyncDurationCustomMinutes,
-    asyncHostDurationCustomMinutesInput?.value || '10'
+    asyncSessionDurationPresetInput?.value || '24h'
   );
   setStorageItem(
     STORAGE_KEYS.asyncAutoStart,
@@ -878,10 +891,10 @@ function initializeModules() {
     onStartAsyncSession: handleStartAsyncSession,
     roundTypeSyncInput,
     roundTypeAsyncInput,
+    syncHostControlsEl,
     asyncHostControlsEl,
     asyncHostDurationPresetInput,
-    asyncHostDurationCustomEl,
-    asyncHostDurationCustomMinutesInput,
+    asyncSessionDurationPresetInput,
     asyncHostAutoStartCheckbox,
     onHostRoundTypeChanged(nextRoundType) {
       setSelectedRoundType(nextRoundType);
@@ -1011,6 +1024,7 @@ function initializeModules() {
       parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
     getSelectedRoundType,
     getAsyncDurationPreset,
+    getAsyncSessionDurationSeconds,
     shouldAutoStartAsyncSession,
     cleanupGameMetaCache,
     resolveDurationSeconds,
@@ -1098,8 +1112,8 @@ function loadSettings() {
   if (savedAsyncDurationPreset && asyncHostDurationPresetInput) {
     asyncHostDurationPresetInput.value = savedAsyncDurationPreset;
   }
-  if (savedAsyncDurationCustomMinutes && asyncHostDurationCustomMinutesInput) {
-    asyncHostDurationCustomMinutesInput.value = savedAsyncDurationCustomMinutes;
+  if (savedAsyncDurationCustomMinutes && asyncSessionDurationPresetInput) {
+    asyncSessionDurationPresetInput.value = savedAsyncDurationCustomMinutes;
   }
   if (savedAsyncAutoStart !== null && asyncHostAutoStartCheckbox) {
     asyncHostAutoStartCheckbox.checked = savedAsyncAutoStart !== 'false';

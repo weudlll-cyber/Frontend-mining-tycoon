@@ -179,16 +179,11 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   </div>
                 </div>
                 <div
-                  id="async-host-controls"
+                  id="sync-host-controls"
                   class="form-group form-span-4 async-host-controls"
-                  hidden
                 >
                   <div class="async-host-row" aria-live="polite">
-                    <label
-                      class="async-host-field"
-                      for="enrollment-window"
-                      hidden
-                    >
+                    <label class="async-host-field" for="enrollment-window">
                       <span>Enrollment Window (seconds)</span>
                       <input
                         id="enrollment-window"
@@ -196,65 +191,25 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                         value="600"
                         min="5"
                         max="3600"
-                        disabled
                       />
                     </label>
-                    <label class="async-host-field" for="async-duration-preset">
+                    <label class="async-host-field" for="duration-preset">
                       <span>Round Duration</span>
-                      <select id="async-duration-preset">
-                        <option value="5m">5m</option>
-                        <option value="10m" selected>10m</option>
-                        <option value="15m">15m</option>
-                        <option value="60m">1h</option>
-                        <option value="3h">3h</option>
-                        <option value="6h">6h</option>
-                        <option value="12h">12h</option>
-                        <option value="24h">24h</option>
+                      <select id="duration-preset">
+                        <option value="5m">5 minutes</option>
+                        <option value="10m">10 minutes</option>
+                        <option value="15m">15 minutes</option>
+                        <option value="20m">20 minutes</option>
+                        <option value="30m" selected>30 minutes</option>
+                        <option value="60m">60 minutes</option>
+                        <option value="6h">6 hours</option>
+                        <option value="12h">12 hours</option>
+                        <option value="24h">24 hours</option>
+                        <option value="3d">3 days</option>
+                        <option value="7d">7 days</option>
+                        <option value="custom">Custom...</option>
                       </select>
                     </label>
-                    <label
-                      id="async-duration-custom-wrap"
-                      class="async-host-field"
-                      for="async-duration-custom-minutes"
-                      hidden
-                    >
-                      <span>Session Duration</span>
-                      <input
-                        id="async-duration-custom-minutes"
-                        type="number"
-                        value="10"
-                        min="1"
-                        max="240"
-                        disabled
-                      />
-                    </label>
-                    <label class="async-host-checkbox" for="async-auto-start">
-                      <input id="async-auto-start" type="checkbox" checked />
-                      <span
-                        >Auto-start async session after game creation and
-                        join</span
-                      >
-                    </label>
-                  </div>
-                </div>
-                <!-- P2.4: Duration selector (presets + custom) -->
-                <div class="form-group form-span-2" hidden>
-                  <label>Game Duration:</label>
-                  <div class="duration-selector">
-                    <select id="duration-preset">
-                      <option value="5m">5 minutes</option>
-                      <option value="10m">10 minutes</option>
-                      <option value="15m">15 minutes</option>
-                      <option value="20m">20 minutes</option>
-                      <option value="30m" selected>30 minutes</option>
-                      <option value="60m">60 minutes</option>
-                      <option value="6h">6 hours</option>
-                      <option value="12h">12 hours</option>
-                      <option value="24h">24 hours</option>
-                      <option value="3d">3 days</option>
-                      <option value="7d">7 days</option>
-                      <option value="custom">Custom…</option>
-                    </select>
                     <div
                       id="duration-custom-input"
                       class="duration-custom-input"
@@ -274,6 +229,50 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                         <option value="days">days</option>
                       </select>
                     </div>
+                  </div>
+                </div>
+                <div
+                  id="async-host-controls"
+                  class="form-group form-span-4 async-host-controls"
+                  hidden
+                >
+                  <div class="async-host-row" aria-live="polite">
+                    <label class="async-host-field" for="async-duration-preset">
+                      <span>Round Duration</span>
+                      <select id="async-duration-preset">
+                        <option value="5m">5m</option>
+                        <option value="10m">10m</option>
+                        <option value="15m">15m</option>
+                        <option value="60m">1h</option>
+                        <option value="3h">3h</option>
+                        <option value="6h">6h</option>
+                        <option value="12h">12h</option>
+                        <option value="24h">1d</option>
+                        <option value="3d" selected>3d</option>
+                        <option value="7d">7d</option>
+                      </select>
+                    </label>
+                    <label
+                      class="async-host-field"
+                      for="async-session-duration-preset"
+                    >
+                      <span>Session Duration</span>
+                      <select id="async-session-duration-preset">
+                        <option value="10m">10m</option>
+                        <option value="30m">30m</option>
+                        <option value="60m">1h</option>
+                        <option value="6h">6h</option>
+                        <option value="12h">12h</option>
+                        <option value="24h" selected>1d</option>
+                      </select>
+                    </label>
+                    <label class="async-host-checkbox" for="async-auto-start">
+                      <input id="async-auto-start" type="checkbox" checked />
+                      <span
+                        >Auto-start async session after game creation and
+                        join</span
+                      >
+                    </label>
                   </div>
                 </div>
                 <!-- P2.4: Optional advanced overrides (collapsed by default) -->
