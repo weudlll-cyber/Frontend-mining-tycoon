@@ -70,17 +70,19 @@ If port `5173` is already used, Vite automatically selects the next free port.
 
 For async rounds, use the explicit session action:
 - select `Round Type = Async (host)` in Setup
-- set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 24h)
+- set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
+- set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
 - keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
 - click `+ New Game`
 - if auto-start is disabled, click `Start Session (Async)`
 - wait for inline status `Async session started.`
 - the app switches to `/sessions/{session_id}/stream` automatically
 
-Simplified async model (backend-aligned):
-- Async rounds do not use enrollment windows; frontend always sends `enrollment_window_seconds=0`.
-- Async session duration is equal to selected round duration (single preset selector).
-- Players can run multiple async sessions in one round; backend computes authoritative best-of score.
+Sync/Async model (backend-aligned):
+- Sync rounds use `Round Duration` + `Enrollment Window` and stream via `/games/{id}/stream`.
+- Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
+- Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
+- Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
 - Header and player analytics show both `This session` and `Best this round` values from backend payload.
 
 ## UI Layout
@@ -245,13 +247,14 @@ Use this host-like flow directly in Setup (no overlays):
 
 ```text
 Round Type: [Sync] [Async (host)]
-Async controls: Round Duration (5m/10m/15m/1h/3h/6h/12h/24h)
+Sync controls: Enrollment Window (seconds) + Round Duration preset/custom
+Async controls: Round Duration (5m/10m/15m/1h/3h/6h/12h/1d/3d/7d) + Session Duration (10m/30m/1h/6h/12h/1d)
 [x] Auto-start async session after game creation and join
 ```
 
 When `+ New Game` is clicked with `Async (host)` selected:
 
-1. `POST /games` with `round_type="asynchronous"`, `enrollment_window_seconds=0`, and `duration_mode="preset"` plus selected duration preset.
+1. `POST /games` with `round_type="asynchronous"`, `enrollment_window_seconds=0`, `duration_mode="preset"`, selected `duration_preset`, and explicit `session_duration_seconds`.
 2. `POST /games/{id}/join` with player name.
 3. If auto-start is enabled, `POST /games/{id}/sessions` and switch to session-scoped SSE.
 
@@ -262,7 +265,8 @@ Short request example:
   "round_type": "asynchronous",
   "enrollment_window_seconds": 0,
   "duration_mode": "preset",
-  "duration_preset": "10m"
+  "duration_preset": "3d",
+  "session_duration_seconds": 86400
 }
 ```
 

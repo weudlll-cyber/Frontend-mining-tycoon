@@ -143,8 +143,10 @@ Frontend session-mode readiness:
 - Setup shell surfaces round mode (`sync` / `async`) and async session support state without blocking gameplay.
 - Async rounds now use an explicit user-triggered `Start Async Session` action in Setup before session-scoped streaming begins.
 - `Start Async Session` is enabled only when player join context exists, backend session support is available, and no session is active yet.
-- Async rounds use a simplified host model: no enrollment window input, one round-duration preset selector, and optional auto-start.
-- Async create payload is fixed to `enrollment_window_seconds=0` with `duration_mode="preset"`.
+- Setup shell exposes explicit host round types:
+  Sync uses enrollment window + round duration controls.
+  Async uses round duration + session duration controls with optional auto-start.
+- Async create payload sends `enrollment_window_seconds=0`, `duration_mode="preset"`, and explicit `session_duration_seconds`.
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
 - Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
