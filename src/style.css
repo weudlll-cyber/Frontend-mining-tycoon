@@ -126,6 +126,14 @@ body {
   letter-spacing: 0.04em;
 }
 
+.async-score-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 .debug-details {
   border-top: 1px dashed var(--border-light);
   padding-top: 0.3rem;
@@ -273,6 +281,70 @@ body {
   grid-column: span 3;
 }
 
+.form-span-4 {
+  grid-column: span 4;
+}
+
+.host-round-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.host-round-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.host-round-option:has(input:checked) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.async-host-controls {
+  min-width: 0;
+}
+
+.async-host-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.async-host-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.async-host-field > input,
+.async-host-field > select {
+  width: auto;
+  min-width: 5.5rem;
+  max-width: 8rem;
+}
+
+.async-host-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .setup-actions {
   display: flex;
   flex-direction: column;
@@ -295,6 +367,40 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+}
+
+.async-diagnostics-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.async-diagnostic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.38rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.async-diagnostic-chip--ok {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.async-diagnostic-chip--dim {
+  color: #4b5563;
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .round-mode-badge {
@@ -1398,6 +1504,18 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   row-gap: 0.1rem;
+}
+
+.ps-session-scores {
+  margin-top: 0.45rem;
+  display: grid;
+  row-gap: 0.08rem;
+}
+
+.ps-session-score-line {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
 }
 
 .ps-footer-line {

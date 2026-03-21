@@ -16,10 +16,12 @@ import {
   normalizeTokenNames,
   formatCompactNumber,
 } from '../utils/token-utils.js';
+import { debugLog } from '../utils/debug-log.js';
 
 let _refs = null;
 let _getGameMeta = null;
 let _defaultTokenNames = [];
+let _lastAsyncBadgeStateKey = '';
 
 export function initLiveSummary(deps) {
   _refs = deps;
@@ -43,10 +45,18 @@ function formatPortfolioValue(value) {
   return display;
 }
 
+function formatExactScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return Math.floor(numeric).toLocaleString();
+}
+
 export function renderAsyncSessionBadge({
   roundMode = 'sync',
   sessionActive = false,
   sessionSupported = true,
+  asyncReady = false,
+  asyncAvailability = null,
 } = {}) {
   const badgeEl = _refs?.asyncSessionStatusEl;
   if (!badgeEl) return;
@@ -57,6 +67,11 @@ export function renderAsyncSessionBadge({
     badgeEl.textContent = 'Async: n/a';
     badgeEl.classList.remove('badge-blue', 'badge-yellow', 'badge-green');
     badgeEl.classList.add('badge-gray');
+    const stateKey = 'sync-hidden';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog('async-badge', 'hidden for sync round');
+    }
     return;
   }
 
@@ -71,17 +86,59 @@ export function renderAsyncSessionBadge({
   if (sessionActive) {
     badgeEl.textContent = 'Async: Session Active';
     badgeEl.classList.add('badge-green');
+    const stateKey = 'async-active';
+    if (_lastAsyncBadgeStateKey !== stateKey) {
+      _lastAsyncBadgeStateKey = stateKey;
+      debugLog('async-badge', 'rendered active badge', {
+        roundMode,
+        sessionActive,
+      });
+    }
     return;
   }
 
-  if (!sessionSupported) {
-    badgeEl.textContent = 'Async: Legacy View';
-    badgeEl.classList.add('badge-yellow');
+  badgeEl.textContent = 'Async: Ready';
+  badgeEl.classList.add(asyncReady ? 'badge-blue' : 'badge-gray');
+  badgeEl.title = sessionSupported
+    ? asyncReady
+      ? 'Ready to start an async session.'
+      : 'Not ready yet. Check async diagnostics chips in setup.'
+    : 'Backend session endpoint unavailable.';
+  const stateKey = `async-ready-${asyncReady ? 'true' : 'false'}-${JSON.stringify(asyncAvailability || {})}`;
+  if (_lastAsyncBadgeStateKey !== stateKey) {
+    _lastAsyncBadgeStateKey = stateKey;
+    debugLog('async-badge', 'rendered ready badge', {
+      asyncReady,
+      sessionSupported,
+      asyncAvailability,
+    });
+  }
+}
+
+export function renderAsyncScoreLines(data) {
+  const thisSessionEl = _refs?.thisSessionScoreEl;
+  const bestRoundEl = _refs?.bestRoundScoreEl;
+  const wrapperEl = _refs?.asyncScoreLinesEl;
+  if (!thisSessionEl || !bestRoundEl || !wrapperEl) return;
+
+  const isAsync =
+    String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
+  wrapperEl.hidden = !isAsync;
+  if (!isAsync) {
+    thisSessionEl.textContent = 'This session: —';
+    bestRoundEl.textContent = 'Best this round: —';
+    thisSessionEl.removeAttribute('title');
+    bestRoundEl.removeAttribute('title');
     return;
   }
 
-  badgeEl.textContent = 'Async: Session Ready';
-  badgeEl.classList.add('badge-blue');
+  const thisSession = Number(data?.current_session_score);
+  const bestRound = Number(data?.player_best_of_score);
+
+  thisSessionEl.textContent = `This session: ${formatScore(thisSession)}`;
+  bestRoundEl.textContent = `Best this round: ${formatScore(bestRound)}`;
+  thisSessionEl.title = `Exact value: ${formatExactScore(thisSession)}`;
+  bestRoundEl.title = `Exact value: ${formatExactScore(bestRound)}`;
 }
 
 export function computePortfolioValue(

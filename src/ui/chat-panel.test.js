@@ -1,3 +1,10 @@
+/*
+File: src/ui/chat-panel.test.js
+Purpose: Verify chat remains social-only, inline, and safely rendered.
+Role in system: Regression coverage for non-gameplay chat interactions.
+Invariants/Security: Ensures textContent-based message rendering and no gameplay coupling.
+*/
+
 import { describe, expect, it } from 'vitest';
 
 import {

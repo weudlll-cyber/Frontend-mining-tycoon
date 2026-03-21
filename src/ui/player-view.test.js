@@ -1,3 +1,10 @@
+/*
+File: src/ui/player-view.test.js
+Purpose: Verify read-only analytics matrix and footer rendering behavior.
+Role in system: Regression coverage for player-state visibility and tooltip wiring.
+Invariants/Security: Preserves oracle/fee-spread visibility and safe text-only rendering patterns.
+*/
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   initPlayerView,
@@ -158,6 +165,68 @@ describe('player state matrix', () => {
       /Fee 0\.0(23|24) \/ 0\.0(12|13)|Fee 0\.02 \/ 0\.01/
     );
     expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
+  });
+
+  it('renders This session and Best this round lines with exact-value tooltip titles', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 123.45,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      current_session_score: 4444,
+      player_best_of_score: 9999,
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines.length).toBe(2);
+    expect(lines[0].textContent).toMatch(/This session:\s+4[\s,\u00A0]444/);
+    expect(lines[1].textContent).toMatch(/Best this round:\s+9[\s,\u00A0]999/);
+    expect(lines[0].getAttribute('title')).toMatch(
+      /Exact value:\s+4[\s,\u00A0]444/
+    );
+    expect(lines[1].getAttribute('title')).toMatch(
+      /Exact value:\s+9[\s,\u00A0]999/
+    );
+  });
+
+  it('preserves next-halving information in running footer and footer tooltip', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      current_sim_month: 1,
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 42,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const line1 = document.querySelector('.ps-footer-line-1');
+    const line2 = document.querySelector('.ps-footer-line-2');
+    expect(line1).not.toBeNull();
+    expect(line2).not.toBeNull();
+
+    const line1Text = line1?.textContent || '';
+    expect(line1Text).toContain('Next halving');
+    expect(line1Text).toContain('Mined 42.00');
+
+    const footerTrigger = line2?.querySelector('.ps-tip-trigger');
+    expect(footerTrigger).not.toBeNull();
+
+    const tooltipId = footerTrigger?.getAttribute('aria-describedby');
+    expect(tooltipId).toBeTruthy();
+    const footerTooltip = tooltipId ? document.getElementById(tooltipId) : null;
+    expect(footerTooltip).not.toBeNull();
+    expect(footerTooltip?.textContent || '').toContain('Halving: Next halving');
   });
 
   it('renders tooltip triggers with aria-describedby and tooltip role', () => {

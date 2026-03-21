@@ -236,9 +236,9 @@ describe('layout controls', () => {
 
     expect(startSessionBtn.hidden).toBe(false);
     expect(startSessionBtn.disabled).toBe(true);
-    expect(noteEl.textContent).toContain('Async sessions not supported');
+    expect(noteEl.textContent).toContain('endpoint is unavailable');
     expect(asyncStatusBadge.hidden).toBe(false);
-    expect(asyncStatusBadge.textContent).toContain('Legacy View');
+    expect(asyncStatusBadge.textContent).toContain('Async: Ready');
   });
 
   it('shows enabled async Start Session when backend support is available', async () => {

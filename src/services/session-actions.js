@@ -12,10 +12,39 @@ Security notes:
 - Never log tickets or player tokens.
 */
 
+import { debugLog } from '../utils/debug-log.js';
+
 let _deps = null;
 
 export function initSessionActions(deps) {
   _deps = deps;
+}
+
+function parseValidSessionResponse(payload) {
+  const sessionIdRaw = payload?.session_id;
+  const sessionId =
+    typeof sessionIdRaw === 'number'
+      ? String(sessionIdRaw)
+      : typeof sessionIdRaw === 'string'
+        ? sessionIdRaw.trim()
+        : '';
+  const sessionStartUnix = Number(payload?.session_start_unix);
+  const sessionDurationSec = Number(payload?.session_duration_sec);
+
+  const isSessionIdValid = sessionId.length > 0;
+  const isStartValid = Number.isFinite(sessionStartUnix);
+  const isDurationValid =
+    Number.isFinite(sessionDurationSec) && sessionDurationSec > 0;
+
+  if (!isSessionIdValid || !isStartValid || !isDurationValid) {
+    return null;
+  }
+
+  return {
+    sessionId,
+    sessionStartUnix,
+    sessionDurationSec,
+  };
 }
 
 async function parseErrorDetail(response, fallback) {
@@ -62,6 +91,109 @@ async function detectRequirePlayerAuth(baseUrl, gameId, playerId, playerToken) {
   return false;
 }
 
+export async function probeRequirePlayerAuth({ gameId, playerId }) {
+  const baseUrl = _deps?.getNormalizedBaseUrlOrNull?.({ notify: false });
+  if (!baseUrl) {
+    return { value: 'unknown', reason: 'missing-base-url' };
+  }
+  if (!gameId || !playerId) {
+    return { value: 'unknown', reason: 'missing-identifiers' };
+  }
+
+  const encodedGameId = encodeURIComponent(gameId);
+  const encodedPlayerId = encodeURIComponent(playerId);
+  const ticketProbeUrl = `${baseUrl}/games/${encodedGameId}/sse-ticket?player_id=${encodedPlayerId}`;
+
+  try {
+    // WHY: SSE ticket endpoint is the authoritative place to infer whether X-Player-Token is mandatory.
+    const response = await fetch(ticketProbeUrl, { method: 'GET' });
+    if (response.status === 401 || response.status === 403) {
+      debugLog('async-probe', 'require-player-auth inferred true', {
+        gameId,
+        status: response.status,
+      });
+      return { value: true, code: response.status };
+    }
+
+    if (
+      response.status === 404 ||
+      response.status === 405 ||
+      response.status === 501
+    ) {
+      return {
+        value: 'unknown',
+        code: response.status,
+        reason: 'ticket-endpoint-unsupported',
+      };
+    }
+
+    return { value: false, code: response.status };
+  } catch {
+    return { value: 'unknown', reason: 'network-error' };
+  }
+}
+
+export async function probeSessionSupport({ gameId, playerId }) {
+  const baseUrl = _deps?.getNormalizedBaseUrlOrNull?.({ notify: false });
+  if (!baseUrl) {
+    return { supported: false, reason: 'missing-base-url' };
+  }
+  if (!gameId) {
+    return { supported: false, reason: 'missing-game-id' };
+  }
+
+  const encodedGameId = encodeURIComponent(gameId);
+  const url = `${baseUrl}/games/${encodedGameId}/sessions`;
+
+  try {
+    const optionsResponse = await fetch(url, {
+      method: 'OPTIONS',
+      headers: { 'X-Dry-Run': 'true' },
+    });
+
+    if (optionsResponse.status === 404 || optionsResponse.status === 501) {
+      return { supported: false, code: optionsResponse.status };
+    }
+
+    if (optionsResponse.ok) {
+      return { supported: true, code: optionsResponse.status };
+    }
+  } catch {
+    // Continue to POST inference if OPTIONS is blocked by intermediaries.
+  }
+
+  const dryRunBody = {
+    mode: 'async',
+  };
+  if (playerId) {
+    dryRunBody.player_id = playerId;
+  }
+
+  try {
+    const postResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Dry-Run': 'true',
+      },
+      body: JSON.stringify(dryRunBody),
+    });
+
+    if (
+      postResponse.status === 404 ||
+      postResponse.status === 405 ||
+      postResponse.status === 501
+    ) {
+      return { supported: false, code: postResponse.status };
+    }
+
+    // WHY: Any non-capability error (400/401/403/409/422/etc.) still proves endpoint support.
+    return { supported: true, code: postResponse.status };
+  } catch {
+    return { supported: false, reason: 'network-error' };
+  }
+}
+
 export async function createAsyncSession({ gameId, playerId }) {
   const baseUrl = _deps.getNormalizedBaseUrlOrNull({ notify: false });
   if (!baseUrl) {
@@ -79,12 +211,17 @@ export async function createAsyncSession({ gameId, playerId }) {
 
   let requirePlayerAuth = false;
   try {
-    requirePlayerAuth = await detectRequirePlayerAuth(
-      baseUrl,
-      gameId,
-      playerId,
-      playerToken
-    );
+    const authProbe = await probeRequirePlayerAuth({ gameId, playerId });
+    if (authProbe.value === true || authProbe.value === false) {
+      requirePlayerAuth = authProbe.value;
+    } else {
+      requirePlayerAuth = await detectRequirePlayerAuth(
+        baseUrl,
+        gameId,
+        playerId,
+        playerToken
+      );
+    }
   } catch {
     requirePlayerAuth = false;
   }
@@ -132,10 +269,21 @@ export async function createAsyncSession({ gameId, playerId }) {
     }
 
     const payload = await response.json();
+    const validSession = parseValidSessionResponse(payload);
+    if (!validSession) {
+      return {
+        ok: false,
+        kind: 'http',
+        code: 'MALFORMED_SESSION_RESPONSE',
+        message: 'Session could not be started (malformed response).',
+      };
+    }
+
     return {
       ok: true,
-      sessionId: payload?.session_id ?? null,
-      sessionStartUnix: Number(payload?.session_start_unix) || null,
+      sessionId: validSession.sessionId,
+      sessionStartUnix: validSession.sessionStartUnix,
+      sessionDurationSec: validSession.sessionDurationSec,
       requiresPlayerAuth: requirePlayerAuth,
       raw: payload,
     };

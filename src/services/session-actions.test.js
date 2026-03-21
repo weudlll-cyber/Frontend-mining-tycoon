@@ -4,7 +4,12 @@ Purpose: Validate auth-aware async session request construction and policy error
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { initSessionActions, createAsyncSession } from './session-actions.js';
+import {
+  initSessionActions,
+  createAsyncSession,
+  probeRequirePlayerAuth,
+  probeSessionSupport,
+} from './session-actions.js';
 
 describe('session-actions', () => {
   beforeEach(() => {
@@ -81,7 +86,11 @@ describe('session-actions', () => {
       .mockResolvedValueOnce({
         status: 200,
         ok: true,
-        json: async () => ({ session_id: 77, session_start_unix: 1700000000 }),
+        json: async () => ({
+          session_id: '77',
+          session_start_unix: 1700000000,
+          session_duration_sec: 600,
+        }),
       });
     globalThis.fetch = fetchMock;
 
@@ -95,5 +104,88 @@ describe('session-actions', () => {
     expect(body.mode).toBe('async');
     expect('player_id' in body).toBe(false);
     expect(postCall[1].headers['X-Player-Token']).toBe('token-123');
+  });
+
+  it('treats malformed 200 session response as explicit failure', async () => {
+    setupDeps();
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ ticket: 't' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        // Missing required session fields: session_id as non-empty string and session_duration_sec > 0
+        json: async () => ({ session_start_unix: 1700000000 }),
+      });
+    globalThis.fetch = fetchMock;
+
+    const result = await createAsyncSession({ gameId: '1', playerId: '2' });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('MALFORMED_SESSION_RESPONSE');
+    expect(result.message).toContain('malformed response');
+  });
+
+  it('probeRequirePlayerAuth returns true on 401 ticket probe', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+    });
+
+    const result = await probeRequirePlayerAuth({ gameId: '1', playerId: '2' });
+    expect(result.value).toBe(true);
+    expect(result.code).toBe(401);
+  });
+
+  it('probeRequirePlayerAuth returns unknown on unsupported ticket endpoint', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 404,
+      ok: false,
+    });
+
+    const result = await probeRequirePlayerAuth({ gameId: '1', playerId: '2' });
+    expect(result.value).toBe('unknown');
+    expect(result.code).toBe(404);
+  });
+
+  it('probeSessionSupport returns false for 404 capability response', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 404,
+      ok: false,
+    });
+
+    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
+    expect(result.supported).toBe(false);
+    expect(result.code).toBe(404);
+  });
+
+  it('probeSessionSupport returns true when POST dry-run reaches endpoint', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 405,
+        ok: false,
+      })
+      .mockResolvedValueOnce({
+        status: 422,
+        ok: false,
+      });
+
+    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
+    expect(result.supported).toBe(true);
+    expect(result.code).toBe(422);
   });
 });

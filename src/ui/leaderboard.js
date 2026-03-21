@@ -38,10 +38,10 @@ export function renderLeaderboard(data) {
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  ['Rank', 'Player', 'Mined'].forEach((label) => {
+  ['Rank', 'Player', 'Score'].forEach((label) => {
     const th = document.createElement('th');
     th.textContent = label;
-    if (label === 'Mined') {
+    if (label === 'Score') {
       th.style.textAlign = 'right';
     }
     headRow.appendChild(th);
