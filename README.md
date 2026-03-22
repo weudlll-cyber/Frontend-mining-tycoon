@@ -72,7 +72,6 @@ If port `5173` is already used, Vite automatically selects the next free port.
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
-
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
@@ -83,7 +82,6 @@ For async rounds, use the explicit session action:
 - the app switches to `/sessions/{session_id}/stream` automatically
 
 Sync/Async model (backend-aligned):
-
 - Sync rounds use `Round Duration` + `Enrollment Window` and stream via `/games/{id}/stream`.
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
