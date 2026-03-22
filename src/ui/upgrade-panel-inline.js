@@ -16,6 +16,7 @@ let _isActiveContractSupported = null;
 let _getActiveUpgradeDefinitions = null;
 let _performUpgrade = null;
 const _inlineTooltipStateByContainer = new WeakMap();
+const _inlineRenderKeyByContainer = new WeakMap();
 
 function cleanupHeaderTooltipsForContainer(containerEl) {
   const previous = _inlineTooltipStateByContainer.get(containerEl);
@@ -106,7 +107,6 @@ export function renderInlineSeasonUpgrades(
   data
 ) {
   if (!upgradesContainer) return;
-  cleanupHeaderTooltipsForContainer(upgradesContainer);
 
   const metrics = data?.upgrade_metrics || {};
   const playerState = data?.player_state || {};
@@ -126,6 +126,24 @@ export function renderInlineSeasonUpgrades(
       ? Object.prototype.hasOwnProperty.call(activeUpgradeDefinitions, type)
       : true
   );
+
+  const renderKey = JSON.stringify({
+    seasonToken,
+    contractSupported,
+    supportedUpgradeTypes,
+    selectedTokenLevels,
+    upgrades: supportedUpgradeTypes.map((type) => ({
+      type,
+      cost: upgrades[type]?.cost_to_next,
+      delta: upgrades[type]?.delta_output,
+      breakeven: upgrades[type]?.breakeven_seconds,
+    })),
+  });
+  if (_inlineRenderKeyByContainer.get(upgradesContainer) === renderKey) {
+    return;
+  }
+
+  cleanupHeaderTooltipsForContainer(upgradesContainer);
 
   // Compact one-line header preserves horizontal space without truncating numeric columns.
   const layout = document.createElement('div');
@@ -235,11 +253,13 @@ export function renderInlineSeasonUpgrades(
       dispose,
       bubbleIds,
     });
+    _inlineRenderKeyByContainer.set(upgradesContainer, renderKey);
   } else {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder';
     placeholder.textContent = 'No upgrades available';
     upgradesContainer.appendChild(placeholder);
+    _inlineRenderKeyByContainer.set(upgradesContainer, renderKey);
   }
 }
 

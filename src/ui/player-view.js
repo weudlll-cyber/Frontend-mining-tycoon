@@ -579,6 +579,7 @@ export function renderPlayerState(data) {
       prev,
       nextHalvingTarget
     );
+    let countdownTarget = nextHalvingTarget;
     if (shouldReset) {
       startNextHalvingCountdown({
         token: nextHalvingTarget.token,
@@ -586,15 +587,18 @@ export function renderPlayerState(data) {
         halvingAtUnix: nextHalvingTarget.halvingAtUnix,
         textNode: null, // No separate text node; footer handles halving display
       });
+    } else if (prev) {
+      // Keep a stable target between payloads so the countdown does not jump.
+      countdownTarget = prev;
     }
     const nowUnix = Date.now() / 1000;
     const remainingSeconds = Math.max(
       0,
-      nextHalvingTarget.halvingAtUnix - nowUnix
+      countdownTarget.halvingAtUnix - nowUnix
     );
     const countdownText = formatCountdownClock(remainingSeconds);
-    halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
-    halvingTooltipPart = `Next halving in ~${countdownText} for ${nextHalvingTarget.token.toUpperCase()} (month ${nextHalvingTarget.halvingMonth}).`;
+    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
   } else {
     stopNextHalvingCountdown();
 

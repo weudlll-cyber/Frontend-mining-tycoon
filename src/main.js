@@ -118,6 +118,10 @@ import {
   renderLeaderboard as renderTopLeaderboard,
 } from './ui/leaderboard.js';
 import {
+  snapSelection,
+  restoreSelectionIfValid,
+} from './ui/selection-persist.js';
+import {
   initSeasonCards,
   formatRemainingMmSs,
   formatDurationCompact,
@@ -278,6 +282,8 @@ let asyncSessionSupportProbe = null;
 let asyncDiagnosticsProbeKey = '';
 let asyncDiagnosticsProbeInFlight = null;
 let selectedSetupRoundType = 'sync';
+let pendingUiRenderFrame = null;
+let pendingUiRenderData = null;
 
 function getRoundModeFromMeta(meta) {
   const raw = String(meta?.round_mode || meta?.round_type || '')
@@ -1146,12 +1152,7 @@ function loadSettings() {
   void refreshAsyncDiagnostics({ force: true });
 }
 
-function updateUI(data) {
-  lastGameData = data;
-  lastGameData.timestamp = Date.now();
-  latestGameStatus = data?.game_status || null;
-  void refreshAsyncDiagnostics();
-
+function applyUIUpdate(data) {
   if (
     activeSession?.sessionId &&
     Number.isFinite(activeSession?.sessionStartUnix)
@@ -1199,6 +1200,38 @@ function updateUI(data) {
   renderEventBanner(data);
   annotateAffectedValues(data);
   updateSetupActionsState();
+}
+
+function cancelPendingUiRender() {
+  if (pendingUiRenderFrame !== null) {
+    cancelAnimationFrame(pendingUiRenderFrame);
+    pendingUiRenderFrame = null;
+  }
+  pendingUiRenderData = null;
+}
+
+function updateUI(data) {
+  lastGameData = data;
+  lastGameData.timestamp = Date.now();
+  latestGameStatus = data?.game_status || null;
+  void refreshAsyncDiagnostics();
+
+  pendingUiRenderData = data;
+  if (pendingUiRenderFrame !== null) {
+    return;
+  }
+
+  // WHY: Coalescing bursty SSE updates into one frame reduces flicker and keeps selection restore scoped to one DOM patch pass.
+  pendingUiRenderFrame = requestAnimationFrame(() => {
+    pendingUiRenderFrame = null;
+    const frameData = pendingUiRenderData;
+    pendingUiRenderData = null;
+    if (!frameData) return;
+
+    const selectionSnapshot = snapSelection(document.body);
+    applyUIUpdate(frameData);
+    restoreSelectionIfValid(selectionSnapshot);
+  });
 }
 
 async function startLiveStream(gameId, playerId, options = {}) {
@@ -1299,6 +1332,7 @@ if (startBtn) {
 
 if (stopBtn) {
   stopBtn.addEventListener('click', () => {
+    cancelPendingUiRender();
     isStreamActive = false;
     latestGameStatus = null;
     closeEventSourceIfOpen();

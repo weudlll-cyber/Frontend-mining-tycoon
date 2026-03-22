@@ -54,6 +54,11 @@ body {
   color: var(--text-primary);
 }
 
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 #app {
   display: flex;
   flex-direction: column;

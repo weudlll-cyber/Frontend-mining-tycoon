@@ -6,7 +6,7 @@ Key responsibilities:
 - Keep render paths concise and selection-safe via text-node updates.
 Entry points / public functions:
 - clearElementChildren, clearNode, createStaticValueRow, setTextNodeValue,
-  formatCost, formatTokenAmount, escapeHtml.
+  setElementTextValue, formatCost, formatTokenAmount, escapeHtml.
 Dependencies:
 - Browser DOM APIs.
 Last updated: 2026-03-12
@@ -53,6 +53,27 @@ export function setTextNodeValue(textNode, value) {
   if (textNode.nodeValue !== nextValue) {
     textNode.nodeValue = nextValue;
   }
+}
+
+export function setElementTextValue(element, value) {
+  if (!element) return;
+  const nextValue = String(value);
+
+  // Keep a stable text node when possible so live updates do not detach selection anchors.
+  if (
+    element.childNodes.length === 1 &&
+    element.firstChild?.nodeType === Node.TEXT_NODE
+  ) {
+    setTextNodeValue(element.firstChild, nextValue);
+    return;
+  }
+
+  if (element.textContent === nextValue) {
+    return;
+  }
+
+  clearNode(element);
+  element.appendChild(document.createTextNode(nextValue));
 }
 
 export function formatCost(cost) {

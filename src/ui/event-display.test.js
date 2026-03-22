@@ -150,6 +150,34 @@ describe('event display', () => {
       expect(banner.className).toContain('event-banner');
       expect(banner.classList.contains('event-banner-hidden')).toBe(false);
     });
+
+    it('keeps the event banner content node stable across refreshes', () => {
+      const firstData = {
+        active_event: {
+          name: 'Heatwave',
+          effect_description: '−20% Cooling Efficiency',
+          domains: ['cooling'],
+          end_unix: Date.now() / 1000 + 3600,
+        },
+      };
+      const secondData = {
+        active_event: {
+          name: 'Heatwave',
+          effect_description: '+10% Output',
+          domains: ['output'],
+          end_unix: Date.now() / 1000 + 1800,
+        },
+      };
+
+      renderEventBanner(firstData);
+      const banner = document.querySelector('.event-banner');
+      const contentNode = banner.querySelector('.event-banner-content');
+
+      renderEventBanner(secondData);
+
+      expect(banner.querySelector('.event-banner-content')).toBe(contentNode);
+      expect(contentNode.textContent).toContain('+10% Output');
+    });
   });
 
   describe('event indicators', () => {

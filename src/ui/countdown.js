@@ -5,6 +5,8 @@ Manages the countdown interval and renders remaining seconds into the provided D
 Call init() once with the display elements before using the other exports.
 */
 
+import { setElementTextValue } from '../utils/dom-utils.js';
+
 let _countdownEl = null;
 let _countdownLabelEl = null;
 let _countdownInterval = null;
@@ -32,18 +34,18 @@ export function formatCountdown(seconds) {
 function updateCountdown() {
   const lastGameData = _lastGameDataRef?.get();
   if (!lastGameData || lastGameData.seconds_remaining === null) {
-    _countdownEl.textContent = '-';
+    setElementTextValue(_countdownEl, '-');
     return;
   }
   const elapsed = (Date.now() - lastGameData.timestamp) / 1000;
   const remaining = Math.max(0, lastGameData.seconds_remaining - elapsed);
-  _countdownEl.textContent = formatCountdown(remaining);
+  setElementTextValue(_countdownEl, formatCountdown(remaining));
 }
 
 function updateEnrollmentCountdown() {
   const lastGameData = _lastGameDataRef?.get();
   if (!lastGameData || lastGameData.enrollment_seconds_remaining === null) {
-    _countdownEl.textContent = '-';
+    setElementTextValue(_countdownEl, '-');
     return;
   }
   const elapsed = (Date.now() - lastGameData.timestamp) / 1000;
@@ -51,7 +53,7 @@ function updateEnrollmentCountdown() {
     0,
     lastGameData.enrollment_seconds_remaining - elapsed
   );
-  _countdownEl.textContent = formatCountdown(remaining);
+  setElementTextValue(_countdownEl, formatCountdown(remaining));
 }
 
 export function startCountdownTimer() {
@@ -71,8 +73,9 @@ export function stopCountdownTimer() {
     clearInterval(_countdownInterval);
     _countdownInterval = null;
   }
-  if (_countdownLabelEl) _countdownLabelEl.textContent = 'Time Remaining';
-  if (_countdownEl) _countdownEl.textContent = '-';
+  if (_countdownLabelEl)
+    setElementTextValue(_countdownLabelEl, 'Time Remaining');
+  if (_countdownEl) setElementTextValue(_countdownEl, '-');
 }
 
 /** Returns the raw interval ID (used by stream-level tear-down). */

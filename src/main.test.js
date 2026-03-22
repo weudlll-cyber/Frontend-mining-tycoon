@@ -796,6 +796,54 @@ describe('Seasonal Oracle season card rendering', () => {
     vi.useRealTimers();
   });
 
+  it('keeps season halving countdown smooth for same-month payload drift', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T00:00:00Z'));
+
+    const module = await loadMainModule();
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-meta">
+          <div class="meta-item halving-item">
+            <span class="meta-label">Halving</span>
+            <span class="season-halving">—</span>
+          </div>
+          <span class="season-balance">0</span>
+          <span class="season-output">0/s</span>
+        </div>
+      </div>
+    `;
+
+    const halvingEl = document.querySelector('.season-halving');
+    const initialNow = Date.now() / 1000;
+
+    module.syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: initialNow + 10,
+      halvingMonth: 36,
+    });
+
+    vi.advanceTimersByTime(2000);
+    const beforeResync = halvingEl.textContent;
+
+    module.syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: Date.now() / 1000 + 10,
+      halvingMonth: 36,
+    });
+
+    vi.advanceTimersByTime(1000);
+    const afterResync = halvingEl.textContent;
+
+    expect(beforeResync).toBe('00:08');
+    expect(afterResync).toBe('00:07');
+
+    module.stopSeasonHalvingTimers();
+    vi.useRealTimers();
+  });
+
   it('keeps halving countdown text selectable and copyable', async () => {
     const module = await loadMainModule();
     document.body.innerHTML = `

@@ -6,12 +6,16 @@ Purpose: Event visibility and effect indicator system.
 - Uses the shared micro-tooltip behavior for explanations
 */
 
+import { setElementTextValue } from '../utils/dom-utils.js';
 import { formatCountdownClock } from './halving-display.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _eventBannerEl = null;
 let _disposeTooltips = null;
 let _tooltipCounter = 0;
+let _eventBannerBubble = null;
+let _eventBannerTrigger = null;
+let _eventBannerContentEl = null;
 
 function nextTooltipId(prefix) {
   _tooltipCounter += 1;
@@ -108,10 +112,41 @@ function refreshTooltips() {
 
 function clearEventTooltipBubbles() {
   document
-    .querySelectorAll(
-      '[id^="event-banner-tip-"] , [id^="event-indicator-tip-"]'
-    )
+    .querySelectorAll('[id^="event-indicator-tip-"]')
     .forEach((node) => node.remove());
+}
+
+function ensureEventBannerUi() {
+  if (!_eventBannerEl) return;
+  if (
+    _eventBannerContentEl?.isConnected &&
+    _eventBannerTrigger?.isConnected &&
+    _eventBannerBubble?.isConnected
+  ) {
+    return;
+  }
+
+  _eventBannerContentEl = null;
+  _eventBannerTrigger = null;
+  _eventBannerBubble = null;
+
+  _eventBannerContentEl = document.createElement('span');
+  _eventBannerContentEl.className = 'event-banner-content selectable';
+  _eventBannerEl.appendChild(_eventBannerContentEl);
+
+  const tooltipId = 'event-banner-tip-current';
+  _eventBannerBubble = mountTooltipBubble({
+    tooltipId,
+    tooltipText: '',
+  });
+  _eventBannerTrigger = createTooltipTrigger({
+    tooltipId,
+    ariaLabel: 'Event details',
+    text: 'ⓘ',
+    extraClass: 'event-banner-trigger',
+  });
+  _eventBannerTrigger.hidden = true;
+  _eventBannerEl.appendChild(_eventBannerTrigger);
 }
 
 /**
@@ -120,6 +155,13 @@ function clearEventTooltipBubbles() {
  */
 export function initEventDisplay(opts = {}) {
   const { seasonScrollEl } = opts;
+
+  if (_eventBannerEl && !_eventBannerEl.isConnected) {
+    _eventBannerEl = null;
+    _eventBannerContentEl = null;
+    _eventBannerTrigger = null;
+    _eventBannerBubble = null;
+  }
 
   if (seasonScrollEl) {
     _eventBannerEl = seasonScrollEl.querySelector('.event-banner');
@@ -131,6 +173,12 @@ export function initEventDisplay(opts = {}) {
         seasonScrollEl.querySelector('.seasons-grid')
       );
     }
+  } else if (!_eventBannerEl) {
+    // WHY: Tests and defensive boot paths may initialize before the scroll host exists; keep a hidden inline fallback instead of dropping banner state.
+    _eventBannerEl = document.createElement('div');
+    _eventBannerEl.className = 'event-banner event-banner-hidden';
+    _eventBannerEl.hidden = true;
+    document.body.appendChild(_eventBannerEl);
   }
 
   ensureTooltipLayer();
@@ -142,13 +190,17 @@ export function initEventDisplay(opts = {}) {
  */
 export function renderEventBanner(data) {
   if (!_eventBannerEl) return;
+  ensureEventBannerUi();
 
   const activeEvent = getActiveEvent(data);
 
   if (!activeEvent || !activeEvent.name) {
     _eventBannerEl.classList.add('event-banner-hidden');
-    _eventBannerEl.replaceChildren();
     clearEventTooltipBubbles();
+    setElementTextValue(_eventBannerContentEl, '');
+    setElementTextValue(_eventBannerBubble, '');
+    setElementTextValue(_eventBannerTrigger, '');
+    _eventBannerTrigger.hidden = true;
     refreshTooltips();
     return;
   }
@@ -160,26 +212,16 @@ export function renderEventBanner(data) {
   );
 
   clearEventTooltipBubbles();
-  _eventBannerEl.replaceChildren();
   _eventBannerEl.classList.remove('event-banner-hidden');
-
-  const contentEl = document.createElement('span');
-  contentEl.className = 'event-banner-content';
-  contentEl.textContent = `⚡ Event: ${eventName} (${effectDesc}) — ${countdownText} remaining`;
-  _eventBannerEl.appendChild(contentEl);
-
-  const tooltipId = nextTooltipId('event-banner-tip');
-  mountTooltipBubble({
-    tooltipId,
-    tooltipText: getEventTooltipText(activeEvent),
-  });
-  const trigger = createTooltipTrigger({
-    tooltipId,
-    ariaLabel: `${eventName} event details`,
-    text: 'ⓘ',
-    extraClass: 'event-banner-trigger',
-  });
-  _eventBannerEl.appendChild(trigger);
+  _eventBannerEl.hidden = false;
+  setElementTextValue(_eventBannerTrigger, 'ⓘ');
+  setElementTextValue(
+    _eventBannerContentEl,
+    `⚡ Event: ${eventName} (${effectDesc}) — ${countdownText} remaining`
+  );
+  setElementTextValue(_eventBannerBubble, getEventTooltipText(activeEvent));
+  _eventBannerTrigger.setAttribute('aria-label', `${eventName} event details`);
+  _eventBannerTrigger.hidden = false;
   refreshTooltips();
 }
 
@@ -293,6 +335,7 @@ export function clearEventIndicators() {
  */
 export function getEventTooltipElement() {
   return (
+    document.getElementById('event-banner-tip-current') ||
     document.querySelector('[id^="event-banner-tip-"]') ||
     document.querySelector('[id^="event-indicator-tip-"]')
   );

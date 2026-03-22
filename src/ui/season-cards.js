@@ -3,6 +3,7 @@ File: src/ui/season-cards.js
 Purpose: Keep season card metrics and per-card halving timers in sync with SSE payloads.
 */
 
+import { setElementTextValue } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
 import { resolveNextHalvingTarget } from './halving-display.js';
 
@@ -56,7 +57,7 @@ export function applyHalvingTextAndSeverity(halvingEl, targetUnix) {
   if (!halvingEl) return;
 
   if (!Number.isFinite(Number(targetUnix))) {
-    halvingEl.textContent = '—';
+    setElementTextValue(halvingEl, '—');
     halvingEl.classList.remove(
       'season-halving--warning',
       'season-halving--critical'
@@ -66,7 +67,7 @@ export function applyHalvingTextAndSeverity(halvingEl, targetUnix) {
 
   const nowUnix = Date.now() / 1000;
   const remaining = Math.max(0, Math.ceil(Number(targetUnix) - nowUnix));
-  halvingEl.textContent = formatDurationCompact(remaining);
+  setElementTextValue(halvingEl, formatDurationCompact(remaining));
 
   const severity = classifyHalvingSeverity(remaining);
   halvingEl.classList.toggle('season-halving--warning', severity === 'warning');
@@ -87,7 +88,12 @@ export function stopSeasonHalvingTimers() {
   Array.from(_seasonHalvingTimers.keys()).forEach(stopSeasonHalvingTimer);
 }
 
-export function syncSeasonHalvingTicker({ token, halvingEl, halvingAtUnix }) {
+export function syncSeasonHalvingTicker({
+  token,
+  halvingEl,
+  halvingAtUnix,
+  halvingMonth,
+}) {
   if (!halvingEl || !token) return;
   const targetUnix = Number(halvingAtUnix);
   if (!Number.isFinite(targetUnix)) {
@@ -97,6 +103,22 @@ export function syncSeasonHalvingTicker({ token, halvingEl, halvingAtUnix }) {
   }
 
   const existing = _seasonHalvingTimers.get(token);
+  const nextHalvingMonth = Number(halvingMonth);
+  if (existing && existing.halvingEl === halvingEl) {
+    const sameMonth = Number(existing.halvingMonth) === nextHalvingMonth;
+    if (sameMonth) {
+      const driftSeconds = Math.abs(
+        Number(existing.halvingAtUnix) - targetUnix
+      );
+      // Ignore tiny payload drift caused by coarse sim-month updates; keep smooth local ticking.
+      if (driftSeconds >= 3) {
+        existing.halvingAtUnix = targetUnix;
+      }
+      applyHalvingTextAndSeverity(halvingEl, Number(existing.halvingAtUnix));
+      return;
+    }
+  }
+
   if (
     existing &&
     existing.halvingEl === halvingEl &&
@@ -111,8 +133,17 @@ export function syncSeasonHalvingTicker({ token, halvingEl, halvingAtUnix }) {
 
   // The client-side ticker keeps the countdown smooth between authoritative SSE updates.
   const intervalId = setInterval(() => {
-    applyHalvingTextAndSeverity(halvingEl, targetUnix);
-    const remaining = Math.max(0, Math.ceil(targetUnix - Date.now() / 1000));
+    const timerState = _seasonHalvingTimers.get(token);
+    if (!timerState) {
+      clearInterval(intervalId);
+      return;
+    }
+    const liveTargetUnix = Number(timerState.halvingAtUnix);
+    applyHalvingTextAndSeverity(halvingEl, liveTargetUnix);
+    const remaining = Math.max(
+      0,
+      Math.ceil(liveTargetUnix - Date.now() / 1000)
+    );
     if (remaining <= 0) {
       clearInterval(intervalId);
       _seasonHalvingTimers.delete(token);
@@ -122,6 +153,7 @@ export function syncSeasonHalvingTicker({ token, halvingEl, halvingAtUnix }) {
   _seasonHalvingTimers.set(token, {
     intervalId,
     halvingAtUnix: targetUnix,
+    halvingMonth: nextHalvingMonth,
     halvingEl,
   });
 }
@@ -146,22 +178,28 @@ export function renderSeasonData(data) {
     const balanceEl = seasonCardEl.querySelector('.season-balance');
     if (balanceEl) {
       const balance = balances[token];
-      balanceEl.textContent =
+      balanceEl.classList.add('selectable');
+      setElementTextValue(
+        balanceEl,
         balance !== undefined
           ? (Math.floor(balance * 100) / 100).toFixed(2)
-          : '—';
+          : '—'
+      );
     }
 
     const outputEl = seasonCardEl.querySelector('.season-output');
     if (outputEl) {
       const rate = Number(outputRatePerToken[token]);
-      outputEl.textContent = Number.isFinite(rate)
-        ? `${rate.toFixed(2)}/s`
-        : '—/s';
+      outputEl.classList.add('selectable');
+      setElementTextValue(
+        outputEl,
+        Number.isFinite(rate) ? `${rate.toFixed(2)}/s` : '—/s'
+      );
     }
 
     const halvingEl = seasonCardEl.querySelector('.season-halving');
     if (!halvingEl) return;
+    halvingEl.classList.add('selectable');
 
     const nextHalvingTarget = resolveNextHalvingTarget({
       data,
@@ -173,6 +211,7 @@ export function renderSeasonData(data) {
         token,
         halvingEl,
         halvingAtUnix: nextHalvingTarget.halvingAtUnix,
+        halvingMonth: nextHalvingTarget.halvingMonth,
       });
     } else {
       stopSeasonHalvingTimer(token);
