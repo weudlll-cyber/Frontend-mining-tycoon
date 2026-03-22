@@ -150,6 +150,20 @@ Every completed task/PR summary must include:
 6. Docs updated (or explicit reason none)
 7. Confirmation all quality gates passed
 
+Additional output policy for this repository:
+
+- Do not paste full file bodies in task summaries, PR summaries, or review comments.
+- Report changed files with concise per-file summaries only.
+- Include CI gate status with `merge-safe = YES` or `merge-safe = NO` when relevant.
+- Keep final merge approval manual; do not recommend or enable auto-merge.
+
+## 8.1) Manual Final Approval Workflow
+
+- Required frontend status checks are: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, and `CI Summary (Manual Merge Gate)`.
+- PR bodies must include the required machine-generated sections from `.github/pull_request_template.md`.
+- Branch protection must keep squash merge as the only merge method and keep auto-merge disabled.
+- Stable rollback tagging happens only after a manual merge decision.
+
 ## 9) Scope Discipline
 
 - Keep changes minimal, safe, and reviewable.

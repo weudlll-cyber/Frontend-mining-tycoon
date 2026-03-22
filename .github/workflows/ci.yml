@@ -38,8 +38,15 @@ jobs:
               - 'package-lock.json'
               - 'eslint.config.js'
               - '.prettierrc*'
+              - '.github/**'
+              - 'README.md'
+              - 'PROJECT_BASELINE.md'
+              - 'LOCKED_DECISIONS.md'
+              - 'CONTRIBUTING.md'
+              - 'COPILOT_INSTRUCTIONS.md'
               - 'vite.config.*'
               - 'vitest.config.*'
+              - 'scripts/**'
             backend:
               - 'backend/**'
               - 'api/**'
@@ -52,52 +59,186 @@ jobs:
             any:
               - '**'
 
-  frontend-ci:
-    name: Frontend CI (tests/lint/audit/build)
+  pr-policy:
+    name: PR Policy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Validate PR body sections
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = context.payload.pull_request?.body || '';
+            const requiredSections = [
+              '## Machine-Generated PR Summary',
+              '## Invariant Compliance',
+              '## Security Notes',
+              '## Documentation Notes',
+              '## Test Summary',
+              '## CI Summary',
+              '## Changed Files Summary'
+            ];
+
+            const missing = requiredSections.filter((section) => !body.includes(section));
+            if (!body.includes('No full file bodies included')) {
+              missing.push('Acknowledgement: No full file bodies included');
+            }
+
+            if (missing.length > 0) {
+              core.setFailed(`PR body is missing required sections: ${missing.join(', ')}`);
+              return;
+            }
+
+            core.notice('PR body contains all required manual-merge workflow sections.');
+
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-
       - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
         run: npm ci
-
-      - name: Lint
+      - name: Run lint
+        if: needs.detect-changes.outputs.frontend == 'true'
         run: npm run lint
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; lint check passes by policy."
 
-      - name: Format check
-        run: npm run format:check
-
-      - name: Unit tests
-        run: npm run test -- --run
-
-      - name: Coverage tests
-        run: npm run test:coverage
-
-      - name: Build
-        run: npm run build
-
-      - name: Security audit
-        run: npm audit --omit=dev --audit-level=high
-
-  backend-ci:
-    name: Backend CI (tests/lint/audit/security)
+  format_check:
+    name: Format check
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.backend == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm ci
+      - name: Run format check
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm run format:check
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; format check passes by policy."
 
+  unit_tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm ci
+      - name: Run unit tests
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm run test -- --run
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; unit tests check passes by policy."
+
+  test_coverage:
+    name: Test coverage
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm ci
+      - name: Run coverage tests
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm run test:coverage
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; coverage check passes by policy."
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm ci
+      - name: Run build
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm run build
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; build check passes by policy."
+
+  security_audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm ci
+      - name: Run security audit
+        if: needs.detect-changes.outputs.frontend == 'true'
+        run: npm audit --omit=dev --audit-level=high
+      - name: No frontend changes
+        if: needs.detect-changes.outputs.frontend != 'true'
+        run: echo "No frontend changes; security audit check passes by policy."
+
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Run backend checks
+        if: needs.detect-changes.outputs.backend == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -153,53 +294,77 @@ jobs:
           fi
 
           echo "Backend changes were detected, but no supported backend project layout was found."
-          echo "Expected one of: backend/package.json, backend/pyproject.toml, backend/requirements.txt, pyproject.toml, requirements.txt"
           exit 1
+      - name: No backend changes
+        if: needs.detect-changes.outputs.backend != 'true'
+        run: echo "No backend changes; backend CI skipped by policy."
 
   ci-summary:
     name: CI Summary (Manual Merge Gate)
     runs-on: ubuntu-latest
     needs:
       - detect-changes
-      - frontend-ci
+      - pr-policy
+      - lint
+      - format_check
+      - unit_tests
+      - test_coverage
+      - build
+      - security_audit
       - backend-ci
     if: always()
     steps:
-      - name: Summarize results
+      - name: Summarize results and emit merge-safe gate
         shell: bash
         run: |
           set -euo pipefail
 
+          PR_POLICY_RESULT="${{ needs.pr-policy.result }}"
           FRONTEND_CHANGED="${{ needs.detect-changes.outputs.frontend }}"
           BACKEND_CHANGED="${{ needs.detect-changes.outputs.backend }}"
-          FRONTEND_RESULT="${{ needs.frontend-ci.result }}"
+          LINT_RESULT="${{ needs.lint.result }}"
+          FORMAT_RESULT="${{ needs.format_check.result }}"
+          TEST_RESULT="${{ needs.unit_tests.result }}"
+          COVERAGE_RESULT="${{ needs.test_coverage.result }}"
+          BUILD_RESULT="${{ needs.build.result }}"
+          AUDIT_RESULT="${{ needs.security_audit.result }}"
           BACKEND_RESULT="${{ needs.backend-ci.result }}"
+
+          MERGE_SAFE="YES"
+
+          if [ "$PR_POLICY_RESULT" != "success" ] && [ "$PR_POLICY_RESULT" != "skipped" ]; then
+            MERGE_SAFE="NO"
+          fi
+
+          for result in "$LINT_RESULT" "$FORMAT_RESULT" "$TEST_RESULT" "$COVERAGE_RESULT" "$BUILD_RESULT" "$AUDIT_RESULT"; do
+            if [ "$result" != "success" ]; then
+              MERGE_SAFE="NO"
+            fi
+          done
+
+          if [ "$BACKEND_CHANGED" = "true" ] && [ "$BACKEND_RESULT" != "success" ]; then
+            MERGE_SAFE="NO"
+          fi
 
           echo "## CI Merge Safety Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PR policy: ${PR_POLICY_RESULT}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend changed: ${FRONTEND_CHANGED}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backend changed: ${BACKEND_CHANGED}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Frontend CI result: ${FRONTEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Backend CI result: ${BACKEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Lint: ${LINT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Format check: ${FORMAT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Unit tests: ${TEST_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Test coverage: ${COVERAGE_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Build: ${BUILD_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Security audit: ${AUDIT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend CI: ${BACKEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "merge-safe = ${MERGE_SAFE}" >> "$GITHUB_STEP_SUMMARY"
 
-          SAFE_TO_MERGE="true"
-
-          if [ "$FRONTEND_CHANGED" = "true" ] && [ "$FRONTEND_RESULT" != "success" ]; then
-            SAFE_TO_MERGE="false"
-          fi
-
-          if [ "$BACKEND_CHANGED" = "true" ] && [ "$BACKEND_RESULT" != "success" ]; then
-            SAFE_TO_MERGE="false"
-          fi
-
-          if [ "$SAFE_TO_MERGE" = "true" ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo ":white_check_mark: All required CI checks passed. Safe to merge manually after review." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MERGE_SAFE" = "YES" ]; then
             exit 0
           fi
 
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo ":x: One or more required checks failed. Not safe to merge." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
   post-results:
@@ -207,7 +372,13 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - detect-changes
-      - frontend-ci
+      - pr-policy
+      - lint
+      - format_check
+      - unit_tests
+      - test_coverage
+      - build
+      - security_audit
       - backend-ci
       - ci-summary
     if: always() && github.event_name == 'pull_request'
@@ -215,9 +386,13 @@ jobs:
       - name: Create or update PR results comment
         uses: actions/github-script@v7
         env:
-          FRONTEND_CHANGED: ${{ needs.detect-changes.outputs.frontend }}
-          BACKEND_CHANGED: ${{ needs.detect-changes.outputs.backend }}
-          FRONTEND_RESULT: ${{ needs.frontend-ci.result }}
+          PR_POLICY_RESULT: ${{ needs.pr-policy.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          FORMAT_RESULT: ${{ needs.format_check.result }}
+          TEST_RESULT: ${{ needs.unit_tests.result }}
+          COVERAGE_RESULT: ${{ needs.test_coverage.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          AUDIT_RESULT: ${{ needs.security_audit.result }}
           BACKEND_RESULT: ${{ needs.backend-ci.result }}
           SUMMARY_RESULT: ${{ needs.ci-summary.result }}
         with:
@@ -232,76 +407,32 @@ jobs:
 
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-
-            const frontendChanged = process.env.FRONTEND_CHANGED === 'true';
-            const backendChanged = process.env.BACKEND_CHANGED === 'true';
-            const frontendResult = process.env.FRONTEND_RESULT || 'skipped';
-            const backendResult = process.env.BACKEND_RESULT || 'skipped';
-            const summaryResult = process.env.SUMMARY_RESULT || 'failure';
-
-            const iconFor = (result) => {
-              if (result === 'success') return '✅';
-              if (result === 'skipped') return '⏭️';
-              if (result === 'cancelled') return '⚪';
-              return '❌';
-            };
-
-            const mergeSafe = summaryResult === 'success';
-            const mergeSafetyText = mergeSafe
-              ? '✅ **SAFE** to merge manually after review.'
-              : '❌ **NOT SAFE** to merge. Resolve failing checks first.';
-
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const mergeSafe = process.env.SUMMARY_RESULT === 'success' ? 'YES' : 'NO';
 
-            const lines = [];
-            lines.push(marker);
-            lines.push('## CI Test Summary');
-            lines.push('');
-            lines.push(`- Workflow run: [View run details](${runUrl})`);
-            lines.push(`- Commit: \`${context.sha.slice(0, 7)}\``);
-            lines.push('');
-            lines.push('### Change Detection');
-            lines.push(`- Frontend changed: **${frontendChanged ? 'yes' : 'no'}**`);
-            lines.push(`- Backend changed: **${backendChanged ? 'yes' : 'no'}**`);
-            lines.push('');
-            lines.push('### Full CI Result');
-            lines.push(`- Overall CI: ${iconFor(summaryResult)} **${summaryResult}**`);
-            lines.push('');
-
-            lines.push('### Frontend Test Results');
-            if (frontendChanged) {
-              lines.push(`- Frontend CI: ${iconFor(frontendResult)} **${frontendResult}**`);
-              lines.push('- Includes: unit tests, coverage, lint, format, build, npm audit');
-            } else {
-              lines.push('- Not applicable (no frontend changes detected).');
-            }
-            lines.push('');
-
-            lines.push('### Backend Test Results');
-            if (backendChanged) {
-              lines.push(`- Backend CI: ${iconFor(backendResult)} **${backendResult}**`);
-              lines.push('- Includes: tests, lint, audit/security checks for detected backend stack');
-            } else {
-              lines.push('- Not applicable (no backend changes detected).');
-            }
-            lines.push('');
-
-            lines.push('### Linting and Formatting');
-            lines.push(`- Frontend lint/format: ${frontendChanged ? `${iconFor(frontendResult)} **${frontendResult}**` : '⏭️ skipped (unchanged)'}`);
-            lines.push(`- Backend lint: ${backendChanged ? `${iconFor(backendResult)} **${backendResult}**` : '⏭️ skipped (unchanged)'}`);
-            lines.push('');
-
-            lines.push('### Audit and Security Checks');
-            lines.push(`- Frontend audit: ${frontendChanged ? `${iconFor(frontendResult)} **${frontendResult}**` : '⏭️ skipped (unchanged)'}`);
-            lines.push(`- Backend security checks: ${backendChanged ? `${iconFor(backendResult)} **${backendResult}**` : '⏭️ skipped (unchanged)'}`);
-            lines.push('');
-
-            lines.push('### Merge Safety');
-            lines.push(`- ${mergeSafetyText}`);
-            lines.push('- Merge remains manual; no auto-merge is performed by this workflow.');
+            const lines = [
+              marker,
+              '## CI Test Summary',
+              '',
+              `- Workflow run: [View run details](${runUrl})`,
+              `- Commit: \`${context.sha.slice(0, 7)}\``,
+              '',
+              '## CI Summary',
+              `- PR policy: **${process.env.PR_POLICY_RESULT || 'skipped'}**`,
+              `- Lint: **${process.env.LINT_RESULT || 'skipped'}**`,
+              `- Format check: **${process.env.FORMAT_RESULT || 'skipped'}**`,
+              `- Unit tests: **${process.env.TEST_RESULT || 'skipped'}**`,
+              `- Test coverage: **${process.env.COVERAGE_RESULT || 'skipped'}**`,
+              `- Build: **${process.env.BUILD_RESULT || 'skipped'}**`,
+              `- Security audit: **${process.env.AUDIT_RESULT || 'skipped'}**`,
+              `- Backend CI: **${process.env.BACKEND_RESULT || 'skipped'}**`,
+              '',
+              `merge-safe = ${mergeSafe}`,
+              '',
+              '- Merge remains manual; auto-merge stays OFF by repository policy.'
+            ];
 
             const body = lines.join('\n');
-
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
               repo,
@@ -309,35 +440,23 @@ jobs:
               per_page: 100,
             });
 
-            const existing = comments.filter(
+            const existing = comments.find(
               (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker)
             );
 
-            if (existing.length === 0) {
-              await github.rest.issues.createComment({
+            if (existing) {
+              await github.rest.issues.updateComment({
                 owner,
                 repo,
-                issue_number: prNumber,
+                comment_id: existing.id,
                 body,
               });
-              core.info('Created CI results comment.');
               return;
             }
 
-            const [keep, ...duplicates] = existing;
-            await github.rest.issues.updateComment({
+            await github.rest.issues.createComment({
               owner,
               repo,
-              comment_id: keep.id,
+              issue_number: prNumber,
               body,
             });
-
-            for (const duplicate of duplicates) {
-              await github.rest.issues.deleteComment({
-                owner,
-                repo,
-                comment_id: duplicate.id,
-              });
-            }
-
-            core.info(`Updated CI results comment and removed ${duplicates.length} duplicate(s).`);

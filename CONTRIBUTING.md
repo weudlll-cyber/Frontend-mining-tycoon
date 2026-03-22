@@ -42,6 +42,14 @@ All of the following must pass before merge:
 - `npm run build`
 - `npm audit --omit=dev`
 
+Repository merge policy:
+
+- Final merge approval is manual even when CI is fully green.
+- Auto-merge must remain OFF.
+- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, and `CI Summary (Manual Merge Gate)`.
+- Use squash merge only.
+- PR descriptions must follow [.github/pull_request_template.md](.github/pull_request_template.md), including `merge-safe = YES/NO` and a changed-files summary without full file bodies.
+
 For UI/layout or tooltip changes, ensure repository guard tests remain green (for example layout-css and tooltip parity assertions).
 
 If your change requires violating a locked invariant:
