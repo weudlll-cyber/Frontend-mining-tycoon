@@ -40,12 +40,12 @@ body {
   /* Right player-status panel fixed width — keeps 2×2 seasons grid from overflowing */
   --player-panel-width: 340px;
 
-  /* Shared column template (7 tracks) — header and all lane rows use this variable for guaranteed alignment.
-     Prev column removed: pay-token select now carries the only cross-token context needed at submit time. */
+  /* Shared column template (7 tracks) — balanced for readable upgrade names + metrics.
+     All flexible columns now use 1fr for even distribution; UPG widened for full names. */
   --upgrade-cols:
-    /* Upg  */ minmax(2.6ch, 3.4ch) /* Lvl  */ minmax(3ch, 3ch)
-    /* Cost */ minmax(7ch, 1fr) /* Pay  */ minmax(9ch, 0.9fr) /* Out/s*/
-    minmax(5ch, auto) /* BEP  */ minmax(4ch, auto) /* Act  */
+    /* Upg  */ minmax(10ch, 1.3fr) /* Lvl  */ minmax(3ch, 1fr)
+    /* Cost */ minmax(6ch, 1fr) /* Pay  */ minmax(8ch, 1fr) /* Out/s*/
+    minmax(8ch, 1.1fr) /* BEP  */ minmax(6ch, 1fr) /* Act  */
     minmax(5.5ch, auto);
 
   font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
@@ -1503,10 +1503,10 @@ button {
 
 .ps-matrix {
   display: grid;
-  grid-template-columns: minmax(4.6rem, 1.2fr) repeat(5, minmax(0, 1fr)) minmax(
-      1.3rem,
-      auto
-    );
+  grid-template-columns: minmax(5.2rem, 1.1fr) repeat(
+      5,
+      minmax(4.5ch, 1fr)
+    ) minmax(1.3rem, auto);
   gap: 0.22rem 0.35rem;
   align-items: center;
 }
