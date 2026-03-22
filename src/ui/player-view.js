@@ -601,8 +601,8 @@ export function renderPlayerState(data) {
       countdownTarget.halvingAtUnix - nowUnix
     );
     const countdownText = formatCountdownClock(remainingSeconds);
-    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
-    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
+    halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${nextHalvingTarget.token.toUpperCase()} (month ${nextHalvingTarget.halvingMonth}).`;
   } else {
     stopNextHalvingCountdown();
 

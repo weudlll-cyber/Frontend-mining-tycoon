@@ -111,6 +111,7 @@ export function renderAsyncSessionBadge({
   }
 
   setElementTextValue(badgeEl, 'Async: Ready');
+  badgeEl.textContent = 'Async: Ready';
   badgeEl.classList.add(asyncReady ? 'badge-blue' : 'badge-gray');
   badgeEl.title = sessionSupported
     ? asyncReady
@@ -140,6 +141,8 @@ export function renderAsyncScoreLines(data) {
   if (!isAsync) {
     setElementTextValue(thisSessionEl, 'This session: —');
     setElementTextValue(bestRoundEl, 'Best this round: —');
+    thisSessionEl.textContent = 'This session: —';
+    bestRoundEl.textContent = 'Best this round: —';
     thisSessionEl.removeAttribute('title');
     bestRoundEl.removeAttribute('title');
     return;
@@ -156,6 +159,8 @@ export function renderAsyncScoreLines(data) {
     bestRoundEl,
     `Best this round: ${formatScore(bestRound)}`
   );
+  thisSessionEl.textContent = `This session: ${formatScore(thisSession)}`;
+  bestRoundEl.textContent = `Best this round: ${formatScore(bestRound)}`;
   thisSessionEl.title = `Exact value: ${formatExactScore(thisSession)}`;
   bestRoundEl.title = `Exact value: ${formatExactScore(bestRound)}`;
 }
