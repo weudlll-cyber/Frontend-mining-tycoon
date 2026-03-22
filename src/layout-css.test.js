@@ -89,4 +89,32 @@ describe('dashboard layout css guardrails', () => {
       /\.upgrade-lane-list[\s\S]*?\{[\s\S]*?display\s*:\s*contents/
     );
   });
+
+  it('player-status panel has a fixed width variable and dashboard uses a fixed right column', () => {
+    const css = readStyleCss();
+
+    // --player-panel-width custom property must be declared
+    expect(css).toMatch(/--player-panel-width\s*:/);
+
+    // .dashboard-main must use the variable as the second column track
+    expect(css).toMatch(
+      /\.dashboard-main\s*\{[\s\S]*?grid-template-columns[\s\S]*?var\(--player-panel-width\)/
+    );
+  });
+
+  it('seasons-scroll has min-width:0 to prevent the left column from overflowing the grid', () => {
+    const css = readStyleCss();
+
+    expect(css).toMatch(/\.seasons-scroll\s*\{[\s\S]*?min-width:\s*0;/);
+  });
+
+  it('seasons-grid uses two equal columns on desktop (2x2 layout)', () => {
+    const css = readStyleCss();
+
+    const gridBlock = css.match(/\.seasons-grid\s*\{([\s\S]*?)\}/);
+    expect(gridBlock).not.toBeNull();
+    expect(gridBlock?.[1] || '').toMatch(
+      /grid-template-columns\s*:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+    );
+  });
 });
