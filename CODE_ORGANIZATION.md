@@ -9,6 +9,7 @@
 The main frontend modularity follow-up identified in this report has now been implemented.
 
 Completed frontend extractions:
+
 - `src/services/stream-controller.js` for SSE lifecycle and timer cleanup
 - `src/services/game-actions.js` for create/join and upgrade requests
 - `src/ui/setup-shell.js` for setup-panel state and header navigation
@@ -17,6 +18,7 @@ Completed frontend extractions:
 - `src/ui/season-cards.js` for season-card balance/output/halving updates
 
 Current status:
+
 - `src/main.js` is now a thinner orchestration module rather than the prior all-in-one entrypoint.
 - The remaining oversized files in the overall stack are backend-heavy (`app/services/game_service.py`, `app/api/routes.py`) and were documented for later refactor rather than split in this audit branch.
 
@@ -30,7 +32,7 @@ Current status:
 Module Category          | Files      | Total LOC  | Avg per File | Status
 ========================|============|============|==============|========
 UI Modules (ui/)         | 6 modules  | 1,263      | 210 lines    | ✅ Good
-Utilities (utils/)       | 3 modules  | 353        | 118 lines    | ✅ Excellent  
+Utilities (utils/)       | 3 modules  | 353        | 118 lines    | ✅ Excellent
 Halving Logic            | 2 modules  | 299        | 150 lines    | ✅ Good
 Core Orchestration       | 1 module   | 1,081      | 1,081        | ⚠️ Large
 Meta Management          | 1 module   | 251        | 251 lines    | ✅ Good
@@ -43,12 +45,12 @@ Total                    | 15 modules | 3,269 LOC  | 218 avg      |
 
 #### ✅ **Excellent Modularity** (< 100 lines)
 
-| Module | Lines | Purpose | Quality |
-|--------|-------|---------|---------|
-| `utils/token-utils.js` | 77 | Token conversion, oracle pricing | ✅ Pure functions |
-| `utils/dom-utils.js` | 75 | DOM creation helpers | ✅ Utility-focused |
-| `ui/badge.js` | 34 | Status badge rendering | ✅ Single responsibility |
-| `counter.js` | 9 | Demo component | ✅ Minimal |
+| Module                 | Lines | Purpose                          | Quality                  |
+| ---------------------- | ----- | -------------------------------- | ------------------------ |
+| `utils/token-utils.js` | 77    | Token conversion, oracle pricing | ✅ Pure functions        |
+| `utils/dom-utils.js`   | 75    | DOM creation helpers             | ✅ Utility-focused       |
+| `ui/badge.js`          | 34    | Status badge rendering           | ✅ Single responsibility |
+| `counter.js`           | 9     | Demo component                   | ✅ Minimal               |
 
 **Strength**: Highly focused utilities, easy to understand and reuse.
 
@@ -56,16 +58,16 @@ Total                    | 15 modules | 3,269 LOC  | 218 avg      |
 
 #### ✅ **Good Modularity** (100-300 lines)
 
-| Module | Lines | Purpose | Quality |
-|--------|-------|---------|---------|
-| `halving.js` | 106 | Halving schedule logic | ✅ Pure algorithms |
-| `ui/countdown.js` | 79 | Timer display lifecycle | ✅ DOM + interval mgmt |
-| `ui/halving-display.js` | 193 | Halving indicator rendering | ✅ UI + state logic |
-| `meta/meta-manager.js` | 251 | API contract caching, ETag | ✅ Self-contained |
-| `ui/chat-panel.js` | 257 | WebSocket chat UI | ✅ Event-driven |
-| `ui/upgrade-panel.js` | 317 | Modal upgrade selector | ✅ Complex form logic |
-| `ui/player-view.js` | 334 | Analytics panel grid | ✅ Highest in category |
-| `ui/upgrade-panel-inline.js` | 188 | Season upgrade slots | ✅ NEW - Well designed |
+| Module                       | Lines | Purpose                     | Quality                |
+| ---------------------------- | ----- | --------------------------- | ---------------------- |
+| `halving.js`                 | 106   | Halving schedule logic      | ✅ Pure algorithms     |
+| `ui/countdown.js`            | 79    | Timer display lifecycle     | ✅ DOM + interval mgmt |
+| `ui/halving-display.js`      | 193   | Halving indicator rendering | ✅ UI + state logic    |
+| `meta/meta-manager.js`       | 251   | API contract caching, ETag  | ✅ Self-contained      |
+| `ui/chat-panel.js`           | 257   | WebSocket chat UI           | ✅ Event-driven        |
+| `ui/upgrade-panel.js`        | 317   | Modal upgrade selector      | ✅ Complex form logic  |
+| `ui/player-view.js`          | 334   | Analytics panel grid        | ✅ Highest in category |
+| `ui/upgrade-panel-inline.js` | 188   | Season upgrade slots        | ✅ NEW - Well designed |
 
 **Strength**: Clear responsibilities, coherent feature sets. Largest (`player-view` at 334) is still manageable.
 
@@ -73,8 +75,8 @@ Total                    | 15 modules | 3,269 LOC  | 218 avg      |
 
 #### ⚠️ **Needs Refactoring** (> 1000 lines)
 
-| Module | Lines | Issues | Recommendation |
-|--------|-------|--------|---|
+| Module    | Lines | Issues                     | Recommendation               |
+| --------- | ----- | -------------------------- | ---------------------------- |
 | `main.js` | 1,081 | **Orchestration overload** | Extract lifecycle management |
 
 ---
@@ -102,7 +104,7 @@ Lines 1100-1200:  DOM init, event listeners
 2. **Game session management** (lines 158-170)
 3. **URL and meta resolution** (lines 220-280)
 4. **UI rendering orchestration** (lines 778-810)
-5. **LEADERBOARD rendering** (lines 410-475) 
+5. **LEADERBOARD rendering** (lines 410-475)
 6. **SEASON rendering** (lines 652-728)
 7. **EVENT SOURCE lifecycle** (lines 816-950)
 8. **GAME CREATION** (lines 1008-1155)
@@ -113,6 +115,7 @@ Lines 1100-1200:  DOM init, event listeners
 ⚠️ **Verdict**: Large but defensible given role as application orchestrator.
 
 **Why 1,081 lines is acceptable**:
+
 - ✅ All child UI modules are properly extracted
 - ✅ Business logic (halving, meta-manager) are separate
 - ✅ Main.js is pure **orchestration** (wiring, not logic)
@@ -128,6 +131,7 @@ Lines 1100-1200:  DOM init, event listeners
 ### Issue #1: LEADERBOARD Rendering (Lines 410-475)
 
 **Current State**:
+
 ```javascript
 function renderLeaderboard(data) {
   // 65 lines of DOM construction, table building
@@ -141,6 +145,7 @@ function renderLeaderboard(data) {
 **Recommendation**: Extract to `ui/leaderboard.js`
 
 **Example extraction**:
+
 ```javascript
 // ui/leaderboard.js (NEW MODULE - 65 lines)
 export function initLeaderboard(deps) {
@@ -156,11 +161,12 @@ import { renderLeaderboard } from './ui/leaderboard.js';
 
 function updateUI(data) {
   // ... other renders
-  renderLeaderboard(data);  // Still called from main
+  renderLeaderboard(data); // Still called from main
 }
 ```
 
-**Impact**: 
+**Impact**:
+
 - ✅ Testable in isolation
 - ✅ Cleaner main.js (-65 lines)
 - ✅ Follows pattern of other UI modules
@@ -170,6 +176,7 @@ function updateUI(data) {
 ### Issue #2: SEASON DATA Rendering (Lines 652-728)
 
 **Current State**:
+
 ```javascript
 function renderSeasonData(data) {
   // 76 lines updating season card balance/output/halving
@@ -184,6 +191,7 @@ function renderSeasonData(data) {
 **Recommendation**: Extract to `ui/season-panel.js`
 
 **Example extraction**:
+
 ```javascript
 // ui/season-panel.js (NEW MODULE - 76 lines)
 export function initSeasonPanel(deps) {
@@ -199,7 +207,8 @@ export function renderAllSeasons(data) {
 }
 ```
 
-**Impact**: 
+**Impact**:
+
 - ✅ Parallel structure with upgrade-panel.js
 - ✅ Groups all season DOM updates
 - ✅ Makes season refactoring easier
@@ -209,6 +218,7 @@ export function renderAllSeasons(data) {
 ### Issue #3: SSE Lifecycle (Lines 816-950)
 
 **Current State**:
+
 ```javascript
 function closeEventSourceIfOpen() { ... }       // 4 lines
 function stopLiveTimersAndHalving() { ... }    // 15 lines
@@ -216,6 +226,7 @@ function setupLiveGameStream() { ... }          // 135 lines
 ```
 
 **Assessment**: ✅ Actually well-isolated
+
 - These functions are cohesive (all event-related)
 - Would create artificial split if separated
 - Current organization is acceptable
@@ -227,13 +238,14 @@ function setupLiveGameStream() { ... }          // 135 lines
 ### Proposed Module Split (Optional Enhancement)
 
 **Before (current)**:
+
 ```
 src/
 ├── main.js                      (1,081 lines)
-│   ├─ leaderboard rendering     
-│   ├─ season rendering          
-│   ├─ orchestration             
-│   └─ SSE lifecycle             
+│   ├─ leaderboard rendering
+│   ├─ season rendering
+│   ├─ orchestration
+│   └─ SSE lifecycle
 └── ui/
     ├── upgrade-panel.js         (317 lines)
     ├── upgrade-panel-inline.js  (188 lines)
@@ -242,6 +254,7 @@ src/
 ```
 
 **After (recommended)**:
+
 ```
 src/
 ├── main.js                      (940 lines - 141 lines removed)
@@ -258,6 +271,7 @@ src/
 ```
 
 **Benefits**:
+
 - ✅ main.js under 1000 lines
 - ✅ Parallel UI module structure
 - ✅ Each module < 400 lines (more readable)
@@ -265,6 +279,7 @@ src/
 - ✅ Easier to modify season/leaderboard independently
 
 **Trade-offs**:
+
 - More files to navigate
 - Minimal real-world benefit (current structure is workable)
 
@@ -290,6 +305,7 @@ graph TD
 ```
 
 **Key Observations**:
+
 - ✅ **Tree structure** - main.js is root (good)
 - ✅ **No circular dependencies** - clean acyclic graph
 - ✅ **Proper layering** - utils/meta/logic below UI
@@ -301,13 +317,13 @@ graph TD
 
 ### ✅ Currently Testable
 
-| Module | Tests Exist | Coverage | Quality |
-|--------|---|---|---|
-| `halving.js` | ✅ Yes | Excellent | All pure functions tested |
-| `main.js` | ✅ Yes | Good | 21 core logic tests |
-| `chat-panel.js` | ✅ Yes | Good | Event handling tested |
-| `upgrade-panel-inline.js` | ✅ Yes | New | 10 new tests added |
-| `player-view.js` | ⚠️ No direct tests | Indirect | Tested via main SSE |
+| Module                    | Tests Exist        | Coverage  | Quality                   |
+| ------------------------- | ------------------ | --------- | ------------------------- |
+| `halving.js`              | ✅ Yes             | Excellent | All pure functions tested |
+| `main.js`                 | ✅ Yes             | Good      | 21 core logic tests       |
+| `chat-panel.js`           | ✅ Yes             | Good      | Event handling tested     |
+| `upgrade-panel-inline.js` | ✅ Yes             | New       | 10 new tests added        |
+| `player-view.js`          | ⚠️ No direct tests | Indirect  | Tested via main SSE       |
 
 ### ⚠️ Gaps in Coverage
 
@@ -330,6 +346,7 @@ graph TD
 ### Cyclomatic Complexity Assessment
 
 **High complexity areas**:
+
 1. **main.js::createNewGameAndJoin()** - 12+ code paths
    - Multiple error conditions, async/await handling
    - Acceptable for complex feature
@@ -358,6 +375,7 @@ graph TD
 ### ✅ Comment Quality
 
 **Main.js header** (lines 1-20):
+
 ```javascript
 /*
 Purpose: Browser dashboard client for Mining Tycoon
@@ -370,6 +388,7 @@ Purpose: Browser dashboard client for Mining Tycoon
 Well-documented purpose statement.
 
 **Function documentation**:
+
 - Most functions have JSDoc-style comments
 - Example: `renderInlineSeasonUpgrades()` has parameter docs
 
@@ -378,15 +397,18 @@ Well-documented purpose statement.
 ## 9. Refactoring Priorities (Optional)
 
 ### Priority 1: LOW (Not Required)
+
 - Extract leaderboard rendering if you frequently modify it
 - Extract season rendering if planning season-specific features
 - Benefit: Better organization, easier testing
 
 ### Priority 2: MEDIUM (Nice to Have)
+
 - Add unit tests for player-view DOM rendering
 - Benefit: Catch layout bugs earlier
 
 ### Priority 3: CRITICAL (Do Not Implement)
+
 - Don't split SSE/connection logic
 - Don't over-modularize pure functions
 - Keep main.js as orchestration hub
@@ -398,6 +420,7 @@ Well-documented purpose statement.
 ### Overall Code Organization Rating: ✅ **GOOD (7.5/10)**
 
 **Strengths**:
+
 - ✅ Clear separation of concerns (UI ≠ Logic ≠ Utils)
 - ✅ Utilities are properly extracted and reusable
 - ✅ No circular dependencies
@@ -406,19 +429,22 @@ Well-documented purpose statement.
 - ✅ New inline-upgrades module well designed
 
 **Opportunities**:
+
 - ⚠️ main.js is large (1,081 lines) but justified
 - ⚠️ Leaderboard & season rendering could be extracted (optional)
 - ⚠️ Player-view lacks direct unit tests
 
 **Recommended Actions**:
+
 1. ✅ **Keep current structure** - it works well
 2. ✅ **No urgent refactoring needed** - code is maintainable
-3. ⚠️ *Optional*: Extract leaderboard/season rendering if modifying them frequently
-4. ⚠️ *Consider*: Add unit tests for player-view rendering
+3. ⚠️ _Optional_: Extract leaderboard/season rendering if modifying them frequently
+4. ⚠️ _Consider_: Add unit tests for player-view rendering
 
 ### For Future Developers
 
 When adding features:
+
 - ✅ Follow the pattern of `ui/upgrade-panel-inline.js` (modular, testable)
 - ✅ Extract rendering logic to `ui/` modules (don't put in main.js)
 - ✅ Keep business logic in separate files (like `halving.js`, `meta-manager.js`)

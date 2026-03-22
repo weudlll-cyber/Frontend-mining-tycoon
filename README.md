@@ -3,15 +3,16 @@
 Frontend dashboard for Mining Tycoon, built with Vite.
 
 This app lets you:
+
 - create and join games
 - start/stop live SSE stream updates
 - view player state, upgrades, and leaderboard in real time
 - use an optional chat side-panel (WebSocket, non-persistent, no gameplay impact)
 - play Seasonal Oracle upgrades (API contract v2):
-	- view 4 seasonal balances and per-token upgrade tracks
-	- view oracle prices and fee/spread hints
-	- choose upgrade target token and payment token
-	- preview converted cross-token upgrade costs before submit
+  - view 4 seasonal balances and per-token upgrade tracks
+  - view oracle prices and fee/spread hints
+  - choose upgrade target token and payment token
+  - preview converted cross-token upgrade costs before submit
 
 ## Project Baseline (Authoritative)
 
@@ -26,6 +27,7 @@ The current implemented state of the game is documented in [PROJECT_BASELINE.md]
 Non-negotiable project invariants are defined in [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 
 Key highlights:
+
 - Backend-authoritative outcomes only; frontend is display/intent and must not become authoritative.
 - Deterministic oracle/halving/events with snapshot-locked game settings.
 - No P2P markets and no real-money mechanics.
@@ -64,11 +66,13 @@ npm run dev
 If port `5173` is already used, Vite automatically selects the next free port.
 
 4. In the UI:
+
 - keep Backend URL as `http://127.0.0.1:8000`
 - click `+ New Game`
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
+
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
@@ -79,6 +83,7 @@ For async rounds, use the explicit session action:
 - the app switches to `/sessions/{session_id}/stream` automatically
 
 Sync/Async model (backend-aligned):
+
 - Sync rounds use `Round Duration` + `Enrollment Window` and stream via `/games/{id}/stream`.
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
@@ -90,6 +95,7 @@ Sync/Async model (backend-aligned):
 The dashboard uses an **inline 2-column layout** designed for desktop viewing without scrolling, with responsive adaptation for tablet and mobile.
 
 ### Desktop (1440x900 target)
+
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
@@ -123,13 +129,14 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
       - Line 2: Fee X / Y with anchored ⓘ tooltip
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
     - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
-- **Bottom Bar**: 
+- **Bottom Bar**:
   - **Portfolio Value** shows the live oracle-weighted portfolio total used for scoring. Large values use compact notation (k/M/B) for scanability, with the exact full value available via tooltip on hover/focus. Updates live as balances and oracle prices change.
   - Trading status, Farming status, and the Chat toggle button complete the bar.
 - On desktop, the setup panel and season list use internal scrolling while the page itself does not scroll.
 - Season upgrades use a compact row-based layout to minimize vertical height and reduce scrolling.
 
 ### Key Principles
+
 - **No overlays/modals**: All important information remains visible on one screen. Upgrade controls are inline within season cards, not in separate popups.
 - **Core data stays inline; non-blocking micro-tooltips are allowed**: Tooltips are positioned in a fixed layer above all content (never clipped), provide optional explanation and precision (4-decimal accuracy), and never block interaction or hide required information.
 - **Setup never blocks gameplay**: Setup is collapsible and bounded by max height with internal scroll only.
@@ -202,9 +209,11 @@ npm run build
 ## CI
 
 GitHub Actions workflow is in:
+
 - `.github/workflows/ci.yml`
 
 Current CI pipeline runs:
+
 - install (`npm ci`)
 - lint
 - format check
@@ -280,6 +289,7 @@ Frontend call chain for async rounds:
 4. `GET /sessions/{session_id}/stream?player_id=...`
 
 Auth-aware behavior:
+
 - if player auth is required, frontend sends `X-Player-Token` for session start and ticket calls
 - session stream URL includes `ticket` query only for auth-required backends
 
@@ -309,12 +319,13 @@ Cost preview behavior:
 
 - Uses target-token base cost from live state/metrics when available.
 - Converts to payment token with:
-	- `ceil(base_cost_target * (P_target / P_pay) * (1 + fee + spread))`
+  - `ceil(base_cost_target * (P_target / P_pay) * (1 + fee + spread))`
 - If numeric base cost is unavailable, the UI falls back to displaying conversion ratio only.
 
 Oracle prices and conversion parameters are read from the latest game-scoped snapshot (`/games/{id}/meta`) with existing ETag/304 caching behavior.
 
 For full-stack local development with backend + frontend in one VS Code session, use the umbrella workspace file:
+
 - `C:\Users\weudl\mining-tycoon-umbrella.code-workspace`
 
 ## Events (Active Event Visibility & Effect Indicators)

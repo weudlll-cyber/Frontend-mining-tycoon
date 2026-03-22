@@ -89,6 +89,7 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
 - [ ] Operational/Security Discipline: Tests remain green; changed behavior includes tests; no untrusted innerHTML usage.
 
 REDESIGN DECISION reminder:
+
 - [ ] If any checklist item is violated, this PR MUST first update LOCKED_DECISIONS.md with an explicit REDESIGN DECISION note before code/docs changes proceed.
 
 ## Change Control

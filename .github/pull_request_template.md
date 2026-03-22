@@ -11,11 +11,11 @@ Describe what changed and why.
 - [ ] Docs were updated when UI/behavior contract changed (`README.md`, `PROJECT_BASELINE.md`, and related docs as needed).
 - [ ] Readability standards preserved (file-level responsibility comments and non-trivial inline WHY comments where needed).
 - [ ] Commands run successfully:
-	- [ ] `npm run lint`
-	- [ ] `npm run format:check`
-	- [ ] `npm run test -- --run`
-	- [ ] `npm run build`
-	- [ ] `npm audit --omit=dev`
+  - [ ] `npm run lint`
+  - [ ] `npm run format:check`
+  - [ ] `npm run test -- --run`
+  - [ ] `npm run build`
+  - [ ] `npm audit --omit=dev`
 
 ## Commenting Compliance (Mandatory)
 
@@ -29,6 +29,7 @@ Describe what changed and why.
 - [ ] I verified this PR does not violate LOCKED_DECISIONS.md.
 
 Checklist (MUST remain compliant):
+
 - [ ] Backend authority is preserved; frontend did not become authoritative.
 - [ ] Oracle/halving/events determinism and snapshot-locked settings are preserved.
 - [ ] No P2P market mechanics and no real-money semantics were introduced.
@@ -44,6 +45,7 @@ Checklist (MUST remain compliant):
 ## If this is a redesign
 
 If any invariant above is intentionally changed, this PR MUST:
+
 1. Update LOCKED_DECISIONS.md first.
 2. Add an explicit REDESIGN DECISION note in LOCKED_DECISIONS.md.
 3. Then update dependent docs/tests/code to match the redesign.

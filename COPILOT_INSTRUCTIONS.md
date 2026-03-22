@@ -5,6 +5,7 @@ These instructions are mandatory for all future Copilot changes in this reposito
 ## 1) Canonical Documents (Read First)
 
 Before proposing or applying any change, read and honor:
+
 - `LOCKED_DECISIONS.md` (hard invariants and change-control gate)
 - `PROJECT_BASELINE.md` (implemented truth)
 - `README.md` (layout, behavior, runbooks)
@@ -12,6 +13,7 @@ Before proposing or applying any change, read and honor:
 - `SECURITY_AUDIT.md` (security posture and safe patterns)
 
 If a requested change would violate any locked invariant:
+
 - Stop immediately.
 - Require an explicit REDESIGN DECISION in `LOCKED_DECISIONS.md` first.
 - Do not implement violating code/docs changes before that.
@@ -19,12 +21,14 @@ If a requested change would violate any locked invariant:
 ## 1.1) Cross-Repo Canonical Context (Frontend + Backend)
 
 When a task touches full-stack behavior, also read backend canonical docs:
+
 - `C:\Users\weudl\Mining tycoon\README.md`
 - `C:\Users\weudl\Mining tycoon\REQUIREMENTS.md`
 - `C:\Users\weudl\Mining tycoon\SECURITY.md`
 - `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md`
 
 Cross-repo rule:
+
 - Keep frontend and backend contracts aligned; do not change one side in ways that silently break the other.
 - If contracts diverge, update docs/tests on both sides or stop and raise change-control requirements.
 
@@ -61,6 +65,7 @@ Cross-repo rule:
 ### 5.1) File-level start comment (required in every source file)
 
 Every source file must start with a short top-of-file comment block that covers:
+
 - file purpose and responsibilities
 - module role in system data-flow (upstream/downstream context)
 - important constraints (invariants, UI rules, determinism)
@@ -99,6 +104,7 @@ Example:
 ## 6) Code Readability & Commenting Standards (Required)
 
 For every source file touched or created:
+
 - Keep/update a short file-level start comment explaining:
   - file responsibility
   - system role (UI module/service/helper/test utility)
@@ -125,6 +131,7 @@ For every source file touched or created:
   - `npm audit --omit=dev`
 
 If backend files are touched in the same task, also run backend gates before push:
+
 - `python -m ruff check app tests scripts`
 - `python -m unittest discover -s tests -q`
 - `python -m pip_audit -r requirements.txt`
@@ -132,6 +139,7 @@ If backend files are touched in the same task, also run backend gates before pus
 ## 8) Required Output Format
 
 Every completed task/PR summary must include:
+
 1. Summary of changes
 2. Files touched
 3. Invariant compliance statement

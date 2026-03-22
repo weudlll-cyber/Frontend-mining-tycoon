@@ -9,6 +9,7 @@ It describes what is currently implemented and validated in code/tests, not idea
 Mining Tycoon is a real-time, backend-authoritative multiplayer simulation game with a live frontend dashboard.
 
 The implemented stack is:
+
 - Backend service handling game lifecycle, simulation, economy, events, validation, and security.
 - Background simulation worker advancing game time and applying mining yields.
 - Frontend dashboard consuming live state via SSE and rendering player state, upgrades, leaderboard, halving/event context, and optional chat.
@@ -20,6 +21,7 @@ The game is built around deterministic simulation inputs (seeded timelines and s
 Canonical locked decisions are defined in [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md). This section maps those constraints to implementation reality and forward constraints.
 
 Implementation-factual contract:
+
 - Backend is authoritative for lifecycle, simulation, economy, event logic, validation, and security.
 - Frontend is SSE-driven display/intent orchestration and must not become client-authoritative for outcomes.
 - Deterministic behavior (oracle, halving, events, snapshot-locked settings) is a hard project constraint.
@@ -30,30 +32,36 @@ Implementation-factual contract:
 - Security posture is mandatory: preserve XSS-safe rendering patterns and avoid untrusted innerHTML paths.
 
 Forward constraints (do not over-claim implementation):
+
 - Farming scope is constrained to Stage 1 Passive and Stage 2 Rotating; Stage 3 is out of scope.
 - Alternative scoring/outcome models are allowed only when fixed before round start.
 
 ## 2) Core Gameplay Systems (stable & authoritative)
 
 Implemented lifecycle:
+
 - enrolling
 - running
 - finished
 
 Lifecycle behavior:
+
 - Players can join only during enrolling.
 - Running starts after enrollment window completion.
 - Finished is terminal for gameplay progression.
 
 State delivery model:
+
 - Backend exposes game/player state endpoints.
 - SSE stream pushes periodic live state updates.
 - Stream payload includes core state, upgrade metrics, and top leaderboard entries.
 
 Automatic systems:
+
 - Status transitions, simulation-time advancement, mining yield accumulation, and event activation are backend-driven.
 
 Player-triggered systems:
+
 - Create game.
 - Join game.
 - Request upgrade actions.
@@ -62,6 +70,7 @@ Player-triggered systems:
 ## 3) Deterministic Economy (mining, halving, events, oracle)
 
 Mining model:
+
 - Tick-based, worker-driven application of yield over elapsed real time.
 - Token-scoped output is computed from:
 - base emission rate per token
@@ -70,30 +79,36 @@ Mining model:
 - active output-domain event multipliers
 
 Token/resource model:
+
 - Four seasonal tokens are implemented: spring, summer, autumn, winter.
 - Player balances are persisted in backend state storage.
 - Cumulative mined is tracked and used for leaderboard scoring.
 
 Economy snapshot model:
+
 - Each game locks an immutable economy snapshot (config/version/hash) at creation.
 - Global economy patches affect only future games.
 - Existing games keep original snapshot behavior.
 
 Upgrade and pricing model:
+
 - Upgrade costs use snapshot-locked economy parameters and optional active event multipliers.
 - Cross-token payment conversion is server-computed using oracle prices, fee/spread, and ceiling rounding.
 - Frontend can preview costs, but backend remains authoritative.
 
 Oracle model:
+
 - Deterministic oracle prices based on seed/time and configured rules.
 - Includes scarcity and halving effects, deterministic variation, and bounded clamping.
 - Event multipliers can modify oracle price and spread domains.
 
 Halving model:
+
 - Staggered per-token schedule with fixed offsets and fixed interval.
 - Halving affects output/scarcity calculations, not direct instant balance cuts.
 
 Event model:
+
 - Deterministic event timeline generated from seed and snapshot-locked in game settings.
 - Active window rule is start-inclusive, end-exclusive.
 - Event domains implemented:
@@ -105,12 +120,14 @@ Event model:
 ## 4) Player Interaction Model (what players can and cannot influence)
 
 Players can:
+
 - Create and join games (within join policy constraints).
 - Select upgrade type and token/payment choices for upgrades.
 - Observe live game state, leaderboard, oracle values, halving/event context.
 - Use optional side-channel chat.
 
 Players cannot directly influence:
+
 - Game phase transitions.
 - Tick progression.
 - Oracle calculation internals.
@@ -121,11 +138,13 @@ Players cannot directly influence:
 ## 5) Frontend Architecture & UX Principles
 
 Frontend update strategy:
+
 - SSE is the primary live state channel.
 - Meta/capabilities are fetched with ETag-aware cache behavior.
 - UI state reacts to backend contract and game-scoped metadata.
 
 Frontend structure is modular:
+
 - Main orchestration module (`main.js`): coordinates SSE lifecycle, data rendering, and user interactions.
 - Session transport module (`services/stream-controller.js`): owns SSE setup, reconnect state, and timer cleanup.
 - Action module (`services/game-actions.js`): owns create/join flow and upgrade submission requests.
@@ -140,6 +159,7 @@ Frontend structure is modular:
 - Halving display module: calculates and renders halving schedules and countdowns per token.
 
 Frontend session-mode readiness:
+
 - Setup shell surfaces round mode (`sync` / `async`) and async session support state without blocking gameplay.
 - Async rounds now use an explicit user-triggered `Start Async Session` action in Setup before session-scoped streaming begins.
 - `Start Async Session` is enabled only when player join context exists, backend session support is available, and no session is active yet.
@@ -156,6 +176,7 @@ Frontend session-mode readiness:
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
 
 Dashboard layout (inline, no overlays):
+
 - **Status Bar (top)**: connection status, game phase, countdown timer, quick stats.
 - **Main Grid (2 columns)**:
   - Left (~65%): 2×2 seasonal card grid with inline upgrade controls (Hashrate, Efficiency, Cooling columns per season).
@@ -164,11 +185,13 @@ Dashboard layout (inline, no overlays):
 - **Chat Panel (docked inline, optional)**: toggleable via bottom bar button; expands/collapses inline in the right column with internal message scrolling only.
 
 Responsive behavior:
+
 - Desktop (1440×900+): fixed layout, zero vertical scrolling in dashboard.
 - Tablet (768px–1200px): grid stacks, minimal scrolling.
 - Mobile (<768px): single-column layout with season card tabs or accordion controls.
 
 UX/behavior principles implemented:
+
 - Contract compatibility gating/disabling for upgrade interactions (no UI mutation after disable).
 - Incremental DOM updates for live metric values (balance, output, countdown).
 - Inline upgrade controls integrated into season cards (no separate modal/overlay panel).
@@ -180,15 +203,18 @@ UX/behavior principles implemented:
 ## 6) Security & Anti-Cheat Invariants
 
 Authoritative boundaries:
+
 - Gameplay-critical rules are enforced on backend routes/services/worker.
 - Frontend calculations are display/preview only.
 
 Player auth and stream controls:
+
 - Per-player session token model is implemented.
 - Optional strict player auth mode enforces token validation.
 - SSE ticket flow provides short-lived stream authorization.
 
 Chat security posture:
+
 - In-band auth handshake with validated ticket context.
 - Scope/identity derived from validated token context.
 - Origin policy checks, strict schema validation, size bounds, rate limits.
@@ -196,6 +222,7 @@ Chat security posture:
 - Non-persistent handling, no gameplay-state mutation.
 
 Platform hardening implemented:
+
 - Endpoint rate limiting.
 - SSE per-IP connection cap.
 - Security headers middleware.
@@ -206,6 +233,7 @@ Platform hardening implemented:
 ## 7) Test Coverage Guarantees
 
 Backend test coverage includes:
+
 - Join policy and lifecycle timing behavior.
 - End-to-end create/join/stream/tick/upgrade/leaderboard flow.
 - Economy snapshot immutability/versioning.
@@ -219,6 +247,7 @@ Backend test coverage includes:
 - Admin game management and aggregated metrics behavior.
 
 Frontend test coverage includes:
+
 - Contract support guards.
 - Token normalization and cost preview helpers.
 - Halving helper behavior and transitions.
@@ -228,6 +257,7 @@ Frontend test coverage includes:
 ## 8) Explicit Non-Goals / Out of Scope
 
 Intentionally not implemented in current baseline:
+
 - Chat message persistence/history replay.
 - Chat-driven gameplay mechanics or economy coupling.
 - Client-authoritative gameplay state changes.
@@ -235,6 +265,7 @@ Intentionally not implemented in current baseline:
 - Offline progression mode.
 
 Operational/security out-of-scope items (documented at threat-model level):
+
 - WAF/CDN edge protections.
 - Network-edge DDoS mitigation architecture.
 - Multi-region failover/disaster-recovery architecture.
@@ -242,6 +273,7 @@ Operational/security out-of-scope items (documented at threat-model level):
 ## 9) Open Design Space (Not Implemented)
 
 Areas intentionally left open by current implementation:
+
 - Deeper player decision systems beyond current upgrade model.
 - Longer-term meta progression structures across games.
 - Additional non-gameplay social/community surfaces beyond minimal chat.
@@ -279,6 +311,7 @@ In a more strategic stage, farming rewards can rotate across seasonal tokens ove
 In an optional endgame-oriented stage, farming can become one of the primary tools for long-term income and positioning. In that shape of the game, mining continues to matter as infrastructure, while farming and trading take on a larger role in expressing strategic judgment across the full economy.
 
 The relationship to game modes remains intentionally selective rather than uniform:
+
 - short games may exclude farming entirely
 - medium games may treat farming as optional or limited
 - long games may use farming as a core strategic layer
@@ -290,6 +323,7 @@ Farming is also explicitly bounded by several non-goals. It is not intended to i
 The current UI is functional and structurally sound, but it is not treated as final.
 
 A broader UI/UX pass remains intentionally open around:
+
 - visual identity and polish
 - layout refinement for different game modes
 - onboarding clarity and information hierarchy
@@ -301,6 +335,7 @@ This work is intentionally deferred until gameplay structure and mode decisions 
 The project is currently operating as a local/development setup.
 
 Deployment to a VPS or similar hosted environment remains an open phase intended to support:
+
 - real playtest sessions
 - longer-running games
 - evaluation of performance and stability under real usage
@@ -312,6 +347,7 @@ Related infrastructure work is understood at a high level and includes environme
 Structured playtesting is planned as a later validation phase, but it has not yet been executed as part of the current baseline.
 
 The expected role of playtesting is to validate:
+
 - balance between mining and trading-oriented decisions
 - pacing across different game modes
 - UX comprehension for new players
@@ -323,6 +359,7 @@ This validation phase is intended to inform tuning and calibration of the implem
 No release process has been initiated at the current stage.
 
 Release preparation is understood only at a high level and includes:
+
 - final balancing
 - UI polish
 - documentation review
