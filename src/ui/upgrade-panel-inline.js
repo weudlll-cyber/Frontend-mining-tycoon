@@ -1,82 +1,296 @@
 /*
 File: src/ui/upgrade-panel-inline.js
 Purpose: Inline upgrade rendering for season cards in a compact row-based layout.
-Context: Header uses compact one-line labels with micro-tooltips so data remains visible without horizontal card scrollbars.
+Context: Keeps controls inline in season cards while previewing cross-token pay costs.
 Constraints: Must remain display-only and use safe DOM APIs (textContent/createElement).
 Call initInlineUpgrades() once with required dependencies before use.
 Renders upgrades directly into season .season-upgrades containers.
 */
 
-import { clearElementChildren, formatCost } from '../utils/dom-utils.js';
-import { normalizeTokenNames } from '../utils/token-utils.js';
+import {
+  clearElementChildren,
+  formatCost,
+  setElementTextValue,
+} from '../utils/dom-utils.js';
+import {
+  computePayCostPreview,
+  normalizeTokenNames,
+} from '../utils/token-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getActiveGameMeta = null;
 let _isActiveContractSupported = null;
 let _getActiveUpgradeDefinitions = null;
 let _performUpgrade = null;
-const _inlineTooltipStateByContainer = new WeakMap();
-const _inlineRenderKeyByContainer = new WeakMap();
+const _inlineStateByContainer = new WeakMap();
 
-function cleanupHeaderTooltipsForContainer(containerEl) {
-  const previous = _inlineTooltipStateByContainer.get(containerEl);
-  if (!previous) return;
+const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
 
-  previous.dispose?.();
-  const tooltipLayer = document.getElementById('tooltip-layer');
-  if (tooltipLayer) {
-    previous.bubbleIds.forEach((id) => {
-      const bubble = document.getElementById(id);
-      if (bubble && tooltipLayer.contains(bubble)) {
-        bubble.remove();
-      }
-    });
-  }
+const UPGRADE_LANES_LEGEND =
+  'Upg: upgrade name. Lvl: current level. Cost: required amount in target token. Pay: token to spend (auto-converts via oracle). Prev: converted cost in pay token. Out/s: output gain per second. BEP: breakeven time in seconds.';
 
-  _inlineTooltipStateByContainer.delete(containerEl);
+function toTokenCode(token) {
+  return String(token || '')
+    .slice(0, 3)
+    .toUpperCase();
 }
 
-function createHeaderCell({ label, tooltip, uniquePrefix }) {
-  const cell = document.createElement('div');
-  cell.className = 'upgrade-header-cell';
+function syncSelectOptions(selectEl, tokenNames) {
+  const previousValue = selectEl.value;
 
-  const labelSpan = document.createElement('span');
-  labelSpan.className = 'upgrade-header-text';
-  labelSpan.textContent = label;
-  cell.appendChild(labelSpan);
+  tokenNames.forEach((token, index) => {
+    let option = selectEl.options[index];
+    if (!option) {
+      option = document.createElement('option');
+      selectEl.appendChild(option);
+    }
+    option.value = token;
+    setElementTextValue(option, toTokenCode(token));
+  });
 
-  if (!tooltip) {
-    return { cell, bubbleId: null };
+  while (selectEl.options.length > tokenNames.length) {
+    selectEl.remove(selectEl.options.length - 1);
   }
 
+  if (tokenNames.includes(previousValue)) {
+    selectEl.value = previousValue;
+  } else {
+    selectEl.value = tokenNames[0] || '';
+  }
+}
+
+function createUpgradeHeaderTooltip(trigger) {
   const tooltipLayer = document.getElementById('tooltip-layer');
   if (!tooltipLayer) {
-    labelSpan.title = tooltip;
-    return { cell, bubbleId: null };
+    trigger.title = UPGRADE_LANES_LEGEND;
+    return null;
   }
 
-  const tipId = `ps-tip-upgrade-${uniquePrefix}-${label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')}`;
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'ps-tip-trigger upgrade-header-tip-trigger';
-  trigger.setAttribute('aria-label', tooltip);
-  trigger.setAttribute('aria-describedby', tipId);
-  trigger.setAttribute('aria-expanded', 'false');
-  trigger.dataset.tooltipId = tipId;
-  trigger.textContent = 'ⓘ';
-  cell.appendChild(trigger);
+  const bubbleId = 'ps-tip-upgrade-lanes';
+  let bubble = document.getElementById(bubbleId);
+  if (!bubble) {
+    bubble = document.createElement('span');
+    bubble.id = bubbleId;
+    bubble.className = 'ps-tip-bubble';
+    bubble.setAttribute('role', 'tooltip');
+    bubble.textContent = UPGRADE_LANES_LEGEND;
+    tooltipLayer.appendChild(bubble);
+  }
 
-  const bubble = document.createElement('span');
-  bubble.className = 'ps-tip-bubble';
-  bubble.id = tipId;
-  bubble.setAttribute('role', 'tooltip');
-  bubble.textContent = tooltip;
+  trigger.setAttribute('aria-describedby', bubbleId);
+  trigger.dataset.tooltipId = bubbleId;
+  trigger.removeAttribute('title');
+  return bubbleId;
+}
 
-  tooltipLayer.appendChild(bubble);
+function createHeader() {
+  const header = document.createElement('div');
+  header.className = 'upgrade-lane-header upgrade-header-grid';
 
-  return { cell, bubbleId: tipId };
+  ['Upg', 'Lvl', 'Cost', 'Pay', 'Prev', 'Out/s', 'BEP'].forEach((label) => {
+    const cell = document.createElement('span');
+    cell.className = 'upgrade-header-cell';
+    cell.appendChild(document.createTextNode(label));
+    header.appendChild(cell);
+  });
+
+  // Info trigger for upgrade lanes legend (replaces 'Act' label)
+  const infoCell = document.createElement('span');
+  infoCell.className = 'upgrade-header-cell upgrade-header-info';
+  const infoTrigger = document.createElement('button');
+  infoTrigger.type = 'button';
+  infoTrigger.className = 'ps-tip-trigger upgrade-header-info-trigger';
+  infoTrigger.setAttribute('aria-label', 'Upgrade lanes legend');
+  infoTrigger.setAttribute('aria-expanded', 'false');
+  infoTrigger.appendChild(document.createTextNode('ℹ︎'));
+  infoCell.appendChild(infoTrigger);
+  header.appendChild(infoCell);
+
+  createUpgradeHeaderTooltip(infoTrigger);
+  return header;
+}
+
+function buildLaneRow(type, seasonToken) {
+  const row = document.createElement('div');
+  row.className = 'upgrade-lane-row';
+  row.dataset.upgradeType = type;
+
+  const nameCell = document.createElement('span');
+  nameCell.className = 'upgrade-row-cell upgrade-row-type';
+
+  const levelCell = document.createElement('span');
+  levelCell.className = 'upgrade-row-cell upgrade-row-level tabular-num';
+
+  const costCell = document.createElement('span');
+  costCell.className = 'upgrade-row-cell upgrade-row-cost tabular-num';
+
+  const payCell = document.createElement('span');
+  payCell.className = 'upgrade-row-cell upgrade-row-pay';
+  const paySelect = document.createElement('select');
+  paySelect.className = 'upgrade-pay-select';
+  paySelect.dataset.upgradeType = type;
+  payCell.appendChild(paySelect);
+
+  const previewCell = document.createElement('span');
+  previewCell.className = 'upgrade-row-cell upgrade-row-preview tabular-num';
+
+  const outputCell = document.createElement('span');
+  outputCell.className = 'upgrade-row-cell upgrade-row-benefit tabular-num';
+
+  const breakevenCell = document.createElement('span');
+  breakevenCell.className =
+    'upgrade-row-cell upgrade-row-breakeven tabular-num';
+
+  const actionCell = document.createElement('span');
+  actionCell.className = 'upgrade-row-cell upgrade-row-action';
+  const button = document.createElement('button');
+  button.className = 'btn-upgrade-inline upgrade-row-action';
+  button.type = 'button';
+  button.dataset.upgrade = type;
+  button.dataset.token = seasonToken;
+  button.setAttribute('aria-label', `Upgrade ${type}`);
+  button.appendChild(document.createTextNode('Upgrade'));
+  actionCell.appendChild(button);
+
+  row.append(
+    nameCell,
+    levelCell,
+    costCell,
+    payCell,
+    previewCell,
+    outputCell,
+    breakevenCell,
+    actionCell
+  );
+
+  return {
+    row,
+    nameCell,
+    levelCell,
+    costCell,
+    paySelect,
+    previewCell,
+    outputCell,
+    breakevenCell,
+    button,
+  };
+}
+
+function computePreviewText({
+  info,
+  definition,
+  targetToken,
+  payToken,
+  oraclePrices,
+  feeRate,
+  spreadRate,
+  effectiveUpgradeCostMultiplier,
+}) {
+  const preview = computePayCostPreview({
+    baseCostTarget:
+      typeof info?.cost_to_next === 'number'
+        ? info.cost_to_next
+        : Number(definition?.base_cost),
+    targetToken,
+    payToken,
+    oraclePrices,
+    feeRate,
+    spreadRate,
+    upgradeCostMultiplier: effectiveUpgradeCostMultiplier,
+  });
+
+  if (!preview) {
+    return '—';
+  }
+
+  return `${preview.payCost} ${toTokenCode(payToken)}`;
+}
+
+function createInlineState(upgradesContainer) {
+  const layout = document.createElement('div');
+  layout.className = 'upgrade-table upgrade-compact-layout';
+
+  const header = createHeader();
+  const laneList = document.createElement('div');
+  laneList.className = 'upgrade-lane-list upgrade-compact-grid';
+
+  const placeholder = document.createElement('p');
+  placeholder.className = 'placeholder';
+  placeholder.hidden = true;
+  placeholder.appendChild(document.createTextNode('No upgrades available'));
+
+  layout.append(header, laneList);
+
+  clearElementChildren(upgradesContainer);
+  upgradesContainer.append(layout, placeholder);
+
+  // Initialize tooltip for upgrade header info trigger
+  const dispose = initMicroTooltips(header);
+
+  const state = {
+    layout,
+    laneList,
+    placeholder,
+    rowsByType: new Map(),
+    payTokenByType: new Map(),
+    context: null,
+    dispose,
+  };
+  _inlineStateByContainer.set(upgradesContainer, state);
+  return state;
+}
+
+function ensureInlineState(upgradesContainer) {
+  return (
+    _inlineStateByContainer.get(upgradesContainer) ||
+    createInlineState(upgradesContainer)
+  );
+}
+
+function updateLanePreview(rowRefs, type, state) {
+  const context = state.context;
+  if (!context) return;
+
+  const info = context.upgrades[type];
+  const definition = context.activeUpgradeDefinitions?.[type];
+  const payToken = rowRefs.paySelect.value;
+  const text = computePreviewText({
+    info,
+    definition,
+    targetToken: context.seasonToken,
+    payToken,
+    oraclePrices: context.oraclePrices,
+    feeRate: context.feeRate,
+    spreadRate: context.spreadRate,
+    effectiveUpgradeCostMultiplier: context.effectiveUpgradeCostMultiplier,
+  });
+  setElementTextValue(rowRefs.previewCell, text);
+}
+
+function ensureLaneRow(type, seasonToken, state) {
+  const existing = state.rowsByType.get(type);
+  if (existing) {
+    return existing;
+  }
+
+  const rowRefs = buildLaneRow(type, seasonToken);
+  rowRefs.paySelect.addEventListener('change', () => {
+    state.payTokenByType.set(type, rowRefs.paySelect.value);
+    updateLanePreview(rowRefs, type, state);
+  });
+  rowRefs.button.addEventListener('click', () => {
+    const nextLevel = parseInt(rowRefs.button.dataset.level, 10) + 1;
+    const payToken = rowRefs.paySelect.value || seasonToken;
+    if (payToken === seasonToken) {
+      _performUpgrade?.(type, nextLevel, seasonToken);
+      return;
+    }
+    _performUpgrade?.(type, nextLevel, seasonToken, payToken);
+  });
+
+  state.laneList.appendChild(rowRefs.row);
+  state.rowsByType.set(type, rowRefs);
+  return rowRefs;
 }
 
 /**
@@ -108,6 +322,8 @@ export function renderInlineSeasonUpgrades(
 ) {
   if (!upgradesContainer) return;
 
+  const state = ensureInlineState(upgradesContainer);
+
   const metrics = data?.upgrade_metrics || {};
   const playerState = data?.player_state || {};
 
@@ -120,147 +336,111 @@ export function renderInlineSeasonUpgrades(
   const activeUpgradeDefinitions = _getActiveUpgradeDefinitions?.();
   const contractSupported = _isActiveContractSupported?.() ?? true;
 
-  const defaultUpgradeOrder = ['hashrate', 'efficiency', 'cooling'];
-  const supportedUpgradeTypes = defaultUpgradeOrder.filter((type) =>
+  const activeGameMeta =
+    _getActiveGameMeta?.(String(data?.game_id || '')) || null;
+  const tokenNames = normalizeTokenNames(
+    Array.isArray(data?.token_names)
+      ? data.token_names
+      : activeGameMeta?.token_names
+  );
+  const oraclePrices =
+    activeGameMeta?.oracle_prices || data?.oracle_prices || null;
+  const feeRate = Number.isFinite(Number(data?.conversion_fee_rate))
+    ? Number(data.conversion_fee_rate)
+    : Number(activeGameMeta?.conversion_fee_rate || 0);
+  const spreadRate = Number.isFinite(Number(data?.oracle_spread))
+    ? Number(data.oracle_spread)
+    : Number(activeGameMeta?.oracle_spread || 0);
+  const effectiveUpgradeCostMultiplier = Number(
+    activeGameMeta?.effective_upgrade_cost_multiplier?.[seasonToken] || 1
+  );
+
+  const supportedUpgradeTypes = DEFAULT_UPGRADE_ORDER.filter((type) =>
     activeUpgradeDefinitions
       ? Object.prototype.hasOwnProperty.call(activeUpgradeDefinitions, type)
       : true
   );
 
-  const renderKey = JSON.stringify({
+  state.context = {
     seasonToken,
-    contractSupported,
-    supportedUpgradeTypes,
-    selectedTokenLevels,
-    upgrades: supportedUpgradeTypes.map((type) => ({
-      type,
-      cost: upgrades[type]?.cost_to_next,
-      delta: upgrades[type]?.delta_output,
-      breakeven: upgrades[type]?.breakeven_seconds,
-    })),
-  });
-  if (_inlineRenderKeyByContainer.get(upgradesContainer) === renderKey) {
+    upgrades,
+    activeUpgradeDefinitions,
+    oraclePrices,
+    feeRate,
+    spreadRate,
+    effectiveUpgradeCostMultiplier,
+  };
+
+  if (!supportedUpgradeTypes.length) {
+    state.layout.hidden = true;
+    state.placeholder.hidden = false;
     return;
   }
 
-  cleanupHeaderTooltipsForContainer(upgradesContainer);
-
-  // Compact one-line header preserves horizontal space without truncating numeric columns.
-  const layout = document.createElement('div');
-  layout.className = 'upgrade-compact-layout';
-
-  const headerGrid = document.createElement('div');
-  headerGrid.className = 'upgrade-header-grid';
-
-  const dataGrid = document.createElement('div');
-  dataGrid.className = 'upgrade-compact-grid';
-
-  // Abbreviations keep the header single-line; tooltips preserve clarity without widening columns.
-  const headers = [
-    { label: 'Upgrade', tooltip: null },
-    { label: 'Lvl', tooltip: 'Lvl = Level' },
-    { label: 'Cost', tooltip: null },
-    { label: 'Out/s', tooltip: 'Out/s = Output per second (delta)' },
-    { label: 'BEP', tooltip: 'BEP = Breakeven Period' },
-    { label: 'Act', tooltip: 'Act = Action' },
-  ];
-
-  const bubbleIds = [];
-
-  headers.forEach((header, index) => {
-    const { cell, bubbleId } = createHeaderCell({
-      ...header,
-      uniquePrefix: `${seasonToken}-${index}`,
-    });
-    if (bubbleId) {
-      bubbleIds.push(bubbleId);
-    }
-    headerGrid.appendChild(cell);
-  });
+  state.layout.hidden = false;
+  state.placeholder.hidden = true;
 
   supportedUpgradeTypes.forEach((type) => {
+    const rowRefs = ensureLaneRow(type, seasonToken, state);
+    rowRefs.row.hidden = false;
+
     const info = upgrades[type];
     const definition = activeUpgradeDefinitions?.[type];
-    if (!info && !definition) return;
+    if (!info && !definition) {
+      rowRefs.row.hidden = true;
+      return;
+    }
 
-    const level = selectedTokenLevels[type] || 0;
     const title = type.charAt(0).toUpperCase() + type.slice(1);
+    const level = selectedTokenLevels[type] || 0;
 
-    const typeCell = document.createElement('div');
-    typeCell.className = 'upgrade-row-cell upgrade-row-type';
-    typeCell.dataset.upgradeType = type;
-    typeCell.textContent = title;
-    dataGrid.appendChild(typeCell);
-
-    const levelCell = document.createElement('div');
-    levelCell.className = 'upgrade-row-cell upgrade-row-level';
-    levelCell.textContent = String(level);
-    dataGrid.appendChild(levelCell);
-
-    const costCell = document.createElement('div');
-    costCell.className = 'upgrade-row-cell upgrade-row-cost';
-    costCell.dataset.upgradeType = type;
-    costCell.textContent =
-      info?.cost_to_next !== undefined ? formatCost(info.cost_to_next) : '—';
-    dataGrid.appendChild(costCell);
-
-    const outputCell = document.createElement('div');
-    outputCell.className = 'upgrade-row-cell upgrade-row-benefit';
-    outputCell.dataset.upgradeType = type;
-    outputCell.textContent =
+    setElementTextValue(rowRefs.nameCell, title);
+    setElementTextValue(rowRefs.levelCell, String(level));
+    setElementTextValue(
+      rowRefs.costCell,
+      info?.cost_to_next !== undefined ? formatCost(info.cost_to_next) : '—'
+    );
+    setElementTextValue(
+      rowRefs.outputCell,
       info?.delta_output !== undefined
         ? `+${info.delta_output.toFixed(2)}/s`
-        : '—';
-    dataGrid.appendChild(outputCell);
-
-    const breakevenCell = document.createElement('div');
-    breakevenCell.className = 'upgrade-row-cell upgrade-row-breakeven';
-    breakevenCell.textContent =
+        : '—'
+    );
+    setElementTextValue(
+      rowRefs.breakevenCell,
       info?.breakeven_seconds !== undefined
         ? `${info.breakeven_seconds.toFixed(1)}s`
-        : '—';
-    dataGrid.appendChild(breakevenCell);
+        : '—'
+    );
 
-    // Upgrade button
-    const button = document.createElement('button');
-    button.className = 'btn-upgrade-inline upgrade-row-action';
-    button.dataset.upgrade = type;
-    button.dataset.level = String(level);
-    button.dataset.token = seasonToken;
-    button.textContent = 'Upgrade';
+    syncSelectOptions(rowRefs.paySelect, tokenNames);
+    const storedPayToken = state.payTokenByType.get(type);
+    const resolvedPayToken =
+      storedPayToken && tokenNames.includes(storedPayToken)
+        ? storedPayToken
+        : tokenNames.includes(seasonToken)
+          ? seasonToken
+          : tokenNames[0] || '';
+    rowRefs.paySelect.value = resolvedPayToken;
+    state.payTokenByType.set(type, resolvedPayToken);
+    updateLanePreview(rowRefs, type, state);
+
+    rowRefs.button.dataset.level = String(level);
     if (!contractSupported) {
-      button.disabled = true;
-      button.title = 'Unsupported API contract version. Upgrades disabled.';
+      rowRefs.button.disabled = true;
+      rowRefs.button.title =
+        'Unsupported API contract version. Upgrades disabled.';
+    } else {
+      rowRefs.button.disabled = false;
+      rowRefs.button.title = '';
     }
-    button.addEventListener('click', () => {
-      const nextLevel = parseInt(button.dataset.level, 10) + 1;
-      const upgradeType = button.dataset.upgrade;
-      const token = button.dataset.token;
-      _performUpgrade?.(upgradeType, nextLevel, token);
-    });
-    dataGrid.appendChild(button);
   });
 
-  layout.appendChild(headerGrid);
-  layout.appendChild(dataGrid);
-
-  // Clear and populate container
-  clearElementChildren(upgradesContainer);
-  if (supportedUpgradeTypes.length > 0) {
-    upgradesContainer.appendChild(layout);
-    const dispose = initMicroTooltips(upgradesContainer);
-    _inlineTooltipStateByContainer.set(upgradesContainer, {
-      dispose,
-      bubbleIds,
-    });
-    _inlineRenderKeyByContainer.set(upgradesContainer, renderKey);
-  } else {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'placeholder';
-    placeholder.textContent = 'No upgrades available';
-    upgradesContainer.appendChild(placeholder);
-    _inlineRenderKeyByContainer.set(upgradesContainer, renderKey);
-  }
+  state.rowsByType.forEach((rowRefs, type) => {
+    if (!supportedUpgradeTypes.includes(type)) {
+      rowRefs.row.hidden = true;
+    }
+  });
 }
 
 /**

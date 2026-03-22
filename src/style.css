@@ -37,6 +37,13 @@ body {
   --status-gray: #9ca3af;
   --status-blue: #3b82f6;
 
+  /* Shared column template — header and all lane rows use this variable for guaranteed alignment */
+  --upgrade-cols:
+    /* Upg  */ minmax(2.6ch, 3.6ch) /* Lvl  */
+    minmax(2.6ch, 4ch) /* Cost */ minmax(7ch, 1fr) /* Pay  */ minmax(4ch, 0.7fr)
+    /* Prev */ minmax(6ch, 0.9fr) /* Out/s */ minmax(5ch, auto) /* BEP  */
+    minmax(4ch, auto) /* Act  */ minmax(5ch, auto);
+
   font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
   line-height: 1.6;
   font-weight: 400;
@@ -57,6 +64,12 @@ body {
 .selectable {
   user-select: text;
   -webkit-user-select: text;
+}
+
+.tabular-num,
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 #app {
@@ -103,6 +116,17 @@ body {
   font-size: 0.82rem;
 }
 
+.debug-toggle-btn {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .game-summary-line {
   display: flex;
   align-items: center;
@@ -139,16 +163,13 @@ body {
   color: var(--text-secondary);
 }
 
-.debug-details {
+.debug-panel {
   border-top: 1px dashed var(--border-light);
-  padding-top: 0.3rem;
-}
-
-.debug-details summary {
-  cursor: pointer;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
+  margin-top: 0.2rem;
+  padding-top: 0.45rem;
+  max-height: min(26vh, 180px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .debug-grid {
@@ -563,6 +584,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .season-header {
@@ -584,18 +606,19 @@ body {
 
 .season-meta {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.65rem;
-  font-size: 0.82rem;
-  line-height: 1.25;
+  font-size: 0.8rem;
+  line-height: 1.2;
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow-x: hidden;
+  padding: 0.05rem 0;
 }
 
 .meta-item {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.25rem;
   white-space: nowrap;
 }
@@ -603,7 +626,13 @@ body {
 .meta-label {
   color: var(--text-secondary);
   font-weight: 600;
-  font-size: 0.79rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.season-upgrades-label {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
 }
 
 .meta-sep {
@@ -617,6 +646,12 @@ body {
   font-family: 'Courier New', monospace;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.season-meta-tip-trigger.ps-tip-trigger {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.66rem;
 }
 
 .season-halving {
@@ -730,66 +765,85 @@ body {
   display: none;
 }
 
-.upgrade-compact-grid {
+.upgrade-lane-layout {
   display: grid;
-  grid-template-columns:
-    minmax(0, 1.35fr) minmax(0, 0.55fr) minmax(0, 0.75fr) minmax(0, 0.9fr)
-    minmax(0, 0.7fr) minmax(0, 0.8fr);
-  gap: 0.22rem 0.4rem;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  line-height: 1.25;
+  gap: 0.2rem;
 }
 
-.upgrade-compact-layout {
+/* Table container: header + rows share one grid context for pixel-exact column alignment */
+.upgrade-table {
   display: grid;
-  gap: 0.18rem;
+  grid-template-columns: var(--upgrade-cols);
+  grid-auto-rows: minmax(28px, auto);
+  row-gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.upgrade-lane-header,
+.upgrade-lane-row,
+.upgrade-header-grid {
+  display: grid;
+  grid-template-columns: var(--upgrade-cols);
+  column-gap: 8px;
+  align-items: center;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.upgrade-lane-header {
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .upgrade-header-grid {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1.35fr) minmax(0, 0.55fr) minmax(0, 0.75fr) minmax(0, 0.9fr)
-    minmax(0, 0.7fr) minmax(0, 0.8fr);
-  gap: 0.05rem 0.4rem;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  padding-bottom: 0.12rem;
+  padding-bottom: 0.15rem;
   border-bottom: 1px solid var(--border-light);
+}
+
+/* Lane list: display:contents so rows become direct grid items of .upgrade-table */
+.upgrade-lane-list,
+.upgrade-compact-grid {
+  display: contents;
 }
 
 .upgrade-header-cell {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.2rem;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.015em;
+  letter-spacing: 0.01em;
   line-height: 1.05;
   white-space: nowrap;
 }
 
-.upgrade-header-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.upgrade-header-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.upgrade-header-tip-trigger.ps-tip-trigger {
-  width: 0.86rem;
-  height: 0.86rem;
-  font-size: 0.62rem;
-  flex-shrink: 0;
+.upgrade-header-info-trigger.ps-tip-trigger {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.66rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .upgrade-row-cell {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
   font-family: 'Courier New', monospace;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .upgrade-row-type {
@@ -814,8 +868,28 @@ body {
 }
 
 .upgrade-row-action {
-  justify-self: stretch;
+  justify-self: end;
   min-width: 0;
+}
+
+.upgrade-row-pay {
+  font-family: inherit;
+}
+
+.upgrade-pay-select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.12rem 0.2rem;
+  border-radius: calc(var(--radius) / 2);
+  border: 1px solid var(--border-light);
+  background: #fff;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.upgrade-row-preview {
+  color: #1d4ed8;
 }
 
 .season-upgrades .btn-upgrade-inline {
@@ -2045,18 +2119,10 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .upgrade-compact-grid {
-    grid-template-columns:
-      minmax(0, 1.25fr) minmax(0, 0.55fr) minmax(0, 0.75fr) minmax(0, 0.85fr)
-      minmax(0, 0.7fr) minmax(0, 0.8fr);
-    gap: 0.2rem 0.28rem;
-  }
-
+  .upgrade-lane-header,
+  .upgrade-lane-row,
   .upgrade-header-grid {
-    grid-template-columns:
-      minmax(0, 1.25fr) minmax(0, 0.55fr) minmax(0, 0.75fr) minmax(0, 0.85fr)
-      minmax(0, 0.7fr) minmax(0, 0.8fr);
-    gap: 0.04rem 0.28rem;
+    column-gap: 4px;
   }
 
   .upgrade-stat,

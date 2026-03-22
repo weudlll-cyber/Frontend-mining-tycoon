@@ -70,6 +70,23 @@ describe('dashboard layout css guardrails', () => {
     const css = readStyleCss();
 
     expect(css).toMatch(/\.season-upgrades\s*\{[\s\S]*?overflow-x:\s*hidden;/);
-    expect(css).toMatch(/\.upgrade-compact-grid\s*\{[\s\S]*?minmax\(0,/);
+    // Column alignment is enforced via --upgrade-cols CSS variable (bounded minmax tracks)
+    expect(css).toMatch(/--upgrade-cols\s*:/);
+  });
+
+  it('upgrade columns use shared CSS variable for header/row alignment', () => {
+    const css = readStyleCss();
+
+    // The variable must be consumed by both .upgrade-table and header/row rules
+    const varUsages = (css.match(/var\(--upgrade-cols\)/g) || []).length;
+    expect(varUsages).toBeGreaterThanOrEqual(2);
+  });
+
+  it('upgrade-lane-list uses display:contents so rows join the parent upgrade-table grid', () => {
+    const css = readStyleCss();
+
+    expect(css).toMatch(
+      /\.upgrade-lane-list[\s\S]*?\{[\s\S]*?display\s*:\s*contents/
+    );
   });
 });
