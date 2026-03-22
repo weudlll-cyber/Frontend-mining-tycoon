@@ -3,6 +3,7 @@ File: src/ui/setup-shell.js
 Purpose: Manage setup-shell visibility and setup action state while preserving user intent.
 Role in system:
 - Keeps setup actions explicit while leaving all session policy enforcement to the backend.
+- Owns inline header interactions, including the non-modal debug panel toggle.
 Constraints:
 - Setup must not flicker-close from repeated SSE updates once the user re-opens it.
 - Async session discoverability must remain explicit with non-blocking status messaging.
@@ -10,6 +11,12 @@ Constraints:
 Security notes:
 - Render status via textContent only.
 */
+
+import {
+  STORAGE_KEYS,
+  getStorageItem,
+  setStorageItem,
+} from '../utils/storage-utils.js';
 
 let _refs = null;
 let _state = {
@@ -41,6 +48,7 @@ const ASYNC_DIAGNOSTIC_CHIPS = [
 
 export function initSetupShell(deps) {
   _refs = deps;
+  applyStoredDebugPanelState();
 }
 
 export function setSetupShellState(partial = {}) {
@@ -293,10 +301,51 @@ export function renderDebugContext() {
     _refs.debugPlayerIdEl.textContent = _refs.playerIdInput?.value || '—';
   }
   if (_refs.debugSessionIdEl) {
-    const debugOpen = Boolean(_refs.debugDetailsEl?.open);
+    const debugOpen = isDebugPanelExpanded();
     _refs.debugSessionIdEl.textContent =
       debugOpen && _state.sessionId ? String(_state.sessionId) : '—';
   }
+}
+
+function isDebugPanelExpanded() {
+  return Boolean(_refs?.debugPanelEl && !_refs.debugPanelEl.hidden);
+}
+
+function setDebugToggleExpandedAttribute(isExpanded) {
+  if (!_refs?.debugToggleBtnEl) return;
+  _refs.debugToggleBtnEl.setAttribute(
+    'aria-expanded',
+    isExpanded ? 'true' : 'false'
+  );
+  _refs.debugToggleBtnEl.setAttribute(
+    'aria-label',
+    isExpanded ? 'Collapse debug panel' : 'Expand debug panel'
+  );
+}
+
+function setDebugPanelExpanded(isExpanded, { persist = true } = {}) {
+  if (!_refs?.debugPanelEl) return;
+
+  _refs.debugPanelEl.hidden = !isExpanded;
+  _refs.debugPanelEl.classList.toggle('debug-panel-open', isExpanded);
+  setDebugToggleExpandedAttribute(isExpanded);
+
+  // WHY: Persisting explicit user intent keeps SSE refreshes from resetting panel visibility.
+  if (persist) {
+    setStorageItem(STORAGE_KEYS.debugPanelOpen, isExpanded ? 'true' : 'false');
+  }
+
+  renderDebugContext();
+}
+
+function toggleDebugPanel() {
+  setDebugPanelExpanded(!isDebugPanelExpanded());
+}
+
+function applyStoredDebugPanelState() {
+  const stored = getStorageItem(STORAGE_KEYS.debugPanelOpen);
+  const shouldExpand = stored === 'true';
+  setDebugPanelExpanded(shouldExpand, { persist: false });
 }
 
 export function setSetupCollapsed(isCollapsed) {
@@ -415,7 +464,7 @@ export function initializeHeaderInteractions() {
       Boolean(_refs.asyncHostAutoStartCheckbox.checked)
     );
   });
-  _refs.debugDetailsEl?.addEventListener('toggle', renderDebugContext);
+  _refs.debugToggleBtnEl?.addEventListener('click', toggleDebugPanel);
 }
 
 export function ensureInputsEditable() {

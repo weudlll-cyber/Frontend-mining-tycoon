@@ -60,8 +60,10 @@ function setCompactNodeValue(textNode, cell, value) {
   if (cell) {
     if (full !== '—') {
       cell.dataset.fullValue = full;
+      cell.title = full;
     } else {
       delete cell.dataset.fullValue;
+      cell.removeAttribute('title');
     }
   }
 }
@@ -70,6 +72,7 @@ function clearCompactCellValue(textNode, cell) {
   setTextNodeValue(textNode, '-');
   if (cell) {
     delete cell.dataset.fullValue;
+    cell.removeAttribute('title');
   }
 }
 
@@ -158,7 +161,7 @@ function createIconCell({ rowKey, tooltipId, tooltipText }) {
   trigger.setAttribute('aria-label', `${rowKey} info`);
   trigger.setAttribute('aria-describedby', tooltipId);
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.textContent = 'ⓘ';
+  trigger.textContent = 'ℹ︎';
   trigger.dataset.tooltipId = tooltipId;
 
   const bubble = document.createElement('span');
@@ -564,6 +567,7 @@ export function renderPlayerState(data) {
   });
   setTextNodeValue(refs.oracleTotalNode, '—');
   delete refs.oracleTotalCell.dataset.fullValue;
+  refs.oracleTotalCell.removeAttribute('title');
 
   const nextHalvingTarget = resolveNextHalvingTarget({
     data,
@@ -579,6 +583,7 @@ export function renderPlayerState(data) {
       prev,
       nextHalvingTarget
     );
+    let countdownTarget = nextHalvingTarget;
     if (shouldReset) {
       startNextHalvingCountdown({
         token: nextHalvingTarget.token,
@@ -586,11 +591,14 @@ export function renderPlayerState(data) {
         halvingAtUnix: nextHalvingTarget.halvingAtUnix,
         textNode: null, // No separate text node; footer handles halving display
       });
+    } else if (prev) {
+      // Keep a stable target between payloads so the countdown does not jump.
+      countdownTarget = prev;
     }
     const nowUnix = Date.now() / 1000;
     const remainingSeconds = Math.max(
       0,
-      nextHalvingTarget.halvingAtUnix - nowUnix
+      countdownTarget.halvingAtUnix - nowUnix
     );
     const countdownText = formatCountdownClock(remainingSeconds);
     halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;

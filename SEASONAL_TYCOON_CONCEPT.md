@@ -11,6 +11,7 @@ That document is the technical truth of what currently exists in the project, wh
 Canonical invariants are maintained in [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 
 At the concept level, these locked constraints preserve Seasonal Tycoon's planning-first identity:
+
 - "Everything visible" supports anticipation and strategy comparison without hiding context.
 - "No overlays" keeps cognitive load low and preserves a stable decision surface.
 - Chat remains a social layer only, so community interaction does not alter gameplay fairness.
@@ -189,6 +190,7 @@ Rounds define a fixed scenario with a fixed duration.
 Each player runs an identical, time-limited session inside that round. Players may start their own session at any point during the round window, and join timing does not change gameplay conditions. Sessions are evaluated under the same rules and timeline structure for all participants.
 
 Two round formats are part of the agreed model:
+
 - asynchronous challenge rounds (default)
 - synchronous live event rounds (host-scheduled)
 
@@ -209,6 +211,7 @@ Trading is never enabled automatically. If trading is enabled by the host, both 
 ### Default Trading Values by Game Length
 
 Default trading values are:
+
 - five-minute games: zero trades
 - ten- to fifteen-minute games: one trade, typically in the middle portion
 - twenty- to forty-minute games: two trades, typically in middle and later portions

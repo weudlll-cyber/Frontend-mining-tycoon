@@ -16,6 +16,7 @@ import {
   normalizeTokenNames,
   formatCompactNumber,
 } from '../utils/token-utils.js';
+import { setElementTextValue } from '../utils/dom-utils.js';
 import { debugLog } from '../utils/debug-log.js';
 
 let _refs = null;
@@ -29,6 +30,18 @@ export function initLiveSummary(deps) {
   _defaultTokenNames = Array.isArray(deps.defaultTokenNames)
     ? deps.defaultTokenNames
     : [];
+
+  [
+    deps.myScoreEl,
+    deps.myRankEl,
+    deps.topScoreEl,
+    deps.portfolioValueEl,
+    deps.thisSessionScoreEl,
+    deps.bestRoundScoreEl,
+    deps.asyncSessionStatusEl,
+  ]
+    .filter(Boolean)
+    .forEach((element) => element.classList.add('selectable'));
 }
 
 function formatScore(value) {
@@ -64,7 +77,7 @@ export function renderAsyncSessionBadge({
   const isAsyncRound = roundMode === 'async';
   if (!isAsyncRound) {
     badgeEl.hidden = true;
-    badgeEl.textContent = 'Async: n/a';
+    setElementTextValue(badgeEl, 'Async: n/a');
     badgeEl.classList.remove('badge-blue', 'badge-yellow', 'badge-green');
     badgeEl.classList.add('badge-gray');
     const stateKey = 'sync-hidden';
@@ -84,7 +97,7 @@ export function renderAsyncSessionBadge({
   );
 
   if (sessionActive) {
-    badgeEl.textContent = 'Async: Session Active';
+    setElementTextValue(badgeEl, 'Async: Session Active');
     badgeEl.classList.add('badge-green');
     const stateKey = 'async-active';
     if (_lastAsyncBadgeStateKey !== stateKey) {
@@ -97,6 +110,7 @@ export function renderAsyncSessionBadge({
     return;
   }
 
+  setElementTextValue(badgeEl, 'Async: Ready');
   badgeEl.textContent = 'Async: Ready';
   badgeEl.classList.add(asyncReady ? 'badge-blue' : 'badge-gray');
   badgeEl.title = sessionSupported
@@ -125,6 +139,8 @@ export function renderAsyncScoreLines(data) {
     String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
   wrapperEl.hidden = !isAsync;
   if (!isAsync) {
+    setElementTextValue(thisSessionEl, 'This session: —');
+    setElementTextValue(bestRoundEl, 'Best this round: —');
     thisSessionEl.textContent = 'This session: —';
     bestRoundEl.textContent = 'Best this round: —';
     thisSessionEl.removeAttribute('title');
@@ -135,6 +151,14 @@ export function renderAsyncScoreLines(data) {
   const thisSession = Number(data?.current_session_score);
   const bestRound = Number(data?.player_best_of_score);
 
+  setElementTextValue(
+    thisSessionEl,
+    `This session: ${formatScore(thisSession)}`
+  );
+  setElementTextValue(
+    bestRoundEl,
+    `Best this round: ${formatScore(bestRound)}`
+  );
   thisSessionEl.textContent = `This session: ${formatScore(thisSession)}`;
   bestRoundEl.textContent = `Best this round: ${formatScore(bestRound)}`;
   thisSessionEl.title = `Exact value: ${formatExactScore(thisSession)}`;
@@ -204,15 +228,15 @@ export function renderQuickStats(data) {
     }
   }
 
-  _refs.myScoreEl.textContent = formatScore(ownScore);
-  _refs.myRankEl.textContent = ownRank ? `#${ownRank}` : '—';
-  _refs.topScoreEl.textContent = formatScore(topScore);
+  setElementTextValue(_refs.myScoreEl, formatScore(ownScore));
+  setElementTextValue(_refs.myRankEl, ownRank ? `#${ownRank}` : '—');
+  setElementTextValue(_refs.topScoreEl, formatScore(topScore));
 }
 
 export function renderPortfolioValue(data) {
   if (!_refs?.portfolioValueEl) return;
   if (!data) {
-    _refs.portfolioValueEl.textContent = '—';
+    setElementTextValue(_refs.portfolioValueEl, '—');
     _refs.portfolioValueEl.removeAttribute('data-full-value');
     return;
   }
@@ -229,7 +253,7 @@ export function renderPortfolioValue(data) {
     activeGameMeta?.oracle_prices || data?.oracle_prices || null;
   const computed = computePortfolioValue(balances, oraclePrices, tokenNames);
 
-  _refs.portfolioValueEl.textContent = formatPortfolioValue(computed);
+  setElementTextValue(_refs.portfolioValueEl, formatPortfolioValue(computed));
 
   if (Number.isFinite(computed)) {
     const fullFormatted = Number(computed).toLocaleString('en-US', {

@@ -70,6 +70,53 @@ describe('dashboard layout css guardrails', () => {
     const css = readStyleCss();
 
     expect(css).toMatch(/\.season-upgrades\s*\{[\s\S]*?overflow-x:\s*hidden;/);
-    expect(css).toMatch(/\.upgrade-compact-grid\s*\{[\s\S]*?minmax\(0,/);
+    // Column alignment is enforced via --upgrade-cols CSS variable (bounded minmax tracks)
+    expect(css).toMatch(/--upgrade-cols\s*:/);
+  });
+
+  it('upgrade columns use shared CSS variable for header/row alignment', () => {
+    const css = readStyleCss();
+
+    // .upgrade-table defines the master column tracks via the variable
+    expect(css).toMatch(/\.upgrade-table\s*\{[\s\S]*?var\(--upgrade-cols\)/);
+
+    // header/row subgrids inherit those tracks — confirmed by 'subgrid' keyword
+    expect(css).toMatch(/grid-template-columns\s*:\s*subgrid/);
+  });
+
+  it('upgrade-lane-list uses display:contents so rows join the parent upgrade-table grid', () => {
+    const css = readStyleCss();
+
+    expect(css).toMatch(
+      /\.upgrade-lane-list[\s\S]*?\{[\s\S]*?display\s*:\s*contents/
+    );
+  });
+
+  it('player-status panel has a fixed width variable and dashboard uses a fixed right column', () => {
+    const css = readStyleCss();
+
+    // --player-panel-width custom property must be declared
+    expect(css).toMatch(/--player-panel-width\s*:/);
+
+    // .dashboard-main must use the variable as the second column track
+    expect(css).toMatch(
+      /\.dashboard-main\s*\{[\s\S]*?grid-template-columns[\s\S]*?var\(--player-panel-width\)/
+    );
+  });
+
+  it('seasons-scroll has min-width:0 to prevent the left column from overflowing the grid', () => {
+    const css = readStyleCss();
+
+    expect(css).toMatch(/\.seasons-scroll\s*\{[\s\S]*?min-width:\s*0;/);
+  });
+
+  it('seasons-grid uses two equal columns on desktop (2x2 layout)', () => {
+    const css = readStyleCss();
+
+    const gridBlock = css.match(/\.seasons-grid\s*\{([\s\S]*?)\}/);
+    expect(gridBlock).not.toBeNull();
+    expect(gridBlock?.[1] || '').toMatch(
+      /grid-template-columns\s*:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+    );
   });
 });

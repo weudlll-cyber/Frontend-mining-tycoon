@@ -1,0 +1,252 @@
+name: snapshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: Create a GitHub Release for the snapshot tag
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  frontend-ci:
+    name: Frontend CI (tests/lint/audit/build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Unit tests
+        run: npm run test -- --run
+
+      - name: Coverage tests
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Security audit
+        run: npm audit --omit=dev --audit-level=high
+
+  backend-ci:
+    name: Backend CI (tests/lint/audit/security)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run backend checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f backend/package.json ]; then
+            echo "Detected Node backend at backend/."
+            pushd backend >/dev/null
+            npm ci
+            npm run lint
+            npm test -- --run
+            npm audit --audit-level=high
+            if npm run | grep -q "build"; then
+              npm run build
+            fi
+            popd >/dev/null
+            exit 0
+          fi
+
+          if [ -f backend/pyproject.toml ] || [ -f backend/requirements.txt ]; then
+            echo "Detected Python backend at backend/."
+            python -m pip install --upgrade pip
+            pushd backend >/dev/null
+
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            fi
+
+            if [ -f pyproject.toml ]; then
+              pip install .
+            fi
+
+            pip install pytest ruff bandit pip-audit
+            ruff check .
+            pytest -q
+            bandit -r . -q
+            pip-audit
+            popd >/dev/null
+            exit 0
+          fi
+
+          if [ -f pyproject.toml ] || [ -f requirements.txt ]; then
+            echo "Detected Python backend at repository root."
+            python -m pip install --upgrade pip
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            fi
+            pip install pytest ruff bandit pip-audit
+            ruff check .
+            pytest -q
+            bandit -r . -q
+            pip-audit
+            exit 0
+          fi
+
+          echo "No supported backend project layout found. Snapshot requires backend CI to pass before tag/release creation."
+          echo "Expected one of: backend/package.json, backend/pyproject.toml, backend/requirements.txt, pyproject.toml, requirements.txt"
+          exit 1
+
+  ci-summary:
+    name: CI Summary Gate
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-ci
+      - backend-ci
+    outputs:
+      merge_safe: ${{ steps.gate.outputs.merge_safe }}
+      summary_md: ${{ steps.gate.outputs.summary_md }}
+    steps:
+      - name: Build CI summary and gate result
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FRONTEND_RESULT="${{ needs.frontend-ci.result }}"
+          BACKEND_RESULT="${{ needs.backend-ci.result }}"
+
+          MERGE_SAFE="true"
+          if [ "$FRONTEND_RESULT" != "success" ] || [ "$BACKEND_RESULT" != "success" ]; then
+            MERGE_SAFE="false"
+          fi
+
+          {
+            echo "summary_md<<EOF"
+            echo "## Snapshot CI Summary"
+            echo
+            echo "- Frontend CI: ${FRONTEND_RESULT}"
+            echo "- Backend CI: ${BACKEND_RESULT}"
+            if [ "$MERGE_SAFE" = "true" ]; then
+              echo "- Merge Safety: SAFE (manual merge only)"
+            else
+              echo "- Merge Safety: NOT SAFE"
+            fi
+            echo
+            echo "Checks included: tests, lint, formatting, audits, build (where applicable), and security checks."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "merge_safe=${MERGE_SAFE}" >> "$GITHUB_OUTPUT"
+
+          echo "## Snapshot CI Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend CI: ${FRONTEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend CI: ${BACKEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MERGE_SAFE" = "true" ]; then
+            echo "- Merge Safety: SAFE (manual merge only)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "- Merge Safety: NOT SAFE" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+  create-snapshot-tag:
+    name: Create Snapshot Tag
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-ci
+      - backend-ci
+      - ci-summary
+    if: needs.ci-summary.result == 'success'
+    outputs:
+      snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push snapshot tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SNAPSHOT_TAG="snapshot-$(date -u +%Y%m%d-%H%M)"
+          echo "snapshot_tag=${SNAPSHOT_TAG}" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse "refs/tags/${SNAPSHOT_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${SNAPSHOT_TAG} already exists."
+            exit 1
+          fi
+
+          git tag "${SNAPSHOT_TAG}" "${GITHUB_SHA}"
+          git push origin "${SNAPSHOT_TAG}"
+
+  create-snapshot-release:
+    name: Create Snapshot Release (optional)
+    runs-on: ubuntu-latest
+    needs:
+      - create-snapshot-tag
+      - ci-summary
+    if: needs.ci-summary.result == 'success' && inputs.create_release
+    steps:
+      - name: Create GitHub release
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_MD: ${{ needs.ci-summary.outputs.summary_md }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tag = "${{ needs.create-snapshot-tag.outputs.snapshot_tag }}";
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const summaryMd = process.env.SUMMARY_MD || '';
+
+            const body = [
+              '## Snapshot Release',
+              '',
+              `- Tag: ${tag}`,
+              `- Commit: ${context.sha}`,
+              `- Workflow run: ${runUrl}`,
+              '',
+              summaryMd
+            ].join('\n');
+
+            await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              name: tag,
+              body,
+              draft: false,
+              prerelease: false,
+              generate_release_notes: false,
+            });

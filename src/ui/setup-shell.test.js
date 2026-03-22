@@ -51,7 +51,8 @@ function buildFixture() {
     <p id="start-session-status"></p>
     <section id="setup-shell" class="setup-shell setup-open"></section>
     <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
-    <details id="debug-details"><summary>Debug</summary></details>
+    <button id="debug-toggle-btn" type="button" aria-expanded="false" aria-controls="debug-panel">⚙️</button>
+    <section id="debug-panel" hidden></section>
     <span id="debug-backend-url">—</span>
     <span id="debug-game-id">—</span>
     <span id="debug-player-id">—</span>
@@ -115,7 +116,8 @@ function buildFixture() {
       'async-duration-custom-minutes'
     ),
     asyncHostAutoStartCheckbox: document.getElementById('async-auto-start'),
-    debugDetailsEl: document.getElementById('debug-details'),
+    debugToggleBtnEl: document.getElementById('debug-toggle-btn'),
+    debugPanelEl: document.getElementById('debug-panel'),
     debugBackendUrlEl: document.getElementById('debug-backend-url'),
     debugGameIdEl: document.getElementById('debug-game-id'),
     debugPlayerIdEl: document.getElementById('debug-player-id'),
@@ -127,6 +129,7 @@ function buildFixture() {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   buildFixture();
 });
 
@@ -270,16 +273,68 @@ describe('setup shell async readiness', () => {
   });
 
   it('shows session id in debug only when debug panel is open', () => {
-    const debugDetailsEl = document.getElementById('debug-details');
+    const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
     const debugSessionIdEl = document.getElementById('debug-session-id');
 
     setSetupShellState({ sessionId: 77 });
     renderDebugContext();
     expect(debugSessionIdEl?.textContent).toBe('—');
 
-    debugDetailsEl.open = true;
-    debugDetailsEl.dispatchEvent(new Event('toggle'));
+    debugToggleBtnEl.click();
     expect(debugSessionIdEl?.textContent).toBe('77');
+  });
+
+  it('toggles gear panel inline without changing setup shell state', () => {
+    const setupShell = document.getElementById('setup-shell');
+    const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
+    const debugPanelEl = document.getElementById('debug-panel');
+
+    expect(debugPanelEl.hidden).toBe(true);
+    expect(debugToggleBtnEl.getAttribute('aria-expanded')).toBe('false');
+
+    debugToggleBtnEl.click();
+
+    expect(debugPanelEl.hidden).toBe(false);
+    expect(debugToggleBtnEl.getAttribute('aria-expanded')).toBe('true');
+    expect(setupShell.classList.contains('setup-collapsed')).toBe(false);
+
+    debugToggleBtnEl.click();
+    expect(debugPanelEl.hidden).toBe(true);
+    expect(debugToggleBtnEl.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('restores debug panel state from localStorage on re-init', () => {
+    const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
+    const debugPanelEl = document.getElementById('debug-panel');
+
+    debugToggleBtnEl.click();
+    expect(localStorage.getItem('mining-tycoon:debugPanelOpen')).toBe('true');
+
+    buildFixture();
+
+    const restoredToggle = document.getElementById('debug-toggle-btn');
+    const restoredPanel = document.getElementById('debug-panel');
+
+    expect(restoredPanel.hidden).toBe(false);
+    expect(restoredToggle.getAttribute('aria-expanded')).toBe('true');
+
+    // Keep variable references used to assert previous state for lint clarity.
+    expect(debugPanelEl).not.toBeNull();
+  });
+
+  it('keeps debug panel open during repeated running-state updates', () => {
+    const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
+    const debugPanelEl = document.getElementById('debug-panel');
+
+    debugToggleBtnEl.click();
+    expect(debugPanelEl.hidden).toBe(false);
+
+    setSetupShellState({ latestGameStatus: 'running' });
+    updateSetupActionsState();
+    updateSetupActionsState();
+
+    expect(debugPanelEl.hidden).toBe(false);
+    expect(debugToggleBtnEl.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('renders gray diagnostic chip for each blocking async predicate', () => {

@@ -35,6 +35,8 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
   - do not require dismissal to continue gameplay,
   - do not hide or replace required information,
   - have no backdrop or modal behavior.
+  - close via pointer-leave / keyboard Escape / blur paths (no timeout-based auto-hide).
+  - use the shared tooltip contract (`.ps-tip-trigger` + `.ps-tip-bubble` in `#tooltip-layer`) across player and season headers.
 - Seasonal gameplay controls MUST stay inline in season cards.
 - Season upgrades MUST remain visible as 3 lanes: hashrate, efficiency, cooling.
 - Analytics panel MUST remain read-only and visible in the main layout.
@@ -89,6 +91,7 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
 - [ ] Operational/Security Discipline: Tests remain green; changed behavior includes tests; no untrusted innerHTML usage.
 
 REDESIGN DECISION reminder:
+
 - [ ] If any checklist item is violated, this PR MUST first update LOCKED_DECISIONS.md with an explicit REDESIGN DECISION note before code/docs changes proceed.
 
 ## Change Control
