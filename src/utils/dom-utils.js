@@ -1,16 +1,15 @@
 /*
 File: src/utils/dom-utils.js
 Purpose: Shared DOM and formatting helpers for frontend rendering code.
+Role in system: Utility layer consumed by all UI modules; no upstream data-flow dependencies.
 Key responsibilities:
-- Provide small, reusable utilities for common DOM update patterns.
-- Keep render paths concise and selection-safe via text-node updates.
+- Safe text-node updates that preserve selection anchors during live SSE refreshes.
+- clearElementChildren / clearNode for subtree teardown without innerHTML.
+- formatCost for the legacy upgrade panel cost display.
 Entry points / public functions:
-- clearElementChildren, clearNode, createStaticValueRow, setTextNodeValue,
-  setElementTextValue, formatCost, formatTokenAmount, escapeHtml.
-Dependencies:
-- Browser DOM APIs.
-Last updated: 2026-03-12
-Author/Owner: Frontend Team
+- clearElementChildren, clearNode, setTextNodeValue, setElementTextValue, formatCost.
+Dependencies: Browser DOM APIs only.
+Security notes: textContent / createTextNode only — never innerHTML with untrusted input.
 */
 
 export function clearElementChildren(el) {
@@ -24,27 +23,6 @@ export function clearNode(node) {
   while (node.firstChild) {
     node.removeChild(node.firstChild);
   }
-}
-
-export function createStaticValueRow(
-  labelText,
-  valueClass = 'state-stat-value'
-) {
-  const row = document.createElement('div');
-  row.className = 'state-stat';
-
-  const label = document.createElement('span');
-  label.className = 'state-stat-label';
-  label.textContent = labelText;
-
-  const value = document.createElement('span');
-  value.className = valueClass;
-  const valueTextNode = document.createTextNode('-');
-  value.appendChild(valueTextNode);
-
-  row.appendChild(label);
-  row.appendChild(value);
-  return { row, value, valueTextNode };
 }
 
 export function setTextNodeValue(textNode, value) {
@@ -89,18 +67,4 @@ export function formatCost(cost) {
     return cost.toString();
   }
   return String(cost);
-}
-
-export function formatTokenAmount(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) {
-    return '-';
-  }
-  return num.toFixed(2);
-}
-
-export function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }

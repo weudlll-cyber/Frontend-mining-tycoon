@@ -35,6 +35,8 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
   - do not require dismissal to continue gameplay,
   - do not hide or replace required information,
   - have no backdrop or modal behavior.
+  - close via pointer-leave / keyboard Escape / blur paths (no timeout-based auto-hide).
+  - use the shared tooltip contract (`.ps-tip-trigger` + `.ps-tip-bubble` in `#tooltip-layer`) across player and season headers.
 - Seasonal gameplay controls MUST stay inline in season cards.
 - Season upgrades MUST remain visible as 3 lanes: hashrate, efficiency, cooling.
 - Analytics panel MUST remain read-only and visible in the main layout.

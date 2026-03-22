@@ -1,17 +1,113 @@
 /*
 File: src/ui/season-cards.js
 Purpose: Keep season card metrics and per-card halving timers in sync with SSE payloads.
+Role in system:
+- Normalizes season-card metric headers so labels stay consistent across all four cards.
+- Maintains stable tooltip anchors and value nodes during high-frequency SSE updates.
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
 import { resolveNextHalvingTarget } from './halving-display.js';
+import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getGameMeta = null;
 const _seasonHalvingTimers = new Map();
+const _seasonMetaStateByCard = new WeakMap();
+
+const SEASON_META_LEGEND =
+  'Balance: token amount. Output/s: per-second production. Halving: time until next halving.';
 
 export function initSeasonCards(deps) {
   _getGameMeta = deps.getGameMeta;
+}
+
+function createSeasonMetaTooltip(trigger) {
+  const bubbleId = 'ps-tip-season-meta-legend';
+  const tooltipLayer = document.getElementById('tooltip-layer');
+  if (!tooltipLayer) {
+    trigger.title = SEASON_META_LEGEND;
+    return null;
+  }
+
+  let bubble = document.getElementById(bubbleId);
+  if (!bubble) {
+    bubble = document.createElement('span');
+    bubble.id = bubbleId;
+    bubble.className = 'ps-tip-bubble';
+    bubble.setAttribute('role', 'tooltip');
+    bubble.textContent = SEASON_META_LEGEND;
+    tooltipLayer.appendChild(bubble);
+  }
+
+  trigger.setAttribute('aria-describedby', bubbleId);
+  trigger.dataset.tooltipId = bubbleId;
+  trigger.removeAttribute('title');
+  return bubbleId;
+}
+
+function ensureMetaSeparator(metaRow, className) {
+  let separator = metaRow.querySelector(`.${className}`);
+  if (!separator) {
+    separator = document.createElement('span');
+    separator.className = `meta-sep ${className}`;
+    separator.setAttribute('aria-hidden', 'true');
+    separator.appendChild(document.createTextNode('|'));
+  }
+  return separator;
+}
+
+function ensureSeasonMetaStructure(seasonCardEl) {
+  let state = _seasonMetaStateByCard.get(seasonCardEl);
+  if (state) {
+    return state;
+  }
+
+  const metaRow = seasonCardEl.querySelector('.season-meta');
+  if (!metaRow) {
+    return null;
+  }
+
+  const balanceItem = metaRow.querySelector('.meta-item:nth-of-type(1)');
+  const outputItem = metaRow.querySelector('.meta-item:nth-of-type(2)');
+  const halvingItem = metaRow.querySelector('.meta-item.halving-item');
+  const balanceLabel = balanceItem?.querySelector('.meta-label');
+  const outputLabel = outputItem?.querySelector('.meta-label');
+  const halvingLabel = halvingItem?.querySelector('.meta-label');
+
+  if (balanceLabel) {
+    setElementTextValue(balanceLabel, 'Balance');
+  }
+  if (outputLabel) {
+    setElementTextValue(outputLabel, 'Output/s');
+  }
+  if (halvingLabel) {
+    setElementTextValue(halvingLabel, 'Halving');
+  }
+
+  const infoSeparator = ensureMetaSeparator(metaRow, 'meta-sep-info-inline');
+
+  const infoTrigger = document.createElement('button');
+  infoTrigger.type = 'button';
+  infoTrigger.className = 'ps-tip-trigger season-meta-tip-trigger';
+  infoTrigger.setAttribute('aria-label', 'Season metrics legend');
+  infoTrigger.setAttribute('aria-expanded', 'false');
+  infoTrigger.appendChild(document.createTextNode('ℹ︎'));
+
+  createSeasonMetaTooltip(infoTrigger);
+  metaRow.append(infoSeparator, infoTrigger);
+
+  const dispose = initMicroTooltips(metaRow);
+  state = {
+    metaRow,
+    balanceEl: seasonCardEl.querySelector('.season-balance'),
+    outputEl: seasonCardEl.querySelector('.season-output'),
+    halvingEl: seasonCardEl.querySelector('.season-halving'),
+    infoTrigger,
+    dispose,
+  };
+  _seasonMetaStateByCard.set(seasonCardEl, state);
+  return state;
 }
 
 export function formatRemainingMmSs(targetUnix, nowUnix = Date.now() / 1000) {
@@ -175,10 +271,12 @@ export function renderSeasonData(data) {
     const seasonCardEl = document.getElementById(`season-${token}`);
     if (!seasonCardEl) return;
 
-    const balanceEl = seasonCardEl.querySelector('.season-balance');
+    const metaState = ensureSeasonMetaStructure(seasonCardEl);
+    const balanceEl =
+      metaState?.balanceEl || seasonCardEl.querySelector('.season-balance');
     if (balanceEl) {
       const balance = balances[token];
-      balanceEl.classList.add('selectable');
+      balanceEl.classList.add('selectable', 'tabular-num');
       setElementTextValue(
         balanceEl,
         balance !== undefined
@@ -187,19 +285,21 @@ export function renderSeasonData(data) {
       );
     }
 
-    const outputEl = seasonCardEl.querySelector('.season-output');
+    const outputEl =
+      metaState?.outputEl || seasonCardEl.querySelector('.season-output');
     if (outputEl) {
       const rate = Number(outputRatePerToken[token]);
-      outputEl.classList.add('selectable');
+      outputEl.classList.add('selectable', 'tabular-num');
       setElementTextValue(
         outputEl,
         Number.isFinite(rate) ? `${rate.toFixed(2)}/s` : '—/s'
       );
     }
 
-    const halvingEl = seasonCardEl.querySelector('.season-halving');
+    const halvingEl =
+      metaState?.halvingEl || seasonCardEl.querySelector('.season-halving');
     if (!halvingEl) return;
-    halvingEl.classList.add('selectable');
+    halvingEl.classList.add('selectable', 'tabular-num');
 
     const nextHalvingTarget = resolveNextHalvingTarget({
       data,

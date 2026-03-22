@@ -73,7 +73,7 @@ describe('season cards header normalization', () => {
       document.querySelectorAll('#season-spring .season-meta .meta-label')
     ).map((node) => node.textContent?.trim());
 
-    expect(labels).toEqual(['Balance', 'Output/s', 'Halving', 'Upgrades']);
+    expect(labels).toEqual(['Balance', 'Output/s', 'Halving']);
 
     const triggers = document.querySelectorAll(
       '#season-spring .season-meta .season-meta-tip-trigger'

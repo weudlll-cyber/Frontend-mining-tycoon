@@ -77,9 +77,11 @@ describe('dashboard layout css guardrails', () => {
   it('upgrade columns use shared CSS variable for header/row alignment', () => {
     const css = readStyleCss();
 
-    // The variable must be consumed by both .upgrade-table and header/row rules
-    const varUsages = (css.match(/var\(--upgrade-cols\)/g) || []).length;
-    expect(varUsages).toBeGreaterThanOrEqual(2);
+    // .upgrade-table defines the master column tracks via the variable
+    expect(css).toMatch(/\.upgrade-table\s*\{[\s\S]*?var\(--upgrade-cols\)/);
+
+    // header/row subgrids inherit those tracks — confirmed by 'subgrid' keyword
+    expect(css).toMatch(/grid-template-columns\s*:\s*subgrid/);
   });
 
   it('upgrade-lane-list uses display:contents so rows join the parent upgrade-table grid', () => {

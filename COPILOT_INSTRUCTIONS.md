@@ -43,6 +43,8 @@ Cross-repo rule:
 
 - No blocking overlays/modals/popups for core gameplay.
 - Desktop core gameplay remains no-page-scroll.
+- Keep one shared micro-tooltip system for player/season headers (`.ps-tip-trigger` + `.ps-tip-bubble` via `#tooltip-layer`).
+- Tooltip close behavior must be pointer-leave / Escape / blur only; do not add timeout-based auto-hide paths.
 - Trading and Farming sections remain visible even when disabled.
 - Analytics/Player State remains read-only and visible, including:
   - per-token output and total output

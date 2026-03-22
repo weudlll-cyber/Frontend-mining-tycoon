@@ -1,7 +1,20 @@
 /*
 File: src/ui/micro-tooltip.js
-Purpose: Lightweight non-blocking tooltip interactions for hover/focus/tap.
-Tooltips are positioned in a fixed tooltip-layer above all content.
+Purpose: Lightweight non-blocking tooltip system (hover / focus / tap).
+Role in system:
+- Consumed by player-view, season-cards, and upgrade-panel-inline; each component
+  calls initMicroTooltips(containerEl) once and holds the returned dispose fn.
+- event-display uses a scoped instance for the event banner only; it does NOT scan
+  document.body on every SSE tick (would dispose other instances and close open tips).
+Constraints:
+- LOCKED_DECISIONS.md §C: no backdrop, no modal behavior, no interaction-blocking.
+- Tooltips close only on mouseleave/Escape/blur — never via auto-hide timeout on hover.
+- Tooltip bubbles live in #tooltip-layer (fixed, above all content) so they are never
+  clipped by overflow:hidden on season cards or the upgrade table.
+- Anchor elements must not be re-mounted during SSE updates while a tooltip is open.
+  (See season-cards.js ensureSeasonMetaStructure for the stable-anchor pattern.)
+Security notes:
+- All tooltip text is set via textContent — no innerHTML, no XSS vectors.
 */
 
 export function initMicroTooltips(containerEl) {
@@ -21,6 +34,73 @@ export function initMicroTooltips(containerEl) {
   }
 
   const openTips = new Set();
+  const closeTimers = new Map();
+  const hoverWatchers = new Map();
+
+  const cancelScheduledClose = (bubble) => {
+    const timerId = closeTimers.get(bubble);
+    if (timerId) {
+      clearTimeout(timerId);
+      closeTimers.delete(bubble);
+    }
+  };
+
+  // scheduleClose is kept only for keyboard/blur cases (not mouseleave)
+  const scheduleClose = (bubble, trigger, delayMs = 450) => {
+    cancelScheduledClose(bubble);
+    const timerId = setTimeout(() => {
+      closeTimers.delete(bubble);
+      if (
+        trigger.matches(':hover') ||
+        bubble.matches(':hover') ||
+        document.activeElement === trigger
+      ) {
+        return;
+      }
+      if (openTips.has(bubble)) {
+        closeTip(bubble);
+      }
+    }, delayMs);
+    closeTimers.set(bubble, timerId);
+  };
+
+  const stopHoverWatch = (bubble) => {
+    const rafId = hoverWatchers.get(bubble);
+    if (rafId !== undefined) {
+      cancelAnimationFrame(rafId);
+      hoverWatchers.delete(bubble);
+    }
+  };
+
+  // RAF loop: stay alive as long as pointer hovers trigger or bubble.
+  // Uses requestAnimationFrame poll instead of mouseleave because SSE countdown
+  // updates cause DOM reflows every ~1 s, which fire spurious mouseleave events
+  // on elements whose geometry shifts — even when the pointer never actually moved.
+  // Polling :hover is reflow-immune; closes after ~350 ms of no :hover.
+  const startHoverWatch = (bubble, trigger) => {
+    stopHoverWatch(bubble);
+    let lastHoveredAt = Date.now();
+
+    const tick = () => {
+      if (!openTips.has(bubble)) {
+        hoverWatchers.delete(bubble);
+        return;
+      }
+      const hovering = trigger.matches(':hover') || bubble.matches(':hover');
+      if (hovering) {
+        lastHoveredAt = Date.now();
+        hoverWatchers.set(bubble, requestAnimationFrame(tick));
+        return;
+      }
+      if (Date.now() - lastHoveredAt < 350) {
+        hoverWatchers.set(bubble, requestAnimationFrame(tick));
+        return;
+      }
+      hoverWatchers.delete(bubble);
+      closeTip(bubble);
+    };
+    hoverWatchers.set(bubble, requestAnimationFrame(tick));
+  };
 
   // Position a tooltip bubble relative to its trigger button
   const positionTooltip = (bubble, trigger) => {
@@ -44,6 +124,8 @@ export function initMicroTooltips(containerEl) {
   };
 
   const closeTip = (bubble) => {
+    cancelScheduledClose(bubble);
+    stopHoverWatch(bubble);
     bubble.classList.remove('is-open');
     const triggerId = bubble.id.replace('ps-tip-', '');
     const trigger = containerEl.querySelector(
@@ -56,6 +138,8 @@ export function initMicroTooltips(containerEl) {
   };
 
   const openTip = (bubble, trigger) => {
+    cancelScheduledClose(bubble);
+    stopHoverWatch(bubble);
     // Close all other tips
     Array.from(openTips).forEach((openBubble) => {
       if (openBubble !== bubble) {
@@ -71,6 +155,9 @@ export function initMicroTooltips(containerEl) {
     setTimeout(() => {
       positionTooltip(bubble, trigger);
     }, 0);
+
+    // Start RAF hover-watch to auto-close when pointer leaves
+    startHoverWatch(bubble, trigger);
   };
 
   const closeAllTips = () => {
@@ -127,18 +214,27 @@ export function initMicroTooltips(containerEl) {
       }
     });
 
-    // Hover to show (desktop)
+    // Hover to show (desktop) — mouseenter opens; RAF loop handles close
     trigger.addEventListener('mouseenter', () => {
+      cancelScheduledClose(bubble);
       if (!openTips.has(bubble)) {
         openTip(bubble, trigger);
+      } else {
+        // Already open: reset the hover watcher so it doesn't close
+        startHoverWatch(bubble, trigger);
       }
     });
 
-    trigger.addEventListener('mouseleave', () => {
-      // Keep open if focused, close if not
-      if (document.activeElement !== trigger && openTips.has(bubble)) {
-        closeTip(bubble);
+    // Keep tooltip visible while the pointer is over the bubble itself
+    bubble.addEventListener('mouseenter', () => {
+      cancelScheduledClose(bubble);
+      if (!openTips.has(bubble)) {
+        bubble.classList.add('is-open');
+        openTips.add(bubble);
+        trigger.setAttribute('aria-expanded', 'true');
       }
+      // Bubble hover: reset watcher so it won't close during pointer dwell
+      startHoverWatch(bubble, trigger);
     });
 
     // Focus to show (keyboard)
@@ -151,7 +247,7 @@ export function initMicroTooltips(containerEl) {
     // Blur to hide
     trigger.addEventListener('blur', () => {
       if (openTips.has(bubble)) {
-        closeTip(bubble);
+        scheduleClose(bubble, trigger, 0);
       }
     });
 
@@ -189,10 +285,22 @@ export function initMicroTooltips(containerEl) {
     document.removeEventListener('pointerdown', onDocumentPointerDown);
     document.removeEventListener('keydown', onDocumentKeyDown);
     window.removeEventListener('resize', onWindowResize);
+    closeTimers.forEach((timerId) => clearTimeout(timerId));
+    closeTimers.clear();
+    hoverWatchers.forEach((rafId) => cancelAnimationFrame(rafId));
+    hoverWatchers.clear();
     triggers.forEach((trigger) => {
       const tooltipId = trigger.getAttribute('aria-describedby');
       const bubble = document.querySelector(`#${tooltipId}`);
       if (bubble && tooltipLayer.contains(bubble)) {
+        // Never force-close a tooltip the user is actively hovering —
+        // another instance's RAF watcher will close it naturally when
+        // the pointer leaves. This prevents refreshTooltips() (called
+        // every SSE tick by event-display) from killing open tooltips.
+        if (trigger.matches(':hover') || bubble.matches(':hover')) {
+          openTips.delete(bubble);
+          return;
+        }
         closeTip(bubble);
       }
     });

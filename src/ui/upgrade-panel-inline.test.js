@@ -335,7 +335,14 @@ describe('inline upgrade grid alignment', () => {
     );
     // First 6 cells carry the column labels
     const dataLabels = headerCells.slice(0, 6).map((c) => c.textContent.trim());
-    expect(dataLabels).toEqual(['Upg', 'Lvl', 'Cost', 'Pay', 'Out/s', 'BEP']);
+    expect(dataLabels).toEqual([
+      'Upgrade',
+      'Lvl',
+      'Cost',
+      'Pay',
+      'Out/s',
+      'BEP',
+    ]);
 
     // Last header cell is the info trigger (no column label text, just \u24d8)
     const lastHeaderCell = headerCells[headerCells.length - 1];
@@ -351,5 +358,36 @@ describe('inline upgrade grid alignment', () => {
       expect(ariaLabel).not.toBeNull();
       expect(ariaLabel).toMatch(/upgrade/i);
     });
+  });
+
+  it('renders large level and cost values in compact form with exact value on hover', () => {
+    const performUpgrade = vi.fn();
+
+    initInlineUpgrades({
+      getActiveGameMeta: () => createMeta(),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 60 },
+        cooling: { base_cost: 70 },
+      }),
+      performUpgrade,
+    });
+
+    const container = document.querySelector('.season-upgrades');
+    const data = createData(12500);
+    data.player_state.upgrades_by_token.spring.hashrate = 12345;
+    renderInlineSeasonUpgrades(container, 'spring', data);
+
+    const row = container.querySelector(
+      '.upgrade-lane-row[data-upgrade-type="hashrate"]'
+    );
+    const levelCell = row?.querySelector('.upgrade-row-level');
+    const costCell = row?.querySelector('.upgrade-row-cost');
+
+    expect(levelCell?.textContent).toContain('k');
+    expect(costCell?.textContent).toContain('k');
+    expect(levelCell?.getAttribute('title')).toContain('12,345');
+    expect(costCell?.getAttribute('title')).toContain('12,500');
   });
 });

@@ -38,15 +38,15 @@ body {
   --status-blue: #3b82f6;
 
   /* Right player-status panel fixed width — keeps 2×2 seasons grid from overflowing */
-  --player-panel-width: 300px;
+  --player-panel-width: 332px;
 
   /* Shared column template (7 tracks) — balanced for readable upgrade names + metrics.
      All flexible columns now use 1fr for even distribution; UPG widened for full names. */
   --upgrade-cols:
-    /* Upg  */ minmax(10ch, 1.3fr) /* Lvl  */ minmax(3ch, 1fr)
-    /* Cost */ minmax(6ch, 1fr) /* Pay  */ minmax(8ch, 1fr) /* Out/s*/
-    minmax(8ch, 1.1fr) /* BEP  */ minmax(6ch, 1fr) /* Act  */
-    minmax(5.5ch, auto);
+    /* Upgrade */ minmax(7.6ch, 1fr) /* Lvl  */
+    minmax(4ch, 0.58fr) /* Cost */ minmax(5.8ch, 0.8fr) /* Pay  */
+    minmax(7.2ch, 0.9fr) /* Out/s*/ minmax(7.2ch, 1fr) /* BEP  */
+    minmax(5.4ch, 0.82fr) /* Act  */ minmax(5.5ch, auto);
 
   font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
   line-height: 1.6;
@@ -469,18 +469,6 @@ body {
   color: var(--text-secondary);
 }
 
-.setup-session-status--success {
-  color: #166534;
-}
-
-.setup-session-status--warning {
-  color: #92400e;
-}
-
-.setup-session-status--error {
-  color: #b91c1c;
-}
-
 .dashboard-shell {
   display: flex;
   flex-direction: column;
@@ -522,7 +510,7 @@ body {
 .dashboard-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--player-panel-width);
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex: 1;
   height: 100%;
   overflow: hidden;
@@ -541,7 +529,7 @@ body {
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 0.5rem;
+  padding-right: 0.25rem;
 }
 
 .seasons-scroll::-webkit-scrollbar {
@@ -615,10 +603,13 @@ body {
   gap: 0.65rem;
   font-size: 0.8rem;
   line-height: 1.2;
+  position: relative;
+  padding-right: 1.2rem;
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow-x: hidden;
-  padding: 0.05rem 0;
+  padding-top: 0.05rem;
+  padding-bottom: 0.05rem;
 }
 
 .meta-item {
@@ -633,11 +624,6 @@ body {
   font-weight: 600;
   font-size: 0.75rem;
   letter-spacing: 0.01em;
-}
-
-.season-upgrades-label {
-  color: var(--text-secondary);
-  font-size: 0.74rem;
 }
 
 .meta-sep {
@@ -657,6 +643,10 @@ body {
   width: 0.95rem;
   height: 0.95rem;
   font-size: 0.66rem;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .season-halving {
@@ -781,16 +771,18 @@ body {
   grid-template-columns: var(--upgrade-cols);
   grid-auto-rows: minmax(28px, auto);
   row-gap: 4px;
+  column-gap: 7px; /* inherited by subgrids below */
   min-width: 0;
   width: 100%;
 }
 
+/* Subgrid: header and rows inherit the exact same column tracks and gap from
+   .upgrade-table, ensuring pixel-perfect alignment regardless of cell content size. */
 .upgrade-lane-header,
 .upgrade-lane-row,
 .upgrade-header-grid {
   display: grid;
-  grid-template-columns: var(--upgrade-cols);
-  column-gap: 8px;
+  grid-template-columns: subgrid;
   align-items: center;
   grid-column: 1 / -1;
   min-width: 0;
@@ -813,10 +805,9 @@ body {
 }
 
 .upgrade-header-cell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
+  display: block;
+  width: 100%;
+  text-align: right;
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-secondary);
@@ -825,6 +816,25 @@ body {
   line-height: 1.05;
   white-space: nowrap;
 }
+
+.upgrade-header-cell:first-child {
+  text-align: left;
+}
+
+/* data-col alignment — robust alternative to nth-child position-based rules */
+[data-col='lvl'],
+[data-col='cost'],
+[data-col='output'],
+[data-col='bep'] {
+  text-align: right;
+}
+
+[data-col='upgrade'],
+[data-col='pay'] {
+  text-align: left;
+}
+
+/* Remove obsolete nth-child overrides — now handled by data-col above */
 
 .upgrade-header-info {
   display: flex;
@@ -843,9 +853,11 @@ body {
 }
 
 .upgrade-row-cell {
+  display: block;
   font-size: 0.74rem;
   font-weight: 700;
   font-family: 'Courier New', monospace;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -855,9 +867,33 @@ body {
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
+  text-align: left;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.upgrade-row-level,
+.upgrade-row-cost,
+.upgrade-row-benefit,
+.upgrade-row-breakeven {
+  width: 100%;
+  text-align: right;
+  justify-self: stretch;
+}
+
+/* Alignment now handled by [data-col] attribute selectors above; these nth-child
+   fallbacks kept only for any cells that lack data-col attributes */
+.upgrade-lane-header > :nth-child(2),
+.upgrade-lane-header > :nth-child(3),
+.upgrade-lane-header > :nth-child(5),
+.upgrade-lane-header > :nth-child(6),
+.upgrade-lane-row > :nth-child(2),
+.upgrade-lane-row > :nth-child(3),
+.upgrade-lane-row > :nth-child(5),
+.upgrade-lane-row > :nth-child(6) {
+  text-align: right;
 }
 
 .upgrade-row-cost {
@@ -879,23 +915,37 @@ body {
 
 .upgrade-row-pay {
   font-family: inherit;
+  width: 100%;
+  justify-self: stretch;
+  overflow: visible;
+  padding-left: 0.18rem;
 }
 
 .upgrade-pay-select {
-  /* clamp keeps the dropdown wide enough to read 3-char codes without overflowing the column */
-  width: clamp(112px, 12ch, 160px);
+  /* Remove native OS arrow so we control the full text width */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  padding: 0.12rem 0.2rem;
+  box-sizing: border-box;
+  /* Right padding only needs to cover our tiny custom arrow */
+  padding: 0.1rem 1rem 0.1rem 0.25rem;
   border-radius: calc(var(--radius) / 2);
   border: 1px solid var(--border-light);
-  background: #fff;
+  /* Custom SVG down-chevron */
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.28rem center;
+  background-size: 0.5rem;
   color: var(--text-primary);
   font-size: 0.72rem;
+  font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
+  font-weight: 600;
   line-height: 1.1;
-}
-
-.upgrade-row-preview {
-  color: #1d4ed8;
+  cursor: pointer;
 }
 
 .season-upgrades .btn-upgrade-inline {
@@ -923,27 +973,6 @@ body {
   opacity: 0.6;
 }
 
-.upgrade-item-value {
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.upgrade-item-cost {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-.upgrade-item-benefit {
-  color: var(--status-green);
-  font-weight: 600;
-}
-
-.upgrade-item-breakeven {
-  color: #f59e0b;
-  font-weight: 600;
-}
-
 .btn-upgrade-inline {
   background-color: var(--status-blue);
   color: white;
@@ -969,31 +998,12 @@ body {
   opacity: 0.6;
 }
 
-.upgrade-column-title {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.upgrade-item {
-  font-size: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.upgrade-item-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
 /* Analytics Panel */
 .analytics-panel {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  padding: 0.85rem;
+  padding: 0.75rem;
   box-shadow: var(--card-shadow);
   display: flex;
   flex-direction: column;
@@ -1174,31 +1184,11 @@ body {
   font-family: inherit;
 }
 
-/* Legacy card classes (kept for compatibility, but unused in new layout) */
-.status-card {
-  display: none;
-}
-
-.player-card {
-  display: none;
-}
-
-.upgrades-card {
-  display: none;
-}
-
 /* Form Groups */
 .form-group {
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
 }
 
 .form-group label {
@@ -1422,48 +1412,6 @@ button {
 }
 
 /* Countdown */
-.countdown-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  text-align: left;
-  padding: 0.85rem 1rem;
-  background-color: var(--bg-primary);
-  border-radius: var(--radius);
-  margin-top: 0.5rem;
-}
-
-.quick-stats {
-  margin-top: 0.8rem;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
-}
-
-.quick-stat-item {
-  border: 1px solid var(--border-light);
-  background: #fff;
-  border-radius: calc(var(--radius) / 1.5);
-  padding: 0.5rem 0.6rem;
-}
-
-.quick-stat-label {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.2rem;
-}
-
-.quick-stat-value {
-  font-family: 'Courier New', monospace;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--status-blue);
-}
-
 .countdown-label {
   font-size: 0.85rem;
   font-weight: 600;
@@ -1504,14 +1452,14 @@ button {
 .ps-matrix {
   display: grid;
   grid-template-columns:
-    minmax(5.2rem, 1.1fr) repeat(5, minmax(4.5ch, 1fr))
+    minmax(4.8rem, 1fr) repeat(5, minmax(4.8ch, 1fr))
     minmax(1.3rem, auto);
-  gap: 0.22rem 0.35rem;
+  gap: 0.15rem 0.25rem;
   align-items: center;
 }
 
-\.ps-cell {
-  font-size: 0.79rem;
+.ps-cell {
+  font-size: 0.76rem;
   min-width: 0;
 }
 
@@ -1557,9 +1505,10 @@ button {
 
 .ps-value {
   text-align: right;
-  font-family: 'Courier New', monospace;
+  font-family: Consolas, 'Lucida Console', monospace;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   min-width: 0;
   overflow: hidden;
@@ -1617,25 +1566,6 @@ button {
 .ps-footer-line-2 {
   font-size: 0.82rem;
   color: var(--text-secondary);
-}
-
-.ps-footer .ps-footer-label {
-  color: var(--text-secondary);
-  font-weight: 600;
-  white-space: nowrap;
-  font-size: 0.84rem;
-}
-
-.ps-footer .ps-footer-value {
-  font-family: 'Courier New', monospace;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-size: 0.84rem;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ps-footer .ps-icon-cell {
@@ -1814,12 +1744,6 @@ button {
   grid-column: 1 / -1;
 }
 
-.upgrade-select-label {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
 .upgrade-select {
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--border-light);
@@ -1850,57 +1774,10 @@ button {
   opacity: 0.6;
 }
 
-/* Toast Notifications */
-.toast {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  padding: 1rem 1.5rem;
-  border-radius: var(--radius);
-  font-weight: 500;
-  font-size: 0.95rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 9999;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.3s ease;
-  max-width: 300px;
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.toast-success {
-  background-color: #dcfce7;
-  color: var(--status-green);
-  border: 1px solid #86efac;
-}
-
-.toast-error {
-  background-color: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
-}
-
-.toast-info {
-  background-color: #dbeafe;
-  color: var(--status-blue);
-  border: 1px solid #93c5fd;
-}
-
 /* Highlight for important stats */
 .state-stat-value.highlight {
   color: var(--status-green);
   font-size: 1.1em;
-}
-
-.leaderboard-info {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  cursor: help;
-  margin-left: 0.4rem;
 }
 
 /* Placeholder */
@@ -1912,49 +1789,9 @@ button {
   grid-column: 1 / -1;
 }
 
-/* Status Message */
-.status-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border-radius: calc(var(--radius) / 2);
-  font-size: 0.9rem;
-  min-height: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-}
-
-.status-message.success {
-  background-color: #dcfce7;
-  color: var(--status-green);
-  border: 1px solid #86efac;
-}
-
-.status-message.error {
-  background-color: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
-}
-
-.status-message.info {
-  background-color: #dbeafe;
-  color: var(--status-blue);
-  border: 1px solid #93c5fd;
-}
-
-.status-message.empty {
-  display: none;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   html,
-  body {
-    min-height: auto;
-    overflow: auto;
-  }
-
   body {
     min-height: auto;
     overflow: auto;
@@ -2099,10 +1936,6 @@ button {
     font-size: 2.5rem;
   }
 
-  .quick-stats {
-    grid-template-columns: 1fr;
-  }
-
   .status-row {
     flex-direction: column;
     gap: 1rem;
@@ -2117,10 +1950,6 @@ button {
   }
 
   .upgrade-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .output-token-grid {
     grid-template-columns: 1fr;
   }
 

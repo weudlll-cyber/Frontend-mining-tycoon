@@ -60,8 +60,10 @@ function setCompactNodeValue(textNode, cell, value) {
   if (cell) {
     if (full !== '—') {
       cell.dataset.fullValue = full;
+      cell.title = full;
     } else {
       delete cell.dataset.fullValue;
+      cell.removeAttribute('title');
     }
   }
 }
@@ -70,6 +72,7 @@ function clearCompactCellValue(textNode, cell) {
   setTextNodeValue(textNode, '-');
   if (cell) {
     delete cell.dataset.fullValue;
+    cell.removeAttribute('title');
   }
 }
 
@@ -158,7 +161,7 @@ function createIconCell({ rowKey, tooltipId, tooltipText }) {
   trigger.setAttribute('aria-label', `${rowKey} info`);
   trigger.setAttribute('aria-describedby', tooltipId);
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.textContent = 'ⓘ';
+  trigger.textContent = 'ℹ︎';
   trigger.dataset.tooltipId = tooltipId;
 
   const bubble = document.createElement('span');
@@ -564,6 +567,7 @@ export function renderPlayerState(data) {
   });
   setTextNodeValue(refs.oracleTotalNode, '—');
   delete refs.oracleTotalCell.dataset.fullValue;
+  refs.oracleTotalCell.removeAttribute('title');
 
   const nextHalvingTarget = resolveNextHalvingTarget({
     data,

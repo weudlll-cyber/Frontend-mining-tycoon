@@ -12,14 +12,15 @@ function buildDomFixture() {
         <header class="card game-header">
           <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
           <button id="jump-live-btn" type="button">Jump to Live Board</button>
-          <details id="debug-details" class="debug-details">
-            <summary>Debug</summary>
+          <button id="debug-toggle-btn" type="button" aria-expanded="false" aria-controls="debug-panel">⚙️</button>
+          <section id="debug-panel" class="debug-panel" hidden>
             <div>debug body</div>
-          </details>
+          </section>
           <div id="meta-debug"></div>
           <div id="debug-backend-url"></div>
           <div id="debug-game-id"></div>
           <div id="debug-player-id"></div>
+          <div id="debug-session-id"></div>
         </header>
 
         <section id="setup-shell" class="setup-shell setup-open">
@@ -122,15 +123,19 @@ describe('layout controls', () => {
     expect(setupShell.classList.contains('setup-collapsed')).toBe(true);
   });
 
-  it('keeps debug details collapsed by default and allows inline expand', () => {
-    const debugDetails = document.getElementById('debug-details');
-    const debugSummary = debugDetails.querySelector('summary');
+  it('keeps debug panel collapsed by default and toggles from gear icon', async () => {
+    await loadMainModule();
+    document.dispatchEvent(new Event('DOMContentLoaded'));
 
-    expect(debugDetails.open).toBe(false);
-    expect(debugSummary).not.toBeNull();
+    const debugPanel = document.getElementById('debug-panel');
+    const debugToggleBtn = document.getElementById('debug-toggle-btn');
 
-    debugDetails.open = true;
-    expect(debugDetails.open).toBe(true);
+    expect(debugPanel.hidden).toBe(true);
+    expect(debugToggleBtn.getAttribute('aria-expanded')).toBe('false');
+
+    debugToggleBtn.click();
+    expect(debugPanel.hidden).toBe(false);
+    expect(debugToggleBtn.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('jump-to-live-board collapses setup and focuses the live board', async () => {

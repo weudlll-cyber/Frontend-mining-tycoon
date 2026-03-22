@@ -1070,7 +1070,7 @@ describe('Seasonal Oracle inline upgrade module', () => {
     expect(layout).not.toBeNull();
     expect(headerGrid).not.toBeNull();
     expect(dataGrid).not.toBeNull();
-    expect(upgradesContainer.textContent).toContain('Upg');
+    expect(upgradesContainer.textContent).toContain('Upgrade');
     expect(upgradesContainer.textContent).toContain('Lvl');
     expect(upgradesContainer.textContent).toContain('Cost');
     expect(upgradesContainer.textContent).toContain('Out/s');

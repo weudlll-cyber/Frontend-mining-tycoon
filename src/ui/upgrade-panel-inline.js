@@ -10,10 +10,12 @@ Renders upgrades directly into season .season-upgrades containers.
 
 import {
   clearElementChildren,
-  formatCost,
   setElementTextValue,
 } from '../utils/dom-utils.js';
-import { normalizeTokenNames } from '../utils/token-utils.js';
+import {
+  formatCompactNumber,
+  normalizeTokenNames,
+} from '../utils/token-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getActiveGameMeta = null;
@@ -25,7 +27,23 @@ const _inlineStateByContainer = new WeakMap();
 const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
 
 const UPGRADE_LANES_LEGEND =
-  'Upg: upgrade name. Lvl: current level. Cost: required amount in target token. Pay: token to spend when submitting (auto-converts via oracle on backend). Out/s: output gain per second. BEP: breakeven time in seconds.';
+  'Upgrade: name | Lvl: level | Cost: target-token | Pay: spend-token (auto-converts) | Out/s: per-second gain | BEP: break-even time';
+
+function formatInlineLevel(value) {
+  const { display, full } = formatCompactNumber(value, {
+    decimalsSmall: 0,
+    decimalsLarge: 0,
+  });
+  return { display, full };
+}
+
+function formatInlineCost(value) {
+  const { display, full } = formatCompactNumber(value, {
+    decimalsSmall: 1,
+    decimalsLarge: 1,
+  });
+  return { display, full };
+}
 
 function toTokenCode(token) {
   return String(token || '')
@@ -60,6 +78,7 @@ function syncSelectOptions(selectEl, tokenNames) {
 function createUpgradeHeaderTooltip(trigger) {
   const tooltipLayer = document.getElementById('tooltip-layer');
   if (!tooltipLayer) {
+    // Fallback only when micro-tooltip layer is unavailable.
     trigger.title = UPGRADE_LANES_LEGEND;
     return null;
   }
@@ -85,10 +104,19 @@ function createHeader() {
   const header = document.createElement('div');
   header.className = 'upgrade-lane-header upgrade-header-grid';
 
-  // Header labels (7 data columns; action column has no label — ℹ︎ trigger instead)
-  ['Upg', 'Lvl', 'Cost', 'Pay', 'Out/s', 'BEP'].forEach((label) => {
+  // Header labels; data-col drives alignment in CSS (independent of nth-child position)
+  const headerCols = [
+    ['Upgrade', 'upgrade'],
+    ['Lvl', 'lvl'],
+    ['Cost', 'cost'],
+    ['Pay', 'pay'],
+    ['Out/s', 'output'],
+    ['BEP', 'bep'],
+  ];
+  headerCols.forEach(([label, colKey]) => {
     const cell = document.createElement('span');
     cell.className = 'upgrade-header-cell';
+    cell.dataset.col = colKey;
     cell.appendChild(document.createTextNode(label));
     header.appendChild(cell);
   });
@@ -116,15 +144,19 @@ function buildLaneRow(type, seasonToken) {
 
   const nameCell = document.createElement('span');
   nameCell.className = 'upgrade-row-cell upgrade-row-type';
+  nameCell.dataset.col = 'upgrade';
 
   const levelCell = document.createElement('span');
   levelCell.className = 'upgrade-row-cell upgrade-row-level tabular-num';
+  levelCell.dataset.col = 'lvl';
 
   const costCell = document.createElement('span');
   costCell.className = 'upgrade-row-cell upgrade-row-cost tabular-num';
+  costCell.dataset.col = 'cost';
 
   const payCell = document.createElement('span');
   payCell.className = 'upgrade-row-cell upgrade-row-pay';
+  payCell.dataset.col = 'pay';
   const paySelect = document.createElement('select');
   paySelect.className = 'upgrade-pay-select';
   paySelect.dataset.upgradeType = type;
@@ -132,10 +164,12 @@ function buildLaneRow(type, seasonToken) {
 
   const outputCell = document.createElement('span');
   outputCell.className = 'upgrade-row-cell upgrade-row-benefit tabular-num';
+  outputCell.dataset.col = 'output';
 
   const breakevenCell = document.createElement('span');
   breakevenCell.className =
     'upgrade-row-cell upgrade-row-breakeven tabular-num';
+  breakevenCell.dataset.col = 'bep';
 
   const actionCell = document.createElement('span');
   actionCell.className = 'upgrade-row-cell upgrade-row-action';
@@ -321,13 +355,14 @@ export function renderInlineSeasonUpgrades(
 
     const title = type.charAt(0).toUpperCase() + type.slice(1);
     const level = selectedTokenLevels[type] || 0;
+    const formattedLevel = formatInlineLevel(level);
+    const formattedCost = formatInlineCost(info?.cost_to_next);
 
     setElementTextValue(rowRefs.nameCell, title);
-    setElementTextValue(rowRefs.levelCell, String(level));
-    setElementTextValue(
-      rowRefs.costCell,
-      info?.cost_to_next !== undefined ? formatCost(info.cost_to_next) : '—'
-    );
+    setElementTextValue(rowRefs.levelCell, formattedLevel.display);
+    rowRefs.levelCell.title = formattedLevel.full;
+    setElementTextValue(rowRefs.costCell, formattedCost.display);
+    rowRefs.costCell.title = formattedCost.full;
     setElementTextValue(
       rowRefs.outputCell,
       info?.delta_output !== undefined

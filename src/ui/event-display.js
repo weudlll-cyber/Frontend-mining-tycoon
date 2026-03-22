@@ -1,9 +1,18 @@
 /*
 File: src/ui/event-display.js
-Purpose: Event visibility and effect indicator system.
-- Renders compact event banner when event is active
-- Annotates affected values with subtle indicators (⚡)
-- Uses the shared micro-tooltip behavior for explanations
+Purpose: Active-event banner and in-place effect indicator system.
+Role in system:
+- Downstream of SSE payloads (renderEventBanner / annotateAffectedValues called on every tick).
+- Annotates affected UI cells with ⚡ indicators; owns their tooltip lifecycle.
+- Does NOT call initMicroTooltips(document.body) on every tick — that would dispose
+  season-card and player-state tooltip instances, closing any open tooltip after ~1 s.
+  Instead: event-banner tooltip scopes to _eventBannerEl only (rebuilt once on mount),
+  and each ⚡ indicator is self-bound via bindDirectTooltip() at creation time.
+Constraints:
+- LOCKED_DECISIONS.md §C: no overlay/modal behavior; event banner is inline.
+- Frontend is display-only; active event data comes from backend SSE payload.
+Security notes:
+- Tooltip text is assembled from backend strings using textContent — no innerHTML.
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
@@ -102,12 +111,73 @@ function createTooltipTrigger({
   return trigger;
 }
 
+// Direct hover binding for a single trigger/bubble pair.
+// Used by event indicators so they don't need a container-wide initMicroTooltips
+// scan that would disturb unrelated tooltip instances.
+function bindDirectTooltip(trigger, bubble) {
+  let closeRaf = null;
+
+  const positionBubble = () => {
+    const rect = trigger.getBoundingClientRect();
+    const bRect = bubble.getBoundingClientRect();
+    const top = rect.top - bRect.height - 8;
+    const left = rect.left + rect.width / 2 - bRect.width / 2;
+    bubble.style.top = `${Math.max(4, top)}px`;
+    bubble.style.left = `${Math.max(4, Math.min(left, window.innerWidth - bRect.width - 4))}px`;
+  };
+
+  const open = () => {
+    if (closeRaf !== null) {
+      cancelAnimationFrame(closeRaf);
+      closeRaf = null;
+    }
+    bubble.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(positionBubble);
+  };
+
+  const closeIfNotHovered = () => {
+    if (closeRaf !== null) {
+      cancelAnimationFrame(closeRaf);
+    }
+    // WHY: check on the next frame so pointer transitions from trigger to bubble
+    // are treated as one continuous hover without any timeout-based auto-hide.
+    closeRaf = requestAnimationFrame(() => {
+      closeRaf = null;
+      if (trigger.matches(':hover') || bubble.matches(':hover')) return;
+      bubble.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  };
+
+  trigger.addEventListener('mouseenter', open);
+  trigger.addEventListener('mouseleave', closeIfNotHovered);
+  bubble.addEventListener('mouseenter', open);
+  bubble.addEventListener('mouseleave', closeIfNotHovered);
+  trigger.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (bubble.classList.contains('is-open')) {
+      bubble.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    } else {
+      open();
+    }
+  });
+}
+
 function refreshTooltips() {
+  // Scope strictly to the event banner element — never document.body.
+  // Scanning document.body re-binds every .ps-tip-trigger on the page and
+  // disposes/recreates instances that own season-card and player-state tooltips,
+  // which kills any open tooltip on every SSE tick.
   if (_disposeTooltips) {
     _disposeTooltips();
     _disposeTooltips = null;
   }
-  _disposeTooltips = initMicroTooltips(document.body);
+  if (_eventBannerEl) {
+    _disposeTooltips = initMicroTooltips(_eventBannerEl);
+  }
 }
 
 function clearEventTooltipBubbles() {
@@ -116,14 +186,15 @@ function clearEventTooltipBubbles() {
     .forEach((node) => node.remove());
 }
 
+// Returns true if the banner UI was freshly built (so caller knows to rebind tooltip).
 function ensureEventBannerUi() {
-  if (!_eventBannerEl) return;
+  if (!_eventBannerEl) return false;
   if (
     _eventBannerContentEl?.isConnected &&
     _eventBannerTrigger?.isConnected &&
     _eventBannerBubble?.isConnected
   ) {
-    return;
+    return false;
   }
 
   _eventBannerContentEl = null;
@@ -147,6 +218,7 @@ function ensureEventBannerUi() {
   });
   _eventBannerTrigger.hidden = true;
   _eventBannerEl.appendChild(_eventBannerTrigger);
+  return true;
 }
 
 /**
@@ -190,7 +262,7 @@ export function initEventDisplay(opts = {}) {
  */
 export function renderEventBanner(data) {
   if (!_eventBannerEl) return;
-  ensureEventBannerUi();
+  const bannerRebuilt = ensureEventBannerUi();
 
   const activeEvent = getActiveEvent(data);
 
@@ -201,7 +273,8 @@ export function renderEventBanner(data) {
     setElementTextValue(_eventBannerBubble, '');
     setElementTextValue(_eventBannerTrigger, '');
     _eventBannerTrigger.hidden = true;
-    refreshTooltips();
+    // Only rebind if the banner element was freshly rebuilt
+    if (bannerRebuilt) refreshTooltips();
     return;
   }
 
@@ -222,7 +295,8 @@ export function renderEventBanner(data) {
   setElementTextValue(_eventBannerBubble, getEventTooltipText(activeEvent));
   _eventBannerTrigger.setAttribute('aria-label', `${eventName} event details`);
   _eventBannerTrigger.hidden = false;
-  refreshTooltips();
+  // Only rebind the banner tooltip when the DOM structure was freshly created
+  if (bannerRebuilt || !_disposeTooltips) refreshTooltips();
 }
 
 /**
@@ -290,8 +364,7 @@ export function annotateAffectedValues(data) {
       addEventIndicator(footerContent, activeEvent);
     }
   }
-
-  refreshTooltips();
+  // No refreshTooltips() call here: each indicator is self-bound via bindDirectTooltip.
 }
 
 /**
@@ -306,7 +379,7 @@ function addEventIndicator(el, activeEvent) {
   }
 
   const tooltipId = nextTooltipId('event-indicator-tip');
-  mountTooltipBubble({
+  const bubble = mountTooltipBubble({
     tooltipId,
     tooltipText: getEventTooltipText(activeEvent),
   });
@@ -316,6 +389,9 @@ function addEventIndicator(el, activeEvent) {
     text: '⚡',
   });
   el.appendChild(indicator);
+  // Bind directly — avoids initMicroTooltips(document.body) which would
+  // dispose and recreate all other tooltip instances on every SSE tick.
+  bindDirectTooltip(indicator, bubble);
 }
 
 /**
@@ -326,7 +402,8 @@ export function clearEventIndicators() {
     el.remove();
   });
   clearEventTooltipBubbles();
-  refreshTooltips();
+  // No refreshTooltips() needed: indicators used bindDirectTooltip,
+  // so removing them from the DOM cleans up their listeners automatically.
 }
 
 /**

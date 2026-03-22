@@ -222,7 +222,8 @@ const setupShellEl = document.getElementById('setup-shell');
 const setupToggleBtnEl = document.getElementById('setup-toggle-btn');
 const jumpLiveBtnEl = document.getElementById('jump-live-btn');
 const jumpLiveBtnSetupEl = document.getElementById('jump-live-btn-setup');
-const debugDetailsEl = document.getElementById('debug-details');
+const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
+const debugPanelEl = document.getElementById('debug-panel');
 const debugBackendUrlEl = document.getElementById('debug-backend-url');
 const debugGameIdEl = document.getElementById('debug-game-id');
 const debugPlayerIdEl = document.getElementById('debug-player-id');
@@ -885,7 +886,8 @@ function initializeModules() {
     asyncSessionStatusEl,
     renderAsyncSessionBadge,
     startSessionStatusEl,
-    debugDetailsEl,
+    debugToggleBtnEl,
+    debugPanelEl,
     debugBackendUrlEl,
     debugGameIdEl,
     debugPlayerIdEl,

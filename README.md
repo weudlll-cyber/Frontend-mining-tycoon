@@ -11,8 +11,8 @@ This app lets you:
 - play Seasonal Oracle upgrades (API contract v2):
   - view 4 seasonal balances and per-token upgrade tracks
   - view oracle prices and fee/spread hints
-  - choose upgrade target token and payment token
-  - preview converted cross-token upgrade costs before submit
+  - choose pay token inline per upgrade lane (target token is the season card)
+  - submit display-only intent; backend remains authoritative for conversion/cost outcome
 
 ## Project Baseline (Authoritative)
 
@@ -110,12 +110,11 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
     - Balance (tokens held)
     - Output per second (mining rate)
     - Halving countdown or "No further halvings"
-    - **Inline upgrades** (3 columns: Hashrate, Efficiency, Cooling) showing:
-      - Current level (Lv N)
-      - Cost (in that season's token)
-      - Output increase (+X.XX /s)
-      - Breakeven time (BE XX.Xs)
-      - Upgrade button
+    - **Inline upgrades** (3 lanes: Hashrate, Efficiency, Cooling) rendered as a compact table with headers:
+      - `Upgrade` | `Lvl` | `Cost` | `Pay` | `Out/s` | `BEP` | info icon
+      - `Pay` is an inline per-lane select (cross-token spend choice)
+      - no preview column; no `Act` header label
+      - action remains server-authoritative submit intent (button text: Upgrade)
   - Season meta rows use full labels (**Balance, Output, Halving**) in a single compact line for clarity.
   - **Right (~35%)**: Player State Analytics panel (READ-ONLY):
     - **Compact stats matrix** optimized for rapid scanning:
@@ -134,14 +133,17 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
   - Trading status, Farming status, and the Chat toggle button complete the bar.
 - On desktop, the setup panel and season list use internal scrolling while the page itself does not scroll.
 - Season upgrades use a compact row-based layout to minimize vertical height and reduce scrolling.
+- Player analytics panel width is fixed through a CSS variable, while the left seasons column uses `min-width: 0` to prevent horizontal overflow.
 
 ### Key Principles
 
 - **No overlays/modals**: All important information remains visible on one screen. Upgrade controls are inline within season cards, not in separate popups.
 - **Core data stays inline; non-blocking micro-tooltips are allowed**: Tooltips are positioned in a fixed layer above all content (never clipped), provide optional explanation and precision (4-decimal accuracy), and never block interaction or hide required information.
+- **One shared micro-tooltip contract across player and season headers**: all header triggers use `.ps-tip-trigger` and bubbles use `.ps-tip-bubble` in `#tooltip-layer`; close behavior is hover/leave + keyboard Escape (no timeout auto-hide).
 - **Setup never blocks gameplay**: Setup is collapsible and bounded by max height with internal scroll only.
 - **Player State uses a fixed-column matrix for fast scan**: Labels left-aligned, numeric values right-aligned in monospace fonts. Tooltip icons (ⓘ) are placed at the end of each row to avoid disrupting the visual flow of data. All matrix values fully visible without scrolling.
 - **Halving countdown updates smoothly and remains copyable**: Season-card halving timers tick client-side every second between SSE sync points, and countdown text is selectable/copyable.
+- **Stable DOM updates under SSE**: rendering paths update text/attributes incrementally (no untrusted `innerHTML` rebuilds), preserving cursor/selection anchors and per-lane pay-select persistence during live updates.
 - **Chat is docked inline (no overlays); internal scroll only.** Messages scroll inside the chat panel, and collapsing chat reclaims right-column space for analytics.
 - **Mining/Trading/Farming visibility**: All three economic pillars are displayed as sections, even if disabled, allowing players to see what is "not enabled" or "available later".
 - **Responsive**:

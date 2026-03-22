@@ -94,7 +94,7 @@ Upgrade and pricing model:
 
 - Upgrade costs use snapshot-locked economy parameters and optional active event multipliers.
 - Cross-token payment conversion is server-computed using oracle prices, fee/spread, and ceiling rounding.
-- Frontend can preview costs, but backend remains authoritative.
+- Frontend inline lanes submit display/intent actions only; backend remains authoritative for accepted cost and conversion outcomes.
 
 Oracle model:
 
@@ -153,7 +153,7 @@ Frontend structure is modular:
 - Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table.
 - Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
 - Player state analytics module (`player-view.js`): renders per-token output, balances, cumulative mined, oracle prices, and conversion parameters.
-- Inline upgrade rendering module (`upgrade-panel-inline.js`): renders upgrade options (hashrate, efficiency, cooling) within each seasonal card in a 3-column layout.
+- Inline upgrade rendering module (`upgrade-panel-inline.js`): renders upgrade lanes (hashrate, efficiency, cooling) within each seasonal card as a compact row-table with headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP` plus inline info tooltip trigger.
 - Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
 - Halving display module: calculates and renders halving schedules and countdowns per token.
@@ -174,15 +174,17 @@ Frontend session-mode readiness:
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
+- Tooltip module (`micro-tooltip.js`): single shared non-blocking tooltip contract (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`) used by player-status and season-header info triggers, with hover-stable behavior across SSE ticks.
 
 Dashboard layout (inline, no overlays):
 
 - **Status Bar (top)**: connection status, game phase, countdown timer, quick stats.
 - **Main Grid (2 columns)**:
-  - Left (~65%): 2×2 seasonal card grid with inline upgrade controls (Hashrate, Efficiency, Cooling columns per season).
-  - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), with optional docked inline chat below.
+  - Left (~65%): 2×2 seasonal card grid with inline upgrade lanes (Hashrate, Efficiency, Cooling) and compact row-table headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP`.
+  - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), with fixed panel width variable and optional docked inline chat below.
 - **Bottom Bar**: portfolio value, trading status, farming status, chat toggle.
 - **Chat Panel (docked inline, optional)**: toggleable via bottom bar button; expands/collapses inline in the right column with internal message scrolling only.
+- Desktop no-page-scroll remains enforced; setup and seasons use internal scroll containers, and left column overflow is constrained with `min-width: 0`.
 
 Responsive behavior:
 
@@ -193,12 +195,13 @@ Responsive behavior:
 UX/behavior principles implemented:
 
 - Contract compatibility gating/disabling for upgrade interactions (no UI mutation after disable).
-- Incremental DOM updates for live metric values (balance, output, countdown).
+- Incremental DOM updates for live metric values (balance, output, countdown) using text/attribute diff updates instead of subtree remounting.
 - Inline upgrade controls integrated into season cards (no separate modal/overlay panel).
 - All three economic modes (mining, trading, farming) visible as sections, even when disabled, supporting long-term planning.
 - Optional chat panel is docked inline and non-gameplay (independent lifecycle, no gameplay coupling).
 - Local persistence of UI/session settings and meta hash hints.
 - Deterministic oracle pricing visible per-token to inform player decision-making.
+- Tooltip anchors are kept stable across SSE ticks (no trigger remount while a tooltip is open).
 
 ## 6) Security & Anti-Cheat Invariants
 
@@ -249,10 +252,13 @@ Backend test coverage includes:
 Frontend test coverage includes:
 
 - Contract support guards.
-- Token normalization and cost preview helpers.
+- Token normalization and conversion helper coverage.
 - Halving helper behavior and transitions.
 - Upgrade rendering interaction behavior.
 - Chat rendering/XSS-safety and scroll behavior.
+- Layout guardrails for desktop no-page-scroll, 2×2 season grid, shared upgrade-column alignment, and fixed player panel width.
+- Repo-wide tooltip parity assertions (shared trigger/bubble contract, scoped tooltip init, and no timeout-based auto-hide paths).
+- Large-value compact-number rendering coverage in analytics/upgrade rows (with exact-value tooltip metadata retained).
 
 ## 8) Explicit Non-Goals / Out of Scope
 

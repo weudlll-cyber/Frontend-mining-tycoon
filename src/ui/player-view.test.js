@@ -455,4 +455,34 @@ describe('player state matrix', () => {
     expect(fullValue).toBeDefined();
     expect(fullValue).toContain('1,250,000');
   });
+
+  it('sets title to full value for compacted large stats cells', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 10,
+        balances: { spring: 1250000, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: {
+        spring: 1234567,
+        summer: 2,
+        autumn: 3,
+        winter: 4,
+      },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const springBalance = document.querySelector(
+      '.ps-cell[data-row="balance"][data-token="spring"]'
+    );
+    const springOutput = document.querySelector(
+      '.ps-cell[data-row="output"][data-token="spring"]'
+    );
+
+    expect(springBalance?.getAttribute('title')).toContain('1,250,000');
+    expect(springOutput?.getAttribute('title')).toContain('1,234,567');
+  });
 });

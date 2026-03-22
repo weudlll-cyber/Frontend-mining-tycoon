@@ -38,8 +38,11 @@ All of the following must pass before merge:
 - `npm run lint`
 - `npm run format:check`
 - `npm run test -- --run`
+- `npm run test:coverage`
 - `npm run build`
 - `npm audit --omit=dev`
+
+For UI/layout or tooltip changes, ensure repository guard tests remain green (for example layout-css and tooltip parity assertions).
 
 If your change requires violating a locked invariant:
 
