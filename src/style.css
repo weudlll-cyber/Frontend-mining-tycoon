@@ -38,14 +38,15 @@ body {
   --status-blue: #3b82f6;
 
   /* Right player-status panel fixed width — keeps 2×2 seasons grid from overflowing */
-  --player-panel-width: 360px;
+  --player-panel-width: 340px;
 
-  /* Shared column template — header and all lane rows use this variable for guaranteed alignment */
+  /* Shared column template (7 tracks) — header and all lane rows use this variable for guaranteed alignment.
+     Prev column removed: pay-token select now carries the only cross-token context needed at submit time. */
   --upgrade-cols:
-    /* Upg  */ minmax(2.6ch, 3.6ch) /* Lvl  */
-    minmax(2.6ch, 4ch) /* Cost */ minmax(7ch, 1fr) /* Pay  */ minmax(4ch, 0.7fr)
-    /* Prev */ minmax(6ch, 0.9fr) /* Out/s */ minmax(5ch, auto) /* BEP  */
-    minmax(4ch, auto) /* Act  */ minmax(5ch, auto);
+    /* Upg  */ minmax(2.6ch, 3.4ch) /* Lvl  */ minmax(3ch, 3ch)
+    /* Cost */ minmax(7ch, 1fr) /* Pay  */ minmax(9ch, 0.9fr) /* Out/s*/
+    minmax(5ch, auto) /* BEP  */ minmax(4ch, auto) /* Act  */
+    minmax(5.5ch, auto);
 
   font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
   line-height: 1.6;
@@ -881,7 +882,8 @@ body {
 }
 
 .upgrade-pay-select {
-  width: 100%;
+  /* clamp keeps the dropdown wide enough to read 3-char codes without overflowing the column */
+  width: clamp(112px, 12ch, 160px);
   min-width: 0;
   padding: 0.12rem 0.2rem;
   border-radius: calc(var(--radius) / 2);

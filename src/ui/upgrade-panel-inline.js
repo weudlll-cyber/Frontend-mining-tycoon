@@ -1,7 +1,8 @@
 /*
 File: src/ui/upgrade-panel-inline.js
 Purpose: Inline upgrade rendering for season cards in a compact row-based layout.
-Context: Keeps controls inline in season cards while previewing cross-token pay costs.
+Context: Displays upgrade options inline in each season card; pay-token is selected per lane
+  and sent with the submit intent so the backend can authoritative-resolve the cost.
 Constraints: Must remain display-only and use safe DOM APIs (textContent/createElement).
 Call initInlineUpgrades() once with required dependencies before use.
 Renders upgrades directly into season .season-upgrades containers.
@@ -12,10 +13,7 @@ import {
   formatCost,
   setElementTextValue,
 } from '../utils/dom-utils.js';
-import {
-  computePayCostPreview,
-  normalizeTokenNames,
-} from '../utils/token-utils.js';
+import { normalizeTokenNames } from '../utils/token-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getActiveGameMeta = null;
@@ -27,7 +25,7 @@ const _inlineStateByContainer = new WeakMap();
 const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
 
 const UPGRADE_LANES_LEGEND =
-  'Upg: upgrade name. Lvl: current level. Cost: required amount in target token. Pay: token to spend (auto-converts via oracle). Prev: converted cost in pay token. Out/s: output gain per second. BEP: breakeven time in seconds.';
+  'Upg: upgrade name. Lvl: current level. Cost: required amount in target token. Pay: token to spend when submitting (auto-converts via oracle on backend). Out/s: output gain per second. BEP: breakeven time in seconds.';
 
 function toTokenCode(token) {
   return String(token || '')
@@ -87,7 +85,8 @@ function createHeader() {
   const header = document.createElement('div');
   header.className = 'upgrade-lane-header upgrade-header-grid';
 
-  ['Upg', 'Lvl', 'Cost', 'Pay', 'Prev', 'Out/s', 'BEP'].forEach((label) => {
+  // Header labels (7 data columns; action column has no label — ℹ︎ trigger instead)
+  ['Upg', 'Lvl', 'Cost', 'Pay', 'Out/s', 'BEP'].forEach((label) => {
     const cell = document.createElement('span');
     cell.className = 'upgrade-header-cell';
     cell.appendChild(document.createTextNode(label));
@@ -131,9 +130,6 @@ function buildLaneRow(type, seasonToken) {
   paySelect.dataset.upgradeType = type;
   payCell.appendChild(paySelect);
 
-  const previewCell = document.createElement('span');
-  previewCell.className = 'upgrade-row-cell upgrade-row-preview tabular-num';
-
   const outputCell = document.createElement('span');
   outputCell.className = 'upgrade-row-cell upgrade-row-benefit tabular-num';
 
@@ -157,7 +153,6 @@ function buildLaneRow(type, seasonToken) {
     levelCell,
     costCell,
     payCell,
-    previewCell,
     outputCell,
     breakevenCell,
     actionCell
@@ -169,41 +164,10 @@ function buildLaneRow(type, seasonToken) {
     levelCell,
     costCell,
     paySelect,
-    previewCell,
     outputCell,
     breakevenCell,
     button,
   };
-}
-
-function computePreviewText({
-  info,
-  definition,
-  targetToken,
-  payToken,
-  oraclePrices,
-  feeRate,
-  spreadRate,
-  effectiveUpgradeCostMultiplier,
-}) {
-  const preview = computePayCostPreview({
-    baseCostTarget:
-      typeof info?.cost_to_next === 'number'
-        ? info.cost_to_next
-        : Number(definition?.base_cost),
-    targetToken,
-    payToken,
-    oraclePrices,
-    feeRate,
-    spreadRate,
-    upgradeCostMultiplier: effectiveUpgradeCostMultiplier,
-  });
-
-  if (!preview) {
-    return '—';
-  }
-
-  return `${preview.payCost} ${toTokenCode(payToken)}`;
 }
 
 function createInlineState(upgradesContainer) {
@@ -247,26 +211,6 @@ function ensureInlineState(upgradesContainer) {
   );
 }
 
-function updateLanePreview(rowRefs, type, state) {
-  const context = state.context;
-  if (!context) return;
-
-  const info = context.upgrades[type];
-  const definition = context.activeUpgradeDefinitions?.[type];
-  const payToken = rowRefs.paySelect.value;
-  const text = computePreviewText({
-    info,
-    definition,
-    targetToken: context.seasonToken,
-    payToken,
-    oraclePrices: context.oraclePrices,
-    feeRate: context.feeRate,
-    spreadRate: context.spreadRate,
-    effectiveUpgradeCostMultiplier: context.effectiveUpgradeCostMultiplier,
-  });
-  setElementTextValue(rowRefs.previewCell, text);
-}
-
 function ensureLaneRow(type, seasonToken, state) {
   const existing = state.rowsByType.get(type);
   if (existing) {
@@ -274,9 +218,9 @@ function ensureLaneRow(type, seasonToken, state) {
   }
 
   const rowRefs = buildLaneRow(type, seasonToken);
+  // Persist the user’s pay-token selection across SSE ticks
   rowRefs.paySelect.addEventListener('change', () => {
     state.payTokenByType.set(type, rowRefs.paySelect.value);
-    updateLanePreview(rowRefs, type, state);
   });
   rowRefs.button.addEventListener('click', () => {
     const nextLevel = parseInt(rowRefs.button.dataset.level, 10) + 1;
@@ -343,18 +287,6 @@ export function renderInlineSeasonUpgrades(
       ? data.token_names
       : activeGameMeta?.token_names
   );
-  const oraclePrices =
-    activeGameMeta?.oracle_prices || data?.oracle_prices || null;
-  const feeRate = Number.isFinite(Number(data?.conversion_fee_rate))
-    ? Number(data.conversion_fee_rate)
-    : Number(activeGameMeta?.conversion_fee_rate || 0);
-  const spreadRate = Number.isFinite(Number(data?.oracle_spread))
-    ? Number(data.oracle_spread)
-    : Number(activeGameMeta?.oracle_spread || 0);
-  const effectiveUpgradeCostMultiplier = Number(
-    activeGameMeta?.effective_upgrade_cost_multiplier?.[seasonToken] || 1
-  );
-
   const supportedUpgradeTypes = DEFAULT_UPGRADE_ORDER.filter((type) =>
     activeUpgradeDefinitions
       ? Object.prototype.hasOwnProperty.call(activeUpgradeDefinitions, type)
@@ -365,10 +297,6 @@ export function renderInlineSeasonUpgrades(
     seasonToken,
     upgrades,
     activeUpgradeDefinitions,
-    oraclePrices,
-    feeRate,
-    spreadRate,
-    effectiveUpgradeCostMultiplier,
   };
 
   if (!supportedUpgradeTypes.length) {
@@ -423,7 +351,6 @@ export function renderInlineSeasonUpgrades(
           : tokenNames[0] || '';
     rowRefs.paySelect.value = resolvedPayToken;
     state.payTokenByType.set(type, resolvedPayToken);
-    updateLanePreview(rowRefs, type, state);
 
     rowRefs.button.dataset.level = String(level);
     if (!contractSupported) {

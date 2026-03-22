@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 
 describe('inline upgrade lanes pay token', () => {
-  it('updates preview when pay token changes and keeps row nodes stable across SSE refreshes', () => {
+  it('persists pay token selection and keeps row nodes stable across SSE refreshes', () => {
     const performUpgrade = vi.fn();
 
     initInlineUpgrades({
@@ -104,9 +104,6 @@ describe('inline upgrade lanes pay token', () => {
     const paySelectBefore = hashrateRowBefore.querySelector(
       '.upgrade-pay-select'
     );
-    const previewBefore = hashrateRowBefore.querySelector(
-      '.upgrade-row-preview'
-    );
     const actionButtonBefore = hashrateRowBefore.querySelector(
       '.btn-upgrade-inline'
     );
@@ -118,7 +115,6 @@ describe('inline upgrade lanes pay token', () => {
 
     paySelectBefore.value = 'winter';
     paySelectBefore.dispatchEvent(new Event('change'));
-    expect(previewBefore.textContent).toContain('WIN');
 
     renderInlineSeasonUpgrades(container, 'spring', createData(55));
 
@@ -128,7 +124,6 @@ describe('inline upgrade lanes pay token', () => {
     const paySelectAfter = hashrateRowAfter.querySelector(
       '.upgrade-pay-select'
     );
-    const previewAfter = hashrateRowAfter.querySelector('.upgrade-row-preview');
     const actionButtonAfter = hashrateRowAfter.querySelector(
       '.btn-upgrade-inline'
     );
@@ -137,7 +132,6 @@ describe('inline upgrade lanes pay token', () => {
     expect(paySelectAfter).toBe(paySelectBefore);
     expect(actionButtonAfter).toBe(actionButtonBefore);
     expect(paySelectAfter.value).toBe('winter');
-    expect(previewAfter.textContent).toContain('WIN');
 
     actionButtonAfter.click();
     expect(performUpgrade).toHaveBeenCalledWith(
@@ -339,17 +333,9 @@ describe('inline upgrade grid alignment', () => {
     const headerCells = Array.from(
       container.querySelectorAll('.upgrade-lane-header .upgrade-header-cell')
     );
-    // First 7 cells carry the column labels
-    const dataLabels = headerCells.slice(0, 7).map((c) => c.textContent.trim());
-    expect(dataLabels).toEqual([
-      'Upg',
-      'Lvl',
-      'Cost',
-      'Pay',
-      'Prev',
-      'Out/s',
-      'BEP',
-    ]);
+    // First 6 cells carry the column labels
+    const dataLabels = headerCells.slice(0, 6).map((c) => c.textContent.trim());
+    expect(dataLabels).toEqual(['Upg', 'Lvl', 'Cost', 'Pay', 'Out/s', 'BEP']);
 
     // Last header cell is the info trigger (no column label text, just \u24d8)
     const lastHeaderCell = headerCells[headerCells.length - 1];
