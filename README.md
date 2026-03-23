@@ -84,7 +84,7 @@ For async rounds, use the explicit session action:
 
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
-- set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
+- set `Session Duration` (5m, 10m, 30m, 1h, 6h, 12h, 1d)
 - keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
 - click `+ New Game`
 - if auto-start is disabled, click `Start Session (Async)`
@@ -324,7 +324,7 @@ Use this host-like flow directly in Setup (no overlays):
 ```text
 Round Type: [Sync] [Async (host)]
 Sync controls: Enrollment Window (seconds) + Round Duration preset/custom
-Async controls: Round Duration (5m/10m/15m/1h/3h/6h/12h/1d/3d/7d) + Session Duration (10m/30m/1h/6h/12h/1d)
+Async controls: Round Duration (5m/10m/15m/1h/3h/6h/12h/1d/3d/7d) + Session Duration (5m/10m/30m/1h/6h/12h/1d)
 [x] Auto-start async session after game creation and join
 ```
 

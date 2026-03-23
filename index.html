@@ -78,6 +78,23 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             <span id="countdown-label" class="summary-label"
               >Time Remaining</span
             >
+            <!--
+              Round-remaining hint — visible only while an async session is
+              active.  Gives the player a second reference point so they can
+              distinguish:
+                • "How long am I playing this session?" → Session Elapsed (⏱)
+                • "How long until the round ends?"      → Round left (this)
+              Visibility is managed by startSessionElapsedTimer() /
+              stopSessionElapsedTimer() in main.js.
+            -->
+            <span
+              id="round-remaining-hint"
+              class="summary-item summary-item--muted"
+              hidden
+            >
+              Round left:
+              <span id="round-remaining" class="summary-value">—</span>
+            </span>
           </div>
 
           <section
@@ -264,6 +281,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     >
                       <span>Session Duration</span>
                       <select id="async-session-duration-preset">
+                        <option value="5m">5m</option>
                         <option value="10m">10m</option>
                         <option value="30m">30m</option>
                         <option value="60m">1h</option>
@@ -272,6 +290,19 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                         <option value="24h" selected>1d</option>
                       </select>
                     </label>
+                    <!--
+                      Session-duration guard warning.
+                      Shown only when the selected session duration exceeded the
+                      round duration and the UI auto-clamped it to a valid value.
+                      Hidden by default; visibility is toggled by
+                      syncSessionDurationOptions() in main.js.
+                    -->
+                    <span
+                      id="session-duration-warning"
+                      class="async-session-warning"
+                      hidden
+                      aria-live="polite"
+                    ></span>
                     <label class="async-host-checkbox" for="async-auto-start">
                       <input id="async-auto-start" type="checkbox" checked />
                       <span

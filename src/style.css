@@ -367,6 +367,30 @@ body {
   white-space: nowrap;
 }
 
+/*
+  Inline warning shown below the Session Duration dropdown when
+  syncSessionDurationOptions() auto-clamps the selected value because
+  it exceeded the Round Duration.  Uses an amber/warning tone so it
+  stands out without being alarming.
+*/
+.async-session-warning {
+  display: block;
+  font-size: 0.72rem;
+  color: #c8960c; /* amber — readable on both light and dark themes */
+  margin-top: 0.2rem;
+}
+
+/*
+  Muted variant of .summary-item used for the "Round left" secondary
+  readout that appears next to the main countdown while a session is
+  active.  Slightly lighter than the primary item so the session
+  elapsed stays visually dominant.
+*/
+.summary-item--muted {
+  opacity: 0.72;
+  font-size: 0.82em;
+}
+
 .setup-actions {
   display: flex;
   flex-direction: column;

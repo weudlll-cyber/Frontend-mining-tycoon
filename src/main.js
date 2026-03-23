@@ -227,6 +227,19 @@ const debugBackendUrlEl = document.getElementById('debug-backend-url');
 const debugGameIdEl = document.getElementById('debug-game-id');
 const debugPlayerIdEl = document.getElementById('debug-player-id');
 const debugSessionIdEl = document.getElementById('debug-session-id');
+
+// DOM elements - async session UX helpers
+// roundRemainingHintEl: the <span> that wraps the "Round left: …" secondary
+//   countdown shown while a session is active (index.html #round-remaining-hint).
+// roundRemainingEl:     the inner <span> whose textContent we update with the
+//   formatted round-remaining time (#round-remaining).
+// sessionDurationWarningEl: small amber text shown below the Session Duration
+//   dropdown when syncSessionDurationOptions() had to auto-clamp the value.
+const roundRemainingHintEl = document.getElementById('round-remaining-hint');
+const roundRemainingEl = document.getElementById('round-remaining');
+const sessionDurationWarningEl = document.getElementById(
+  'session-duration-warning'
+);
 const chatPanelEl = document.getElementById('chat-panel');
 const chatToggleBtnEl = document.getElementById('chat-toggle-btn');
 const chatMessagesEl = document.getElementById('chat-messages');
@@ -297,6 +310,97 @@ function getSelectedRoundType() {
   return roundTypeAsyncInput?.checked ? 'async' : 'sync';
 }
 
+// ---------------------------------------------------------------------------
+// Async session-duration guard helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts a preset label (e.g. "5m", "3h", "7d") to seconds.
+ * Covers every option that exists in either the Round Duration or the
+ * Session Duration dropdown so we can compare them numerically.
+ *
+ * Returns null for unknown labels so callers can decide how to handle missing
+ * mappings rather than silently treating them as 0.
+ */
+function presetToSeconds(preset) {
+  const map = {
+    '5m': 300,
+    '10m': 600,
+    '15m': 900,
+    '60m': 3600,
+    '3h': 10800,
+    '6h': 21600,
+    '12h': 43200,
+    '24h': 86400,
+    '3d': 259200,
+    '7d': 604800,
+    // Session-only aliases (the session dropdown uses "30m" which round doesn't)
+    '30m': 1800,
+  };
+  return Object.prototype.hasOwnProperty.call(map, preset) ? map[preset] : null;
+}
+
+/**
+ * Enforces the invariant: session duration ≤ round duration.
+ *
+ * Called whenever either the Round Duration or the Session Duration dropdown
+ * changes, and once on page load after settings are restored.
+ *
+ * What it does:
+ *  1. Reads the currently selected round duration in seconds.
+ *  2. Disables every <option> in the session dropdown whose duration would
+ *     exceed the round.
+ *  3. If the currently selected session option is now disabled (was already
+ *     set to an invalid value), auto-selects the largest still-valid option.
+ *  4. Shows a small amber warning message below the session dropdown when
+ *     auto-clamping occurred so the user knows their choice was adjusted,
+ *     and hides it otherwise.
+ */
+function syncSessionDurationOptions() {
+  // Guard: both dropdowns must be present in the DOM.
+  if (!asyncHostDurationPresetInput || !asyncSessionDurationPresetInput) return;
+
+  const roundSeconds = presetToSeconds(asyncHostDurationPresetInput.value);
+
+  // If the round preset is not in our map (e.g. future preset added to HTML
+  // without updating presetToSeconds), leave the session dropdown untouched.
+  if (roundSeconds === null) return;
+
+  let lastValidValue = null; // highest session preset that is still valid
+
+  // Pass 1 — enable/disable each option in the session dropdown.
+  for (const opt of asyncSessionDurationPresetInput.options) {
+    const optSec = presetToSeconds(opt.value);
+    // An option with an unknown preset value is left enabled (safe default).
+    const tooLong = optSec !== null && optSec > roundSeconds;
+    opt.disabled = tooLong;
+    if (!tooLong) lastValidValue = opt.value;
+  }
+
+  // Pass 2 — if the current selection is now disabled, clamp to the largest
+  // valid option.
+  const currentOpt = asyncSessionDurationPresetInput.selectedOptions[0];
+  const hadToClamp = Boolean(currentOpt?.disabled) && lastValidValue !== null;
+  if (hadToClamp) {
+    asyncSessionDurationPresetInput.value = lastValidValue;
+  }
+
+  // Show / hide the inline warning beneath the dropdown.
+  if (sessionDurationWarningEl) {
+    if (hadToClamp) {
+      // Tell the user what happened and what the new value is.
+      const roundLabel = asyncHostDurationPresetInput.value;
+      const newLabel = asyncSessionDurationPresetInput.value;
+      sessionDurationWarningEl.textContent = `Session clamped to ${newLabel} — must be ≤ round (${roundLabel})`;
+      sessionDurationWarningEl.hidden = false;
+    } else {
+      // Everything is fine — no need to display anything.
+      sessionDurationWarningEl.textContent = '';
+      sessionDurationWarningEl.hidden = true;
+    }
+  }
+}
+
 function getAsyncDurationPreset() {
   const selectedPreset = String(asyncHostDurationPresetInput?.value || '10m');
   const allowed = new Set([
@@ -317,6 +421,7 @@ function getAsyncDurationPreset() {
 function getAsyncSessionDurationSeconds() {
   const selected = String(asyncSessionDurationPresetInput?.value || '24h');
   const presetSeconds = {
+    '5m': 300,
     '10m': 600,
     '30m': 1800,
     '60m': 3600,
@@ -523,6 +628,9 @@ function stopSessionElapsedTimer() {
     clearInterval(sessionElapsedInterval);
     sessionElapsedInterval = null;
   }
+  // Hide the secondary "Round left" display — it is only meaningful while a
+  // session is running and would show stale data once the session ends.
+  if (roundRemainingHintEl) roundRemainingHintEl.hidden = true;
 }
 
 function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
@@ -535,9 +643,36 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
       Number(initialElapsedSeconds) || 0,
       nowSeconds - Number(sessionStartUnix)
     );
-    // WHY: Once the backend session exists, the primary timer should reflect session-relative age.
+
+    // ── Primary header counter ──────────────────────────────────────────────
+    // WHY: Once the backend session exists, the primary timer shows how long
+    // the player has been in *this session*, not how long the round runs.
     countdownLabelEl.textContent = 'Session Elapsed';
     countdownEl.textContent = formatRemainingMmSs(elapsed);
+
+    // ── Secondary "Round left" indicator ───────────────────────────────────
+    // WHY: The round carries on beyond the session. Halvings, scoring, and
+    // the leaderboard all run until the *round* ends, not the session.
+    // Showing this number prevents confusion when halvings still fire after
+    // the session duration has elapsed.
+    //
+    // We read seconds_remaining from the most-recent stream payload
+    // (lastGameData) and subtract the time that has passed since that payload
+    // arrived so the display stays fresh between stream ticks.
+    if (roundRemainingHintEl && roundRemainingEl) {
+      const remaining = lastGameData?.seconds_remaining;
+      if (remaining != null && Number.isFinite(Number(remaining))) {
+        // Drift-correct: the payload was received some milliseconds ago.
+        const streamAge = (Date.now() - (lastGameData.timestamp ?? Date.now())) / 1000;
+        const roundLeft = Math.max(0, Number(remaining) - streamAge);
+        roundRemainingEl.textContent = formatDurationCompact(roundLeft);
+        roundRemainingHintEl.hidden = false;
+      } else {
+        // No stream data yet (session just started) — keep hint hidden to
+        // avoid showing a stale or misleading "—".
+        roundRemainingHintEl.hidden = true;
+      }
+    }
   };
 
   update();
@@ -906,6 +1041,9 @@ function initializeModules() {
       saveSettings();
     },
     onHostAsyncDurationChanged() {
+      // Keep the session dropdown in sync whenever the round duration changes:
+      // disable options that would exceed the round and auto-clamp if needed.
+      syncSessionDurationOptions();
       updateAsyncHostControlsVisibility();
       updateSetupActionsState();
       saveSettings();
@@ -1398,6 +1536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeHeaderInteractions();
   ensureInputsEditable();
   loadSettings();
+  // Apply the session-duration guard immediately after settings are restored
+  // so the dropdown reflects the saved round duration on first render.
+  syncSessionDurationOptions();
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
   const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
