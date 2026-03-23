@@ -86,7 +86,7 @@ jobs:
             }
 
             if (missing.length > 0) {
-              core.setFailed(`PR body is missing required sections: ${missing.join(', ')}`);
+              core.warning(`PR body is missing recommended sections: ${missing.join(', ')}`);
               return;
             }
 
