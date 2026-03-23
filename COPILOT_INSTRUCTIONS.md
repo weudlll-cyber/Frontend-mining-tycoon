@@ -125,6 +125,8 @@ For every source file touched or created:
 - Evaluate test impact; add/update Vitest tests for changed behavior.
 - Evaluate documentation impact:
   - update `README.md` and/or `PROJECT_BASELINE.md` when behavior/UI contract changes
+  - update other affected frontend docs (`CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `CODE_ORGANIZATION.md`, `SECURITY_AUDIT.md`, concept docs) when their statements become stale
+  - if the change affects backend contracts, runtime behavior, security posture, or operational steps, review and update sibling backend docs in the same workstream
   - if docs are unchanged, explicitly state why
 - Run all quality gates before push:
   - `npm run lint`
@@ -137,6 +139,7 @@ If backend files are touched in the same task, also run backend gates before pus
 
 - `python -m ruff check app tests scripts`
 - `python -m unittest discover -s tests -q`
+- `python -m pytest -q`
 - `python -m pip_audit -r requirements.txt`
 
 ## 8) Required Output Format

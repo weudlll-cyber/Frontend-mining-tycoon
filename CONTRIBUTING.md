@@ -10,6 +10,8 @@ Before opening a PR:
 
 - Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
 - Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, or security docs when impacted) and remove stale statements that no longer match implementation.
+- If the change touches API contracts, session flow, security posture, runbooks, or any other full-stack behavior, review the sibling backend repo docs in the same workstream and update them when needed.
+- Treat documentation impact review as mandatory for every code change, even when the outcome is that no doc update was required.
 - Validate changes against LOCKED_DECISIONS.md.
 - Use the PR checklist in [.github/pull_request_template.md](.github/pull_request_template.md).
 - Ensure tests remain green and add/update tests for changed behavior.
