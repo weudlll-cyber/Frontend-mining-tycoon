@@ -38,13 +38,51 @@ let _state = {
 };
 
 const ASYNC_DIAGNOSTIC_CHIPS = [
-  { key: 'isAsyncRound', label: 'Async' },
-  { key: 'isWindowOpen', label: 'Window' },
-  { key: 'isJoined', label: 'Joined' },
-  { key: 'backendSessionSupport', label: 'SessionAPI' },
-  { key: 'hasNoActiveSession', label: 'NoSession' },
-  { key: 'requireAuth', label: 'Auth' },
+  {
+    key: 'isAsyncRound',
+    label: 'Async',
+    meaning: 'Round mode is asynchronous.',
+  },
+  {
+    key: 'isWindowOpen',
+    label: 'Window',
+    meaning: 'Session start window is open for this round.',
+  },
+  {
+    key: 'isJoined',
+    label: 'Joined',
+    meaning: 'A player is joined for this game (Player ID present).',
+  },
+  {
+    key: 'backendSessionSupport',
+    label: 'SessionAPI',
+    meaning: 'Backend supports async session creation and tickets.',
+  },
+  {
+    key: 'hasNoActiveSession',
+    label: 'NoSession',
+    meaning: 'No active async session currently exists for this player.',
+  },
+  {
+    key: 'requireAuth',
+    label: 'Auth',
+    meaning: 'Backend requires player auth token for session endpoints.',
+  },
 ];
+
+function formatAsyncChipTitle(chipConfig, chipValue) {
+  const valueText = chipValue === null ? 'unknown' : String(chipValue);
+  if (chipConfig.key === 'requireAuth') {
+    if (chipValue === true) {
+      return `${chipConfig.meaning} Current: required.`;
+    }
+    if (chipValue === false) {
+      return `${chipConfig.meaning} Current: not required (backend auth disabled).`;
+    }
+    return `${chipConfig.meaning} Current: unknown. This is checked only after async diagnostics can probe with Backend URL, Game ID, and Player ID.`;
+  }
+  return `${chipConfig.meaning} Current: ${valueText}.`;
+}
 
 export function initSetupShell(deps) {
   _refs = deps;
@@ -153,9 +191,7 @@ function renderAsyncAvailabilityChips() {
       ? 'async-diagnostic-chip async-diagnostic-chip--ok'
       : 'async-diagnostic-chip async-diagnostic-chip--dim';
     chip.textContent = `${icon} ${chipConfig.label}`;
-    chip.title = isSatisfied
-      ? `${chipConfig.key}: true`
-      : `${chipConfig.key}: ${chipValue === null ? 'unknown' : String(chipValue)}`;
+    chip.title = formatAsyncChipTitle(chipConfig, chipValue);
     container.appendChild(chip);
   });
 }
@@ -180,6 +216,10 @@ export function updateSetupActionsState() {
   }
 
   const gameRunning = _state.latestGameStatus === 'running';
+  const gameFinished = _state.latestGameStatus === 'finished';
+  const hasKnownGameStatus = ['enrolling', 'running', 'finished'].includes(
+    String(_state.latestGameStatus || '').toLowerCase()
+  );
   const gameExists = hasActiveGame();
   const availability = getAsyncAvailability();
   const isAsyncRound = availability.isAsyncRound;
@@ -206,6 +246,7 @@ export function updateSetupActionsState() {
     _refs.startBtn.disabled =
       _state.isSetupBusy ||
       !gameExists ||
+      gameFinished ||
       _state.isStreamActive ||
       requiresSessionStart;
   }
@@ -216,6 +257,7 @@ export function updateSetupActionsState() {
       _state.isSetupBusy ||
       !isAsyncRound ||
       !gameExists ||
+      gameFinished ||
       !availability.isJoined ||
       !availability.hasNoActiveSession ||
       _state.isStreamActive ||
@@ -242,6 +284,35 @@ export function updateSetupActionsState() {
     return;
   }
 
+  if (gameFinished) {
+    _refs.setupActionsNoteEl.textContent =
+      'This game is finished. Create a new game to start another async session.';
+    return;
+  }
+
+  if (!gameExists) {
+    _refs.setupActionsNoteEl.textContent =
+      'Create a game first, then Start Stream to join the live board.';
+    return;
+  }
+
+  const sessionStatusText = String(
+    _refs.startSessionStatusEl?.textContent || ''
+  ).trim();
+  const sessionStatusClass = String(
+    _refs.startSessionStatusEl?.className || ''
+  );
+  const hasSessionStartWarning =
+    sessionStatusText.length > 0 &&
+    (sessionStatusClass.includes('setup-session-status--warning') ||
+      sessionStatusClass.includes('setup-session-status--error'));
+
+  if (isAsyncRound && hasSessionStartWarning) {
+    _refs.setupActionsNoteEl.textContent =
+      'Session start failed. Check the message above and retry.';
+    return;
+  }
+
   if (isAsyncRound && !_state.sessionStartSupported) {
     _refs.setupActionsNoteEl.textContent =
       'Async session endpoint is unavailable on backend.';
@@ -261,14 +332,14 @@ export function updateSetupActionsState() {
       return;
     }
 
+    if (!hasKnownGameStatus) {
+      _refs.setupActionsNoteEl.textContent =
+        'Optional: Start Session (Async) to reconnect this game, or click + New Game for a fresh round.';
+      return;
+    }
+
     _refs.setupActionsNoteEl.textContent =
       'Start Session (Async) first, then stream uses the session-scoped channel.';
-    return;
-  }
-
-  if (!gameExists) {
-    _refs.setupActionsNoteEl.textContent =
-      'Create a game first, then Start Stream to join the live board.';
     return;
   }
 

@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe('player state matrix', () => {
-  it('renders matrix headers SPR/SUM/AUT/WIN/Σ', () => {
+  it('renders matrix headers SPR/SUM/AUT/WIN', () => {
     renderPlayerState({
       game_id: 'g1',
       game_status: 'idle',
@@ -65,7 +65,7 @@ describe('player state matrix', () => {
       (el) => el.textContent.trim()
     );
 
-    expect(heads).toEqual(['SPR', 'SUM', 'AUT', 'WIN', 'Σ']);
+    expect(heads).toEqual(['SPR', 'SUM', 'AUT', 'WIN']);
   });
 
   it('renders Out/s, Bal, Price rows with values', () => {
@@ -116,7 +116,7 @@ describe('player state matrix', () => {
     ).toBe('3.46');
   });
 
-  it('renders icon column for each matrix row', () => {
+  it('renders inline info triggers on each matrix row label', () => {
     renderPlayerState({
       game_id: 'g1',
       game_status: 'idle',
@@ -130,13 +130,17 @@ describe('player state matrix', () => {
       oracle_spread: 0.01,
     });
 
-    const icons = Array.from(document.querySelectorAll('.ps-icon-cell'));
-    expect(icons.length).toBeGreaterThanOrEqual(3); // output, balance, price + footer
+    const rowLabelTriggers = Array.from(
+      document.querySelectorAll('.ps-row-label .ps-tip-trigger')
+    );
+    expect(rowLabelTriggers.length).toBe(3);
 
-    const iconRows = icons.map((icon) => icon.dataset.row);
-    expect(iconRows).toContain('output');
-    expect(iconRows).toContain('balance');
-    expect(iconRows).toContain('price');
+    const rowKeys = rowLabelTriggers.map(
+      (trigger) => trigger.closest('.ps-row-label')?.dataset.row
+    );
+    expect(rowKeys).toContain('output');
+    expect(rowKeys).toContain('balance');
+    expect(rowKeys).toContain('price');
   });
 
   it('renders footer as two lines with fee/spread tooltip on line 2', () => {
@@ -223,6 +227,70 @@ describe('player state matrix', () => {
     expect(lines.length).toBe(2);
     expect(lines[0].hidden).toBe(true);
     expect(lines[1].hidden).toBe(true);
+  });
+
+  it('falls back to alternate backend score field names in async mode', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      scoring_aggregate: 'best_of',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 123.45,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      session: {
+        session_id: 's-1',
+        session_score: 3210,
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      best_round_score: 6543,
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines.length).toBe(2);
+    expect(lines[0].hidden).toBe(false);
+    expect(lines[1].hidden).toBe(false);
+    expect(lines[0].textContent).toMatch(/This session:\s+3[\s,\u00A0]210/);
+    expect(lines[1].textContent).toMatch(/Best this round:\s+6[\s,\u00A0]543/);
+  });
+
+  it('derives This session score from cumulative mined when backend score is stale zero', () => {
+    const baseData = {
+      game_id: 'g1',
+      game_status: 'running',
+      scoring_aggregate: 'best_of',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 1000,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      session: {
+        session_id: 'session-99',
+        status: 'running',
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      current_session_score: 0,
+      player_best_of_score: 7777,
+    };
+
+    renderPlayerState(baseData);
+    renderPlayerState({
+      ...baseData,
+      player_state: {
+        ...baseData.player_state,
+        cumulative_mined: 1125,
+      },
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines.length).toBe(2);
+    expect(lines[0].textContent).toMatch(/This session:\s+125/);
+    expect(lines[1].textContent).toMatch(/Best this round:\s+7[\s,\u00A0]777/);
   });
 
   it('preserves next-halving information in running footer and footer tooltip', () => {
@@ -344,18 +412,13 @@ describe('player state matrix', () => {
     expect(springPrice?.textContent).not.toBe('-');
     expect(winterPrice?.textContent).not.toBe('-');
 
-    const sigmaPrice = document.querySelector(
-      '.ps-cell[data-row="price"][data-token="sigma"]'
-    );
-    expect(sigmaPrice?.textContent.trim()).toBe('—');
-
     const priceLabel = document.querySelector('.ps-row-price-label');
     expect(priceLabel).not.toBeNull();
     expect(priceLabel?.textContent).toContain('Price');
     expect(priceLabel?.classList.contains('ps-row-price-label')).toBe(true);
 
     const priceCells = document.querySelectorAll('.ps-value-price');
-    expect(priceCells.length).toBeGreaterThanOrEqual(5);
+    expect(priceCells.length).toBe(4);
     priceCells.forEach((cell) => {
       expect(cell.hasAttribute('hidden')).toBe(false);
     });

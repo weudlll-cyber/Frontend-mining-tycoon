@@ -16,6 +16,18 @@ function buildDomFixture() {
       <input id="enrollment-window" value="60" />
       <input id="game-id" value="1" />
       <input id="player-id" value="1" />
+      <input id="show-advanced-overrides" type="checkbox" />
+      <div id="advanced-overrides" style="display:none"></div>
+      <select id="anchor-token">
+        <option value="">— Use recommendation —</option>
+        <option value="spring">spring</option>
+        <option value="summer">summer</option>
+        <option value="autumn">autumn</option>
+        <option value="winter">winter</option>
+      </select>
+      <input id="anchor-rate" value="" />
+      <input id="season-cycles" value="" />
+      <div id="derived-emission-preview" style="display:none"></div>
       <button id="new-game-btn"></button>
       <button id="start-btn"></button>
       <button id="stop-btn"></button>
@@ -128,6 +140,42 @@ describe('Seasonal Oracle frontend helpers', () => {
         spreadRate: 0.01,
       })
     ).toBeNull();
+  });
+
+  it('does not include advanced overrides when the toggle is unchecked', async () => {
+    const module = await loadMainModule();
+
+    const showAdvanced = document.getElementById('show-advanced-overrides');
+    const anchorToken = document.getElementById('anchor-token');
+    const anchorRate = document.getElementById('anchor-rate');
+    const seasonCycles = document.getElementById('season-cycles');
+
+    showAdvanced.checked = false;
+    anchorToken.value = 'winter';
+    anchorRate.value = '9.5';
+    seasonCycles.value = '4';
+
+    expect(module.collectAdvancedOverrides()).toEqual({});
+  });
+
+  it('includes advanced overrides only when the toggle is checked', async () => {
+    const module = await loadMainModule();
+
+    const showAdvanced = document.getElementById('show-advanced-overrides');
+    const anchorToken = document.getElementById('anchor-token');
+    const anchorRate = document.getElementById('anchor-rate');
+    const seasonCycles = document.getElementById('season-cycles');
+
+    showAdvanced.checked = true;
+    anchorToken.value = 'summer';
+    anchorRate.value = '8.5';
+    seasonCycles.value = '2';
+
+    expect(module.collectAdvancedOverrides()).toEqual({
+      emission_anchor_token: 'summer',
+      emission_anchor_tokens_per_second: 8.5,
+      season_cycles_per_game: 2,
+    });
   });
 
   it('computes Portfolio Value from balances and oracle prices', async () => {
@@ -1337,7 +1385,12 @@ describe('Seasonal Oracle inline upgrade module', () => {
     const button = upgradesContainer.querySelector('.btn-upgrade-inline');
     button?.click();
 
-    expect(mockPerformUpgrade).toHaveBeenCalledWith('hashrate', 3, 'spring');
+    expect(mockPerformUpgrade).toHaveBeenCalledWith(
+      'hashrate',
+      3,
+      'spring',
+      'spring'
+    );
   });
 
   it('renders exactly one row per supported upgrade type', async () => {

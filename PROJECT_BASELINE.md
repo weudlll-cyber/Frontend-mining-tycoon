@@ -167,9 +167,11 @@ Frontend session-mode readiness:
   Sync uses enrollment window + round duration controls.
   Async uses round duration + session duration controls with optional auto-start.
 - Async create payload sends `enrollment_window_seconds=0`, `duration_mode="preset"`, and explicit `session_duration_seconds`.
+- Async enrollment phase is intentionally skipped: because `enrollment_window_seconds=0`, the backend transitions directly from creation to `running` without an `enrolling` phase. The frontend detects async mode via `getRoundModeFromMeta() === 'async'` from the game meta payload and skips the enrollment countdown, showing the round duration countdown immediately instead.
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
 - Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
+- Async best-of attempts are backend-reset per session start: player state is reset to deterministic baseline (balances/tracks/upgrades/cumulative mined) before each new async session, so attempts are directly comparable.
 - Best-of visibility is surfaced in Player State panel during async rounds only: shows `This session` and `Best this round` (read-only backend values from backend payload). Hidden in sync mode.
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.

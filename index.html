@@ -324,6 +324,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   class="advanced-overrides"
                   style="display: none"
                 >
+                  <p class="advanced-overrides-help" aria-live="polite">
+                    Override math: total halving checkpoints across the game =
+                    season cycles x 4 (spring, summer, autumn, winter).
+                  </p>
                   <div class="form-group">
                     <label>Anchor Token:</label>
                     <select id="anchor-token">
@@ -333,6 +337,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       <option value="autumn">autumn</option>
                       <option value="winter">winter</option>
                     </select>
+                    <p class="field-help">
+                      The anchor token is the reference token used to derive all
+                      other base emission rates by fixed ratios.
+                    </p>
                   </div>
                   <div class="form-group">
                     <label>Anchor Tokens/sec:</label>
@@ -343,16 +351,24 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       step="0.1"
                       min="0"
                     />
+                    <p class="field-help">
+                      Base emission speed for the anchor token (tokens per real
+                      second). Other tokens are scaled from this value.
+                    </p>
                   </div>
                   <div class="form-group">
-                    <label>Season Cycles:</label>
+                    <label>Season Cycles (not total halvings):</label>
                     <input
                       id="season-cycles"
                       type="number"
-                      placeholder="e.g., 1"
+                      placeholder="e.g., 1 (short sessions)"
                       step="1"
                       min="1"
                     />
+                    <p class="field-help">
+                      One cycle contains 4 halving checkpoints. Example: cycles
+                      = 4 means up to 16 halving checkpoints over the game.
+                    </p>
                   </div>
                   <div
                     id="derived-emission-preview"
@@ -384,6 +400,13 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     Round: Sync
                   </span>
                 </div>
+                <p id="async-diagnostics-help" class="async-diagnostics-help">
+                  Chip meaning: Async = round mode is async. Window = session
+                  window is open. Joined = player joined this game. SessionAPI =
+                  backend supports async sessions. NoSession = no active session
+                  for this player. Auth = backend requires player auth token.
+                  Auth can stay ○ when auth is disabled or not probed yet.
+                </p>
                 <div class="button-group">
                   <button id="new-game-btn" class="btn-primary">
                     + New Game

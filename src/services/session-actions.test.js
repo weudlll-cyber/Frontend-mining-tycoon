@@ -24,7 +24,7 @@ describe('session-actions', () => {
     });
   }
 
-  it('maps 403 to policy-closed message', async () => {
+  it('maps 403 to http error and preserves backend detail', async () => {
     setupDeps();
 
     const fetchMock = vi
@@ -38,17 +38,18 @@ describe('session-actions', () => {
         status: 403,
         ok: false,
         statusText: 'Forbidden',
-        json: async () => ({}),
+        json: async () => ({ detail: 'Missing or invalid player token.' }),
       });
     globalThis.fetch = fetchMock;
 
     const result = await createAsyncSession({ gameId: '1', playerId: '2' });
 
     expect(result.ok).toBe(false);
-    expect(result.kind).toBe('policy-closed');
+    expect(result.kind).toBe('http');
+    expect(result.message).toBe('Missing or invalid player token.');
   });
 
-  it('maps 409 to policy-closed message', async () => {
+  it('maps 409 to policy-closed and preserves backend detail', async () => {
     setupDeps();
 
     const fetchMock = vi
@@ -62,7 +63,9 @@ describe('session-actions', () => {
         status: 409,
         ok: false,
         statusText: 'Conflict',
-        json: async () => ({}),
+        json: async () => ({
+          detail: 'Finish the current async session before starting another.',
+        }),
       });
     globalThis.fetch = fetchMock;
 
@@ -70,6 +73,9 @@ describe('session-actions', () => {
 
     expect(result.ok).toBe(false);
     expect(result.kind).toBe('policy-closed');
+    expect(result.message).toBe(
+      'Finish the current async session before starting another.'
+    );
   });
 
   it('omits player_id and sends X-Player-Token when auth is required', async () => {
@@ -157,7 +163,7 @@ describe('session-actions', () => {
     expect(result.code).toBe(404);
   });
 
-  it('probeSessionSupport returns false for 404 capability response', async () => {
+  it('probeSessionSupport returns null for ambiguous 404 capability response', async () => {
     setupDeps();
 
     globalThis.fetch = vi.fn().mockResolvedValueOnce({
@@ -166,7 +172,7 @@ describe('session-actions', () => {
     });
 
     const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
-    expect(result.supported).toBe(false);
+    expect(result.supported).toBe(null);
     expect(result.code).toBe(404);
   });
 
@@ -187,5 +193,23 @@ describe('session-actions', () => {
     const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
     expect(result.supported).toBe(true);
     expect(result.code).toBe(422);
+  });
+
+  it('probeSessionSupport returns null on network error', async () => {
+    setupDeps();
+
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network'));
+
+    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
+    expect(result.supported).toBe(null);
+    expect(result.reason).toBe('network-error');
+  });
+
+  it('probeSessionSupport returns null when gameId is missing', async () => {
+    setupDeps();
+
+    const result = await probeSessionSupport({ gameId: '', playerId: '2' });
+    expect(result.supported).toBe(null);
+    expect(result.reason).toBe('missing-game-id');
   });
 });

@@ -136,10 +136,10 @@ export async function probeRequirePlayerAuth({ gameId, playerId }) {
 export async function probeSessionSupport({ gameId, playerId }) {
   const baseUrl = _deps?.getNormalizedBaseUrlOrNull?.({ notify: false });
   if (!baseUrl) {
-    return { supported: false, reason: 'missing-base-url' };
+    return { supported: null, reason: 'missing-base-url' };
   }
   if (!gameId) {
-    return { supported: false, reason: 'missing-game-id' };
+    return { supported: null, reason: 'missing-game-id' };
   }
 
   const encodedGameId = encodeURIComponent(gameId);
@@ -151,7 +151,13 @@ export async function probeSessionSupport({ gameId, playerId }) {
       headers: { 'X-Dry-Run': 'true' },
     });
 
-    if (optionsResponse.status === 404 || optionsResponse.status === 501) {
+    if (optionsResponse.status === 404) {
+      // Could be either "route not found" or "game not found" depending on backend.
+      // Defer a hard unsupported decision to the dry-run POST probe.
+      return { supported: null, code: optionsResponse.status };
+    }
+
+    if (optionsResponse.status === 501) {
       return { supported: false, code: optionsResponse.status };
     }
 
@@ -179,18 +185,22 @@ export async function probeSessionSupport({ gameId, playerId }) {
       body: JSON.stringify(dryRunBody),
     });
 
-    if (
-      postResponse.status === 404 ||
-      postResponse.status === 405 ||
-      postResponse.status === 501
-    ) {
+    if (postResponse.status === 405 || postResponse.status === 501) {
       return { supported: false, code: postResponse.status };
+    }
+
+    if (postResponse.status === 404) {
+      // 404 here is ambiguous across backend variants (missing game vs missing route).
+      // Keep diagnostics neutral to avoid false "endpoint unavailable" UI states.
+      return { supported: null, code: postResponse.status };
     }
 
     // WHY: Any non-capability error (400/401/403/409/422/etc.) still proves endpoint support.
     return { supported: true, code: postResponse.status };
   } catch {
-    return { supported: false, reason: 'network-error' };
+    // Network/CORS failures are not authoritative for capability support.
+    // Keep diagnostics neutral so users can still attempt real session start.
+    return { supported: null, reason: 'network-error' };
   }
 }
 
@@ -248,11 +258,15 @@ export async function createAsyncSession({ gameId, playerId }) {
       body: JSON.stringify(body),
     });
 
-    if (response.status === 403 || response.status === 409) {
+    if (response.status === 409) {
+      const detail = await parseErrorDetail(
+        response,
+        'Session cannot be started now (policy window closed).'
+      );
       return {
         ok: false,
         kind: 'policy-closed',
-        message: 'Session cannot be started now (policy window closed).',
+        message: detail,
       };
     }
 

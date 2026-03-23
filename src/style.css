@@ -38,7 +38,7 @@ body {
   --status-blue: #3b82f6;
 
   /* Right player-status panel fixed width — keeps 2×2 seasons grid from overflowing */
-  --player-panel-width: 332px;
+  --player-panel-width: clamp(332px, 26vw, 376px);
 
   /* Shared column template (7 tracks) — balanced for readable upgrade names + metrics.
      All flexible columns now use 1fr for even distribution; UPG widened for full names. */
@@ -413,6 +413,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+}
+
+.async-diagnostics-help {
+  margin: -0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
 }
 
 .async-diagnostics-chips {
@@ -1292,6 +1299,19 @@ body {
   margin: 0.5rem 0 1rem 0;
 }
 
+.advanced-overrides-help {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.field-help {
+  margin: 0.45rem 0 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
 .form-group select {
   padding: 0.65rem 0.85rem;
   border: 1px solid var(--border-light);
@@ -1467,9 +1487,7 @@ button {
 
 .ps-matrix {
   display: grid;
-  grid-template-columns:
-    minmax(4.8rem, 1fr) repeat(5, minmax(4.8ch, 1fr))
-    minmax(1.3rem, auto);
+  grid-template-columns: minmax(5rem, 1fr) repeat(4, minmax(6ch, 1fr));
   gap: 0.15rem 0.25rem;
   align-items: center;
 }
@@ -1500,6 +1518,8 @@ button {
 .ps-label-cell {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.24rem;
   color: var(--text-secondary);
   font-weight: 600;
   white-space: nowrap;
@@ -1507,6 +1527,14 @@ button {
 
 .ps-label-text {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ps-row-tip-trigger {
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.68rem;
 }
 
 .ps-icon-cell {
@@ -1527,8 +1555,8 @@ button {
   letter-spacing: -0.01em;
   color: var(--text-primary);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -1925,7 +1953,7 @@ button {
   }
 
   .ps-matrix {
-    grid-template-columns: minmax(4.2rem, 1.2fr) repeat(5, minmax(0, 1fr));
+    grid-template-columns: minmax(4.4rem, 1.25fr) repeat(4, minmax(0, 1fr));
     gap: 0.2rem 0.28rem;
   }
 

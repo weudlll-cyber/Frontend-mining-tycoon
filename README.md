@@ -43,7 +43,7 @@ Key highlights:
 - Desktop gameplay view keeps core information visible without page scrolling.
 - No overlays/modals/popups for core gameplay interactions.
 - Seasonal upgrades stay inline with three visible lanes: hashrate, efficiency, cooling.
-- Analytics stays read-only and visible with per-token output + total, cumulative mined, balances, oracle prices, and fee/spread.
+- Analytics stays read-only and visible with per-token output, cumulative mined, balances, oracle prices, and fee/spread.
 - Trading and farming remain visible as sections even when disabled.
 - Chat remains social-only, docked inline (not overlay), and non-gameplay.
 - Tests must remain green and new behavior must be covered; keep XSS-safe rendering patterns.
@@ -97,6 +97,7 @@ Sync/Async model (backend-aligned):
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
 - Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
+- Every new async session attempt starts from the same backend baseline state (balances/tracks/upgrades/cumulative mined reset for that player), so attempts are comparable and only your per-session decisions can change results.
 - In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
 
 ## UI Layout

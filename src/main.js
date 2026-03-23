@@ -161,6 +161,8 @@ import {
 } from './services/session-actions.js';
 import { debugLog } from './utils/debug-log.js';
 
+const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
+
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
 const playerNameInput = document.getElementById('player-name');
@@ -286,6 +288,9 @@ let sessionStartSupported = true;
 let setupRoundModeOverride = null;
 let activeSession = null;
 let sessionElapsedInterval = null;
+let sessionElapsedAnchorUnix = null;
+let sessionElapsedSeedSeconds = 0;
+let roundRemainingHintInterval = null;
 let asyncWindowOpen = null;
 let asyncRequirePlayerAuth = 'unknown';
 let asyncSessionSupportProbe = null;
@@ -508,11 +513,13 @@ function getCurrentRoundContext() {
   const supportsSessionStart =
     roundMode !== 'async'
       ? false
-      : supportFromMeta === null
-        ? supportFromProbe === null
-          ? sessionStartSupported
-          : supportFromProbe
-        : supportFromMeta;
+      : supportFromMeta === false
+        ? false
+        : supportFromMeta === true
+          ? true
+          : supportFromProbe === true
+            ? true
+            : sessionStartSupported;
   return {
     roundMode,
     supportsSessionStart,
@@ -636,7 +643,7 @@ function handleActiveSessionExpired() {
   cancelPendingUiRender();
   closeEventSourceIfOpen();
   stopLiveTimersAndHalving();
-  stopSessionElapsedTimer();
+  stopSessionElapsedTimer({ resetDisplay: false, hideRoundHint: false });
   disconnectChat();
 
   isStreamActive = false;
@@ -648,29 +655,113 @@ function handleActiveSessionExpired() {
   );
   showToast('Session ended at configured duration.', 'info');
 
+  // Freeze session clock at 00 once no active session exists.
+  if (countdownLabelEl) {
+    countdownLabelEl.textContent = 'Session Left';
+    countdownLabelEl.hidden = false;
+  }
+  if (countdownEl) {
+    countdownEl.textContent = formatDurationCompact(0);
+  }
+
+  // Keep round-left countdown running independently after session expiry.
+  startRoundRemainingHintTimer();
+
   updateSetupActionsState();
   renderDebugContext();
 }
 
-function stopSessionElapsedTimer() {
+function updateRoundRemainingHint() {
+  if (!roundRemainingHintEl || !roundRemainingEl) return;
+
+  const remaining = Number(lastGameData?.seconds_remaining);
+  if (!Number.isFinite(remaining)) {
+    roundRemainingHintEl.hidden = true;
+    return;
+  }
+
+  const streamAge =
+    (Date.now() - (lastGameData?.timestamp ?? Date.now())) / 1000;
+  const roundLeft = Math.max(0, remaining - streamAge);
+  roundRemainingEl.textContent = formatDurationCompact(roundLeft);
+  roundRemainingHintEl.hidden = false;
+}
+
+function startRoundRemainingHintTimer() {
+  if (roundRemainingHintInterval) {
+    clearInterval(roundRemainingHintInterval);
+    roundRemainingHintInterval = null;
+  }
+  updateRoundRemainingHint();
+  roundRemainingHintInterval = setInterval(updateRoundRemainingHint, 500);
+}
+
+function stopRoundRemainingHintTimer(hide = true) {
+  if (roundRemainingHintInterval) {
+    clearInterval(roundRemainingHintInterval);
+    roundRemainingHintInterval = null;
+  }
+  if (hide && roundRemainingHintEl) {
+    roundRemainingHintEl.hidden = true;
+  }
+}
+
+function stopSessionElapsedTimer({
+  resetDisplay = true,
+  hideRoundHint = true,
+} = {}) {
   if (sessionElapsedInterval) {
     clearInterval(sessionElapsedInterval);
     sessionElapsedInterval = null;
   }
-  // Hide the secondary "Round left" display — it is only meaningful while a
-  // session is running and would show stale data once the session ends.
-  if (roundRemainingHintEl) roundRemainingHintEl.hidden = true;
+  sessionElapsedAnchorUnix = null;
+  sessionElapsedSeedSeconds = 0;
+
+  if (resetDisplay) {
+    if (countdownLabelEl) {
+      countdownLabelEl.textContent = 'Time Remaining';
+      countdownLabelEl.hidden = false;
+    }
+    if (countdownEl) countdownEl.textContent = '-';
+  }
+
+  if (hideRoundHint) {
+    stopRoundRemainingHintTimer(true);
+  }
 }
 
 function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
   if (!Number.isFinite(sessionStartUnix)) return;
+
+  const normalizedStartUnix = Number(sessionStartUnix);
+  const normalizedInitialElapsed = Number(initialElapsedSeconds);
+  const nextInitialElapsed = Number.isFinite(normalizedInitialElapsed)
+    ? normalizedInitialElapsed
+    : 0;
+
+  if (
+    sessionElapsedInterval &&
+    sessionElapsedAnchorUnix === normalizedStartUnix
+  ) {
+    sessionElapsedSeedSeconds = Math.max(
+      sessionElapsedSeedSeconds,
+      nextInitialElapsed
+    );
+    return;
+  }
+
   stopSessionElapsedTimer();
+  clearCountdownInterval();
+  stopRoundRemainingHintTimer(false);
+
+  sessionElapsedAnchorUnix = normalizedStartUnix;
+  sessionElapsedSeedSeconds = nextInitialElapsed;
 
   const update = () => {
     const nowSeconds = Date.now() / 1000;
     const elapsed = Math.max(
-      Number(initialElapsedSeconds) || 0,
-      nowSeconds - Number(sessionStartUnix)
+      Number(sessionElapsedSeedSeconds) || 0,
+      nowSeconds - Number(sessionElapsedAnchorUnix)
     );
 
     const sessionDurationSec = Number(activeSession?.sessionDurationSec);
@@ -684,10 +775,17 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
     }
 
     // ── Primary header counter ──────────────────────────────────────────────
-    // WHY: Once the backend session exists, the primary timer shows how long
-    // the player has been in *this session*, not how long the round runs.
-    countdownLabelEl.textContent = 'Session Elapsed';
-    countdownEl.textContent = formatRemainingMmSs(elapsed);
+    // WHY: Session timer should count down remaining session lifetime.
+    // Keep it compact for long sessions (h/d formatting).
+    if (countdownLabelEl) {
+      countdownLabelEl.textContent = 'Session Left';
+      countdownLabelEl.hidden = false;
+    }
+    const sessionLeft =
+      Number.isFinite(sessionDurationSec) && sessionDurationSec > 0
+        ? Math.max(0, sessionDurationSec - elapsed)
+        : elapsed;
+    countdownEl.textContent = formatDurationCompact(sessionLeft);
 
     // ── Secondary "Round left" indicator ───────────────────────────────────
     // WHY: The round carries on beyond the session. Halvings, scoring, and
@@ -698,20 +796,7 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
     // We read seconds_remaining from the most-recent stream payload
     // (lastGameData) and subtract the time that has passed since that payload
     // arrived so the display stays fresh between stream ticks.
-    if (roundRemainingHintEl && roundRemainingEl) {
-      const remaining = lastGameData?.seconds_remaining;
-      if (remaining != null && Number.isFinite(Number(remaining))) {
-        // Drift-correct: the payload was received some milliseconds ago.
-        const streamAge = (Date.now() - (lastGameData.timestamp ?? Date.now())) / 1000;
-        const roundLeft = Math.max(0, Number(remaining) - streamAge);
-        roundRemainingEl.textContent = formatDurationCompact(roundLeft);
-        roundRemainingHintEl.hidden = false;
-      } else {
-        // No stream data yet (session just started) — keep hint hidden to
-        // avoid showing a stale or misleading "—".
-        roundRemainingHintEl.hidden = true;
-      }
-    }
+    updateRoundRemainingHint();
   };
 
   update();
@@ -818,16 +903,21 @@ function resolveDurationSeconds() {
 
 // P2.4: Collect optional overrides from advanced form
 function collectAdvancedOverrides() {
+  // Advanced overrides are opt-in only. Hidden values must not leak into payloads.
+  if (!showAdvancedCheckbox?.checked) {
+    return {};
+  }
+
   const overrides = {};
-  const anchorToken = anchorTokenInput.value.trim();
+  const anchorToken = String(anchorTokenInput?.value || '').trim();
   if (anchorToken) {
     overrides.emission_anchor_token = anchorToken;
   }
-  const anchorRate = parseFloat(anchorRateInput.value);
+  const anchorRate = parseFloat(String(anchorRateInput?.value || ''));
   if (Number.isFinite(anchorRate) && anchorRate > 0) {
     overrides.emission_anchor_tokens_per_second = anchorRate;
   }
-  const seasonCycles = parseInt(seasonCyclesInput.value, 10);
+  const seasonCycles = parseInt(String(seasonCyclesInput?.value || ''), 10);
   if (Number.isFinite(seasonCycles) && seasonCycles > 0) {
     overrides.season_cycles_per_game = seasonCycles;
   }
@@ -848,6 +938,11 @@ Manual QA Checklist for P2.4 Duration Presets & Overrides:
 */
 
 function getNormalizedBaseUrlOrNull({ notify = true } = {}) {
+  const rawBaseUrl = String(baseUrlInput?.value || '').trim();
+  if (!rawBaseUrl && baseUrlInput) {
+    baseUrlInput.value = DEFAULT_BACKEND_URL;
+  }
+
   try {
     return normalizeBaseUrl(baseUrlInput.value);
   } catch (e) {
@@ -1007,7 +1102,13 @@ function clearNewGameStatus() {
 }
 
 function saveSettings() {
-  setStorageItem(STORAGE_KEYS.baseUrl, baseUrlInput.value);
+  const baseUrlValue = String(baseUrlInput?.value || '').trim();
+  const effectiveBaseUrl = baseUrlValue || DEFAULT_BACKEND_URL;
+  if (baseUrlInput && !baseUrlValue) {
+    baseUrlInput.value = effectiveBaseUrl;
+  }
+
+  setStorageItem(STORAGE_KEYS.baseUrl, effectiveBaseUrl);
   setStorageItem(STORAGE_KEYS.playerName, playerNameInput.value);
   setStorageItem(STORAGE_KEYS.durationPreset, durationPresetInput.value);
   setStorageItem(
@@ -1279,7 +1380,11 @@ function loadSettings() {
   const savedGameId = getStorageItem(STORAGE_KEYS.gameId);
   const savedPlayerId = getStorageItem(STORAGE_KEYS.playerId);
 
-  if (savedBaseUrl) baseUrlInput.value = savedBaseUrl;
+  if (savedBaseUrl && String(savedBaseUrl).trim()) {
+    baseUrlInput.value = String(savedBaseUrl).trim();
+  } else if (baseUrlInput && !String(baseUrlInput.value || '').trim()) {
+    baseUrlInput.value = DEFAULT_BACKEND_URL;
+  }
   if (savedPlayerName) playerNameInput.value = savedPlayerName;
   if (savedDurationPreset) durationPresetInput.value = savedDurationPreset;
   if (savedDurationCustomValue)
@@ -1335,23 +1440,36 @@ function applyUIUpdate(data) {
       : String(streamSessionIdRaw).trim();
   const streamSessionRunning =
     streamSessionStatus === 'running' && streamSessionId.length > 0;
+  const hasExplicitSessionSignal =
+    streamSessionId.length > 0 || streamSessionStatus.length > 0;
 
   // Keep frontend session state aligned with backend-truth from stream payload.
-  // If backend no longer reports this session as running, drop local session.
+  // Only clear activeSession if the backend EXPLICITLY confirms the session ended or
+  // a different session has taken over. If the payload simply doesn't include session
+  // data yet (e.g. first tick after session creation), keep the local session intact
+  // to avoid a false drop on startup.
   if (activeSession?.sessionId) {
     const localSessionId = String(activeSession.sessionId);
-    const sameSession = streamSessionId.length > 0 && streamSessionId === localSessionId;
-    if (!streamSessionRunning || !sameSession) {
+    const thisSessionEndedExplicitly =
+      streamSessionId === localSessionId && !streamSessionRunning;
+    const differentSessionTookOver =
+      streamSessionId.length > 0 &&
+      streamSessionId !== localSessionId &&
+      streamSessionRunning;
+    if (thisSessionEndedExplicitly || differentSessionTookOver) {
       activeSession = null;
       stopSessionElapsedTimer();
-      setStartSessionStatus('Async session ended. Start a new session to continue.', 'info');
+      setStartSessionStatus(
+        'Async session ended. Start a new session to continue.',
+        'info'
+      );
     }
   }
 
   const hasActiveSession =
     Boolean(activeSession?.sessionId) &&
     Number.isFinite(activeSession?.sessionStartUnix) &&
-    streamSessionRunning;
+    (streamSessionRunning || !hasExplicitSessionSignal);
 
   if (hasActiveSession) {
     const elapsedFromPayload = Number(streamSession?.session_elapsed_seconds);
@@ -1371,8 +1489,8 @@ function applyUIUpdate(data) {
     autoCollapseSetupForLiveState(data.game_status);
 
     if (hasActiveSession) {
-      // WHY: Once session-active, the user-visible primary timer reflects session age.
-      startSessionElapsedTimer(Number(activeSession.sessionStartUnix), 0);
+      // Session timer is already updated above (using payload elapsed when available).
+      // Avoid starting a second interval here, which can cause visible header jitter.
     } else if (data.game_status === 'enrolling') {
       countdownLabelEl.textContent = 'Game starts in';
       startEnrollmentCountdown();
@@ -1450,12 +1568,12 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
   const result = await createAsyncSession({ gameId, playerId });
   if (!result.ok) {
     isSetupBusy = false;
-    updateSetupActionsState();
 
     if (result.code === 'MALFORMED_SESSION_RESPONSE') {
       const malformedMessage =
         'Session could not be started (malformed response).';
       setStartSessionStatus(malformedMessage, 'error');
+      updateSetupActionsState();
       return {
         ok: false,
         code: result.code,
@@ -1465,10 +1583,16 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
 
     if (result.kind === 'policy-closed') {
       setStartSessionStatus(result.message, 'warning');
+      // Keep setup hints aligned when backend says game/session window is already closed.
+      if (/finished/i.test(String(result.message || ''))) {
+        latestGameStatus = 'finished';
+      }
+      updateSetupActionsState();
       return { ok: false, kind: result.kind, message: result.message };
     }
 
     setStartSessionStatus(result.message, 'error');
+    updateSetupActionsState();
     return { ok: false, kind: result.kind, message: result.message };
   }
 
@@ -1553,11 +1677,32 @@ if (stopBtn) {
 }
 
 if (newGameBtn) {
-  newGameBtn.addEventListener('click', () => {
-    activeSession = null;
-    setStartSessionStatus('', 'info');
-    stopSessionElapsedTimer();
-    createNewGameAndJoin();
+  newGameBtn.addEventListener('click', async () => {
+    try {
+      initializeModules();
+      showNewGameStatus('Starting new game...', 'info');
+
+      // Clear stale identifiers first so follow-up actions cannot target an old finished game.
+      gameIdInput.value = '';
+      playerIdInput.value = '';
+
+      activeSession = null;
+      latestGameStatus = null;
+      setBadgeStatus(gameStatusEl, 'idle');
+      setStartSessionStatus('', 'info');
+      stopSessionElapsedTimer();
+      saveSettings();
+      updateSetupActionsState();
+
+      await createNewGameAndJoin();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unexpected New Game error.';
+      showNewGameStatus(`Error: ${message}`, 'error');
+      showToast(`Error: ${message}`, 'error');
+      isSetupBusy = false;
+      updateSetupActionsState();
+    }
   });
 }
 
@@ -1620,6 +1765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 export {
+  collectAdvancedOverrides,
   computeNextHalvingHint,
   computeMostRecentPastHalving,
   deriveLastHalvingNoticeUpdate,
