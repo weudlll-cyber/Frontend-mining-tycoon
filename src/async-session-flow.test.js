@@ -12,10 +12,10 @@ function buildDomFixture() {
         <header class="card game-header">
           <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
           <button id="jump-live-btn" type="button">Jump to Live Board</button>
-          <details id="debug-details" class="debug-details">
-            <summary>Debug</summary>
+          <button id="debug-toggle-btn" type="button" aria-expanded="false" aria-controls="debug-panel">⚙️</button>
+          <section id="debug-panel" class="debug-panel" hidden>
             <div>debug body</div>
-          </details>
+          </section>
           <div id="meta-debug"></div>
           <div id="debug-backend-url"></div>
           <div id="debug-game-id"></div>

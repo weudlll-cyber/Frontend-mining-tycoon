@@ -3,15 +3,25 @@
 Frontend dashboard for Mining Tycoon, built with Vite.
 
 This app lets you:
+
 - create and join games
 - start/stop live SSE stream updates
 - view player state, upgrades, and leaderboard in real time
 - use an optional chat side-panel (WebSocket, non-persistent, no gameplay impact)
 - play Seasonal Oracle upgrades (API contract v2):
-	- view 4 seasonal balances and per-token upgrade tracks
-	- view oracle prices and fee/spread hints
-	- choose upgrade target token and payment token
-	- preview converted cross-token upgrade costs before submit
+  - view 4 seasonal balances and per-token upgrade tracks
+  - view oracle prices and fee/spread hints
+  - choose pay token inline per upgrade lane (target token is the season card)
+  - submit display-only intent; backend remains authoritative for conversion/cost outcome
+
+## Current Implementation Status (2026-03-23)
+
+- Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
+- Trading and Farming UI implementation has not started yet; the dashboard currently exposes visibility/status placeholders only.
+- Gameplay-balance validation is still pending through playtests, especially for:
+  - mined output pacing over time
+  - upgrade impact compared to upgrade cost progression
+  - halving trigger and post-halving behavior
 
 ## Project Baseline (Authoritative)
 
@@ -26,6 +36,7 @@ The current implemented state of the game is documented in [PROJECT_BASELINE.md]
 Non-negotiable project invariants are defined in [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 
 Key highlights:
+
 - Backend-authoritative outcomes only; frontend is display/intent and must not become authoritative.
 - Deterministic oracle/halving/events with snapshot-locked game settings.
 - No P2P markets and no real-money mechanics.
@@ -64,11 +75,13 @@ npm run dev
 If port `5173` is already used, Vite automatically selects the next free port.
 
 4. In the UI:
+
 - keep Backend URL as `http://127.0.0.1:8000`
 - click `+ New Game`
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
+
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
@@ -79,24 +92,26 @@ For async rounds, use the explicit session action:
 - the app switches to `/sessions/{session_id}/stream` automatically
 
 Sync/Async model (backend-aligned):
+
 - Sync rounds use `Round Duration` + `Enrollment Window` and stream via `/games/{id}/stream`.
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
 - Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
-- Header and player analytics show both `This session` and `Best this round` values from backend payload.
+- In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
 
 ## UI Layout
 
 The dashboard uses an **inline 2-column layout** designed for desktop viewing without scrolling, with responsive adaptation for tablet and mobile.
 
 ### Desktop (1440x900 target)
+
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
 - **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and `Start Stream` remains gated until a valid async session exists.
 - **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
 - **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Ready` or `Async: Session Active`).
-- **Best-of visibility**: Async rounds display `This session` and `Best this round` values inline with exact-value tooltips.
+- **Best-of visibility (async mode only)**: When playing async/best-of rounds, the Player State panel displays `This session` and `Best this round` score values inline with exact-value tooltips. These fields are hidden in sync mode.
 - **Session active badge**: After successful async start, the header summary line shows `Async: Session Active`.
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
@@ -104,12 +119,11 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
     - Balance (tokens held)
     - Output per second (mining rate)
     - Halving countdown or "No further halvings"
-    - **Inline upgrades** (3 columns: Hashrate, Efficiency, Cooling) showing:
-      - Current level (Lv N)
-      - Cost (in that season's token)
-      - Output increase (+X.XX /s)
-      - Breakeven time (BE XX.Xs)
-      - Upgrade button
+    - **Inline upgrades** (3 lanes: Hashrate, Efficiency, Cooling) rendered as a compact table with headers:
+      - `Upgrade` | `Lvl` | `Cost` | `Pay` | `Out/s` | `BEP` | info icon
+      - `Pay` is an inline per-lane select (cross-token spend choice)
+      - no preview column; no `Act` header label
+      - action remains server-authoritative submit intent (button text: Upgrade)
   - Season meta rows use full labels (**Balance, Output, Halving**) in a single compact line for clarity.
   - **Right (~35%)**: Player State Analytics panel (READ-ONLY):
     - **Compact stats matrix** optimized for rapid scanning:
@@ -123,18 +137,22 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
       - Line 2: Fee X / Y with anchored ⓘ tooltip
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
     - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
-- **Bottom Bar**: 
+- **Bottom Bar**:
   - **Portfolio Value** shows the live oracle-weighted portfolio total used for scoring. Large values use compact notation (k/M/B) for scanability, with the exact full value available via tooltip on hover/focus. Updates live as balances and oracle prices change.
   - Trading status, Farming status, and the Chat toggle button complete the bar.
 - On desktop, the setup panel and season list use internal scrolling while the page itself does not scroll.
 - Season upgrades use a compact row-based layout to minimize vertical height and reduce scrolling.
+- Player analytics panel width is fixed through a CSS variable, while the left seasons column uses `min-width: 0` to prevent horizontal overflow.
 
 ### Key Principles
+
 - **No overlays/modals**: All important information remains visible on one screen. Upgrade controls are inline within season cards, not in separate popups.
 - **Core data stays inline; non-blocking micro-tooltips are allowed**: Tooltips are positioned in a fixed layer above all content (never clipped), provide optional explanation and precision (4-decimal accuracy), and never block interaction or hide required information.
+- **One shared micro-tooltip contract across player and season headers**: all header triggers use `.ps-tip-trigger` and bubbles use `.ps-tip-bubble` in `#tooltip-layer`; close behavior is hover/leave + keyboard Escape (no timeout auto-hide).
 - **Setup never blocks gameplay**: Setup is collapsible and bounded by max height with internal scroll only.
 - **Player State uses a fixed-column matrix for fast scan**: Labels left-aligned, numeric values right-aligned in monospace fonts. Tooltip icons (ⓘ) are placed at the end of each row to avoid disrupting the visual flow of data. All matrix values fully visible without scrolling.
 - **Halving countdown updates smoothly and remains copyable**: Season-card halving timers tick client-side every second between SSE sync points, and countdown text is selectable/copyable.
+- **Stable DOM updates under SSE**: rendering paths update text/attributes incrementally (no untrusted `innerHTML` rebuilds), preserving cursor/selection anchors and per-lane pay-select persistence during live updates.
 - **Chat is docked inline (no overlays); internal scroll only.** Messages scroll inside the chat panel, and collapsing chat reclaims right-column space for analytics.
 - **Mining/Trading/Farming visibility**: All three economic pillars are displayed as sections, even if disabled, allowing players to see what is "not enabled" or "available later".
 - **Responsive**:
@@ -170,6 +188,62 @@ npm run test -- --run
 npm run build
 ```
 
+## Mining Validation Playtest Checklist
+
+Use this checklist to validate mining-only gameplay before Trading and Farming UI implementation starts.
+
+### Session Setup
+
+1. Start backend and worker, then confirm backend status endpoint is healthy.
+2. Start frontend and create a new round in Sync mode.
+3. Join as one player and start stream.
+4. Record initial values in a notes table:
+
+- Time
+- SPR/SUM/AUT/WIN balances
+- Out/s by token
+- Total Out/s
+- Portfolio value
+
+### Output Pace Validation
+
+5. Wait 60 seconds with no upgrades and record the same values again.
+6. Confirm each token balance increased consistently with its shown Out/s trend.
+7. Repeat one more 60-second interval and confirm growth remains monotonic (no unexpected drops/reset).
+
+### Upgrade Value and Cost Validation
+
+8. Buy one Hashrate upgrade on a single season card; record old/new:
+
+- level
+- Out/s
+- upgrade cost shown
+- post-upgrade balance delta
+
+9. Repeat for Efficiency and Cooling on the same token.
+10. Confirm each upgrade increases expected production signal and that displayed costs progress upward by level.
+11. Perform one cross-token pay selection in Upgrade Pay and confirm backend-authoritative outcome is reflected correctly in balances/cost.
+
+### Halving Validation
+
+12. Run a round configuration where halving should occur during your session.
+13. Capture values immediately before and after halving trigger:
+
+- halving countdown display
+- token Out/s
+- cumulative mined trend
+
+14. Confirm halving trigger timing is consistent with countdown and post-halving output behavior matches expected reduction logic.
+
+### Pass Criteria
+
+15. Mark the session PASS only if all checks hold:
+
+- no non-monotonic mining anomalies under stable conditions
+- upgrade gains and cost progression remain coherent
+- halving timing and effect behavior are correct
+- no frontend/backend desync in displayed authoritative values
+
 ## Scripts
 
 - `npm run dev`: start local dev server
@@ -202,9 +276,11 @@ npm run build
 ## CI
 
 GitHub Actions workflow is in:
+
 - `.github/workflows/ci.yml`
 
 Current CI pipeline runs:
+
 - install (`npm ci`)
 - lint
 - format check
@@ -280,6 +356,7 @@ Frontend call chain for async rounds:
 4. `GET /sessions/{session_id}/stream?player_id=...`
 
 Auth-aware behavior:
+
 - if player auth is required, frontend sends `X-Player-Token` for session start and ticket calls
 - session stream URL includes `ticket` query only for auth-required backends
 
@@ -309,12 +386,13 @@ Cost preview behavior:
 
 - Uses target-token base cost from live state/metrics when available.
 - Converts to payment token with:
-	- `ceil(base_cost_target * (P_target / P_pay) * (1 + fee + spread))`
+  - `ceil(base_cost_target * (P_target / P_pay) * (1 + fee + spread))`
 - If numeric base cost is unavailable, the UI falls back to displaying conversion ratio only.
 
 Oracle prices and conversion parameters are read from the latest game-scoped snapshot (`/games/{id}/meta`) with existing ETag/304 caching behavior.
 
 For full-stack local development with backend + frontend in one VS Code session, use the umbrella workspace file:
+
 - `C:\Users\weudl\mining-tycoon-umbrella.code-workspace`
 
 ## Events (Active Event Visibility & Effect Indicators)

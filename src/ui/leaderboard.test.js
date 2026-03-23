@@ -38,4 +38,20 @@ describe('leaderboard renderer', () => {
     );
     expect(headers).toEqual(['Rank', 'Player', 'Score']);
   });
+
+  it('keeps existing leaderboard row nodes stable across live updates', () => {
+    renderLeaderboard({ leaderboard: [{ player_id: 1, name: 'A', score: 7 }] });
+
+    const firstRow = document.querySelector('tbody tr');
+    const firstScore = firstRow.querySelector('.leaderboard-score');
+
+    renderLeaderboard({ leaderboard: [{ player_id: 1, name: 'A', score: 9 }] });
+
+    const secondRow = document.querySelector('tbody tr');
+    expect(secondRow).toBe(firstRow);
+    expect(secondRow.querySelector('.leaderboard-score')).toBe(firstScore);
+    expect(secondRow.querySelector('.leaderboard-score')?.textContent).toBe(
+      '9'
+    );
+  });
 });

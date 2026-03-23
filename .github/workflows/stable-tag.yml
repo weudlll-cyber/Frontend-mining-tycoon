@@ -1,0 +1,60 @@
+name: stable-tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to tag after manual merge
+        required: true
+        default: main
+        type: string
+      tag_name:
+        description: Stable rollback tag name
+        required: true
+        default: snapshot-stable-v1
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-stable-tag:
+    name: Create Stable Snapshot Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create annotated stable tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${{ inputs.tag_name }}"
+          TAG_MESSAGE="Stable snapshot after full hygiene, tooltip parity, layout stabilization, and documentation sync."
+
+          if git rev-parse "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            echo "Tag ${TAG_NAME} already exists."
+            exit 1
+          fi
+
+          git tag -a "${TAG_NAME}" -m "${TAG_MESSAGE}"
+          git push origin "${TAG_NAME}"
+
+      - name: Write summary
+        shell: bash
+        run: |
+          {
+            echo "## Stable Tag Created"
+            echo ""
+            echo "- Ref: ${{ inputs.ref }}"
+            echo "- Tag: ${{ inputs.tag_name }}"
+            echo "- Manual merge workflow preserved; tagging is post-merge only."
+          } >> "$GITHUB_STEP_SUMMARY"

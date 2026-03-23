@@ -35,7 +35,12 @@ async function getErrorMessageFromResponse(response, fallbackMessage) {
   }
 }
 
-export async function performUpgrade(upgradeType, nextLevel, targetToken) {
+export async function performUpgrade(
+  upgradeType,
+  nextLevel,
+  targetToken,
+  payToken
+) {
   if (!_deps.isActiveContractSupported()) {
     _deps.showToast(
       'Unsupported contract version. Upgrade actions are disabled.',
@@ -63,7 +68,9 @@ export async function performUpgrade(upgradeType, nextLevel, targetToken) {
 
   const selectedTokens = _deps.getSelectedTokens();
   const actualTargetToken = targetToken || selectedTokens.targetToken;
-  const actualPayToken = targetToken || selectedTokens.payToken;
+  // WHY: Inline lanes may select a different pay token per-upgrade; fallback stays backward-compatible with legacy panel selection.
+  const actualPayToken =
+    payToken || selectedTokens.payToken || actualTargetToken;
 
   const headers = { 'Content-Type': 'application/json' };
   if (playerToken) {

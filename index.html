@@ -1,7 +1,7 @@
 <!--
 File: index.html
 Purpose: Static application shell for the Mining Tycoon frontend.
-Role in system: Hosts the inline dashboard, setup panel, debug disclosure, and live summary regions wired by src/main.js.
+Role in system: Hosts the inline dashboard, setup panel, gear-toggled debug panel, and live summary regions wired by src/main.js.
 Invariants: No modal shell markup for gameplay; async-session status and debug session id stay inline and non-sensitive.
 Security notes: Static DOM scaffold only; runtime text is populated with safe DOM APIs.
 -->
@@ -37,6 +37,17 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               >
                 Jump to Live Board
               </button>
+              <button
+                id="debug-toggle-btn"
+                class="btn-secondary debug-toggle-btn"
+                type="button"
+                aria-expanded="false"
+                aria-controls="debug-panel"
+                aria-label="Expand debug panel"
+                title="Debug"
+              >
+                ⚙️
+              </button>
             </div>
           </div>
 
@@ -69,17 +80,12 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             >
           </div>
 
-          <div id="async-score-lines" class="async-score-lines" hidden>
-            <span id="this-session-score" class="summary-item"
-              >This session: —</span
-            >
-            <span id="best-round-score" class="summary-item"
-              >Best this round: —</span
-            >
-          </div>
-
-          <details id="debug-details" class="debug-details">
-            <summary>Debug</summary>
+          <section
+            id="debug-panel"
+            class="debug-panel"
+            aria-label="Debug details"
+            hidden
+          >
             <div class="debug-grid">
               <div class="debug-row">
                 <span class="debug-label">Contract</span>
@@ -104,7 +110,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                 <span id="debug-session-id" class="debug-value">—</span>
               </div>
             </div>
-          </details>
+          </section>
         </header>
 
         <!-- Connection & Controls -->

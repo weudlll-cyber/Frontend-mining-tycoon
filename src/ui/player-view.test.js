@@ -5,7 +5,7 @@ Role in system: Regression coverage for player-state visibility and tooltip wiri
 Invariants/Security: Preserves oracle/fee-spread visibility and safe text-only rendering patterns.
 */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   initPlayerView,
   renderPlayerState,
@@ -40,6 +40,10 @@ beforeEach(() => {
     getActiveGameMeta: () => getMeta(),
   });
   resetPlayerStateView();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('player state matrix', () => {
@@ -167,10 +171,11 @@ describe('player state matrix', () => {
     expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
   });
 
-  it('renders This session and Best this round lines with exact-value tooltip titles', () => {
+  it('renders This session and Best this round lines with exact-value tooltip titles in async mode', () => {
     renderPlayerState({
       game_id: 'g1',
       game_status: 'running',
+      scoring_aggregate: 'best_of',
       token_names: ['spring', 'summer', 'autumn', 'winter'],
       player_state: {
         cumulative_mined: 123.45,
@@ -185,6 +190,8 @@ describe('player state matrix', () => {
 
     const lines = document.querySelectorAll('.ps-session-score-line');
     expect(lines.length).toBe(2);
+    expect(lines[0].hidden).toBe(false);
+    expect(lines[1].hidden).toBe(false);
     expect(lines[0].textContent).toMatch(/This session:\s+4[\s,\u00A0]444/);
     expect(lines[1].textContent).toMatch(/Best this round:\s+9[\s,\u00A0]999/);
     expect(lines[0].getAttribute('title')).toMatch(
@@ -193,6 +200,29 @@ describe('player state matrix', () => {
     expect(lines[1].getAttribute('title')).toMatch(
       /Exact value:\s+9[\s,\u00A0]999/
     );
+  });
+
+  it('hides This session and Best this round lines in sync mode', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      scoring_aggregate: 'sync',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 123.45,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      current_session_score: 4444,
+      player_best_of_score: 9999,
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines.length).toBe(2);
+    expect(lines[0].hidden).toBe(true);
+    expect(lines[1].hidden).toBe(true);
   });
 
   it('preserves next-halving information in running footer and footer tooltip', () => {
@@ -454,5 +484,35 @@ describe('player state matrix', () => {
     // Full value should be present for tooltip
     expect(fullValue).toBeDefined();
     expect(fullValue).toContain('1,250,000');
+  });
+
+  it('sets title to full value for compacted large stats cells', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 10,
+        balances: { spring: 1250000, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: {
+        spring: 1234567,
+        summer: 2,
+        autumn: 3,
+        winter: 4,
+      },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+    });
+
+    const springBalance = document.querySelector(
+      '.ps-cell[data-row="balance"][data-token="spring"]'
+    );
+    const springOutput = document.querySelector(
+      '.ps-cell[data-row="output"][data-token="spring"]'
+    );
+
+    expect(springBalance?.getAttribute('title')).toContain('1,250,000');
+    expect(springOutput?.getAttribute('title')).toContain('1,234,567');
   });
 });

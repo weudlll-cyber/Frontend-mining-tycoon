@@ -34,6 +34,7 @@ export const STORAGE_KEYS = {
   asyncDurationPreset: 'mining-tycoon:asyncDurationPreset',
   asyncDurationCustomMinutes: 'mining-tycoon:asyncDurationCustomMinutes',
   asyncAutoStart: 'mining-tycoon:asyncAutoStart',
+  debugPanelOpen: 'mining-tycoon:debugPanelOpen',
   gameId: 'mining-tycoon:gameId',
   playerId: 'mining-tycoon:playerId',
   globalMetaHash: 'mining-tycoon:globalMetaHash',

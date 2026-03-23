@@ -18,12 +18,15 @@ import {
   getHalvingCountdownTarget,
   getLastHalvingNotice,
   formatCountdownClock,
+  subscribeHalvingClock,
 } from './halving-display.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _playerStateEl = null;
 let _getActiveGameMeta = null;
 let _disposeTooltips = null;
+let _disposeHalvingClock = null;
+let _footerClockState = null;
 
 const TOKEN_LABELS = {
   spring: 'SPR',
@@ -60,8 +63,10 @@ function setCompactNodeValue(textNode, cell, value) {
   if (cell) {
     if (full !== '—') {
       cell.dataset.fullValue = full;
+      cell.title = full;
     } else {
       delete cell.dataset.fullValue;
+      cell.removeAttribute('title');
     }
   }
 }
@@ -70,6 +75,7 @@ function clearCompactCellValue(textNode, cell) {
   setTextNodeValue(textNode, '-');
   if (cell) {
     delete cell.dataset.fullValue;
+    cell.removeAttribute('title');
   }
 }
 
@@ -158,7 +164,7 @@ function createIconCell({ rowKey, tooltipId, tooltipText }) {
   trigger.setAttribute('aria-label', `${rowKey} info`);
   trigger.setAttribute('aria-describedby', tooltipId);
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.textContent = 'ⓘ';
+  trigger.textContent = 'ℹ︎';
   trigger.dataset.tooltipId = tooltipId;
 
   const bubble = document.createElement('span');
@@ -201,10 +207,16 @@ export function resetPlayerStateView() {
   _uiRefs.bestRoundNode = null;
   _uiRefs.thisSessionEl = null;
   _uiRefs.bestRoundEl = null;
+  _footerClockState = null;
 
   if (_disposeTooltips) {
     _disposeTooltips();
     _disposeTooltips = null;
+  }
+
+  if (_disposeHalvingClock) {
+    _disposeHalvingClock();
+    _disposeHalvingClock = null;
   }
 
   clearNode(_playerStateEl);
@@ -400,11 +412,13 @@ function ensurePlayerStateView(tokenNames) {
 
   const thisSessionLine = document.createElement('div');
   thisSessionLine.className = 'ps-session-score-line';
+  thisSessionLine.hidden = true;
   const thisSessionNode = document.createTextNode('This session: —');
   thisSessionLine.appendChild(thisSessionNode);
 
   const bestRoundLine = document.createElement('div');
   bestRoundLine.className = 'ps-session-score-line';
+  bestRoundLine.hidden = true;
   const bestRoundNode = document.createTextNode('Best this round: —');
   bestRoundLine.appendChild(bestRoundNode);
 
@@ -470,6 +484,42 @@ function formatScoreLineValue(value) {
     display: floored.toLocaleString(),
     exact: floored.toLocaleString(),
   };
+}
+
+function renderFooterHalvingState() {
+  if (!_footerClockState) return;
+
+  const { refs, minedPart, fee, spread, lastHalvingNotice } = _footerClockState;
+  const countdownTarget = getHalvingCountdownTarget();
+
+  let halvinPart = 'No further halvings';
+  let halvingTooltipPart = 'No further halvings in this round.';
+
+  if (countdownTarget) {
+    const nowUnix = Date.now() / 1000;
+    const remainingSeconds = Math.max(
+      0,
+      countdownTarget.halvingAtUnix - nowUnix
+    );
+    const countdownText = formatCountdownClock(remainingSeconds);
+    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
+  } else if (lastHalvingNotice) {
+    halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+  }
+
+  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
+  setTextNodeValue(
+    refs.tooltipNodes.footer,
+    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
+  );
+}
+
+function ensurePlayerHalvingClockSubscription() {
+  if (_disposeHalvingClock) return;
+  _disposeHalvingClock = subscribeHalvingClock(() => {
+    renderFooterHalvingState();
+  });
 }
 
 export function renderPlayerState(data) {
@@ -564,15 +614,13 @@ export function renderPlayerState(data) {
   });
   setTextNodeValue(refs.oracleTotalNode, '—');
   delete refs.oracleTotalCell.dataset.fullValue;
+  refs.oracleTotalCell.removeAttribute('title');
 
   const nextHalvingTarget = resolveNextHalvingTarget({
     data,
     activeGameMeta,
     tokenNames,
   });
-  // Build footer content across two deliberate lines to avoid accidental wrapping behavior.
-  let halvinPart = 'No further halvings';
-  let halvingTooltipPart = 'No further halvings in this round.';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
     const shouldReset = shouldResetNextHalvingCountdownTarget(
@@ -587,20 +635,13 @@ export function renderPlayerState(data) {
         textNode: null, // No separate text node; footer handles halving display
       });
     }
-    const nowUnix = Date.now() / 1000;
-    const remainingSeconds = Math.max(
-      0,
-      nextHalvingTarget.halvingAtUnix - nowUnix
-    );
-    const countdownText = formatCountdownClock(remainingSeconds);
-    halvinPart = `Next halving ${countdownText} (${nextHalvingTarget.token.toUpperCase()})`;
-    halvingTooltipPart = `Next halving in ~${countdownText} for ${nextHalvingTarget.token.toUpperCase()} (month ${nextHalvingTarget.halvingMonth}).`;
+    ensurePlayerHalvingClockSubscription();
   } else {
     stopNextHalvingCountdown();
 
-    const lastHalvingNotice = getLastHalvingNotice();
-    if (lastHalvingNotice) {
-      halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+    if (_disposeHalvingClock) {
+      _disposeHalvingClock();
+      _disposeHalvingClock = null;
     }
   }
 
@@ -613,20 +654,28 @@ export function renderPlayerState(data) {
   const spread = Number(data.oracle_spread);
   const feeSpreadPart = `${format2(fee)} / ${format2(spread)}`;
 
-  const thisSessionScore = formatScoreLineValue(data?.current_session_score);
-  const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
-  setTextNodeValue(
-    refs.thisSessionNode,
-    `This session: ${thisSessionScore.display}`
-  );
-  setTextNodeValue(
-    refs.bestRoundNode,
-    `Best this round: ${bestRoundScore.display}`
-  );
-  refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
-  refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
+  const isAsyncMode =
+    String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
+  if (isAsyncMode) {
+    const thisSessionScore = formatScoreLineValue(data?.current_session_score);
+    const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
+    setTextNodeValue(
+      refs.thisSessionNode,
+      `This session: ${thisSessionScore.display}`
+    );
+    setTextNodeValue(
+      refs.bestRoundNode,
+      `Best this round: ${bestRoundScore.display}`
+    );
+    refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
+    refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
+    refs.thisSessionEl.hidden = false;
+    refs.bestRoundEl.hidden = false;
+  } else {
+    refs.thisSessionEl.hidden = true;
+    refs.bestRoundEl.hidden = true;
+  }
 
-  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
 
   // Update precision tooltips for matrix rows
@@ -649,9 +698,12 @@ export function renderPlayerState(data) {
     oraclePrices
   );
 
-  // Update footer tooltip with all details
-  setTextNodeValue(
-    refs.tooltipNodes.footer,
-    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
-  );
+  _footerClockState = {
+    refs,
+    minedPart,
+    fee,
+    spread,
+    lastHalvingNotice: getLastHalvingNotice(),
+  };
+  renderFooterHalvingState();
 }

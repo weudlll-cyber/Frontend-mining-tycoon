@@ -796,6 +796,54 @@ describe('Seasonal Oracle season card rendering', () => {
     vi.useRealTimers();
   });
 
+  it('keeps season halving countdown smooth for same-month payload drift', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T00:00:00Z'));
+
+    const module = await loadMainModule();
+    document.body.innerHTML = `
+      <div id="season-spring" class="season-card">
+        <div class="season-meta">
+          <div class="meta-item halving-item">
+            <span class="meta-label">Halving</span>
+            <span class="season-halving">—</span>
+          </div>
+          <span class="season-balance">0</span>
+          <span class="season-output">0/s</span>
+        </div>
+      </div>
+    `;
+
+    const halvingEl = document.querySelector('.season-halving');
+    const initialNow = Date.now() / 1000;
+
+    module.syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: initialNow + 10,
+      halvingMonth: 36,
+    });
+
+    vi.advanceTimersByTime(2000);
+    const beforeResync = halvingEl.textContent;
+
+    module.syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: Date.now() / 1000 + 10,
+      halvingMonth: 36,
+    });
+
+    vi.advanceTimersByTime(1000);
+    const afterResync = halvingEl.textContent;
+
+    expect(beforeResync).toBe('00:08');
+    expect(afterResync).toBe('00:07');
+
+    module.stopSeasonHalvingTimers();
+    vi.useRealTimers();
+  });
+
   it('keeps halving countdown text selectable and copyable', async () => {
     const module = await loadMainModule();
     document.body.innerHTML = `
@@ -1027,19 +1075,8 @@ describe('Seasonal Oracle inline upgrade module', () => {
     expect(upgradesContainer.textContent).toContain('Cost');
     expect(upgradesContainer.textContent).toContain('Out/s');
     expect(upgradesContainer.textContent).toContain('BEP');
-    expect(upgradesContainer.textContent).toContain('Act');
-
-    const headerTipTriggers = upgradesContainer.querySelectorAll(
-      '.upgrade-header-tip-trigger'
-    );
-    if (headerTipTriggers.length > 0) {
-      expect(headerTipTriggers.length).toBe(4);
-    } else {
-      const titledHeaders = upgradesContainer.querySelectorAll(
-        '.upgrade-header-text[title]'
-      );
-      expect(titledHeaders.length).toBe(4);
-    }
+    expect(upgradesContainer.textContent).toContain('ℹ︎');
+    expect(upgradesContainer.textContent).toContain('Pay');
 
     // one compact row per type
     const typeCells = upgradesContainer.querySelectorAll('.upgrade-row-type');
@@ -1051,7 +1088,7 @@ describe('Seasonal Oracle inline upgrade module', () => {
     ]);
 
     const actionButtons = upgradesContainer.querySelectorAll(
-      '.upgrade-row-action'
+      '.btn-upgrade-inline'
     );
     expect(actionButtons.length).toBe(3);
   });
@@ -1235,7 +1272,7 @@ describe('Seasonal Oracle inline upgrade module', () => {
       mockGetGameMeta()
     );
 
-    const button = upgradesContainer.querySelector('.upgrade-row-action');
+    const button = upgradesContainer.querySelector('.btn-upgrade-inline');
     expect(button?.disabled).toBe(true);
     expect(button?.title).toContain('Unsupported API contract version');
   });
@@ -1297,7 +1334,7 @@ describe('Seasonal Oracle inline upgrade module', () => {
       mockGetGameMeta()
     );
 
-    const button = upgradesContainer.querySelector('.upgrade-row-action');
+    const button = upgradesContainer.querySelector('.btn-upgrade-inline');
     button?.click();
 
     expect(mockPerformUpgrade).toHaveBeenCalledWith('hashrate', 3, 'spring');
@@ -1362,7 +1399,7 @@ describe('Seasonal Oracle inline upgrade module', () => {
     expect(rowTypes.length).toBe(3);
 
     const rowButtons = upgradesContainer.querySelectorAll(
-      '.upgrade-row-action'
+      '.btn-upgrade-inline'
     );
     expect(rowButtons.length).toBe(3);
   });

@@ -5,6 +5,7 @@ These instructions are mandatory for all future Copilot changes in this reposito
 ## 1) Canonical Documents (Read First)
 
 Before proposing or applying any change, read and honor:
+
 - `LOCKED_DECISIONS.md` (hard invariants and change-control gate)
 - `PROJECT_BASELINE.md` (implemented truth)
 - `README.md` (layout, behavior, runbooks)
@@ -12,6 +13,7 @@ Before proposing or applying any change, read and honor:
 - `SECURITY_AUDIT.md` (security posture and safe patterns)
 
 If a requested change would violate any locked invariant:
+
 - Stop immediately.
 - Require an explicit REDESIGN DECISION in `LOCKED_DECISIONS.md` first.
 - Do not implement violating code/docs changes before that.
@@ -19,12 +21,14 @@ If a requested change would violate any locked invariant:
 ## 1.1) Cross-Repo Canonical Context (Frontend + Backend)
 
 When a task touches full-stack behavior, also read backend canonical docs:
+
 - `C:\Users\weudl\Mining tycoon\README.md`
 - `C:\Users\weudl\Mining tycoon\REQUIREMENTS.md`
 - `C:\Users\weudl\Mining tycoon\SECURITY.md`
 - `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md`
 
 Cross-repo rule:
+
 - Keep frontend and backend contracts aligned; do not change one side in ways that silently break the other.
 - If contracts diverge, update docs/tests on both sides or stop and raise change-control requirements.
 
@@ -39,6 +43,8 @@ Cross-repo rule:
 
 - No blocking overlays/modals/popups for core gameplay.
 - Desktop core gameplay remains no-page-scroll.
+- Keep one shared micro-tooltip system for player/season headers (`.ps-tip-trigger` + `.ps-tip-bubble` via `#tooltip-layer`).
+- Tooltip close behavior must be pointer-leave / Escape / blur only; do not add timeout-based auto-hide paths.
 - Trading and Farming sections remain visible even when disabled.
 - Analytics/Player State remains read-only and visible, including:
   - per-token output and total output
@@ -61,6 +67,7 @@ Cross-repo rule:
 ### 5.1) File-level start comment (required in every source file)
 
 Every source file must start with a short top-of-file comment block that covers:
+
 - file purpose and responsibilities
 - module role in system data-flow (upstream/downstream context)
 - important constraints (invariants, UI rules, determinism)
@@ -99,6 +106,7 @@ Example:
 ## 6) Code Readability & Commenting Standards (Required)
 
 For every source file touched or created:
+
 - Keep/update a short file-level start comment explaining:
   - file responsibility
   - system role (UI module/service/helper/test utility)
@@ -125,6 +133,7 @@ For every source file touched or created:
   - `npm audit --omit=dev`
 
 If backend files are touched in the same task, also run backend gates before push:
+
 - `python -m ruff check app tests scripts`
 - `python -m unittest discover -s tests -q`
 - `python -m pip_audit -r requirements.txt`
@@ -132,6 +141,7 @@ If backend files are touched in the same task, also run backend gates before pus
 ## 8) Required Output Format
 
 Every completed task/PR summary must include:
+
 1. Summary of changes
 2. Files touched
 3. Invariant compliance statement
@@ -139,6 +149,20 @@ Every completed task/PR summary must include:
 5. Tests added/updated (or explicit reason none)
 6. Docs updated (or explicit reason none)
 7. Confirmation all quality gates passed
+
+Additional output policy for this repository:
+
+- Do not paste full file bodies in task summaries, PR summaries, or review comments.
+- Report changed files with concise per-file summaries only.
+- Include CI gate status with `merge-safe = YES` or `merge-safe = NO` when relevant.
+- Keep final merge approval manual; do not recommend or enable auto-merge.
+
+## 8.1) Manual Final Approval Workflow
+
+- Required frontend status checks are: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, and `CI Summary (Manual Merge Gate)`.
+- PR bodies must include the required machine-generated sections from `.github/pull_request_template.md`.
+- Branch protection must keep squash merge as the only merge method and keep auto-merge disabled.
+- Stable rollback tagging happens only after a manual merge decision.
 
 ## 9) Scope Discipline
 
