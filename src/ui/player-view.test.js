@@ -5,7 +5,7 @@ Role in system: Regression coverage for player-state visibility and tooltip wiri
 Invariants/Security: Preserves oracle/fee-spread visibility and safe text-only rendering patterns.
 */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   initPlayerView,
   renderPlayerState,
@@ -40,6 +40,10 @@ beforeEach(() => {
     getActiveGameMeta: () => getMeta(),
   });
   resetPlayerStateView();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('player state matrix', () => {

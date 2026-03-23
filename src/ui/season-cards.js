@@ -8,12 +8,16 @@ Role in system:
 
 import { setElementTextValue } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
-import { resolveNextHalvingTarget } from './halving-display.js';
+import {
+  resolveNextHalvingTarget,
+  subscribeHalvingClock,
+} from './halving-display.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _getGameMeta = null;
 const _seasonHalvingTimers = new Map();
 const _seasonMetaStateByCard = new WeakMap();
+let _disposeSeasonHalvingClock = null;
 
 const SEASON_META_LEGEND =
   'Balance: token amount. Output/s: per-second production. Halving: time until next halving.';
@@ -121,7 +125,7 @@ export function formatRemainingMmSs(targetUnix, nowUnix = Date.now() / 1000) {
 }
 
 export function formatDurationCompact(totalSeconds) {
-  const remaining = Math.max(0, Math.ceil(Number(totalSeconds)));
+  const remaining = Math.max(0, Math.floor(Number(totalSeconds)));
   if (!Number.isFinite(remaining)) return '—';
 
   if (remaining < 3600) {
@@ -162,7 +166,7 @@ export function applyHalvingTextAndSeverity(halvingEl, targetUnix) {
   }
 
   const nowUnix = Date.now() / 1000;
-  const remaining = Math.max(0, Math.ceil(Number(targetUnix) - nowUnix));
+  const remaining = Math.max(0, Math.floor(Number(targetUnix) - nowUnix));
   setElementTextValue(halvingEl, formatDurationCompact(remaining));
 
   const severity = classifyHalvingSeverity(remaining);
@@ -174,14 +178,39 @@ export function applyHalvingTextAndSeverity(halvingEl, targetUnix) {
 }
 
 export function stopSeasonHalvingTimer(token) {
-  const timerState = _seasonHalvingTimers.get(token);
-  if (!timerState) return;
-  clearInterval(timerState.intervalId);
   _seasonHalvingTimers.delete(token);
+  if (_seasonHalvingTimers.size === 0 && _disposeSeasonHalvingClock) {
+    _disposeSeasonHalvingClock();
+    _disposeSeasonHalvingClock = null;
+  }
 }
 
 export function stopSeasonHalvingTimers() {
   Array.from(_seasonHalvingTimers.keys()).forEach(stopSeasonHalvingTimer);
+}
+
+function ensureSeasonHalvingClock() {
+  if (_disposeSeasonHalvingClock || _seasonHalvingTimers.size === 0) return;
+  _disposeSeasonHalvingClock = subscribeHalvingClock(() => {
+    Array.from(_seasonHalvingTimers.entries()).forEach(
+      ([token, timerState]) => {
+        const liveTargetUnix = Number(timerState.halvingAtUnix);
+        applyHalvingTextAndSeverity(timerState.halvingEl, liveTargetUnix);
+        const remaining = Math.max(
+          0,
+          Math.floor(liveTargetUnix - Date.now() / 1000)
+        );
+        if (remaining <= 0) {
+          _seasonHalvingTimers.delete(token);
+        }
+      }
+    );
+
+    if (_seasonHalvingTimers.size === 0 && _disposeSeasonHalvingClock) {
+      _disposeSeasonHalvingClock();
+      _disposeSeasonHalvingClock = null;
+    }
+  });
 }
 
 export function syncSeasonHalvingTicker({
@@ -203,13 +232,8 @@ export function syncSeasonHalvingTicker({
   if (existing && existing.halvingEl === halvingEl) {
     const sameMonth = Number(existing.halvingMonth) === nextHalvingMonth;
     if (sameMonth) {
-      const driftSeconds = Math.abs(
-        Number(existing.halvingAtUnix) - targetUnix
-      );
-      // Ignore tiny payload drift caused by coarse sim-month updates; keep smooth local ticking.
-      if (driftSeconds >= 3) {
-        existing.halvingAtUnix = targetUnix;
-      }
+      // Keep a stable per-card target between authoritative payloads while month/token stay the same.
+      // This prevents visible countdown jumps caused by coarse or jittery sim-month updates.
       applyHalvingTextAndSeverity(halvingEl, Number(existing.halvingAtUnix));
       return;
     }
@@ -227,31 +251,12 @@ export function syncSeasonHalvingTicker({
   stopSeasonHalvingTimer(token);
   applyHalvingTextAndSeverity(halvingEl, targetUnix);
 
-  // The client-side ticker keeps the countdown smooth between authoritative SSE updates.
-  const intervalId = setInterval(() => {
-    const timerState = _seasonHalvingTimers.get(token);
-    if (!timerState) {
-      clearInterval(intervalId);
-      return;
-    }
-    const liveTargetUnix = Number(timerState.halvingAtUnix);
-    applyHalvingTextAndSeverity(halvingEl, liveTargetUnix);
-    const remaining = Math.max(
-      0,
-      Math.ceil(liveTargetUnix - Date.now() / 1000)
-    );
-    if (remaining <= 0) {
-      clearInterval(intervalId);
-      _seasonHalvingTimers.delete(token);
-    }
-  }, 1000);
-
   _seasonHalvingTimers.set(token, {
-    intervalId,
     halvingAtUnix: targetUnix,
     halvingMonth: nextHalvingMonth,
     halvingEl,
   });
+  ensureSeasonHalvingClock();
 }
 
 export function renderSeasonData(data) {

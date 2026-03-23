@@ -18,12 +18,15 @@ import {
   getHalvingCountdownTarget,
   getLastHalvingNotice,
   formatCountdownClock,
+  subscribeHalvingClock,
 } from './halving-display.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _playerStateEl = null;
 let _getActiveGameMeta = null;
 let _disposeTooltips = null;
+let _disposeHalvingClock = null;
+let _footerClockState = null;
 
 const TOKEN_LABELS = {
   spring: 'SPR',
@@ -204,10 +207,16 @@ export function resetPlayerStateView() {
   _uiRefs.bestRoundNode = null;
   _uiRefs.thisSessionEl = null;
   _uiRefs.bestRoundEl = null;
+  _footerClockState = null;
 
   if (_disposeTooltips) {
     _disposeTooltips();
     _disposeTooltips = null;
+  }
+
+  if (_disposeHalvingClock) {
+    _disposeHalvingClock();
+    _disposeHalvingClock = null;
   }
 
   clearNode(_playerStateEl);
@@ -475,6 +484,42 @@ function formatScoreLineValue(value) {
   };
 }
 
+function renderFooterHalvingState() {
+  if (!_footerClockState) return;
+
+  const { refs, minedPart, fee, spread, lastHalvingNotice } = _footerClockState;
+  const countdownTarget = getHalvingCountdownTarget();
+
+  let halvinPart = 'No further halvings';
+  let halvingTooltipPart = 'No further halvings in this round.';
+
+  if (countdownTarget) {
+    const nowUnix = Date.now() / 1000;
+    const remainingSeconds = Math.max(
+      0,
+      countdownTarget.halvingAtUnix - nowUnix
+    );
+    const countdownText = formatCountdownClock(remainingSeconds);
+    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
+  } else if (lastHalvingNotice) {
+    halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+  }
+
+  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
+  setTextNodeValue(
+    refs.tooltipNodes.footer,
+    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
+  );
+}
+
+function ensurePlayerHalvingClockSubscription() {
+  if (_disposeHalvingClock) return;
+  _disposeHalvingClock = subscribeHalvingClock(() => {
+    renderFooterHalvingState();
+  });
+}
+
 export function renderPlayerState(data) {
   if (!data) {
     resetPlayerStateView();
@@ -574,16 +619,12 @@ export function renderPlayerState(data) {
     activeGameMeta,
     tokenNames,
   });
-  // Build footer content across two deliberate lines to avoid accidental wrapping behavior.
-  let halvinPart = 'No further halvings';
-  let halvingTooltipPart = 'No further halvings in this round.';
   if (nextHalvingTarget && data?.game_status === 'running') {
     const prev = getHalvingCountdownTarget();
     const shouldReset = shouldResetNextHalvingCountdownTarget(
       prev,
       nextHalvingTarget
     );
-    let countdownTarget = nextHalvingTarget;
     if (shouldReset) {
       startNextHalvingCountdown({
         token: nextHalvingTarget.token,
@@ -591,24 +632,14 @@ export function renderPlayerState(data) {
         halvingAtUnix: nextHalvingTarget.halvingAtUnix,
         textNode: null, // No separate text node; footer handles halving display
       });
-    } else if (prev) {
-      // Keep a stable target between payloads so the countdown does not jump.
-      countdownTarget = prev;
     }
-    const nowUnix = Date.now() / 1000;
-    const remainingSeconds = Math.max(
-      0,
-      countdownTarget.halvingAtUnix - nowUnix
-    );
-    const countdownText = formatCountdownClock(remainingSeconds);
-    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
-    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
+    ensurePlayerHalvingClockSubscription();
   } else {
     stopNextHalvingCountdown();
 
-    const lastHalvingNotice = getLastHalvingNotice();
-    if (lastHalvingNotice) {
-      halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+    if (_disposeHalvingClock) {
+      _disposeHalvingClock();
+      _disposeHalvingClock = null;
     }
   }
 
@@ -634,7 +665,6 @@ export function renderPlayerState(data) {
   refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
   refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
 
-  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
 
   // Update precision tooltips for matrix rows
@@ -657,9 +687,12 @@ export function renderPlayerState(data) {
     oraclePrices
   );
 
-  // Update footer tooltip with all details
-  setTextNodeValue(
-    refs.tooltipNodes.footer,
-    `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`
-  );
+  _footerClockState = {
+    refs,
+    minedPart,
+    fee,
+    spread,
+    lastHalvingNotice: getLastHalvingNotice(),
+  };
+  renderFooterHalvingState();
 }

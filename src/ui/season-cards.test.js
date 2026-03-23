@@ -5,9 +5,14 @@ Role in system: Guards SSE-safe inline header behavior without remounting card n
 Invariants/Security: Confirms non-blocking tooltip usage and text-only DOM updates.
 */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { initSeasonCards, renderSeasonData } from './season-cards.js';
+import {
+  initSeasonCards,
+  renderSeasonData,
+  stopSeasonHalvingTimers,
+  syncSeasonHalvingTicker,
+} from './season-cards.js';
 
 function buildSeasonCard(token) {
   return `
@@ -245,5 +250,38 @@ describe('season-card tooltip parity with player-status', () => {
     const bubble = document.getElementById(bubbleId);
     expect(bubble).not.toBeNull();
     expect(bubble.className).toContain('ps-tip-bubble');
+  });
+});
+
+describe('season halving countdown stability', () => {
+  it('keeps the local countdown target stable for same halving month updates', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    const halvingEl = document.querySelector('#season-spring .season-halving');
+    expect(halvingEl).not.toBeNull();
+
+    syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: Date.now() / 1000 + 30,
+      halvingMonth: 5,
+    });
+    const firstText = halvingEl.textContent;
+
+    // Same halving month arrives with a later target (sim-month jitter from payloads).
+    syncSeasonHalvingTicker({
+      token: 'spring',
+      halvingEl,
+      halvingAtUnix: Date.now() / 1000 + 37,
+      halvingMonth: 5,
+    });
+    const secondText = halvingEl.textContent;
+
+    expect(firstText).toBe('00:30');
+    expect(secondText).toBe('00:30');
+
+    stopSeasonHalvingTimers();
+    vi.useRealTimers();
   });
 });

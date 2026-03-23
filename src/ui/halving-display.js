@@ -16,12 +16,13 @@ import {
 import { normalizeTokenNames } from '../utils/token-utils.js';
 
 // Module-level state
-let _halvingCountdownInterval = null;
+let _halvingClockInterval = null;
 let _halvingCountdownTarget = null;
 let _lastHalvingSeenKey = null;
 let _lastHalvingNotice = null;
 let _lastHalvingHideTimeout = null;
 let _getActiveGameMeta = null;
+const _halvingClockSubscribers = new Set();
 
 /**
  * @param {{ getActiveGameMeta: (gameId: string) => object|null }} deps
@@ -47,12 +48,39 @@ export function formatCountdownClock(seconds) {
 
 /* ---------- next-halving countdown ---------- */
 
-export function stopNextHalvingCountdown() {
-  if (_halvingCountdownInterval) {
-    clearInterval(_halvingCountdownInterval);
-    _halvingCountdownInterval = null;
+function syncHalvingClockInterval() {
+  const shouldRun =
+    Boolean(_halvingCountdownTarget) || _halvingClockSubscribers.size > 0;
+
+  if (shouldRun && !_halvingClockInterval) {
+    _halvingClockInterval = setInterval(() => {
+      renderNextHalvingCountdownTick();
+      _halvingClockSubscribers.forEach((listener) => listener());
+    }, 1000);
+    return;
   }
+
+  if (!shouldRun && _halvingClockInterval) {
+    clearInterval(_halvingClockInterval);
+    _halvingClockInterval = null;
+  }
+}
+
+export function subscribeHalvingClock(listener) {
+  if (typeof listener !== 'function') {
+    return () => {};
+  }
+  _halvingClockSubscribers.add(listener);
+  syncHalvingClockInterval();
+  return () => {
+    _halvingClockSubscribers.delete(listener);
+    syncHalvingClockInterval();
+  };
+}
+
+export function stopNextHalvingCountdown() {
   _halvingCountdownTarget = null;
+  syncHalvingClockInterval();
 }
 
 function renderNextHalvingCountdownTick() {
@@ -68,10 +96,7 @@ function renderNextHalvingCountdownTick() {
 export function startNextHalvingCountdown(target) {
   _halvingCountdownTarget = target;
   renderNextHalvingCountdownTick();
-  if (_halvingCountdownInterval) {
-    clearInterval(_halvingCountdownInterval);
-  }
-  _halvingCountdownInterval = setInterval(renderNextHalvingCountdownTick, 1000);
+  syncHalvingClockInterval();
 }
 
 export function getHalvingCountdownTarget() {
