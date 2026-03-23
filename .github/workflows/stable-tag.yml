@@ -51,8 +51,10 @@ jobs:
       - name: Write summary
         shell: bash
         run: |
-          echo "## Stable Tag Created" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Ref: ${{ inputs.ref }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tag: ${{ inputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Manual merge workflow preserved; tagging is post-merge only." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Stable Tag Created"
+            echo ""
+            echo "- Ref: ${{ inputs.ref }}"
+            echo "- Tag: ${{ inputs.tag_name }}"
+            echo "- Manual merge workflow preserved; tagging is post-merge only."
+          } >> "$GITHUB_STEP_SUMMARY"

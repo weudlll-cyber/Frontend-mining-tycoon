@@ -346,20 +346,22 @@ jobs:
             MERGE_SAFE="NO"
           fi
 
-          echo "## CI Merge Safety Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- PR policy: ${PR_POLICY_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Frontend changed: ${FRONTEND_CHANGED}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Backend changed: ${BACKEND_CHANGED}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Lint: ${LINT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Format check: ${FORMAT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Unit tests: ${TEST_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Test coverage: ${COVERAGE_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Build: ${BUILD_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Security audit: ${AUDIT_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Backend CI: ${BACKEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "merge-safe = ${MERGE_SAFE}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## CI Merge Safety Summary"
+            echo ""
+            echo "- PR policy: ${PR_POLICY_RESULT}"
+            echo "- Frontend changed: ${FRONTEND_CHANGED}"
+            echo "- Backend changed: ${BACKEND_CHANGED}"
+            echo "- Lint: ${LINT_RESULT}"
+            echo "- Format check: ${FORMAT_RESULT}"
+            echo "- Unit tests: ${TEST_RESULT}"
+            echo "- Test coverage: ${COVERAGE_RESULT}"
+            echo "- Build: ${BUILD_RESULT}"
+            echo "- Security audit: ${AUDIT_RESULT}"
+            echo "- Backend CI: ${BACKEND_RESULT}"
+            echo ""
+            echo "merge-safe = ${MERGE_SAFE}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$MERGE_SAFE" = "YES" ]; then
             exit 0

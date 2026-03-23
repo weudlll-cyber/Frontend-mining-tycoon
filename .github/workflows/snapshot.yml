@@ -159,10 +159,12 @@ jobs:
 
           echo "merge_safe=${MERGE_SAFE}" >> "$GITHUB_OUTPUT"
 
-          echo "## Snapshot CI Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Frontend CI: ${FRONTEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Backend CI: ${BACKEND_RESULT}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Snapshot CI Summary"
+            echo ""
+            echo "- Frontend CI: ${FRONTEND_RESULT}"
+            echo "- Backend CI: ${BACKEND_RESULT}"
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ "$MERGE_SAFE" = "true" ]; then
             echo "- Merge Safety: SAFE (manual merge only)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
