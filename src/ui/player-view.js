@@ -412,11 +412,13 @@ function ensurePlayerStateView(tokenNames) {
 
   const thisSessionLine = document.createElement('div');
   thisSessionLine.className = 'ps-session-score-line';
+  thisSessionLine.hidden = true;
   const thisSessionNode = document.createTextNode('This session: —');
   thisSessionLine.appendChild(thisSessionNode);
 
   const bestRoundLine = document.createElement('div');
   bestRoundLine.className = 'ps-session-score-line';
+  bestRoundLine.hidden = true;
   const bestRoundNode = document.createTextNode('Best this round: —');
   bestRoundLine.appendChild(bestRoundNode);
 
@@ -652,18 +654,29 @@ export function renderPlayerState(data) {
   const spread = Number(data.oracle_spread);
   const feeSpreadPart = `${format2(fee)} / ${format2(spread)}`;
 
-  const thisSessionScore = formatScoreLineValue(data?.current_session_score);
-  const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
-  setTextNodeValue(
-    refs.thisSessionNode,
-    `This session: ${thisSessionScore.display}`
-  );
-  setTextNodeValue(
-    refs.bestRoundNode,
-    `Best this round: ${bestRoundScore.display}`
-  );
-  refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
-  refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
+  const isAsyncMode =
+    String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
+  if (isAsyncMode) {
+    const thisSessionScore = formatScoreLineValue(
+      data?.current_session_score
+    );
+    const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
+    setTextNodeValue(
+      refs.thisSessionNode,
+      `This session: ${thisSessionScore.display}`
+    );
+    setTextNodeValue(
+      refs.bestRoundNode,
+      `Best this round: ${bestRoundScore.display}`
+    );
+    refs.thisSessionEl.title = `Exact value: ${thisSessionScore.exact}`;
+    refs.bestRoundEl.title = `Exact value: ${bestRoundScore.exact}`;
+    refs.thisSessionEl.hidden = false;
+    refs.bestRoundEl.hidden = false;
+  } else {
+    refs.thisSessionEl.hidden = true;
+    refs.bestRoundEl.hidden = true;
+  }
 
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
 

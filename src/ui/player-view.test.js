@@ -171,10 +171,11 @@ describe('player state matrix', () => {
     expect(line2?.querySelector('.ps-tip-trigger')).not.toBeNull();
   });
 
-  it('renders This session and Best this round lines with exact-value tooltip titles', () => {
+  it('renders This session and Best this round lines with exact-value tooltip titles in async mode', () => {
     renderPlayerState({
       game_id: 'g1',
       game_status: 'running',
+      scoring_aggregate: 'best_of',
       token_names: ['spring', 'summer', 'autumn', 'winter'],
       player_state: {
         cumulative_mined: 123.45,
@@ -189,6 +190,8 @@ describe('player state matrix', () => {
 
     const lines = document.querySelectorAll('.ps-session-score-line');
     expect(lines.length).toBe(2);
+    expect(lines[0].hidden).toBe(false);
+    expect(lines[1].hidden).toBe(false);
     expect(lines[0].textContent).toMatch(/This session:\s+4[\s,\u00A0]444/);
     expect(lines[1].textContent).toMatch(/Best this round:\s+9[\s,\u00A0]999/);
     expect(lines[0].getAttribute('title')).toMatch(
@@ -197,6 +200,29 @@ describe('player state matrix', () => {
     expect(lines[1].getAttribute('title')).toMatch(
       /Exact value:\s+9[\s,\u00A0]999/
     );
+  });
+
+  it('hides This session and Best this round lines in sync mode', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      scoring_aggregate: 'sync',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 123.45,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      current_session_score: 4444,
+      player_best_of_score: 9999,
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines.length).toBe(2);
+    expect(lines[0].hidden).toBe(true);
+    expect(lines[1].hidden).toBe(true);
   });
 
   it('preserves next-halving information in running footer and footer tooltip', () => {
