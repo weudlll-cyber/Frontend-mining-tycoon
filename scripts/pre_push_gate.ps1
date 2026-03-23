@@ -18,7 +18,8 @@ Set-Location $projectRoot
 function Run-Step {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][scriptblock]$Action
+        [Parameter(Mandatory = $true)][scriptblock]$Action,
+        [switch]$WarningOnly
     )
 
     Write-Host "`n==> $Name"
@@ -27,6 +28,10 @@ function Run-Step {
     $exitCode = $LASTEXITCODE
 
     if ($null -ne $exitCode -and $exitCode -ne 0) {
+        if ($WarningOnly) {
+            Write-Warning "NON-BLOCKING: $Name failed (exit $exitCode)."
+            return
+        }
         throw "FAILED: $Name (exit $exitCode)"
     }
 
@@ -63,5 +68,9 @@ Run-Step -Name "Production build" -Action { & npm run build }
 Run-Step -Name "npm audit (prod, high+)" -Action {
     & npm audit --omit=dev --audit-level=high
 }
+Run-Step -Name "Code health audit (advisory)" -Action {
+    & (Join-Path $PSScriptRoot "code_health_audit.ps1")
+} -WarningOnly
 
 Write-Host "`nFrontend pre-push gate completed successfully."
+

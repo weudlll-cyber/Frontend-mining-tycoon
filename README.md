@@ -139,8 +139,15 @@ What happens before push:
 - `npm run test:coverage`
 - `npm run build`
 - `npm audit --omit=dev --audit-level=high`
+- advisory code-health audit (file-size hotspots, comment-header coverage, TODO/FIXME markers, debug-console scan)
 
 The push helper also prints a concise summary of commits and changed files since the last push so the outgoing change set is easy to review.
+
+Run the structural audit manually at any time:
+
+```powershell
+npm run audit:health
+```
 
 ## UI Layout
 

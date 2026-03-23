@@ -44,6 +44,12 @@ All of the following must pass before merge:
 - `npm run test:coverage`
 - `npm run build`
 - `npm audit --omit=dev --audit-level=high`
+
+Recommended structural audit before larger merges:
+
+- `npm run audit:health`
+
+This audit reports oversized files, missing top-of-file comment headers, TODO/FIXME markers, and debug-console usage so refactor work can be planned before a larger merge.
 - GitHub check run: `CodeQL`
 - GitHub check run: `Dependency Review`
 - GitHub check run: `Actionlint`
