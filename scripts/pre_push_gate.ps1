@@ -22,10 +22,11 @@ function Run-Step {
     )
 
     Write-Host "`n==> $Name"
+    $global:LASTEXITCODE = 0
     & $Action
     $exitCode = $LASTEXITCODE
 
-    if ($exitCode -ne 0) {
+    if ($null -ne $exitCode -and $exitCode -ne 0) {
         throw "FAILED: $Name (exit $exitCode)"
     }
 
