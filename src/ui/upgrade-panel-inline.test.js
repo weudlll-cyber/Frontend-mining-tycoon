@@ -141,6 +141,66 @@ describe('inline upgrade lanes pay token', () => {
       'winter'
     );
   });
+
+  it('passes same-token pay selection explicitly for non-spring lanes', () => {
+    const performUpgrade = vi.fn();
+
+    initInlineUpgrades({
+      getActiveGameMeta: () => createMeta(),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 60 },
+        cooling: { base_cost: 70 },
+      }),
+      performUpgrade,
+    });
+
+    const container = document.querySelector('.season-upgrades');
+    const summerData = createData(50);
+    summerData.player_state.upgrades_by_token.summer = {
+      hashrate: 0,
+      efficiency: 0,
+      cooling: 0,
+    };
+    summerData.upgrade_metrics.summer = {
+      upgrades: {
+        hashrate: {
+          cost_to_next: 50,
+          delta_output: 1,
+          breakeven_seconds: 50,
+        },
+        efficiency: {
+          cost_to_next: 60,
+          delta_output: 1.2,
+          breakeven_seconds: 45,
+        },
+        cooling: {
+          cost_to_next: 70,
+          delta_output: 1.4,
+          breakeven_seconds: 40,
+        },
+      },
+    };
+
+    renderInlineSeasonUpgrades(container, 'summer', summerData);
+
+    const hashrateRow = container.querySelector(
+      '.upgrade-lane-row[data-upgrade-type="hashrate"]'
+    );
+    const paySelect = hashrateRow?.querySelector('.upgrade-pay-select');
+    const actionButton = hashrateRow?.querySelector('.btn-upgrade-inline');
+
+    expect(paySelect?.value).toBe('summer');
+    actionButton?.click();
+
+    expect(performUpgrade).toHaveBeenCalledWith(
+      'hashrate',
+      1,
+      'summer',
+      'summer'
+    );
+  });
 });
 
 describe('inline upgrade header tooltip', () => {

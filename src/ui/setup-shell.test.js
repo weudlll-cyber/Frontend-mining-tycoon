@@ -159,7 +159,7 @@ describe('setup shell async readiness', () => {
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
     expect(document.getElementById('start-btn')?.disabled).toBe(true);
-    expect(note?.textContent).toContain('Start Session (Async) first');
+    expect(note?.textContent).toContain('click + New Game for a fresh round');
   });
 
   it('keeps Start Async Session disabled until player join is complete', () => {
@@ -240,6 +240,52 @@ describe('setup shell async readiness', () => {
     expect(startSessionBtn?.disabled).toBe(true);
     expect(asyncStatus?.textContent).toContain('Async: Ready');
     expect(note?.textContent).toContain('endpoint is unavailable');
+  });
+
+  it('shows retry guidance note when session start warning is present', () => {
+    const statusEl = document.getElementById('start-session-status');
+    if (statusEl) {
+      statusEl.textContent =
+        'Finish the current async session before starting another.';
+      statusEl.className = 'setup-session-status setup-session-status--warning';
+    }
+
+    setSetupShellState({
+      isSetupBusy: false,
+      isStreamActive: false,
+      latestGameStatus: 'enrolling',
+      roundMode: 'async',
+      sessionStartSupported: true,
+      sessionApiSupported: true,
+      asyncWindowOpen: true,
+      sessionActive: false,
+      hostRoundType: 'async',
+    });
+    updateSetupActionsState();
+
+    const note = document.getElementById('setup-actions-note');
+    expect(note?.textContent).toContain('Session start failed');
+  });
+
+  it('disables session start and shows finished guidance when game is finished', () => {
+    setSetupShellState({
+      isSetupBusy: false,
+      isStreamActive: false,
+      latestGameStatus: 'finished',
+      roundMode: 'async',
+      sessionStartSupported: true,
+      sessionApiSupported: true,
+      asyncWindowOpen: true,
+      sessionActive: false,
+      hostRoundType: 'async',
+    });
+    updateSetupActionsState();
+
+    const startSessionBtn = document.getElementById('start-session-btn');
+    const note = document.getElementById('setup-actions-note');
+
+    expect(startSessionBtn?.disabled).toBe(true);
+    expect(note?.textContent).toContain('This game is finished');
   });
 
   it('auto-closes only once when entering running if user did not reopen setup', () => {

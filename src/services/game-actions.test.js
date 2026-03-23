@@ -11,7 +11,11 @@ Security notes:
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNewGameAndJoin, initGameActions } from './game-actions.js';
+import {
+  createNewGameAndJoin,
+  initGameActions,
+  performUpgrade,
+} from './game-actions.js';
 
 function buildDeps(overrides = {}) {
   return {
@@ -94,6 +98,9 @@ describe('game-actions async host flow', () => {
     expect(createBody.duration_mode).toBe('preset');
     expect(createBody.duration_preset).toBe('10m');
     expect(createBody.session_duration_seconds).toBe(86400);
+    expect(createBody.emission_anchor_token).toBeUndefined();
+    expect(createBody.emission_anchor_tokens_per_second).toBeUndefined();
+    expect(createBody.season_cycles_per_game).toBeUndefined();
   });
 
   it('auto-start ON triggers async session startup and avoids legacy start stream call', async () => {
@@ -186,5 +193,36 @@ describe('game-actions async host flow', () => {
       'Session could not be started (malformed response).',
       'error'
     );
+  });
+});
+
+describe('performUpgrade pay-token wiring', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sends explicit target_token and pay_token from inline intent', async () => {
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+      getSelectedTokens: vi.fn(() => ({
+        targetToken: 'spring',
+        payToken: 'spring',
+      })),
+    });
+    initGameActions(deps);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    globalThis.fetch = fetchMock;
+
+    await performUpgrade('hashrate', 1, 'summer', 'winter');
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(requestBody.upgrade_type).toBe('hashrate');
+    expect(requestBody.target_token).toBe('summer');
+    expect(requestBody.pay_token).toBe('winter');
   });
 });

@@ -170,6 +170,10 @@ export async function startRoundSession(roundId, playerId) {
 }
 
 export async function createNewGameAndJoin() {
+  if (!_deps) {
+    throw new Error('Game actions module is not initialized.');
+  }
+
   if (_deps.hasOpenStream()) {
     _deps.stopActiveStream();
   }

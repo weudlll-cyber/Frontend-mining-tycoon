@@ -259,10 +259,8 @@ function ensureLaneRow(type, seasonToken, state) {
   rowRefs.button.addEventListener('click', () => {
     const nextLevel = parseInt(rowRefs.button.dataset.level, 10) + 1;
     const payToken = rowRefs.paySelect.value || seasonToken;
-    if (payToken === seasonToken) {
-      _performUpgrade?.(type, nextLevel, seasonToken);
-      return;
-    }
+    // Always pass payToken explicitly so service-layer fallbacks cannot
+    // accidentally reuse stale panel selections from another token lane.
     _performUpgrade?.(type, nextLevel, seasonToken, payToken);
   });
 
