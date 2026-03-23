@@ -1326,11 +1326,34 @@ function loadSettings() {
 }
 
 function applyUIUpdate(data) {
-  if (
-    activeSession?.sessionId &&
-    Number.isFinite(activeSession?.sessionStartUnix)
-  ) {
-    const streamSession = data?.session || null;
+  const streamSession = data?.session || null;
+  const streamSessionStatus = String(streamSession?.status || '').toLowerCase();
+  const streamSessionIdRaw = streamSession?.session_id;
+  const streamSessionId =
+    streamSessionIdRaw === null || streamSessionIdRaw === undefined
+      ? ''
+      : String(streamSessionIdRaw).trim();
+  const streamSessionRunning =
+    streamSessionStatus === 'running' && streamSessionId.length > 0;
+
+  // Keep frontend session state aligned with backend-truth from stream payload.
+  // If backend no longer reports this session as running, drop local session.
+  if (activeSession?.sessionId) {
+    const localSessionId = String(activeSession.sessionId);
+    const sameSession = streamSessionId.length > 0 && streamSessionId === localSessionId;
+    if (!streamSessionRunning || !sameSession) {
+      activeSession = null;
+      stopSessionElapsedTimer();
+      setStartSessionStatus('Async session ended. Start a new session to continue.', 'info');
+    }
+  }
+
+  const hasActiveSession =
+    Boolean(activeSession?.sessionId) &&
+    Number.isFinite(activeSession?.sessionStartUnix) &&
+    streamSessionRunning;
+
+  if (hasActiveSession) {
     const elapsedFromPayload = Number(streamSession?.session_elapsed_seconds);
     startSessionElapsedTimer(
       Number(activeSession.sessionStartUnix),
@@ -1340,14 +1363,14 @@ function applyUIUpdate(data) {
     stopSessionElapsedTimer();
   }
 
-  setLiveSessionActive(true);
+  setLiveSessionActive(hasActiveSession);
   handleLastHalvingStateUpdate(data);
 
   if (data.game_status) {
     setBadgeStatus(gameStatusEl, data.game_status);
     autoCollapseSetupForLiveState(data.game_status);
 
-    if (activeSession?.sessionId) {
+    if (hasActiveSession) {
       // WHY: Once session-active, the user-visible primary timer reflects session age.
       startSessionElapsedTimer(Number(activeSession.sessionStartUnix), 0);
     } else if (data.game_status === 'enrolling') {
