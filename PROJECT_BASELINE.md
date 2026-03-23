@@ -288,9 +288,15 @@ Areas intentionally left open by current implementation:
 
 ### Current status
 
-The current baseline is functionally complete in the sense that the implemented backend-authoritative game loop, live frontend dashboard, deterministic economy systems, security boundaries, and test-covered core behaviors are present and working together as a coherent product surface.
+The current baseline is stable for the implemented mining-focused loop: backend-authoritative simulation, live frontend dashboard, deterministic economy foundations, security boundaries, and test-covered core behaviors are working together for mining gameplay.
 
 At the same time, the project is still in an iterative phase. Some major areas are intentionally left open so that future decisions can be evaluated against the implemented baseline rather than assumed from design intent alone.
+
+Implementation checkpoint (2026-03-23):
+
+- Mining is the only fully implemented and validated gameplay pillar at this time.
+- Trading UI and Farming UI work are not started yet beyond explicit placeholder visibility/status in the layout.
+- Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
 
 ### Round Formats & Shared Chat (Non-Binding Status)
 
@@ -359,6 +365,12 @@ The expected role of playtesting is to validate:
 - UX comprehension for new players
 
 This validation phase is intended to inform tuning and calibration of the implemented systems, not to redefine the project’s core architecture.
+
+Immediate validation backlog (mining-first):
+
+- Validate mined output amounts over full-round timelines.
+- Validate per-upgrade gains against upgrade price progression.
+- Validate halving timing and post-halving output behavior end-to-end.
 
 ### Release Preparation (Not Started)
 

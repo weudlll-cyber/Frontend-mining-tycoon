@@ -274,3 +274,9 @@ Hosts may set the minimum farming duration and the farming reward level before t
 All farming parameters must be fixed before round start and must apply equally to all players in that round.
 
 Farming is intentionally limited to Stage 1 (Passive Farming) and Stage 2 (Rotating Farming), with no Stage 3 or further escalation layers planned. This is a deliberate design choice to preserve clarity, flexibility, and round-based playability.
+
+## Implementation Reality Check (2026-03-23)
+
+- Current implementation/validation focus is Mining.
+- Trading and Farming remain concept-defined, but dedicated UI implementation work for those pillars has not started yet.
+- Structured playtest validation is still needed for mining pace, upgrade economy tuning, and halving behavior quality.

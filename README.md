@@ -14,6 +14,15 @@ This app lets you:
   - choose pay token inline per upgrade lane (target token is the season card)
   - submit display-only intent; backend remains authoritative for conversion/cost outcome
 
+## Current Implementation Status (2026-03-23)
+
+- Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
+- Trading and Farming UI implementation has not started yet; the dashboard currently exposes visibility/status placeholders only.
+- Gameplay-balance validation is still pending through playtests, especially for:
+  - mined output pacing over time
+  - upgrade impact compared to upgrade cost progression
+  - halving trigger and post-halving behavior
+
 ## Project Baseline (Authoritative)
 
 The current implemented state of the game is documented in [PROJECT_BASELINE.md](PROJECT_BASELINE.md).
@@ -72,6 +81,7 @@ If port `5173` is already used, Vite automatically selects the next free port.
 - click `Start Stream`
 
 For async rounds, use the explicit session action:
+
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (10m, 30m, 1h, 6h, 12h, 1d)
@@ -82,6 +92,7 @@ For async rounds, use the explicit session action:
 - the app switches to `/sessions/{session_id}/stream` automatically
 
 Sync/Async model (backend-aligned):
+
 - Sync rounds use `Round Duration` + `Enrollment Window` and stream via `/games/{id}/stream`.
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
@@ -176,6 +187,62 @@ npm run dev
 npm run test -- --run
 npm run build
 ```
+
+## Mining Validation Playtest Checklist
+
+Use this checklist to validate mining-only gameplay before Trading and Farming UI implementation starts.
+
+### Session Setup
+
+1. Start backend and worker, then confirm backend status endpoint is healthy.
+2. Start frontend and create a new round in Sync mode.
+3. Join as one player and start stream.
+4. Record initial values in a notes table:
+
+- Time
+- SPR/SUM/AUT/WIN balances
+- Out/s by token
+- Total Out/s
+- Portfolio value
+
+### Output Pace Validation
+
+5. Wait 60 seconds with no upgrades and record the same values again.
+6. Confirm each token balance increased consistently with its shown Out/s trend.
+7. Repeat one more 60-second interval and confirm growth remains monotonic (no unexpected drops/reset).
+
+### Upgrade Value and Cost Validation
+
+8. Buy one Hashrate upgrade on a single season card; record old/new:
+
+- level
+- Out/s
+- upgrade cost shown
+- post-upgrade balance delta
+
+9. Repeat for Efficiency and Cooling on the same token.
+10. Confirm each upgrade increases expected production signal and that displayed costs progress upward by level.
+11. Perform one cross-token pay selection in Upgrade Pay and confirm backend-authoritative outcome is reflected correctly in balances/cost.
+
+### Halving Validation
+
+12. Run a round configuration where halving should occur during your session.
+13. Capture values immediately before and after halving trigger:
+
+- halving countdown display
+- token Out/s
+- cumulative mined trend
+
+14. Confirm halving trigger timing is consistent with countdown and post-halving output behavior matches expected reduction logic.
+
+### Pass Criteria
+
+15. Mark the session PASS only if all checks hold:
+
+- no non-monotonic mining anomalies under stable conditions
+- upgrade gains and cost progression remain coherent
+- halving timing and effect behavior are correct
+- no frontend/backend desync in displayed authoritative values
 
 ## Scripts
 
