@@ -9,6 +9,7 @@ All contributions MUST comply with [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 Before opening a PR:
 
 - Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+- Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, or security docs when impacted) and remove stale statements that no longer match implementation.
 - Validate changes against LOCKED_DECISIONS.md.
 - Use the PR checklist in [.github/pull_request_template.md](.github/pull_request_template.md).
 - Ensure tests remain green and add/update tests for changed behavior.

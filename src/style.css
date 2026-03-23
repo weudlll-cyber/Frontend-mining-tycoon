@@ -159,14 +159,6 @@ body {
   letter-spacing: 0.04em;
 }
 
-.async-score-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 0.18rem;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
 .debug-panel {
   border-top: 1px dashed var(--border-light);
   margin-top: 0.2rem;

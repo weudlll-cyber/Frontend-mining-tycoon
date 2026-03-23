@@ -97,7 +97,7 @@ Sync/Async model (backend-aligned):
 - Async rounds send `enrollment_window_seconds=0` and include `session_duration_seconds` in create payload.
 - Async rounds use session-scoped transport only (`/sessions/{session_id}/stream`) and never fallback to legacy stream.
 - Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
-- Header and player analytics show both `This session` and `Best this round` values from backend payload.
+- In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
 
 ## UI Layout
 
