@@ -133,8 +133,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          FRONTEND_RESULT="${{ needs.frontend-ci.result }}"
-          BACKEND_RESULT="${{ needs.backend-ci.result }}"
+          FRONTEND_RESULT="${{ needs['frontend-ci'].result }}"
+          BACKEND_RESULT="${{ needs['backend-ci'].result }}"
 
           MERGE_SAFE="true"
           if [ "$FRONTEND_RESULT" != "success" ] || [ "$BACKEND_RESULT" != "success" ]; then
@@ -178,7 +178,7 @@ jobs:
       - frontend-ci
       - backend-ci
       - ci-summary
-    if: needs.ci-summary.result == 'success'
+    if: needs['ci-summary'].result == 'success'
     outputs:
       snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
     steps:
@@ -215,18 +215,18 @@ jobs:
     needs:
       - create-snapshot-tag
       - ci-summary
-    if: needs.ci-summary.result == 'success' && inputs.create_release
+    if: needs['ci-summary'].result == 'success' && inputs.create_release
     steps:
       - name: Create GitHub release
         uses: actions/github-script@v7
         env:
-          SUMMARY_MD: ${{ needs.ci-summary.outputs.summary_md }}
+          SUMMARY_MD: ${{ needs['ci-summary'].outputs.summary_md }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const tag = "${{ needs.create-snapshot-tag.outputs.snapshot_tag }}";
+            const tag = "${{ needs['create-snapshot-tag'].outputs.snapshot_tag }}";
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const summaryMd = process.env.SUMMARY_MD || '';
 
@@ -250,3 +250,4 @@ jobs:
               prerelease: false,
               generate_release_notes: false,
             });
+

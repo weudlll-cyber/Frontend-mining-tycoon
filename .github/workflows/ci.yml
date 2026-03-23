@@ -100,19 +100,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run lint
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm run lint
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; lint check passes by policy."
 
   format_check:
@@ -123,19 +123,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run format check
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm run format:check
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; format check passes by policy."
 
   unit_tests:
@@ -146,19 +146,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run unit tests
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm run test -- --run
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; unit tests check passes by policy."
 
   test_coverage:
@@ -169,19 +169,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run coverage tests
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm run test:coverage
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; coverage check passes by policy."
 
   build:
@@ -192,19 +192,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run build
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm run build
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; build check passes by policy."
 
   security_audit:
@@ -215,19 +215,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run security audit
-        if: needs.detect-changes.outputs.frontend == 'true'
+        if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm audit --omit=dev --audit-level=high
       - name: No frontend changes
-        if: needs.detect-changes.outputs.frontend != 'true'
+        if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; security audit check passes by policy."
 
   backend-ci:
@@ -238,7 +238,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Run backend checks
-        if: needs.detect-changes.outputs.backend == 'true'
+        if: needs['detect-changes'].outputs.backend == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -296,7 +296,7 @@ jobs:
           echo "Backend changes were detected, but no supported backend project layout was found."
           exit 1
       - name: No backend changes
-        if: needs.detect-changes.outputs.backend != 'true'
+        if: needs['detect-changes'].outputs.backend != 'true'
         run: echo "No backend changes; backend CI skipped by policy."
 
   ci-summary:
@@ -319,16 +319,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          PR_POLICY_RESULT="${{ needs.pr-policy.result }}"
-          FRONTEND_CHANGED="${{ needs.detect-changes.outputs.frontend }}"
-          BACKEND_CHANGED="${{ needs.detect-changes.outputs.backend }}"
+          PR_POLICY_RESULT="${{ needs['pr-policy'].result }}"
+          FRONTEND_CHANGED="${{ needs['detect-changes'].outputs.frontend }}"
+          BACKEND_CHANGED="${{ needs['detect-changes'].outputs.backend }}"
           LINT_RESULT="${{ needs.lint.result }}"
           FORMAT_RESULT="${{ needs.format_check.result }}"
           TEST_RESULT="${{ needs.unit_tests.result }}"
           COVERAGE_RESULT="${{ needs.test_coverage.result }}"
           BUILD_RESULT="${{ needs.build.result }}"
           AUDIT_RESULT="${{ needs.security_audit.result }}"
-          BACKEND_RESULT="${{ needs.backend-ci.result }}"
+          BACKEND_RESULT="${{ needs['backend-ci'].result }}"
 
           MERGE_SAFE="YES"
 
@@ -386,15 +386,15 @@ jobs:
       - name: Create or update PR results comment
         uses: actions/github-script@v7
         env:
-          PR_POLICY_RESULT: ${{ needs.pr-policy.result }}
+          PR_POLICY_RESULT: ${{ needs['pr-policy'].result }}
           LINT_RESULT: ${{ needs.lint.result }}
           FORMAT_RESULT: ${{ needs.format_check.result }}
           TEST_RESULT: ${{ needs.unit_tests.result }}
           COVERAGE_RESULT: ${{ needs.test_coverage.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           AUDIT_RESULT: ${{ needs.security_audit.result }}
-          BACKEND_RESULT: ${{ needs.backend-ci.result }}
-          SUMMARY_RESULT: ${{ needs.ci-summary.result }}
+          BACKEND_RESULT: ${{ needs['backend-ci'].result }}
+          SUMMARY_RESULT: ${{ needs['ci-summary'].result }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -460,3 +460,4 @@ jobs:
               issue_number: prNumber,
               body,
             });
+
