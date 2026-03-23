@@ -623,6 +623,35 @@ function setStartSessionStatus(message = '', type = 'info') {
     : 'setup-session-status';
 }
 
+function handleActiveSessionExpired() {
+  if (!activeSession?.sessionId) {
+    return;
+  }
+
+  // Clear session context first so subsequent UI updates use non-session paths.
+  activeSession = null;
+
+  // Session lifespan is reached: stop receiving live updates for this session
+  // so the player does not keep seeing halving ticks beyond configured duration.
+  cancelPendingUiRender();
+  closeEventSourceIfOpen();
+  stopLiveTimersAndHalving();
+  stopSessionElapsedTimer();
+  disconnectChat();
+
+  isStreamActive = false;
+  setLiveSessionActive(false);
+  setBadgeStatus(connStatusEl, 'idle');
+  setStartSessionStatus(
+    'Session duration reached. Start Async Session to continue.',
+    'warning'
+  );
+  showToast('Session ended at configured duration.', 'info');
+
+  updateSetupActionsState();
+  renderDebugContext();
+}
+
 function stopSessionElapsedTimer() {
   if (sessionElapsedInterval) {
     clearInterval(sessionElapsedInterval);
@@ -643,6 +672,16 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
       Number(initialElapsedSeconds) || 0,
       nowSeconds - Number(sessionStartUnix)
     );
+
+    const sessionDurationSec = Number(activeSession?.sessionDurationSec);
+    if (
+      Number.isFinite(sessionDurationSec) &&
+      sessionDurationSec > 0 &&
+      elapsed >= sessionDurationSec
+    ) {
+      handleActiveSessionExpired();
+      return;
+    }
 
     // ── Primary header counter ──────────────────────────────────────────────
     // WHY: Once the backend session exists, the primary timer shows how long
@@ -743,6 +782,7 @@ function setSetupStateForTests({
     activeSession = {
       sessionId,
       sessionStartUnix: activeSession?.sessionStartUnix || null,
+      sessionDurationSec: activeSession?.sessionDurationSec || null,
       requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
     };
   }
@@ -1412,6 +1452,7 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
   activeSession = {
     sessionId: result.sessionId,
     sessionStartUnix: Number(result.sessionStartUnix) || null,
+    sessionDurationSec: Number(result.sessionDurationSec) || null,
     requiresPlayerAuth: Boolean(result.requiresPlayerAuth),
   };
   sessionStartSupported = true;
