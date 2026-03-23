@@ -4,10 +4,7 @@ Purpose: Verify async session badge rendering in top summary.
 */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  initLiveSummary,
-  renderAsyncSessionBadge,
-} from './live-summary.js';
+import { initLiveSummary, renderAsyncSessionBadge } from './live-summary.js';
 
 describe('live-summary async badge', () => {
   beforeEach(() => {

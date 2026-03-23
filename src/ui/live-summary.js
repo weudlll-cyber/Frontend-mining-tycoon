@@ -120,8 +120,6 @@ export function renderAsyncSessionBadge({
   }
 }
 
-
-
 export function computePortfolioValue(
   balances,
   oraclePrices,

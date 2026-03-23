@@ -657,9 +657,7 @@ export function renderPlayerState(data) {
   const isAsyncMode =
     String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
   if (isAsyncMode) {
-    const thisSessionScore = formatScoreLineValue(
-      data?.current_session_score
-    );
+    const thisSessionScore = formatScoreLineValue(data?.current_session_score);
     const bestRoundScore = formatScoreLineValue(data?.player_best_of_score);
     setTextNodeValue(
       refs.thisSessionNode,
