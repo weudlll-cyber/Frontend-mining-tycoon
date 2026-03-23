@@ -42,12 +42,15 @@ All of the following must pass before merge:
 - `npm run test:coverage`
 - `npm run build`
 - `npm audit --omit=dev`
+- GitHub check run: `CodeQL`
+- GitHub check run: `Dependency Review`
+- GitHub check run: `Actionlint`
 
 Repository merge policy:
 
 - Final merge approval is manual even when CI is fully green.
 - Auto-merge must remain OFF.
-- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, and `CI Summary (Manual Merge Gate)`.
+- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, `CodeQL`, `Dependency Review`, `Actionlint`, and `CI Summary (Manual Merge Gate)`.
 - Use squash merge only.
 - PR descriptions must follow [.github/pull_request_template.md](.github/pull_request_template.md), including `merge-safe = YES/NO` and a changed-files summary without full file bodies.
 
