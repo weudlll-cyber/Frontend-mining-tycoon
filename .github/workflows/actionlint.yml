@@ -21,5 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="1.7.7"
+          curl -sSfL -o actionlint.tgz "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf actionlint.tgz actionlint
+          chmod +x ./actionlint
+
       - name: Run actionlint
-        uses: rhysd/actionlint@v1.7.7
+        shell: bash
+        run: ./actionlint -color
