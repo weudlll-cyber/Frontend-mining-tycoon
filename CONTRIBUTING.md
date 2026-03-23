@@ -43,10 +43,16 @@ All of the following must pass before merge:
 - `npm run test -- --run`
 - `npm run test:coverage`
 - `npm run build`
-- `npm audit --omit=dev`
+- `npm audit --omit=dev --audit-level=high`
 - GitHub check run: `CodeQL`
 - GitHub check run: `Dependency Review`
 - GitHub check run: `Actionlint`
+
+Local push discipline:
+
+- enable the tracked git hooks once with `& .\scripts\enable_git_hooks.ps1`
+- use `& .\scripts\push_with_audit.ps1` for normal pushes when possible
+- the tracked pre-push hook runs the same local gate automatically and blocks pushes on failure
 
 Repository merge policy:
 

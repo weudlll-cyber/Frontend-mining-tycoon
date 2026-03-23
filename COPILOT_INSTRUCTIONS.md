@@ -132,8 +132,13 @@ For every source file touched or created:
   - `npm run lint`
   - `npm run format:check`
   - `npm run test -- --run`
+  - `npm run test:coverage`
   - `npm run build`
-  - `npm audit --omit=dev`
+  - `npm audit --omit=dev --audit-level=high`
+
+- Prefer the audited push helper when pushing this repo:
+  - `& .\scripts\push_with_audit.ps1`
+  - ensure tracked hooks are enabled with `& .\scripts\enable_git_hooks.ps1`
 
 If backend files are touched in the same task, also run backend gates before push:
 

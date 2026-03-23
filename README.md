@@ -114,6 +114,34 @@ Sync/Async model (backend-aligned):
 - Every new async session attempt starts from the same backend baseline state (balances/tracks/upgrades/cumulative mined reset for that player), so attempts are comparable and only your per-session decisions can change results.
 - In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
 
+## Audited Push Workflow
+
+This repo now supports a tracked audited push workflow.
+
+One-time local setup:
+
+```powershell
+& .\scripts\enable_git_hooks.ps1
+```
+
+Daily usage:
+
+```powershell
+& .\scripts\push_with_audit.ps1
+```
+
+What happens before push:
+
+- required frontend docs presence check
+- `npm run lint`
+- `npm run format:check`
+- `npm run test -- --run`
+- `npm run test:coverage`
+- `npm run build`
+- `npm audit --omit=dev --audit-level=high`
+
+The push helper also prints a concise summary of commits and changed files since the last push so the outgoing change set is easy to review.
+
 ## UI Layout
 
 The dashboard uses an **inline 2-column layout** designed for desktop viewing without scrolling, with responsive adaptation for tablet and mobile.
