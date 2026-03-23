@@ -25,19 +25,19 @@ Backend repo:
   - `python -m unittest discover -s tests -q`
   - `python -m ruff check app tests scripts`
   - `python -m black --check app tests scripts`
-- CI: `C:\Users\weudl\Mining tycoon\.github\workflows\ci.yml`
+- CI: sibling backend repo `.github/workflows/ci.yml`
 
 Largest source files discovered:
 
-1. `C:\Users\weudl\frontend mining tycoon\src\main.js` — 1330 lines
-2. `C:\Users\weudl\Mining tycoon\app\services\game_service.py` — 1025 lines
-3. `C:\Users\weudl\Mining tycoon\app\api\routes.py` — 873 lines
+1. frontend repo `src/main.js` — 1330 lines
+2. sibling backend repo `app/services/game_service.py` — 1025 lines
+3. sibling backend repo `app/api/routes.py` — 873 lines
 
 Existing audit reports:
 
 - [SECURITY_AUDIT.md](SECURITY_AUDIT.md) — 2025-01-15
 - [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md) — 2025-01-15
-- `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md` — 2025-01-15
+- sibling backend repo `BACKEND_TEST_AUDIT.md` — 2025-01-15
 
 ## Step 1 Baseline Quality Run
 

@@ -50,6 +50,20 @@ Key highlights:
 
 When using Copilot, always instruct it to not violate LOCKED_DECISIONS.md.
 
+## Documentation Map
+
+Use these files as the current documentation set for the frontend repo:
+
+- `README.md`: quick start, UI behavior, runbook, and current implementation scope
+- `PROJECT_BASELINE.md`: canonical factual baseline of what is implemented right now
+- `SEASONAL_TYCOON_CONCEPT.md`: high-level game vision and product intent
+- `LOCKED_DECISIONS.md`: non-negotiable product and UX invariants
+- `CONTRIBUTING.md`: contribution rules, commenting expectations, and quality gates
+- `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
+- `SECURITY_AUDIT.md`: frontend-relevant security and review notes
+
+If a change affects backend contracts, update the sibling backend repo docs in the same workstream so both repos stay aligned.
+
 ## Requirements
 
 - Node.js (LTS recommended)
@@ -394,7 +408,7 @@ Oracle prices and conversion parameters are read from the latest game-scoped sna
 
 For full-stack local development with backend + frontend in one VS Code session, use the umbrella workspace file:
 
-- `C:\Users\weudl\mining-tycoon-umbrella.code-workspace`
+- your shared umbrella workspace file, if you keep one for opening frontend + backend together
 
 ## Events (Active Event Visibility & Effect Indicators)
 

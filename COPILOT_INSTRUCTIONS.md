@@ -22,10 +22,11 @@ If a requested change would violate any locked invariant:
 
 When a task touches full-stack behavior, also read backend canonical docs:
 
-- `C:\Users\weudl\Mining tycoon\README.md`
-- `C:\Users\weudl\Mining tycoon\REQUIREMENTS.md`
-- `C:\Users\weudl\Mining tycoon\SECURITY.md`
-- `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md`
+- sibling backend repo `README.md`
+- sibling backend repo `PROJECT_BASELINE.md`
+- sibling backend repo `REQUIREMENTS.md`
+- sibling backend repo `SECURITY.md`
+- sibling backend repo `BACKEND_TEST_AUDIT.md`
 
 Cross-repo rule:
 
