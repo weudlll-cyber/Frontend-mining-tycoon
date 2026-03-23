@@ -291,7 +291,7 @@ export async function createNewGameAndJoin() {
         `Join failed: ${joinResponse.status} ${joinResponse.statusText}`
       );
       if (code) {
-        console.debug('[join-policy] error code:', code);
+        // Join policy error code logged
       }
       throw new Error(detail);
     }

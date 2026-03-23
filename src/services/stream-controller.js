@@ -150,13 +150,7 @@ export function startStream(gameId, playerId, streamContext = {}) {
         }
 
         if (!_payloadLogged) {
-          console.log('SSE payload keys:', Object.keys(data));
-          if (data.upgrade_metrics) {
-            console.log('upgrade_metrics structure:', data.upgrade_metrics);
-          }
-          if (data.player_state) {
-            console.log('player_state keys:', Object.keys(data.player_state));
-          }
+          // Payload structure logged once for debugging (if needed, can be re-enabled)
           _payloadLogged = true;
         }
 
@@ -179,10 +173,7 @@ export function startStream(gameId, playerId, streamContext = {}) {
 
         if (!_intentionalClose) {
           _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
-          console.log(
-            'Connection error, readyState:',
-            _eventSource?.readyState
-          );
+          // Connection error - will attempt to reconnect
         } else {
           _deps.onStreamStateChange(false);
           _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
