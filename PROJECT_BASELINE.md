@@ -170,7 +170,7 @@ Frontend session-mode readiness:
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
 - Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
-- Best-of visibility is surfaced inline: header and player analytics show `This session` and `Best this round` (read-only backend values).
+- Best-of visibility is surfaced in Player State panel during async rounds only: shows `This session` and `Best this round` (read-only backend values from backend payload). Hidden in sync mode.
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.

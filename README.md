@@ -111,7 +111,7 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and `Start Stream` remains gated until a valid async session exists.
 - **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
 - **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Ready` or `Async: Session Active`).
-- **Best-of visibility**: Async rounds display `This session` and `Best this round` values inline with exact-value tooltips.
+- **Best-of visibility (async mode only)**: When playing async/best-of rounds, the Player State panel displays `This session` and `Best this round` score values inline with exact-value tooltips. These fields are hidden in sync mode.
 - **Session active badge**: After successful async start, the header summary line shows `Async: Session Active`.
 - **Main Grid (2 columns)**:
   - **Left (~65%)**: 2×2 grid of seasonal cards (Spring, Summer, Autumn, Winter). Each card displays:
