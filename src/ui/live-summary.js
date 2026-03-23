@@ -36,8 +36,6 @@ export function initLiveSummary(deps) {
     deps.myRankEl,
     deps.topScoreEl,
     deps.portfolioValueEl,
-    deps.thisSessionScoreEl,
-    deps.bestRoundScoreEl,
     deps.asyncSessionStatusEl,
   ]
     .filter(Boolean)
@@ -56,12 +54,6 @@ function formatPortfolioValue(value) {
     decimalsLarge: 2,
   });
   return display;
-}
-
-function formatExactScore(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '—';
-  return Math.floor(numeric).toLocaleString();
 }
 
 export function renderAsyncSessionBadge({
@@ -128,37 +120,7 @@ export function renderAsyncSessionBadge({
   }
 }
 
-export function renderAsyncScoreLines(data) {
-  const thisSessionEl = _refs?.thisSessionScoreEl;
-  const bestRoundEl = _refs?.bestRoundScoreEl;
-  const wrapperEl = _refs?.asyncScoreLinesEl;
-  if (!thisSessionEl || !bestRoundEl || !wrapperEl) return;
 
-  const isAsync =
-    String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
-  wrapperEl.hidden = !isAsync;
-  if (!isAsync) {
-    setElementTextValue(thisSessionEl, 'This session: —');
-    setElementTextValue(bestRoundEl, 'Best this round: —');
-    thisSessionEl.removeAttribute('title');
-    bestRoundEl.removeAttribute('title');
-    return;
-  }
-
-  const thisSession = Number(data?.current_session_score);
-  const bestRound = Number(data?.player_best_of_score);
-
-  setElementTextValue(
-    thisSessionEl,
-    `This session: ${formatScore(thisSession)}`
-  );
-  setElementTextValue(
-    bestRoundEl,
-    `Best this round: ${formatScore(bestRound)}`
-  );
-  thisSessionEl.title = `Exact value: ${formatExactScore(thisSession)}`;
-  bestRoundEl.title = `Exact value: ${formatExactScore(bestRound)}`;
-}
 
 export function computePortfolioValue(
   balances,

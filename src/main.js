@@ -111,7 +111,6 @@ import {
   renderQuickStats as renderLiveQuickStats,
   renderPortfolioValue as renderLivePortfolioValue,
   renderAsyncSessionBadge,
-  renderAsyncScoreLines,
 } from './ui/live-summary.js';
 import {
   initLeaderboard,
@@ -245,9 +244,6 @@ const myScoreEl = document.getElementById('my-score');
 const myRankEl = document.getElementById('my-rank');
 const topScoreEl = document.getElementById('top-score');
 const portfolioValueEl = document.getElementById('portfolio-value');
-const asyncScoreLinesEl = document.getElementById('async-score-lines');
-const thisSessionScoreEl = document.getElementById('this-session-score');
-const bestRoundScoreEl = document.getElementById('best-round-score');
 const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
 const editableInputs = [
   baseUrlInput,
@@ -929,9 +925,6 @@ function initializeModules() {
     myRankEl,
     topScoreEl,
     portfolioValueEl,
-    asyncScoreLinesEl,
-    thisSessionScoreEl,
-    bestRoundScoreEl,
     asyncSessionStatusEl,
     getGameMeta,
     defaultTokenNames: PLAYER_STATE_TOKENS,
@@ -1197,7 +1190,6 @@ function applyUIUpdate(data) {
   renderUpgradeMetrics(data);
   renderLeaderboard(data);
   renderQuickStats(data);
-  renderAsyncScoreLines(data);
   renderPortfolioValue(data);
   renderEventBanner(data);
   annotateAffectedValues(data);
@@ -1350,7 +1342,6 @@ if (stopBtn) {
     if (myScoreEl) myScoreEl.textContent = '—';
     if (myRankEl) myRankEl.textContent = '—';
     if (topScoreEl) topScoreEl.textContent = '—';
-    renderAsyncScoreLines(null);
     resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
     ensureInputsEditable();
     setLiveSessionActive(false);
