@@ -435,9 +435,8 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
         : Promise.resolve({ value: 'unknown', reason: 'missing-player-id' }),
     ]);
 
-    asyncSessionSupportProbe = resolveSessionSupportProbeValue(
-      sessionSupportResult
-    );
+    asyncSessionSupportProbe =
+      resolveSessionSupportProbeValue(sessionSupportResult);
     asyncRequirePlayerAuth = resolveRequirePlayerAuthValue(authResult);
 
     debugLog('async-diagnostics', 'probe results', {

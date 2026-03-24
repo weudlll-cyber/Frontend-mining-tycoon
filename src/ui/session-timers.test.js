@@ -58,7 +58,10 @@ describe('session-timers helpers', () => {
       isSessionExpired({ sessionDurationSec: 10, elapsedSeconds: elapsed })
     ).toBe(true);
     expect(
-      computeSessionLeftSeconds({ sessionDurationSec: 10, elapsedSeconds: elapsed })
+      computeSessionLeftSeconds({
+        sessionDurationSec: 10,
+        elapsedSeconds: elapsed,
+      })
     ).toBe(0);
     expect(
       computeSessionLeftSeconds({ sessionDurationSec: null, elapsedSeconds: 8 })

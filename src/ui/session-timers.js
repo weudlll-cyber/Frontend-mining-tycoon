@@ -13,7 +13,10 @@ export function computeRoundRemainingSeconds(lastGameData, nowMs = Date.now()) {
   return Math.max(0, remaining - streamAge);
 }
 
-export function normalizeSessionTimerInputs(sessionStartUnix, initialElapsedSeconds) {
+export function normalizeSessionTimerInputs(
+  sessionStartUnix,
+  initialElapsedSeconds
+) {
   if (!Number.isFinite(sessionStartUnix)) {
     return null;
   }
@@ -33,7 +36,10 @@ export function shouldReuseSessionElapsedTimer({
   sessionElapsedAnchorUnix,
   normalizedStartUnix,
 }) {
-  return Boolean(sessionElapsedInterval) && sessionElapsedAnchorUnix === normalizedStartUnix;
+  return (
+    Boolean(sessionElapsedInterval) &&
+    sessionElapsedAnchorUnix === normalizedStartUnix
+  );
 }
 
 export function computeElapsedSeconds({
@@ -55,7 +61,10 @@ export function isSessionExpired({ sessionDurationSec, elapsedSeconds }) {
   );
 }
 
-export function computeSessionLeftSeconds({ sessionDurationSec, elapsedSeconds }) {
+export function computeSessionLeftSeconds({
+  sessionDurationSec,
+  elapsedSeconds,
+}) {
   if (Number.isFinite(sessionDurationSec) && sessionDurationSec > 0) {
     return Math.max(0, sessionDurationSec - elapsedSeconds);
   }

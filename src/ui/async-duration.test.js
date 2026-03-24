@@ -67,9 +67,9 @@ describe('async-duration helpers', () => {
     });
 
     expect(sessionDurationInput.value).toBe('60m');
-    expect(Array.from(sessionDurationInput.options).every((opt) => !opt.disabled)).toBe(
-      true
-    );
+    expect(
+      Array.from(sessionDurationInput.options).every((opt) => !opt.disabled)
+    ).toBe(true);
     expect(warningEl.hidden).toBe(true);
     expect(warningEl.textContent).toBe('');
   });

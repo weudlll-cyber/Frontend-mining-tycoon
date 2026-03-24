@@ -10,7 +10,11 @@ import {
 describe('async-diagnostics helpers', () => {
   it('resets diagnostics outside async-ready prerequisites', () => {
     expect(
-      shouldResetAsyncDiagnostics({ baseUrl: '', gameId: 'g1', roundMode: 'async' })
+      shouldResetAsyncDiagnostics({
+        baseUrl: '',
+        gameId: 'g1',
+        roundMode: 'async',
+      })
     ).toBe(true);
     expect(
       shouldResetAsyncDiagnostics({

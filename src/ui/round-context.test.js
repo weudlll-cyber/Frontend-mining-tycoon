@@ -14,12 +14,12 @@ describe('round-context helpers', () => {
   });
 
   it('resolves session support from flags and capability lists', () => {
-    expect(
-      getSessionSupportFromMeta({ supports_round_sessions: true })
-    ).toBe(true);
-    expect(
-      getSessionSupportFromMeta({ supports_session_stream: false })
-    ).toBe(false);
+    expect(getSessionSupportFromMeta({ supports_round_sessions: true })).toBe(
+      true
+    );
+    expect(getSessionSupportFromMeta({ supports_session_stream: false })).toBe(
+      false
+    );
     expect(
       getSessionSupportFromMeta({ capabilities: ['chat', 'session-stream'] })
     ).toBe(true);
