@@ -92,7 +92,11 @@ import {
   setActiveMeta as setActiveMetaState,
   fetchMetaSnapshot,
 } from './meta/meta-manager.js';
-import { initPlayerView, renderPlayerState } from './ui/player-view.js';
+import {
+  initPlayerView,
+  renderPlayerState,
+  resetPlayerStateView,
+} from './ui/player-view.js';
 import {
   initSetupShell,
   setSetupShellState,
@@ -135,6 +139,49 @@ import {
   renderUpgradeMetrics as renderUpgradePanelMetrics,
   getSelectedTokens,
 } from './ui/upgrade-panel.js';
+import {
+  syncSessionDurationOptions,
+  getAsyncDurationPreset,
+  getAsyncSessionDurationSeconds,
+} from './ui/async-duration.js';
+import {
+  resolveDurationSecondsFromInputs,
+  collectAdvancedOverridesFromInputs,
+} from './ui/setup-payload.js';
+import {
+  getRoundModeFromMeta,
+  resolveAsyncWindowOpen,
+  computeCurrentRoundContext,
+} from './ui/round-context.js';
+import {
+  shouldResetAsyncDiagnostics,
+  createAsyncDiagnosticsProbeKey,
+  shouldSkipAsyncDiagnosticsProbe,
+  resolveSessionSupportProbeValue,
+  resolveRequirePlayerAuthValue,
+} from './ui/async-diagnostics.js';
+import {
+  computeRoundRemainingSeconds,
+  normalizeSessionTimerInputs,
+  shouldReuseSessionElapsedTimer,
+  computeElapsedSeconds,
+  isSessionExpired,
+  computeSessionLeftSeconds,
+} from './ui/session-timers.js';
+import {
+  buildSetupShellState,
+  buildStartSessionStatusClass,
+} from './ui/setup-state.js';
+import {
+  deriveStreamSessionState,
+  resolveCountdownMode,
+  stampIncomingUiData,
+  shouldScheduleUiRender,
+} from './ui/ui-update-state.js';
+import {
+  normalizeAsyncSessionStartFailure,
+  buildActiveSessionFromResult,
+} from './ui/async-session-state.js';
 import {
   initInlineUpgrades,
   renderAllSeasonUpgrades,
@@ -300,141 +347,11 @@ let selectedSetupRoundType = 'sync';
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
 
-function getRoundModeFromMeta(meta) {
-  const raw = String(meta?.round_mode || meta?.round_type || '')
-    .trim()
-    .toLowerCase();
-  if (raw === 'async' || raw === 'asynchronous') return 'async';
-  return 'sync';
-}
-
 function getSelectedRoundType() {
   if (selectedSetupRoundType === 'async' || selectedSetupRoundType === 'sync') {
     return selectedSetupRoundType;
   }
   return roundTypeAsyncInput?.checked ? 'async' : 'sync';
-}
-
-// ---------------------------------------------------------------------------
-// Async session-duration guard helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Converts a preset label (e.g. "5m", "3h", "7d") to seconds.
- * Covers every option that exists in either the Round Duration or the
- * Session Duration dropdown so we can compare them numerically.
- *
- * Returns null for unknown labels so callers can decide how to handle missing
- * mappings rather than silently treating them as 0.
- */
-function presetToSeconds(preset) {
-  const map = {
-    '5m': 300,
-    '10m': 600,
-    '15m': 900,
-    '60m': 3600,
-    '3h': 10800,
-    '6h': 21600,
-    '12h': 43200,
-    '24h': 86400,
-    '3d': 259200,
-    '7d': 604800,
-    // Session-only aliases (the session dropdown uses "30m" which round doesn't)
-    '30m': 1800,
-  };
-  return Object.prototype.hasOwnProperty.call(map, preset) ? map[preset] : null;
-}
-
-/**
- * Enforces the invariant: session duration ≤ round duration.
- *
- * Called whenever either the Round Duration or the Session Duration dropdown
- * changes, and once on page load after settings are restored.
- *
- * What it does:
- *  1. Reads the currently selected round duration in seconds.
- *  2. Disables every <option> in the session dropdown whose duration would
- *     exceed the round.
- *  3. If the currently selected session option is now disabled (was already
- *     set to an invalid value), auto-selects the largest still-valid option.
- *  4. Shows a small amber warning message below the session dropdown when
- *     auto-clamping occurred so the user knows their choice was adjusted,
- *     and hides it otherwise.
- */
-function syncSessionDurationOptions() {
-  // Guard: both dropdowns must be present in the DOM.
-  if (!asyncHostDurationPresetInput || !asyncSessionDurationPresetInput) return;
-
-  const roundSeconds = presetToSeconds(asyncHostDurationPresetInput.value);
-
-  // If the round preset is not in our map (e.g. future preset added to HTML
-  // without updating presetToSeconds), leave the session dropdown untouched.
-  if (roundSeconds === null) return;
-
-  let lastValidValue = null; // highest session preset that is still valid
-
-  // Pass 1 — enable/disable each option in the session dropdown.
-  for (const opt of asyncSessionDurationPresetInput.options) {
-    const optSec = presetToSeconds(opt.value);
-    // An option with an unknown preset value is left enabled (safe default).
-    const tooLong = optSec !== null && optSec > roundSeconds;
-    opt.disabled = tooLong;
-    if (!tooLong) lastValidValue = opt.value;
-  }
-
-  // Pass 2 — if the current selection is now disabled, clamp to the largest
-  // valid option.
-  const currentOpt = asyncSessionDurationPresetInput.selectedOptions[0];
-  const hadToClamp = Boolean(currentOpt?.disabled) && lastValidValue !== null;
-  if (hadToClamp) {
-    asyncSessionDurationPresetInput.value = lastValidValue;
-  }
-
-  // Show / hide the inline warning beneath the dropdown.
-  if (sessionDurationWarningEl) {
-    if (hadToClamp) {
-      // Tell the user what happened and what the new value is.
-      const roundLabel = asyncHostDurationPresetInput.value;
-      const newLabel = asyncSessionDurationPresetInput.value;
-      sessionDurationWarningEl.textContent = `Session clamped to ${newLabel} — must be ≤ round (${roundLabel})`;
-      sessionDurationWarningEl.hidden = false;
-    } else {
-      // Everything is fine — no need to display anything.
-      sessionDurationWarningEl.textContent = '';
-      sessionDurationWarningEl.hidden = true;
-    }
-  }
-}
-
-function getAsyncDurationPreset() {
-  const selectedPreset = String(asyncHostDurationPresetInput?.value || '10m');
-  const allowed = new Set([
-    '5m',
-    '10m',
-    '15m',
-    '60m',
-    '3h',
-    '6h',
-    '12h',
-    '24h',
-    '3d',
-    '7d',
-  ]);
-  return allowed.has(selectedPreset) ? selectedPreset : '10m';
-}
-
-function getAsyncSessionDurationSeconds() {
-  const selected = String(asyncSessionDurationPresetInput?.value || '24h');
-  const presetSeconds = {
-    '5m': 300,
-    '10m': 600,
-    '30m': 1800,
-    '60m': 3600,
-    '6h': 21600,
-    '12h': 43200,
-    '24h': 86400,
-  };
-  return presetSeconds[selected] || 86400;
 }
 
 function shouldAutoStartAsyncSession() {
@@ -462,78 +379,17 @@ function setSelectedRoundType(roundType) {
   updateAsyncHostControlsVisibility();
 }
 
-function getSessionSupportFromMeta(meta) {
-  if (!meta) return null;
-  if (
-    meta.supports_round_sessions === true ||
-    meta.supports_session_stream === true ||
-    meta.supports_async_sessions === true
-  ) {
-    return true;
-  }
-  if (
-    meta.supports_round_sessions === false ||
-    meta.supports_session_stream === false
-  ) {
-    return false;
-  }
-  const capabilityLists = [];
-  if (Array.isArray(meta.capabilities)) capabilityLists.push(meta.capabilities);
-  if (Array.isArray(meta.features)) capabilityLists.push(meta.features);
-  const capabilityMatch = capabilityLists
-    .flat()
-    .map((entry) => String(entry).toLowerCase())
-    .some((entry) => entry.includes('session'));
-  return capabilityMatch ? true : null;
-}
-
 function getCurrentRoundContext() {
   const gameMeta = getGameMeta(gameIdInput?.value);
-  const selectedRoundType = getSelectedRoundType();
-  const metaRoundMode = getRoundModeFromMeta(gameMeta);
-  const shouldPreferHostSelection =
-    selectedRoundType === 'async' &&
-    !isStreamActive &&
-    (latestGameStatus === null ||
-      latestGameStatus === 'idle' ||
-      latestGameStatus === 'enrolling');
-  const roundMode =
-    setupRoundModeOverride === 'async' || setupRoundModeOverride === 'sync'
-      ? setupRoundModeOverride
-      : shouldPreferHostSelection
-        ? 'async'
-        : gameMeta
-          ? metaRoundMode
-          : selectedRoundType;
-  const supportFromMeta = getSessionSupportFromMeta(gameMeta);
-  const supportFromProbe =
-    typeof asyncSessionSupportProbe === 'boolean'
-      ? asyncSessionSupportProbe
-      : null;
-  const supportsSessionStart =
-    roundMode !== 'async'
-      ? false
-      : supportFromMeta === false
-        ? false
-        : supportFromMeta === true
-          ? true
-          : supportFromProbe === true
-            ? true
-            : sessionStartSupported;
-  return {
-    roundMode,
-    supportsSessionStart,
-  };
-}
-
-function resolveAsyncWindowOpen(meta) {
-  if (getRoundModeFromMeta(meta) === 'async') {
-    return true;
-  }
-  if (typeof meta?.window_open === 'boolean') {
-    return meta.window_open;
-  }
-  return null;
+  return computeCurrentRoundContext({
+    gameMeta,
+    selectedRoundType: getSelectedRoundType(),
+    isStreamActive,
+    latestGameStatus,
+    setupRoundModeOverride,
+    asyncSessionSupportProbe,
+    sessionStartSupported,
+  });
 }
 
 async function refreshAsyncDiagnostics({ force = false } = {}) {
@@ -545,24 +401,28 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
 
   asyncWindowOpen = resolveAsyncWindowOpen(gameMeta);
 
-  if (!baseUrl || !gameId || roundMode !== 'async') {
+  if (shouldResetAsyncDiagnostics({ baseUrl, gameId, roundMode })) {
     asyncSessionSupportProbe = null;
     asyncRequirePlayerAuth = 'unknown';
     updateSetupActionsState();
     return;
   }
 
-  const probeKey = `${baseUrl}|${gameId}|${playerId}`;
-  if (
-    !force &&
-    probeKey === asyncDiagnosticsProbeKey &&
-    !asyncDiagnosticsProbeInFlight
-  ) {
-    updateSetupActionsState();
-    return;
-  }
-
-  if (asyncDiagnosticsProbeInFlight && !force) {
+  const probeKey = createAsyncDiagnosticsProbeKey({
+    baseUrl,
+    gameId,
+    playerId,
+  });
+  const shouldSkipProbe = shouldSkipAsyncDiagnosticsProbe({
+    force,
+    probeKey,
+    previousProbeKey: asyncDiagnosticsProbeKey,
+    inFlight: asyncDiagnosticsProbeInFlight,
+  });
+  if (shouldSkipProbe) {
+    if (!asyncDiagnosticsProbeInFlight) {
+      updateSetupActionsState();
+    }
     return;
   }
 
@@ -575,14 +435,10 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
         : Promise.resolve({ value: 'unknown', reason: 'missing-player-id' }),
     ]);
 
-    asyncSessionSupportProbe =
-      typeof sessionSupportResult?.supported === 'boolean'
-        ? sessionSupportResult.supported
-        : null;
-    asyncRequirePlayerAuth =
-      authResult?.value === true || authResult?.value === false
-        ? authResult.value
-        : 'unknown';
+    asyncSessionSupportProbe = resolveSessionSupportProbeValue(
+      sessionSupportResult
+    );
+    asyncRequirePlayerAuth = resolveRequirePlayerAuthValue(authResult);
 
     debugLog('async-diagnostics', 'probe results', {
       gameId,
@@ -606,7 +462,7 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
 
 function syncSetupShellState() {
   const roundContext = getCurrentRoundContext();
-  setSetupShellState({
+  const nextSetupState = buildSetupShellState({
     isStreamActive,
     isSetupBusy,
     latestGameStatus,
@@ -615,19 +471,17 @@ function syncSetupShellState() {
     sessionApiSupported: asyncSessionSupportProbe,
     asyncWindowOpen,
     requirePlayerAuth: asyncRequirePlayerAuth,
-    sessionActive: Boolean(activeSession?.sessionId),
-    sessionId: activeSession?.sessionId || null,
+    activeSession,
     hostRoundType: getSelectedRoundType(),
     asyncHostAutoStart: shouldAutoStartAsyncSession(),
   });
+  setSetupShellState(nextSetupState);
 }
 
 function setStartSessionStatus(message = '', type = 'info') {
   if (!startSessionStatusEl) return;
   startSessionStatusEl.textContent = message;
-  startSessionStatusEl.className = message
-    ? `setup-session-status setup-session-status--${type}`
-    : 'setup-session-status';
+  startSessionStatusEl.className = buildStartSessionStatusClass(message, type);
 }
 
 function handleActiveSessionExpired() {
@@ -674,15 +528,12 @@ function handleActiveSessionExpired() {
 function updateRoundRemainingHint() {
   if (!roundRemainingHintEl || !roundRemainingEl) return;
 
-  const remaining = Number(lastGameData?.seconds_remaining);
-  if (!Number.isFinite(remaining)) {
+  const roundLeft = computeRoundRemainingSeconds(lastGameData);
+  if (!Number.isFinite(roundLeft)) {
     roundRemainingHintEl.hidden = true;
     return;
   }
 
-  const streamAge =
-    (Date.now() - (lastGameData?.timestamp ?? Date.now())) / 1000;
-  const roundLeft = Math.max(0, remaining - streamAge);
   roundRemainingEl.textContent = formatDurationCompact(roundLeft);
   roundRemainingHintEl.hidden = false;
 }
@@ -731,17 +582,20 @@ function stopSessionElapsedTimer({
 }
 
 function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
-  if (!Number.isFinite(sessionStartUnix)) return;
+  const normalizedInputs = normalizeSessionTimerInputs(
+    sessionStartUnix,
+    initialElapsedSeconds
+  );
+  if (!normalizedInputs) return;
 
-  const normalizedStartUnix = Number(sessionStartUnix);
-  const normalizedInitialElapsed = Number(initialElapsedSeconds);
-  const nextInitialElapsed = Number.isFinite(normalizedInitialElapsed)
-    ? normalizedInitialElapsed
-    : 0;
+  const { normalizedStartUnix, nextInitialElapsed } = normalizedInputs;
 
   if (
-    sessionElapsedInterval &&
-    sessionElapsedAnchorUnix === normalizedStartUnix
+    shouldReuseSessionElapsedTimer({
+      sessionElapsedInterval,
+      sessionElapsedAnchorUnix,
+      normalizedStartUnix,
+    })
   ) {
     sessionElapsedSeedSeconds = Math.max(
       sessionElapsedSeedSeconds,
@@ -758,17 +612,17 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
   sessionElapsedSeedSeconds = nextInitialElapsed;
 
   const update = () => {
-    const nowSeconds = Date.now() / 1000;
-    const elapsed = Math.max(
-      Number(sessionElapsedSeedSeconds) || 0,
-      nowSeconds - Number(sessionElapsedAnchorUnix)
-    );
+    const elapsed = computeElapsedSeconds({
+      sessionElapsedSeedSeconds,
+      sessionElapsedAnchorUnix,
+    });
 
     const sessionDurationSec = Number(activeSession?.sessionDurationSec);
     if (
-      Number.isFinite(sessionDurationSec) &&
-      sessionDurationSec > 0 &&
-      elapsed >= sessionDurationSec
+      isSessionExpired({
+        sessionDurationSec,
+        elapsedSeconds: elapsed,
+      })
     ) {
       handleActiveSessionExpired();
       return;
@@ -781,10 +635,10 @@ function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
       countdownLabelEl.textContent = 'Session Left';
       countdownLabelEl.hidden = false;
     }
-    const sessionLeft =
-      Number.isFinite(sessionDurationSec) && sessionDurationSec > 0
-        ? Math.max(0, sessionDurationSec - elapsed)
-        : elapsed;
+    const sessionLeft = computeSessionLeftSeconds({
+      sessionDurationSec,
+      elapsedSeconds: elapsed,
+    });
     countdownEl.textContent = formatDurationCompact(sessionLeft);
 
     // ── Secondary "Round left" indicator ───────────────────────────────────
@@ -876,52 +730,21 @@ function setSetupStateForTests({
 
 // P2.4: Duration resolution helper
 function resolveDurationSeconds() {
-  const preset = durationPresetInput.value;
-  if (preset === 'custom') {
-    const customValue = parseInt(durationCustomValueInput.value, 10);
-    const unit = durationCustomUnitInput.value || 'seconds';
-    if (!Number.isFinite(customValue) || customValue <= 0) {
-      throw new Error('Custom duration must be a positive number');
-    }
-    let seconds = customValue;
-    if (unit === 'minutes') seconds = customValue * 60;
-    else if (unit === 'hours') seconds = customValue * 3600;
-    else if (unit === 'days') seconds = customValue * 86400;
-
-    const MIN_SECONDS = 60;
-    const MAX_SECONDS = 30 * 24 * 3600;
-    if (seconds < MIN_SECONDS || seconds > MAX_SECONDS) {
-      throw new Error(
-        `Duration must be between ${MIN_SECONDS}s and ${MAX_SECONDS}s`
-      );
-    }
-    return { mode: 'custom', customSeconds: seconds };
-  }
-  // Preset mode (including default)
-  return { mode: 'preset', preset };
+  return resolveDurationSecondsFromInputs({
+    durationPresetInput,
+    durationCustomValueInput,
+    durationCustomUnitInput,
+  });
 }
 
 // P2.4: Collect optional overrides from advanced form
 function collectAdvancedOverrides() {
-  // Advanced overrides are opt-in only. Hidden values must not leak into payloads.
-  if (!showAdvancedCheckbox?.checked) {
-    return {};
-  }
-
-  const overrides = {};
-  const anchorToken = String(anchorTokenInput?.value || '').trim();
-  if (anchorToken) {
-    overrides.emission_anchor_token = anchorToken;
-  }
-  const anchorRate = parseFloat(String(anchorRateInput?.value || ''));
-  if (Number.isFinite(anchorRate) && anchorRate > 0) {
-    overrides.emission_anchor_tokens_per_second = anchorRate;
-  }
-  const seasonCycles = parseInt(String(seasonCyclesInput?.value || ''), 10);
-  if (Number.isFinite(seasonCycles) && seasonCycles > 0) {
-    overrides.season_cycles_per_game = seasonCycles;
-  }
-  return overrides;
+  return collectAdvancedOverridesFromInputs({
+    showAdvancedCheckbox,
+    anchorTokenInput,
+    anchorRateInput,
+    seasonCyclesInput,
+  });
 }
 
 /*
@@ -1178,13 +1001,24 @@ function initializeModules() {
     asyncHostAutoStartCheckbox,
     onHostRoundTypeChanged(nextRoundType) {
       setSelectedRoundType(nextRoundType);
+      syncSessionDurationOptions({
+        roundDurationInput: asyncHostDurationPresetInput,
+        sessionDurationInput: asyncSessionDurationPresetInput,
+        warningEl: sessionDurationWarningEl,
+        enforceLimit: getSelectedRoundType() === 'async',
+      });
       updateSetupActionsState();
       saveSettings();
     },
     onHostAsyncDurationChanged() {
       // Keep the session dropdown in sync whenever the round duration changes:
       // disable options that would exceed the round and auto-clamp if needed.
-      syncSessionDurationOptions();
+      syncSessionDurationOptions({
+        roundDurationInput: asyncHostDurationPresetInput,
+        sessionDurationInput: asyncSessionDurationPresetInput,
+        warningEl: sessionDurationWarningEl,
+        enforceLimit: getSelectedRoundType() === 'async',
+      });
       updateAsyncHostControlsVisibility();
       updateSetupActionsState();
       saveSettings();
@@ -1303,8 +1137,10 @@ function initializeModules() {
     getEnrollmentWindow: () =>
       parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
     getSelectedRoundType,
-    getAsyncDurationPreset,
-    getAsyncSessionDurationSeconds,
+    getAsyncDurationPreset: () =>
+      getAsyncDurationPreset(asyncHostDurationPresetInput),
+    getAsyncSessionDurationSeconds: () =>
+      getAsyncSessionDurationSeconds(asyncSessionDurationPresetInput),
     shouldAutoStartAsyncSession,
     cleanupGameMetaCache,
     resolveDurationSeconds,
@@ -1432,50 +1268,33 @@ function loadSettings() {
 
 function applyUIUpdate(data) {
   const streamSession = data?.session || null;
-  const streamSessionStatus = String(streamSession?.status || '').toLowerCase();
-  const streamSessionIdRaw = streamSession?.session_id;
-  const streamSessionId =
-    streamSessionIdRaw === null || streamSessionIdRaw === undefined
-      ? ''
-      : String(streamSessionIdRaw).trim();
-  const streamSessionRunning =
-    streamSessionStatus === 'running' && streamSessionId.length > 0;
-  const hasExplicitSessionSignal =
-    streamSessionId.length > 0 || streamSessionStatus.length > 0;
+  const sessionRenderState = deriveStreamSessionState({
+    activeSession,
+    streamSession,
+  });
 
   // Keep frontend session state aligned with backend-truth from stream payload.
   // Only clear activeSession if the backend EXPLICITLY confirms the session ended or
   // a different session has taken over. If the payload simply doesn't include session
   // data yet (e.g. first tick after session creation), keep the local session intact
   // to avoid a false drop on startup.
-  if (activeSession?.sessionId) {
-    const localSessionId = String(activeSession.sessionId);
-    const thisSessionEndedExplicitly =
-      streamSessionId === localSessionId && !streamSessionRunning;
-    const differentSessionTookOver =
-      streamSessionId.length > 0 &&
-      streamSessionId !== localSessionId &&
-      streamSessionRunning;
-    if (thisSessionEndedExplicitly || differentSessionTookOver) {
-      activeSession = null;
-      stopSessionElapsedTimer();
-      setStartSessionStatus(
-        'Async session ended. Start a new session to continue.',
-        'info'
-      );
-    }
+  if (sessionRenderState.shouldClearActiveSession) {
+    activeSession = null;
+    stopSessionElapsedTimer();
+    setStartSessionStatus(
+      'Async session ended. Start a new session to continue.',
+      'info'
+    );
   }
 
-  const hasActiveSession =
-    Boolean(activeSession?.sessionId) &&
-    Number.isFinite(activeSession?.sessionStartUnix) &&
-    (streamSessionRunning || !hasExplicitSessionSignal);
+  const hasActiveSession = sessionRenderState.hasActiveSession;
 
   if (hasActiveSession) {
-    const elapsedFromPayload = Number(streamSession?.session_elapsed_seconds);
     startSessionElapsedTimer(
       Number(activeSession.sessionStartUnix),
-      Number.isFinite(elapsedFromPayload) ? elapsedFromPayload : 0
+      Number.isFinite(sessionRenderState.elapsedFromPayload)
+        ? sessionRenderState.elapsedFromPayload
+        : 0
     );
   } else {
     stopSessionElapsedTimer();
@@ -1488,16 +1307,21 @@ function applyUIUpdate(data) {
     setBadgeStatus(gameStatusEl, data.game_status);
     autoCollapseSetupForLiveState(data.game_status);
 
-    if (hasActiveSession) {
+    const countdownMode = resolveCountdownMode({
+      gameStatus: data.game_status,
+      hasActiveSession,
+    });
+
+    if (countdownMode === 'session') {
       // Session timer is already updated above (using payload elapsed when available).
       // Avoid starting a second interval here, which can cause visible header jitter.
-    } else if (data.game_status === 'enrolling') {
+    } else if (countdownMode === 'enrolling') {
       countdownLabelEl.textContent = 'Game starts in';
       startEnrollmentCountdown();
-    } else if (data.game_status === 'running') {
+    } else if (countdownMode === 'running') {
       countdownLabelEl.textContent = 'Time Remaining';
       startCountdownTimer();
-    } else if (data.game_status === 'finished') {
+    } else if (countdownMode === 'finished') {
       countdownLabelEl.textContent = 'Time Remaining';
       stopCountdownTimer();
       stopNextHalvingCountdown();
@@ -1524,13 +1348,14 @@ function cancelPendingUiRender() {
 }
 
 function updateUI(data) {
-  lastGameData = data;
-  lastGameData.timestamp = Date.now();
-  latestGameStatus = data?.game_status || null;
+  const { stampedData, latestGameStatus: nextGameStatus } =
+    stampIncomingUiData(data);
+  lastGameData = stampedData;
+  latestGameStatus = nextGameStatus;
   void refreshAsyncDiagnostics();
 
-  pendingUiRenderData = data;
-  if (pendingUiRenderFrame !== null) {
+  pendingUiRenderData = stampedData;
+  if (!shouldScheduleUiRender(pendingUiRenderFrame)) {
     return;
   }
 
@@ -1569,39 +1394,19 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
   if (!result.ok) {
     isSetupBusy = false;
 
-    if (result.code === 'MALFORMED_SESSION_RESPONSE') {
-      const malformedMessage =
-        'Session could not be started (malformed response).';
-      setStartSessionStatus(malformedMessage, 'error');
-      updateSetupActionsState();
-      return {
-        ok: false,
-        code: result.code,
-        message: malformedMessage,
-      };
+    const normalizedFailure = normalizeAsyncSessionStartFailure(result);
+    setStartSessionStatus(
+      normalizedFailure.message,
+      normalizedFailure.statusType
+    );
+    if (normalizedFailure.nextLatestGameStatus) {
+      latestGameStatus = normalizedFailure.nextLatestGameStatus;
     }
-
-    if (result.kind === 'policy-closed') {
-      setStartSessionStatus(result.message, 'warning');
-      // Keep setup hints aligned when backend says game/session window is already closed.
-      if (/finished/i.test(String(result.message || ''))) {
-        latestGameStatus = 'finished';
-      }
-      updateSetupActionsState();
-      return { ok: false, kind: result.kind, message: result.message };
-    }
-
-    setStartSessionStatus(result.message, 'error');
     updateSetupActionsState();
-    return { ok: false, kind: result.kind, message: result.message };
+    return normalizedFailure.response;
   }
 
-  activeSession = {
-    sessionId: result.sessionId,
-    sessionStartUnix: Number(result.sessionStartUnix) || null,
-    sessionDurationSec: Number(result.sessionDurationSec) || null,
-    requiresPlayerAuth: Boolean(result.requiresPlayerAuth),
-  };
+  activeSession = buildActiveSessionFromResult(result);
   sessionStartSupported = true;
   renderDebugContext();
   setStartSessionStatus('Async session started.', 'success');
@@ -1663,7 +1468,9 @@ if (stopBtn) {
     setBadgeStatus(gameStatusEl, 'idle');
     stopCountdownTimer();
     lastGameData = null;
-    resetSectionPlaceholder(playerStateEl, 'Waiting for game data...');
+    // Reset player-view module state so cached text-node refs do not point to
+    // detached nodes after manual stop/start stream cycles.
+    resetPlayerStateView();
     resetSectionPlaceholder(leaderboardEl, 'Waiting for game data...');
     if (myScoreEl) myScoreEl.textContent = '—';
     if (myRankEl) myRankEl.textContent = '—';
@@ -1729,7 +1536,6 @@ if (showAdvancedCheckbox) {
 
 baseUrlInput?.addEventListener('change', saveSettings);
 playerNameInput?.addEventListener('change', saveSettings);
-durationPresetInput?.addEventListener('change', saveSettings);
 durationCustomValueInput?.addEventListener('change', saveSettings);
 durationCustomUnitInput?.addEventListener('change', saveSettings);
 enrollmentWindowInput?.addEventListener('change', saveSettings);
@@ -1747,7 +1553,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadSettings();
   // Apply the session-duration guard immediately after settings are restored
   // so the dropdown reflects the saved round duration on first render.
-  syncSessionDurationOptions();
+  syncSessionDurationOptions({
+    roundDurationInput: asyncHostDurationPresetInput,
+    sessionDurationInput: asyncSessionDurationPresetInput,
+    warningEl: sessionDurationWarningEl,
+    enforceLimit: getSelectedRoundType() === 'async',
+  });
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
   const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
