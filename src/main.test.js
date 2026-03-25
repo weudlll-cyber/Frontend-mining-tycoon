@@ -280,8 +280,6 @@ describe('Seasonal Oracle frontend helpers', () => {
     });
     expect(portfolioEl.textContent).toBe('10');
   });
-
-
 });
 
 describe('Seasonal Oracle upgrade rendering', () => {
@@ -637,5 +635,3 @@ describe('Portfolio Value with compact formatting', () => {
     expect(portfolioEl.getAttribute('data-full-value')).toBeNull();
   });
 });
-
-

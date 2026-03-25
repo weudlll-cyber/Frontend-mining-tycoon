@@ -266,9 +266,13 @@ export function updateUpgradePanelDynamic(data, activeGameMeta) {
     renderedTypes.add(type);
 
     const level = selectedTokenLevels[type] || 0;
-    const sectionRefs = ensureUpgradeSection(refs, type, (upgradeType, nextLevel) => {
-      _performUpgrade?.(upgradeType, nextLevel);
-    });
+    const sectionRefs = ensureUpgradeSection(
+      refs,
+      type,
+      (upgradeType, nextLevel) => {
+        _performUpgrade?.(upgradeType, nextLevel);
+      }
+    );
     sectionRefs.section.style.display = '';
     setTextNodeValue(sectionRefs.levelNode, `Level ${level}`);
 

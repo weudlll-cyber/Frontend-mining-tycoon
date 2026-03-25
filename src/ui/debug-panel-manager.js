@@ -44,14 +44,22 @@ function isDebugPanelExpanded(refs) {
 
 function setDebugToggleExpandedAttribute(refs, isExpanded) {
   if (!refs?.debugToggleBtnEl) return;
-  refs.debugToggleBtnEl.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+  refs.debugToggleBtnEl.setAttribute(
+    'aria-expanded',
+    isExpanded ? 'true' : 'false'
+  );
   refs.debugToggleBtnEl.setAttribute(
     'aria-label',
     isExpanded ? 'Collapse debug panel' : 'Expand debug panel'
   );
 }
 
-function setDebugPanelExpanded(refs, state, isExpanded, { persist = true } = {}) {
+function setDebugPanelExpanded(
+  refs,
+  state,
+  isExpanded,
+  { persist = true } = {}
+) {
   if (!refs?.debugPanelEl) return;
 
   refs.debugPanelEl.hidden = !isExpanded;

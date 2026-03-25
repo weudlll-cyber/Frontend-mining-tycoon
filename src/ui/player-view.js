@@ -183,7 +183,6 @@ function updatePrecisionTooltip(node, label, tokenNames, values) {
   setTextNodeValue(node, `${label} Precision: ${details || 'unavailable'}.`);
 }
 
-
 function renderFooterHalvingState() {
   if (!_footerClockState) return;
 

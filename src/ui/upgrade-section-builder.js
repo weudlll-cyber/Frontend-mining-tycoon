@@ -26,7 +26,12 @@ export function createUpgradeStat(labelText, extraClass = '') {
   return { row, labelNode, valueNode, value };
 }
 
-export function setStatRowContent(statRefs, labelText, valueText, hidden = false) {
+export function setStatRowContent(
+  statRefs,
+  labelText,
+  valueText,
+  hidden = false
+) {
   if (!statRefs) return;
   statRefs.row.style.display = hidden ? 'none' : '';
   if (hidden) return;
@@ -68,7 +73,10 @@ export function ensureUpgradeSection(refs, type, onUpgrade) {
 
   const costStat = createUpgradeStat('Cost:', 'upgrade-cost');
   const previewStat = createUpgradeStat('Preview:', 'upgrade-current');
-  const outputIncreaseStat = createUpgradeStat('Output Increase:', 'upgrade-benefit');
+  const outputIncreaseStat = createUpgradeStat(
+    'Output Increase:',
+    'upgrade-benefit'
+  );
   const outputAfterStat = createUpgradeStat('Output After:', 'upgrade-current');
   const breakevenStat = createUpgradeStat('Breakeven:', 'upgrade-roi');
 

@@ -288,12 +288,16 @@ describe('Seasonal Oracle season card rendering', () => {
     expect(module.classifyHalvingSeverity(45)).toBe('normal');
     module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 45);
     expect(halvingEl.classList.contains('season-halving--warning')).toBe(false);
-    expect(halvingEl.classList.contains('season-halving--critical')).toBe(false);
+    expect(halvingEl.classList.contains('season-halving--critical')).toBe(
+      false
+    );
 
     expect(module.classifyHalvingSeverity(20)).toBe('warning');
     module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 20);
     expect(halvingEl.classList.contains('season-halving--warning')).toBe(true);
-    expect(halvingEl.classList.contains('season-halving--critical')).toBe(false);
+    expect(halvingEl.classList.contains('season-halving--critical')).toBe(
+      false
+    );
 
     expect(module.classifyHalvingSeverity(3)).toBe('critical');
     module.applyHalvingTextAndSeverity(halvingEl, Date.now() / 1000 + 3);
@@ -343,4 +347,3 @@ describe('Seasonal Oracle season card rendering', () => {
     expect(outputEl.textContent).toBe('5.25/s');
   });
 });
-

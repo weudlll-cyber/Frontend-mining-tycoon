@@ -30,7 +30,11 @@ export function formatScoreLineValue(value) {
   };
 }
 
-export function resolveDisplayedSessionScore(data, playerState, sessionScoreState) {
+export function resolveDisplayedSessionScore(
+  data,
+  playerState,
+  sessionScoreState
+) {
   const backendScore = firstFiniteNumber([
     data?.current_session_score,
     data?.session?.current_session_score,
