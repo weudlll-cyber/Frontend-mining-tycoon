@@ -369,11 +369,15 @@ jobs:
             MERGE_SAFE="NO"
           fi
 
-          for result in "$LINT_RESULT" "$FORMAT_RESULT" "$TEST_RESULT" "$COVERAGE_RESULT" "$CHANGED_LINES_COVERAGE_RESULT" "$BUILD_RESULT" "$AUDIT_RESULT"; do
+          for result in "$LINT_RESULT" "$FORMAT_RESULT" "$TEST_RESULT" "$COVERAGE_RESULT" "$BUILD_RESULT" "$AUDIT_RESULT"; do
             if [ "$result" != "success" ]; then
               MERGE_SAFE="NO"
             fi
           done
+
+          if [ "$CHANGED_LINES_COVERAGE_RESULT" != "success" ] && [ "$CHANGED_LINES_COVERAGE_RESULT" != "skipped" ]; then
+            MERGE_SAFE="NO"
+          fi
 
           if [ "$BACKEND_CHANGED" = "true" ] && [ "$BACKEND_RESULT" != "success" ]; then
             MERGE_SAFE="NO"
