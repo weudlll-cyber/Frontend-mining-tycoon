@@ -59,6 +59,7 @@ Use these files as the current documentation set for the frontend repo:
 - `SEASONAL_TYCOON_CONCEPT.md`: high-level game vision and product intent
 - `LOCKED_DECISIONS.md`: non-negotiable product and UX invariants
 - `CONTRIBUTING.md`: contribution rules, commenting expectations, and quality gates
+- `QUALITY_ENFORCEMENT.md`: mandatory local/CI enforcement policy and test-quality strategy
 - `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
 - `SECURITY_AUDIT.md`: frontend-relevant security and review notes
 

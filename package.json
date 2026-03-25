@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "format:check": "prettier --check \"src/**/*.{js,css}\" index.html",
+    "check:changed-lines-coverage": "node ./scripts/check_changed_lines_coverage.mjs",
+    "mutation": "stryker run",
+    "mutation:check": "stryker run --dryRunOnly",
     "audit:health": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\code_health_audit.ps1",
     "check:all": "npm run lint && npm run format:check && npm run test -- --run && npm run build && npm audit --omit=dev",
     "test": "vitest run --environment jsdom",
@@ -16,6 +19,7 @@
     "test:coverage": "vitest run --coverage --environment jsdom"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
     "@eslint/js": "^9.22.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.22.0",

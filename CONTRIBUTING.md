@@ -36,12 +36,16 @@ PRs that do not satisfy commenting compliance are incomplete.
 
 ## Quality Gates
 
+The authoritative enforcement policy is documented in [QUALITY_ENFORCEMENT.md](QUALITY_ENFORCEMENT.md).
+Use this file as the source of truth for local push gates, CI merge requirements, and test-quality expectations.
+
 All of the following must pass before merge:
 
 - `npm run lint`
 - `npm run format:check`
 - `npm run test -- --run`
 - `npm run test:coverage`
+- `Changed lines coverage` (CI PR check)
 - `npm run build`
 - `npm audit --omit=dev --audit-level=high`
 
@@ -64,7 +68,7 @@ Repository merge policy:
 
 - Final merge approval is manual even when CI is fully green.
 - Auto-merge must remain OFF.
-- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, `CodeQL`, `Dependency Review`, `Actionlint`, and `CI Summary (Manual Merge Gate)`.
+- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Changed lines coverage`, `Build`, `Security audit`, `CodeQL`, `Dependency Review`, `Actionlint`, and `CI Summary (Manual Merge Gate)`.
 - Use squash merge only.
 - PR descriptions must follow [.github/pull_request_template.md](.github/pull_request_template.md), including `merge-safe = YES/NO` and a changed-files summary without full file bodies.
 

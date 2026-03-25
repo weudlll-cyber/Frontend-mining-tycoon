@@ -184,6 +184,37 @@ jobs:
         if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; coverage check passes by policy."
 
+  changed_lines_coverage:
+    name: Changed lines coverage
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        if: needs['detect-changes'].outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: needs['detect-changes'].outputs.frontend == 'true'
+        run: npm ci
+      - name: Run coverage tests
+        if: needs['detect-changes'].outputs.frontend == 'true'
+        run: npm run test:coverage
+      - name: Enforce changed-lines coverage
+        if: needs['detect-changes'].outputs.frontend == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: npm run check:changed-lines-coverage
+      - name: No frontend changes
+        if: needs['detect-changes'].outputs.frontend != 'true'
+        run: echo "No frontend changes; changed-lines coverage passes by policy."
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -309,6 +340,7 @@ jobs:
       - format_check
       - unit_tests
       - test_coverage
+      - changed_lines_coverage
       - build
       - security_audit
       - backend-ci
@@ -326,6 +358,7 @@ jobs:
           FORMAT_RESULT="${{ needs.format_check.result }}"
           TEST_RESULT="${{ needs.unit_tests.result }}"
           COVERAGE_RESULT="${{ needs.test_coverage.result }}"
+          CHANGED_LINES_COVERAGE_RESULT="${{ needs.changed_lines_coverage.result }}"
           BUILD_RESULT="${{ needs.build.result }}"
           AUDIT_RESULT="${{ needs.security_audit.result }}"
           BACKEND_RESULT="${{ needs['backend-ci'].result }}"
@@ -336,7 +369,7 @@ jobs:
             MERGE_SAFE="NO"
           fi
 
-          for result in "$LINT_RESULT" "$FORMAT_RESULT" "$TEST_RESULT" "$COVERAGE_RESULT" "$BUILD_RESULT" "$AUDIT_RESULT"; do
+          for result in "$LINT_RESULT" "$FORMAT_RESULT" "$TEST_RESULT" "$COVERAGE_RESULT" "$CHANGED_LINES_COVERAGE_RESULT" "$BUILD_RESULT" "$AUDIT_RESULT"; do
             if [ "$result" != "success" ]; then
               MERGE_SAFE="NO"
             fi
@@ -356,6 +389,7 @@ jobs:
             echo "- Format check: ${FORMAT_RESULT}"
             echo "- Unit tests: ${TEST_RESULT}"
             echo "- Test coverage: ${COVERAGE_RESULT}"
+            echo "- Changed-lines coverage: ${CHANGED_LINES_COVERAGE_RESULT}"
             echo "- Build: ${BUILD_RESULT}"
             echo "- Security audit: ${AUDIT_RESULT}"
             echo "- Backend CI: ${BACKEND_RESULT}"
@@ -379,6 +413,7 @@ jobs:
       - format_check
       - unit_tests
       - test_coverage
+      - changed_lines_coverage
       - build
       - security_audit
       - backend-ci
@@ -393,6 +428,7 @@ jobs:
           FORMAT_RESULT: ${{ needs.format_check.result }}
           TEST_RESULT: ${{ needs.unit_tests.result }}
           COVERAGE_RESULT: ${{ needs.test_coverage.result }}
+          CHANGED_LINES_COVERAGE_RESULT: ${{ needs.changed_lines_coverage.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           AUDIT_RESULT: ${{ needs.security_audit.result }}
           BACKEND_RESULT: ${{ needs['backend-ci'].result }}
@@ -425,6 +461,7 @@ jobs:
               `- Format check: **${process.env.FORMAT_RESULT || 'skipped'}**`,
               `- Unit tests: **${process.env.TEST_RESULT || 'skipped'}**`,
               `- Test coverage: **${process.env.COVERAGE_RESULT || 'skipped'}**`,
+              `- Changed-lines coverage: **${process.env.CHANGED_LINES_COVERAGE_RESULT || 'skipped'}**`,
               `- Build: **${process.env.BUILD_RESULT || 'skipped'}**`,
               `- Security audit: **${process.env.AUDIT_RESULT || 'skipped'}**`,
               `- Backend CI: **${process.env.BACKEND_RESULT || 'skipped'}**`,
