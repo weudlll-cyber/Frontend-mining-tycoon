@@ -13,10 +13,15 @@ Security notes:
 */
 
 import {
-  STORAGE_KEYS,
-  getStorageItem,
-  setStorageItem,
-} from '../utils/storage-utils.js';
+  applyStoredDebugPanelState as applyStoredDebugPanelStateManaged,
+  renderDebugContext as renderDebugContextManaged,
+  toggleDebugPanel as toggleDebugPanelManaged,
+} from './debug-panel-manager.js';
+import {
+  getAsyncAvailability,
+  renderAsyncAvailabilityChips as renderAsyncAvailabilityChipsManaged,
+  renderAsyncSessionStatusBadge,
+} from './setup-async-diagnostics.js';
 
 let _refs = null;
 let _state = {
@@ -37,56 +42,9 @@ let _state = {
   asyncHostAutoStart: true,
 };
 
-const ASYNC_DIAGNOSTIC_CHIPS = [
-  {
-    key: 'isAsyncRound',
-    label: 'Async',
-    meaning: 'Round mode is asynchronous.',
-  },
-  {
-    key: 'isWindowOpen',
-    label: 'Window',
-    meaning: 'Session start window is open for this round.',
-  },
-  {
-    key: 'isJoined',
-    label: 'Joined',
-    meaning: 'A player is joined for this game (Player ID present).',
-  },
-  {
-    key: 'backendSessionSupport',
-    label: 'SessionAPI',
-    meaning: 'Backend supports async session creation and tickets.',
-  },
-  {
-    key: 'hasNoActiveSession',
-    label: 'NoSession',
-    meaning: 'No active async session currently exists for this player.',
-  },
-  {
-    key: 'requireAuth',
-    label: 'Auth',
-    meaning: 'Backend requires player auth token for session endpoints.',
-  },
-];
-
-function formatAsyncChipTitle(chipConfig, chipValue) {
-  const valueText = chipValue === null ? 'unknown' : String(chipValue);
-  if (chipConfig.key === 'requireAuth') {
-    if (chipValue === true) {
-      return `${chipConfig.meaning} Current: required.`;
-    }
-    if (chipValue === false) {
-      return `${chipConfig.meaning} Current: not required (backend auth disabled).`;
-    }
-    return `${chipConfig.meaning} Current: unknown. This is checked only after async diagnostics can probe with Backend URL, Game ID, and Player ID.`;
-  }
-  return `${chipConfig.meaning} Current: ${valueText}.`;
-}
-
 export function initSetupShell(deps) {
   _refs = deps;
-  applyStoredDebugPanelState();
+  applyStoredDebugPanelStateManaged(_refs, _state);
 }
 
 export function setSetupShellState(partial = {}) {
@@ -116,84 +74,17 @@ function updateRoundModeBadge() {
 }
 
 function updateAsyncSessionStatusBadge() {
-  if (typeof _refs?.renderAsyncSessionBadge !== 'function') return;
-  const availability = getAsyncAvailability();
-  const isAsyncReady =
-    availability.isAsyncRound &&
-    availability.isJoined &&
-    availability.backendSessionSupport === true &&
-    availability.hasNoActiveSession;
-
-  _refs.renderAsyncSessionBadge({
-    roundMode: _state.roundMode,
-    sessionActive: _state.sessionActive,
-    sessionSupported: _state.sessionStartSupported,
-    asyncReady: isAsyncReady,
-    asyncAvailability: availability,
-  });
+  const availability = getCurrentAsyncAvailability();
+  renderAsyncSessionStatusBadge(_refs, _state, availability);
 }
 
-function getAsyncAvailability() {
-  const isAsyncRound = _state.roundMode === 'async';
-  return {
-    isAsyncRound,
-    // WHY: Backend async model has no enrollment window; keep this diagnostic predicate always satisfied in async mode.
-    isWindowOpen: isAsyncRound ? true : null,
-    isJoined: hasActivePlayer(),
-    backendSessionSupport:
-      typeof _state.sessionApiSupported === 'boolean'
-        ? _state.sessionApiSupported
-        : _state.sessionStartSupported === true
-          ? true
-          : null,
-    hasNoActiveSession: !_state.sessionActive && !_state.sessionId,
-    requireAuth:
-      _state.requirePlayerAuth === true || _state.requirePlayerAuth === false
-        ? _state.requirePlayerAuth
-        : 'unknown',
-  };
-}
-
-function ensureAsyncDiagnosticsContainer() {
-  if (_refs?.asyncDiagnosticsEl) {
-    return _refs.asyncDiagnosticsEl;
-  }
-  const host = _refs?.roundModeBadgeEl?.parentElement;
-  if (!host || !_refs?.roundModeBadgeEl) {
-    return null;
-  }
-
-  const container = document.createElement('span');
-  container.className = 'async-diagnostics-chips';
-  container.setAttribute('aria-label', 'Async availability diagnostics');
-  host.appendChild(container);
-  _refs.asyncDiagnosticsEl = container;
-  return container;
+function getCurrentAsyncAvailability() {
+  return getAsyncAvailability(_state, hasActivePlayer());
 }
 
 function renderAsyncAvailabilityChips() {
-  const container = ensureAsyncDiagnosticsContainer();
-  if (!container) return;
-
-  const availability = getAsyncAvailability();
-  container.textContent = '';
-
-  ASYNC_DIAGNOSTIC_CHIPS.forEach((chipConfig) => {
-    const chip = document.createElement('span');
-    const chipValue = availability[chipConfig.key];
-    const isSatisfied =
-      chipConfig.key === 'requireAuth'
-        ? chipValue === true
-        : chipValue === true;
-    const icon = isSatisfied ? '✔' : '○';
-
-    chip.className = isSatisfied
-      ? 'async-diagnostic-chip async-diagnostic-chip--ok'
-      : 'async-diagnostic-chip async-diagnostic-chip--dim';
-    chip.textContent = `${icon} ${chipConfig.label}`;
-    chip.title = formatAsyncChipTitle(chipConfig, chipValue);
-    container.appendChild(chip);
-  });
+  const availability = getCurrentAsyncAvailability();
+  renderAsyncAvailabilityChipsManaged(_refs, availability);
 }
 
 export function updateSetupActionsState() {
@@ -221,7 +112,7 @@ export function updateSetupActionsState() {
     String(_state.latestGameStatus || '').toLowerCase()
   );
   const gameExists = hasActiveGame();
-  const availability = getAsyncAvailability();
+  const availability = getCurrentAsyncAvailability();
   const isAsyncRound = availability.isAsyncRound;
   const isSessionReady =
     availability.isAsyncRound &&
@@ -360,63 +251,7 @@ export function setSetupStateForTests(partial = {}) {
 }
 
 export function renderDebugContext() {
-  if (!_refs) return;
-
-  if (_refs.debugBackendUrlEl) {
-    _refs.debugBackendUrlEl.textContent = _refs.baseUrlInput?.value || '—';
-  }
-  if (_refs.debugGameIdEl) {
-    _refs.debugGameIdEl.textContent = _refs.gameIdInput?.value || '—';
-  }
-  if (_refs.debugPlayerIdEl) {
-    _refs.debugPlayerIdEl.textContent = _refs.playerIdInput?.value || '—';
-  }
-  if (_refs.debugSessionIdEl) {
-    const debugOpen = isDebugPanelExpanded();
-    _refs.debugSessionIdEl.textContent =
-      debugOpen && _state.sessionId ? String(_state.sessionId) : '—';
-  }
-}
-
-function isDebugPanelExpanded() {
-  return Boolean(_refs?.debugPanelEl && !_refs.debugPanelEl.hidden);
-}
-
-function setDebugToggleExpandedAttribute(isExpanded) {
-  if (!_refs?.debugToggleBtnEl) return;
-  _refs.debugToggleBtnEl.setAttribute(
-    'aria-expanded',
-    isExpanded ? 'true' : 'false'
-  );
-  _refs.debugToggleBtnEl.setAttribute(
-    'aria-label',
-    isExpanded ? 'Collapse debug panel' : 'Expand debug panel'
-  );
-}
-
-function setDebugPanelExpanded(isExpanded, { persist = true } = {}) {
-  if (!_refs?.debugPanelEl) return;
-
-  _refs.debugPanelEl.hidden = !isExpanded;
-  _refs.debugPanelEl.classList.toggle('debug-panel-open', isExpanded);
-  setDebugToggleExpandedAttribute(isExpanded);
-
-  // WHY: Persisting explicit user intent keeps SSE refreshes from resetting panel visibility.
-  if (persist) {
-    setStorageItem(STORAGE_KEYS.debugPanelOpen, isExpanded ? 'true' : 'false');
-  }
-
-  renderDebugContext();
-}
-
-function toggleDebugPanel() {
-  setDebugPanelExpanded(!isDebugPanelExpanded());
-}
-
-function applyStoredDebugPanelState() {
-  const stored = getStorageItem(STORAGE_KEYS.debugPanelOpen);
-  const shouldExpand = stored === 'true';
-  setDebugPanelExpanded(shouldExpand, { persist: false });
+  renderDebugContextManaged(_refs, _state);
 }
 
 export function setSetupCollapsed(isCollapsed) {
@@ -535,7 +370,9 @@ export function initializeHeaderInteractions() {
       Boolean(_refs.asyncHostAutoStartCheckbox.checked)
     );
   });
-  _refs.debugToggleBtnEl?.addEventListener('click', toggleDebugPanel);
+  _refs.debugToggleBtnEl?.addEventListener('click', () =>
+    toggleDebugPanelManaged(_refs, _state)
+  );
 }
 
 export function ensureInputsEditable() {

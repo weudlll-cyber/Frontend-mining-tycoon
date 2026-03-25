@@ -1,14 +1,14 @@
 # Code Organization & Modularity Audit
 
-**Date**: 2025-01-15  
-**Scope**: Frontend JavaScript module structure  
-**Overall Rating**: ✅ **GOOD** - Well organized with minor improvement opportunities
+**Date**: 2026-03-25
+**Scope**: Frontend JavaScript module structure after the recent refactor wave
+**Overall Rating**: GOOD - modular UI/service split with one intentionally large orchestrator
 
-## 2026-03-19 Audit Refresh Addendum
+## Current State Summary
 
-The main frontend modularity follow-up identified in this report has now been implemented.
+The frontend refactor goals from the earlier audit were largely completed.
 
-Completed frontend extractions:
+Completed extractions now in place:
 
 - `src/services/stream-controller.js` for SSE lifecycle and timer cleanup
 - `src/services/game-actions.js` for create/join and upgrade requests
@@ -16,276 +16,91 @@ Completed frontend extractions:
 - `src/ui/live-summary.js` for score and portfolio summary rendering
 - `src/ui/leaderboard.js` for leaderboard rendering
 - `src/ui/season-cards.js` for season-card balance/output/halving updates
+- `src/ui/player-view-layout.js` for player analytics matrix/layout construction
+- `src/ui/player-view-score.js` for player analytics score resolution/formatting
 
 Current status:
 
-- `src/main.js` is now a thinner orchestration module rather than the prior all-in-one entrypoint.
-- The remaining oversized files in the overall stack are backend-heavy (`app/services/game_service.py`, `app/api/routes.py`) and were documented for later refactor rather than split in this audit branch.
+- `src/main.js` remains large at about 1,611 lines, but it is now primarily an orchestration/root wiring module.
+- `src/ui/player-view.js` is down to about 392 lines and delegates layout and score helpers.
+- High-noise test coverage in `src/main.test.js` has been split into dedicated suites (`src/main.halving.test.js`, `src/main.halving-passthrough.test.js`, `src/main.season-upgrades.test.js`, `src/main.inline-upgrades.test.js`).
 
 ---
 
 ## 1. Module Distribution Overview
 
-### File Size Analysis
+### File Size Snapshot (selected refactor-sensitive modules)
 
-```
-Module Category          | Files      | Total LOC  | Avg per File | Status
-========================|============|============|==============|========
-UI Modules (ui/)         | 6 modules  | 1,263      | 210 lines    | ✅ Good
-Utilities (utils/)       | 3 modules  | 353        | 118 lines    | ✅ Excellent
-Halving Logic            | 2 modules  | 299        | 150 lines    | ✅ Good
-Core Orchestration       | 1 module   | 1,081      | 1,081        | ⚠️ Large
-Meta Management          | 1 module   | 251        | 251 lines    | ✅ Good
-Demo/Testing             | 2 modules  | 22         | 11 lines     | ✅ Minimal
-========================|============|============|==============|========
-Total                    | 15 modules | 3,269 LOC  | 218 avg      |
-```
+| Module | Approx. Lines | Role | Status |
+| --- | ---: | --- | --- |
+| `src/main.js` | 1611 | App orchestration/root wiring | Large but intentional |
+| `src/main.test.js` | 642 | Core orchestration tests | Reduced and focused |
+| `src/ui/player-view.js` | 392 | Analytics render orchestration | Reduced and focused |
+| `src/ui/player-view-layout.js` | 286 | Analytics DOM/layout builders | Newly extracted |
+| `src/ui/player-view-score.js` | 83 | Analytics score helpers | Newly extracted |
+| `src/main.inline-upgrades.test.js` | 487 | Inline upgrade module tests | Newly extracted |
+| `src/main.season-upgrades.test.js` | 346 | Season-card/upgrade flow tests | Newly extracted |
+| `src/main.halving.test.js` | 256 | Halving behavior tests | Newly extracted |
 
-### Detailed Breakdown
+### Modularity Assessment
 
-#### ✅ **Excellent Modularity** (< 100 lines)
+#### Strongly modular areas
 
-| Module                 | Lines | Purpose                          | Quality                  |
-| ---------------------- | ----- | -------------------------------- | ------------------------ |
-| `utils/token-utils.js` | 77    | Token conversion, oracle pricing | ✅ Pure functions        |
-| `utils/dom-utils.js`   | 75    | DOM creation helpers             | ✅ Utility-focused       |
-| `ui/badge.js`          | 34    | Status badge rendering           | ✅ Single responsibility |
-| `counter.js`           | 9     | Demo component                   | ✅ Minimal               |
+- `src/ui/` is now split into focused render/state modules instead of concentrating UI behavior in `main.js`.
+- `src/services/` owns transport and action flows.
+- `src/utils/` stays utility-only.
+- `src/meta/` isolates contract/meta concerns.
 
-**Strength**: Highly focused utilities, easy to understand and reuse.
+#### Remaining large area
+
+- `src/main.js` is still above the normal size threshold, but this is currently accepted because it coordinates the app shell, bootstrapping, stream state, setup state, and module wiring.
 
 ---
 
-#### ✅ **Good Modularity** (100-300 lines)
+## 2. main.js Assessment
 
-| Module                       | Lines | Purpose                     | Quality                |
-| ---------------------------- | ----- | --------------------------- | ---------------------- |
-| `halving.js`                 | 106   | Halving schedule logic      | ✅ Pure algorithms     |
-| `ui/countdown.js`            | 79    | Timer display lifecycle     | ✅ DOM + interval mgmt |
-| `ui/halving-display.js`      | 193   | Halving indicator rendering | ✅ UI + state logic    |
-| `meta/meta-manager.js`       | 251   | API contract caching, ETag  | ✅ Self-contained      |
-| `ui/chat-panel.js`           | 257   | WebSocket chat UI           | ✅ Event-driven        |
-| `ui/upgrade-panel.js`        | 317   | Modal upgrade selector      | ✅ Complex form logic  |
-| `ui/player-view.js`          | 334   | Analytics panel grid        | ✅ Highest in category |
-| `ui/upgrade-panel-inline.js` | 188   | Season upgrade slots        | ✅ NEW - Well designed |
+### What main.js still owns
 
-**Strength**: Clear responsibilities, coherent feature sets. Largest (`player-view` at 334) is still manageable.
+`src/main.js` remains the root entrypoint for:
 
----
+1. DOM element caching and top-level app state
+2. bootstrapping child UI/service modules
+3. setup-mode state transitions
+4. async/sync round orchestration
+5. stream-driven UI update scheduling
+6. app-level event listeners and startup flow
 
-#### ⚠️ **Needs Refactoring** (> 1000 lines)
+### Why it was not split further
 
-| Module    | Lines | Issues                     | Recommendation               |
-| --------- | ----- | -------------------------- | ---------------------------- |
-| `main.js` | 1,081 | **Orchestration overload** | Extract lifecycle management |
+The remaining size is mostly orchestration, not hidden business logic duplication.
 
----
+- Stream transport is already delegated to service modules.
+- Season rendering, leaderboard rendering, setup shell, live summary, and analytics are already delegated.
+- Further forced extraction would mostly move cross-module coordination into smaller files without reducing conceptual complexity.
 
-## 2. main.js Analysis - Current Structure
+Current recommendation:
 
-### What main.js Does (by line ranges)
-
-```javascript
-Lines 1-150:      Module imports (64 items imported)
-Lines 150-220:    Global state/config variables (input elements, flags)
-Lines 220-260:    URL setup & game meta functions (getNormalizedBaseUrlOrNull)
-Lines 260-410:    Game creation/joining logic
-Lines 410-475:    Leaderboard rendering
-Lines 475-640:    Upgrade rendering & submission (calls upgrade-panel modules)
-Lines 640-800:    Season data rendering, UI updates, event handlers
-Lines 800-1000:   Connection lifecycle, SSE setup, event streams
-Lines 1000-1100:  Game creation, SSE start stream
-Lines 1100-1200:  DOM init, event listeners
-```
-
-### Main.js Responsibilities (9 concerns)
-
-1. **DOM element caching** (lines 95-125)
-2. **Game session management** (lines 158-170)
-3. **URL and meta resolution** (lines 220-280)
-4. **UI rendering orchestration** (lines 778-810)
-5. **LEADERBOARD rendering** (lines 410-475)
-6. **SEASON rendering** (lines 652-728)
-7. **EVENT SOURCE lifecycle** (lines 816-950)
-8. **GAME CREATION** (lines 1008-1155)
-9. **INITIALIZATION** (lines 1155-1207)
-
-### Size Justification
-
-⚠️ **Verdict**: Large but defensible given role as application orchestrator.
-
-**Why 1,081 lines is acceptable**:
-
-- ✅ All child UI modules are properly extracted
-- ✅ Business logic (halving, meta-manager) are separate
-- ✅ Main.js is pure **orchestration** (wiring, not logic)
-- ✅ Would be harder to split without artificial fragmentation
-- ✅ Change requests typically affect entire app (one file acceptable)
-
-**However**: Two functions are candidates for extraction:
+- Keep `src/main.js` as the orchestration root unless a clearly cohesive new subsystem emerges.
+- Prefer future extractions only when they remove a stable concern boundary, not just to reduce line count.
 
 ---
 
-## 3. Extraction Opportunities - Improvement Plan
+## 3. Current High-Value Modules
 
-### Issue #1: LEADERBOARD Rendering (Lines 410-475)
-
-**Current State**:
-
-```javascript
-function renderLeaderboard(data) {
-  // 65 lines of DOM construction, table building
-  const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  // ... table building logic
-}
-```
-
-**Problem**: Tightly coupled rendering + formatting  
-**Recommendation**: Extract to `ui/leaderboard.js`
-
-**Example extraction**:
-
-```javascript
-// ui/leaderboard.js (NEW MODULE - 65 lines)
-export function initLeaderboard(deps) {
-  // Store reference to DOM element
-}
-
-export function renderLeaderboard(data) {
-  // All current implementation
-}
-
-// main.js (UPDATED)
-import { renderLeaderboard } from './ui/leaderboard.js';
-
-function updateUI(data) {
-  // ... other renders
-  renderLeaderboard(data); // Still called from main
-}
-```
-
-**Impact**:
-
-- ✅ Testable in isolation
-- ✅ Cleaner main.js (-65 lines)
-- ✅ Follows pattern of other UI modules
+| Module | Responsibility |
+| --- | --- |
+| `src/ui/leaderboard.js` | leaderboard rendering |
+| `src/ui/season-cards.js` | season-card balance/output/halving updates |
+| `src/ui/player-view.js` | analytics render orchestration |
+| `src/ui/player-view-layout.js` | analytics table/layout creation and tooltip anchors |
+| `src/ui/player-view-score.js` | analytics score display helpers |
+| `src/services/stream-controller.js` | SSE stream lifecycle |
+| `src/services/game-actions.js` | create/join/upgrade API flows |
+| `src/ui/setup-shell.js` | setup panel, top controls, and header navigation |
 
 ---
 
-### Issue #2: SEASON DATA Rendering (Lines 652-728)
-
-**Current State**:
-
-```javascript
-function renderSeasonData(data) {
-  // 76 lines updating season card balance/output/halving
-  tokenNames.forEach((token) => {
-    const seasonCardEl = document.getElementById(`season-${token}`);
-    // ... update balance, output, halving
-  });
-}
-```
-
-**Problem**: Orphaned module - no corresponding file  
-**Recommendation**: Extract to `ui/season-panel.js`
-
-**Example extraction**:
-
-```javascript
-// ui/season-panel.js (NEW MODULE - 76 lines)
-export function initSeasonPanel(deps) {
-  // Store dependency references
-}
-
-export function renderSeasonData(data) {
-  // All current season rendering
-}
-
-export function renderAllSeasons(data) {
-  // Wrapper for modularity
-}
-```
-
-**Impact**:
-
-- ✅ Parallel structure with upgrade-panel.js
-- ✅ Groups all season DOM updates
-- ✅ Makes season refactoring easier
-
----
-
-### Issue #3: SSE Lifecycle (Lines 816-950)
-
-**Current State**:
-
-```javascript
-function closeEventSourceIfOpen() { ... }       // 4 lines
-function stopLiveTimersAndHalving() { ... }    // 15 lines
-function setupLiveGameStream() { ... }          // 135 lines
-```
-
-**Assessment**: ✅ Actually well-isolated
-
-- These functions are cohesive (all event-related)
-- Would create artificial split if separated
-- Current organization is acceptable
-
----
-
-## 4. Recommended Code Organization - NEW STRUCTURE
-
-### Proposed Module Split (Optional Enhancement)
-
-**Before (current)**:
-
-```
-src/
-├── main.js                      (1,081 lines)
-│   ├─ leaderboard rendering
-│   ├─ season rendering
-│   ├─ orchestration
-│   └─ SSE lifecycle
-└── ui/
-    ├── upgrade-panel.js         (317 lines)
-    ├── upgrade-panel-inline.js  (188 lines)
-    ├── player-view.js           (334 lines)
-    └── ...
-```
-
-**After (recommended)**:
-
-```
-src/
-├── main.js                      (940 lines - 141 lines removed)
-│   ├─ orchestration             ✅
-│   ├─ SSE lifecycle             ✅
-│   └─ initialization            ✅
-└── ui/
-    ├── leaderboard.js           (65 lines - NEW)
-    ├── season-panel.js          (76 lines - NEW)
-    ├── upgrade-panel.js         (317 lines)
-    ├── upgrade-panel-inline.js  (188 lines)
-    ├── player-view.js           (334 lines)
-    └── ...
-```
-
-**Benefits**:
-
-- ✅ main.js under 1000 lines
-- ✅ Parallel UI module structure
-- ✅ Each module < 400 lines (more readable)
-- ✅ Easier to test in isolation
-- ✅ Easier to modify season/leaderboard independently
-
-**Trade-offs**:
-
-- More files to navigate
-- Minimal real-world benefit (current structure is workable)
-
----
-
-## 5. Current Module Dependencies
+## 4. Current Module Dependencies
 
 ```mermaid
 graph TD
@@ -313,35 +128,29 @@ graph TD
 
 ---
 
-## 6. Testability Assessment
+## 5. Testability Assessment
 
 ### ✅ Currently Testable
 
-| Module                    | Tests Exist        | Coverage  | Quality                   |
-| ------------------------- | ------------------ | --------- | ------------------------- |
-| `halving.js`              | ✅ Yes             | Excellent | All pure functions tested |
-| `main.js`                 | ✅ Yes             | Good      | 21 core logic tests       |
-| `chat-panel.js`           | ✅ Yes             | Good      | Event handling tested     |
-| `upgrade-panel-inline.js` | ✅ Yes             | New       | 10 new tests added        |
-| `player-view.js`          | ⚠️ No direct tests | Indirect  | Tested via main SSE       |
+| Module | Tests Exist | Coverage | Quality |
+| --- | --- | --- | --- |
+| `halving.js` | Yes | Excellent | Pure functions tested |
+| `main.js` orchestration | Yes | Good | Split across `main*.test.js` suites |
+| `chat-panel.js` | Yes | Good | Event handling tested |
+| `upgrade-panel-inline.js` | Yes | Good | Dedicated module tests |
+| `player-view.js` | Yes | Good | Direct unit tests in `src/ui/player-view.test.js` |
+| `leaderboard.js` | Yes | Good | Dedicated rendering tests |
+| `season-cards.js` | Yes | Good | Dedicated rendering tests |
 
-### ⚠️ Gaps in Coverage
+### Remaining test focus areas
 
-1. **Leaderboard rendering** - No dedicated tests
-   - Currently tested indirectly through main.test.js
-   - **Recommendation**: Add tests if extracted to separate module
-
-2. **Season rendering** - No dedicated tests
-   - Currently untested (before this sprint)
-   - **Recommendation**: Tests added for inline upgrade logic
-
-3. **Player-view rendering** - No direct unit tests
-   - Only integration tests through SSE tests
-   - **Recommendation**: Add unit tests for DOM building
+1. `src/main.js` still carries the most branch-heavy orchestration paths.
+2. Future changes around async round lifecycle should continue to add scenario-specific tests rather than grow `src/main.test.js` monolithically.
+3. Tooltip/static parity tests should remain aligned with helper-module extractions (for example `player-view-layout.js`).
 
 ---
 
-## 7. Code Quality Metrics
+## 6. Code Quality Metrics
 
 ### Cyclomatic Complexity Assessment
 
@@ -352,7 +161,7 @@ graph TD
    - Acceptable for complex feature
 
 2. **ui/player-view.js::renderPlayerState()** - Multiple token loops
-   - Justified by multi-token rendering requirement
+  - Still justified by multi-token rendering requirement, now supported by extracted layout/score helpers
 
 3. **ui/upgrade-panel.js::renderUpgradeMetrics()** - Complex form building
    - Acceptable for modal structure
@@ -361,7 +170,7 @@ graph TD
 
 ---
 
-## 8. Naming & Clarity Assessment
+## 7. Naming & Clarity Assessment
 
 ### ✅ Excellent Naming Conventions
 
@@ -417,7 +226,7 @@ Well-documented purpose statement.
 
 ## 10. Conclusion
 
-### Overall Code Organization Rating: ✅ **GOOD (7.5/10)**
+### Overall Code Organization Rating: GOOD (8/10)
 
 **Strengths**:
 
@@ -426,35 +235,35 @@ Well-documented purpose statement.
 - ✅ No circular dependencies
 - ✅ Child modules are testable in isolation
 - ✅ Good naming conventions throughout
-- ✅ New inline-upgrades module well designed
+- ✅ Recent player-view and main-test refactors improved cohesion significantly
 
 **Opportunities**:
 
-- ⚠️ main.js is large (1,081 lines) but justified
-- ⚠️ Leaderboard & season rendering could be extracted (optional)
-- ⚠️ Player-view lacks direct unit tests
+- `main.js` is still large (about 1,611 lines) but justified as orchestration root
+- keep future extractions boundary-driven rather than size-driven
+- continue splitting orchestration tests by concern when new feature areas are added
 
 **Recommended Actions**:
 
-1. ✅ **Keep current structure** - it works well
-2. ✅ **No urgent refactoring needed** - code is maintainable
-3. ⚠️ _Optional_: Extract leaderboard/season rendering if modifying them frequently
-4. ⚠️ _Consider_: Add unit tests for player-view rendering
+1. Keep current structure - it is coherent after the recent refactor pass
+2. No urgent refactoring needed purely for file size
+3. Treat `main.js` as an orchestrator exception unless a true subsystem boundary appears
+4. Keep docs and parity tests updated when helper modules are extracted from existing UI modules
 
 ### For Future Developers
 
 When adding features:
 
-- ✅ Follow the pattern of `ui/upgrade-panel-inline.js` (modular, testable)
-- ✅ Extract rendering logic to `ui/` modules (don't put in main.js)
-- ✅ Keep business logic in separate files (like `halving.js`, `meta-manager.js`)
-- ✅ Use `utils/` for reusable helpers
-- ⚠️ Don't make modules > 400 lines without good reason
+- Follow the pattern of focused `ui/`, `services/`, and `meta/` modules
+- Extract helpers when they form a stable concern boundary (as with `player-view-layout.js` and `player-view-score.js`)
+- Keep business logic in separate files (like `halving.js`, `meta-manager.js`)
+- Use `utils/` for reusable helpers
+- Avoid making modules large unless they are true orchestration roots
 
-**Modularity Score**: 7.5/10 - Well organized, minimal tech debt, easy to modify and extend.
+**Modularity Score**: 8/10 - well organized, recently improved, and currently maintainable without forced further splits.
 
 ---
 
-**Reviewed by**: Copilot Code Organization Analysis  
-**Date**: January 15, 2025  
-**Status**: RECOMMENDED FOR DEPLOYMENT AS-IS
+**Reviewed by**: Copilot Code Organization Analysis
+**Date**: March 25, 2026
+**Status**: CURRENT AND ACCEPTABLE AS-IS

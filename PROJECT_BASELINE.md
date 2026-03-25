@@ -152,7 +152,9 @@ Frontend structure is modular:
 - Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and portfolio value.
 - Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table.
 - Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
-- Player state analytics module (`player-view.js`): renders per-token output, balances, cumulative mined, oracle prices, and conversion parameters.
+- Player state analytics render module (`player-view.js`): orchestrates per-token output, balances, cumulative mined, oracle prices, and conversion parameter display.
+- Player analytics layout helper (`ui/player-view-layout.js`): owns analytics matrix construction and tooltip trigger/bubble anchors.
+- Player analytics score helper (`ui/player-view-score.js`): owns `This session` / `Best this round` display resolution and score formatting.
 - Inline upgrade rendering module (`upgrade-panel-inline.js`): renders upgrade lanes (hashrate, efficiency, cooling) within each seasonal card as a compact row-table with headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP` plus inline info tooltip trigger.
 - Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
@@ -256,6 +258,8 @@ Frontend test coverage includes:
 - Contract support guards.
 - Token normalization and conversion helper coverage.
 - Halving helper behavior and transitions.
+- Orchestration coverage split across `src/main.test.js`, `src/main.halving.test.js`, `src/main.halving-passthrough.test.js`, `src/main.season-upgrades.test.js`, and `src/main.inline-upgrades.test.js`.
+- Direct player analytics rendering tests in `src/ui/player-view.test.js`.
 - Upgrade rendering interaction behavior.
 - Chat rendering/XSS-safety and scroll behavior.
 - Layout guardrails for desktop no-page-scroll, 2×2 season grid, shared upgrade-column alignment, and fixed player panel width.

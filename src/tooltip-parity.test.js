@@ -60,26 +60,30 @@ describe('tooltip system parity — static source checks', () => {
   it('all tooltip trigger classes use .ps-tip-trigger across ui modules', () => {
     // Collect all button/trigger definitions from UI modules and ensure
     // they use the shared class — guarantees the CSS/ARIA contract is consistent.
-    const files = [
-      'ui/player-view.js',
-      'ui/season-cards.js',
-      'ui/upgrade-panel-inline.js',
+    // NOTE: player-view.js delegates layout construction to player-view-layout.js,
+    // so we check that player-view-layout.js (its helper) contains the classes.
+    const fileChecks = [
+      { file: 'ui/player-view-layout.js', key: 'player-view' }, // extracted helpers for player-view
+      { file: 'ui/season-cards.js', key: 'season-cards' },
+      { file: 'ui/upgrade-panel-inline.js', key: 'upgrade-panel-inline' },
     ];
-    files.forEach((f) => {
-      const src = readSrc(f);
+    fileChecks.forEach(({ file }) => {
+      const src = readSrc(file);
       // Each file creates a tooltip trigger — it must carry 'ps-tip-trigger'
       expect(src).toMatch(/ps-tip-trigger/);
     });
   });
 
   it('all tooltip bubble classes use .ps-tip-bubble across ui modules', () => {
-    const files = [
-      'ui/player-view.js',
-      'ui/season-cards.js',
-      'ui/upgrade-panel-inline.js',
+    // NOTE: player-view.js delegates layout construction to player-view-layout.js,
+    // so we check that player-view-layout.js (its helper) contains the classes.
+    const fileChecks = [
+      { file: 'ui/player-view-layout.js', key: 'player-view' }, // extracted helpers for player-view
+      { file: 'ui/season-cards.js', key: 'season-cards' },
+      { file: 'ui/upgrade-panel-inline.js', key: 'upgrade-panel-inline' },
     ];
-    files.forEach((f) => {
-      const src = readSrc(f);
+    fileChecks.forEach(({ file }) => {
+      const src = readSrc(file);
       expect(src).toMatch(/ps-tip-bubble/);
     });
   });

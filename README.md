@@ -63,6 +63,7 @@ Use these files as the current documentation set for the frontend repo:
 - `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
 - `SECURITY_AUDIT.md`: frontend-relevant security and review notes
 - `AUDIT_MATRIX.md`: PR and nightly audit frequencies with blocking thresholds
+- `DEPLOY.md`: frontend-only VPS deployment and full-stack deployment handoff notes
 
 If a change affects backend contracts, update the sibling backend repo docs in the same workstream so both repos stay aligned.
 
@@ -115,6 +116,29 @@ Sync/Async model (backend-aligned):
 - Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
 - Every new async session attempt starts from the same backend baseline state (balances/tracks/upgrades/cumulative mined reset for that player), so attempts are comparable and only your per-session decisions can change results.
 - In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
+
+## VPS Deployment
+
+Frontend-only deploy to a VPS:
+
+```powershell
+& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game"
+```
+
+Preview without uploading:
+
+```powershell
+& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game" -DryRun
+```
+
+If you want frontend + backend on the same VPS, run the full-stack deploy from the sibling backend repo:
+
+```powershell
+Set-Location "..\Mining tycoon"
+& .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com"
+```
+
+Further deployment details live in [DEPLOY.md](DEPLOY.md).
 
 ## Audited Push Workflow
 

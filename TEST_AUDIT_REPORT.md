@@ -16,7 +16,8 @@ This audit summarizes current frontend test coverage quality, practical risk gap
 - UI modules: `src/ui/**/*.test.js`
 - Service/API client orchestration: `src/services/**/*.test.js`
 - Meta + storage utilities: `src/meta/**/*.test.js`, `src/utils/**/*.test.js`
-- Orchestration flows: `src/main.test.js`, `src/layout-controls.test.js`, `src/async-session-flow.test.js`
+- Orchestration flows: `src/main.test.js`, `src/main.halving.test.js`, `src/main.halving-passthrough.test.js`, `src/main.season-upgrades.test.js`, `src/main.inline-upgrades.test.js`, `src/layout-controls.test.js`, `src/async-session-flow.test.js`
+- Player analytics rendering: `src/ui/player-view.test.js`
 - Security rendering guardrails: `src/security-rendering.test.js`
 
 ## Top Risk Gaps Identified
