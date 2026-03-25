@@ -16,12 +16,71 @@ Invariants:
 
 html,
 body {
-  height: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
   overflow: hidden;
 }
 
+/* Admin-only controls: hidden in the player UI (index.html).
+     These elements are visible only in admin.html. */
+.admin-only {
+  display: none !important;
+}
+
+/* Page theme variables — distinguish player vs admin visually */
+:root {
+  /* Player page accent: subtle blue-green */
+  --accent-player: #0891b2;
+  --banner-bg-player: #ecf0f1;
+  --banner-border-player: #bdc3c7;
+
+  /* Admin page accent: amber/warning to suggest elevated action */
+  --accent-admin: #d97706;
+  --banner-bg-admin: #fef3c7;
+  --banner-border-admin: #f59e0b;
+}
+
+/* Player page styling */
+body.page-player {
+  --current-accent: var(--accent-player);
+}
+
+body.page-player .page-banner {
+  background: var(--banner-bg-player);
+  border: 1px solid var(--banner-border-player);
+  color: #1a1a1a;
+}
+
+body.page-player .page-banner-icon {
+  color: var(--accent-player);
+}
+
+/* Admin page styling */
+body.page-admin {
+  --current-accent: var(--accent-admin);
+}
+
+body.page-admin .page-banner {
+  background: var(--banner-bg-admin);
+  border: 2px solid var(--banner-border-admin);
+  color: #92400e;
+  font-weight: 600;
+}
+
+body.page-admin .page-banner-icon {
+  color: var(--accent-admin);
+}
+
+/* Shared page banner styles */
+.page-banner {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Layout and color variables */
 :root {
   --bg-primary: #f5f5f5;
   --bg-secondary: #ffffff;
@@ -1737,6 +1796,261 @@ button {
   font-size: 1rem;
   margin-bottom: 0.55rem;
   color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Trading Panel */
+.trading-panel {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.trading-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.78rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+}
+
+.trading-card.trading-disabled {
+  opacity: 0.9;
+  border-color: #ddd;
+}
+
+.trading-card.trading-enabled {
+  border-color: var(--status-green);
+  background-color: #f0fdf4;
+}
+
+.trading-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.trading-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.trading-mode {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.trading-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.trading-card.trading-disabled .trading-badge {
+  background-color: #f8fafc;
+  color: #6b7280;
+}
+
+.trading-card.trading-enabled .trading-badge {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.trading-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.trading-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.trading-field-amount {
+  grid-column: 1 / -1;
+}
+
+.trading-field select,
+.trading-field input {
+  width: 100%;
+}
+
+.trading-balance-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.trading-balance-row strong {
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.trading-cost-note {
+  grid-column: 1 / -1;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.trading-primary-result {
+  border: 1px solid #dbeafe;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f8ff 100%);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.72rem 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+}
+
+.primary-result-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.primary-result-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #1d4ed8;
+}
+
+.primary-result-metric-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.primary-result-value {
+  font-size: 1.28rem;
+  line-height: 1.1;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.primary-result-secondary {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.trading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.trading-execute-btn {
+  padding-inline: 0.82rem;
+}
+
+.trading-inline-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.trading-inline-tip.ps-tip-trigger {
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.64rem;
+}
+
+.trading-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.trading-status {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.trading-reason {
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.trading-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.62rem;
+}
+
+.trading-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  gap: 0.75rem;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.detail-value {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.trading-schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.trading-schedule-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 980px) {
+  .trading-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Bottom Bar Trading Status */
+.trading-status-disabled {
+  color: var(--text-secondary);
+}
+
+.trading-status-enabled {
+  color: var(--status-green);
   font-weight: 600;
 }
 

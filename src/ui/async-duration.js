@@ -12,26 +12,22 @@ Security notes:
 - Pure client-side UI helpers; no network or token handling.
 */
 
+import {
+  ROUND_DURATION_PRESETS,
+  ASYNC_ROUND_PRESET_IDS,
+  ASYNC_ROUND_DEFAULT_PRESET,
+  ASYNC_SESSION_PRESET_IDS,
+  ASYNC_SESSION_DEFAULT_PRESET,
+} from '../config/game-control-data.js';
+
 /**
  * Converts a preset label (e.g. "5m", "3h", "7d") to seconds.
  * Returns null for unknown labels so callers can handle unsupported presets safely.
  */
 export function presetToSeconds(preset) {
-  const map = {
-    '5m': 300,
-    '10m': 600,
-    '15m': 900,
-    '60m': 3600,
-    '3h': 10800,
-    '6h': 21600,
-    '12h': 43200,
-    '24h': 86400,
-    '3d': 259200,
-    '7d': 604800,
-    // Session-only alias.
-    '30m': 1800,
-  };
-  return Object.prototype.hasOwnProperty.call(map, preset) ? map[preset] : null;
+  return Object.prototype.hasOwnProperty.call(ROUND_DURATION_PRESETS, preset)
+    ? ROUND_DURATION_PRESETS[preset]
+    : null;
 }
 
 /**
@@ -88,32 +84,23 @@ export function syncSessionDurationOptions({
 }
 
 export function getAsyncDurationPreset(roundDurationInput) {
-  const selectedPreset = String(roundDurationInput?.value || '10m');
-  const allowed = new Set([
-    '5m',
-    '10m',
-    '15m',
-    '60m',
-    '3h',
-    '6h',
-    '12h',
-    '24h',
-    '3d',
-    '7d',
-  ]);
-  return allowed.has(selectedPreset) ? selectedPreset : '10m';
+  const selectedPreset = String(
+    roundDurationInput?.value || ASYNC_ROUND_DEFAULT_PRESET
+  );
+  const allowed = new Set(ASYNC_ROUND_PRESET_IDS);
+  return allowed.has(selectedPreset)
+    ? selectedPreset
+    : ASYNC_ROUND_DEFAULT_PRESET;
 }
 
 export function getAsyncSessionDurationSeconds(sessionDurationInput) {
-  const selected = String(sessionDurationInput?.value || '24h');
-  const presetSeconds = {
-    '5m': 300,
-    '10m': 600,
-    '30m': 1800,
-    '60m': 3600,
-    '6h': 21600,
-    '12h': 43200,
-    '24h': 86400,
-  };
-  return presetSeconds[selected] || 86400;
+  const selected = String(
+    sessionDurationInput?.value || ASYNC_SESSION_DEFAULT_PRESET
+  );
+  const isValidSession = ASYNC_SESSION_PRESET_IDS.includes(selected);
+  const seconds = ROUND_DURATION_PRESETS[selected];
+  if (isValidSession && seconds !== undefined) {
+    return seconds;
+  }
+  return ROUND_DURATION_PRESETS[ASYNC_SESSION_DEFAULT_PRESET];
 }

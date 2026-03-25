@@ -25,6 +25,7 @@ Implementation-factual contract:
 - Backend is authoritative for lifecycle, simulation, economy, event logic, validation, and security.
 - Frontend is SSE-driven display/intent orchestration and must not become client-authoritative for outcomes.
 - Deterministic behavior (oracle, halving, events, snapshot-locked settings) is a hard project constraint.
+- Admin configuration is separate from gameplay: settings are snapshot-locked at round creation and only admin can create rounds (via admin.html, not index.html).
 - Main gameplay UI is inline: seasonal cards with visible three-lane upgrades and read-only analytics.
 - Chat is optional, social-only, docked inline, and non-gameplay.
 - Trading and farming visibility is maintained in UI even when disabled (status remains explicit).
@@ -34,7 +35,8 @@ Implementation-factual contract:
 Forward constraints (do not over-claim implementation):
 
 - Farming scope is constrained to Stage 1 Passive and Stage 2 Rotating; Stage 3 is out of scope.
-- Alternative scoring/outcome models are allowed only when fixed before round start.
+- Four scoring/outcome modes are part of the project contract and are fixed before round start (Stockpile default; Power, Mining Time Equivalent, and Efficiency optional).
+- Round/game definition contract includes a snapshot-locked `scoring_mode` field set at creation time and shared identically by all players in that round.
 
 ## 2) Core Gameplay Systems (stable & authoritative)
 
@@ -82,7 +84,7 @@ Token/resource model:
 
 - Four seasonal tokens are implemented: spring, summer, autumn, winter.
 - Player balances are persisted in backend state storage.
-- Cumulative mined is tracked and used for leaderboard scoring.
+- Cumulative mined is tracked and exposed as a deterministic gameplay metric used by score/outcome evaluation modes.
 
 Economy snapshot model:
 
@@ -149,7 +151,7 @@ Frontend structure is modular:
 - Session transport module (`services/stream-controller.js`): owns SSE setup, reconnect state, and timer cleanup.
 - Action module (`services/game-actions.js`): owns create/join flow and upgrade submission requests.
 - Setup shell module (`ui/setup-shell.js`): manages setup panel state, action enablement, and live-board navigation.
-- Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and portfolio value.
+- Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and a live score-context metric display.
 - Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table.
 - Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
 - Player state analytics render module (`player-view.js`): orchestrates per-token output, balances, cumulative mined, oracle prices, and conversion parameter display.
@@ -159,6 +161,7 @@ Frontend structure is modular:
 - Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
 - Halving display module: calculates and renders halving schedules and countdowns per token.
+- Control-data layer (`src/config/game-control-data.js`): centralises all game setup tunables — duration presets, round/session limits, enrollment window defaults, async defaults, and scoring mode constants. `src/config/trading-control-data.js` holds trade-scheduling tunables. UI modules and `main.js` import from here; constants are not duplicated inline.
 
 Frontend session-mode readiness:
 
@@ -186,7 +189,7 @@ Dashboard layout (inline, no overlays):
 - **Main Grid (2 columns)**:
   - Left (~65%): 2×2 seasonal card grid with inline upgrade lanes (Hashrate, Efficiency, Cooling) and compact row-table headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP`.
   - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), with fixed panel width variable and optional docked inline chat below.
-- **Bottom Bar**: portfolio value, trading status, farming status, chat toggle.
+- **Bottom Bar**: score-context metric display, trading status, farming status, chat toggle.
 - **Chat Panel (docked inline, optional)**: toggleable via bottom bar button; expands/collapses inline in the right column with internal message scrolling only.
 - Desktop no-page-scroll remains enforced; setup and seasons use internal scroll containers, and left column overflow is constrained with `min-width: 0`.
 
@@ -404,7 +407,7 @@ Release timing remains intentionally undecided in the current project state.
 
 - Round format framing exists: challenge-style rounds are represented and synchronous live rounds are documented as planned; what is still missing is full alignment to the locked session model where each player runs an identical fixed-duration session within a round window.
 - Host control framing exists in principle through admin and configuration controls; what is still missing is explicit concept-level alignment to preset-plus-override round setup as a stable pre-round contract.
-- Trading cost behavior exists in the economy model through deterministic conversion costs; what is still missing is implementation-level support for the agreed default that every trade carries a round-consistent value-based fee unless the host predefines an override.
+- Trading cost behavior exists in the economy model through deterministic conversion costs; what is still missing is implementation-level support for the agreed default that every trade carries a round-consistent conversion-ratio-based fee unless the host predefines an override.
 - Farming is already documented as planned; what is still missing is implementation-level support for the locked two-stage scope (Stage 1 passive and Stage 2 rotating only) in the non-binding farming narrative.
 
 ### 3) Concept Areas Not Yet Implemented
@@ -415,7 +418,7 @@ Required future work to realize the agreed concept:
 
 - Implement the locked round/session structure where each player runs an identical time-limited session that can start at any point within the round window.
 - Implement host-defined trading gates per round, including fixed trade count and fixed minimum trade-start timing shared equally across all players.
-- Implement the agreed scoring model based on final portfolio value weighted by oracle-relative value at session end, including pre-fixed alternative outcome formats when used.
+- Implement full support for the four approved scoring/outcome modes (Stockpile default, plus optional Power, Mining Time Equivalent, and Efficiency), with mode selection fixed before round start and no mid-round switching.
 
 ### B) Economy & Progression Systems
 

@@ -65,9 +65,17 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
 
 ## F) Scoring LOCKED ✅
 
-- Default score MUST be based on final oracle-weighted portfolio value.
-- Any alternative outcome mode MUST be fixed before round start.
-- Runtime switching of scoring rules within a round MUST NOT be introduced.
+REDESIGN DECISION (2026-03-25):
+
+- Mode definitions are documented in [SCORING_MODES.md](SCORING_MODES.md).
+- Scoring/outcome now supports four project-approved modes selected before round start:
+  - Stockpile Mode (Total Tokens)
+  - Power Mode (Oracle-Weighted Score)
+  - Mining Time Equivalent Mode
+  - Efficiency Mode (System Mastery)
+- Default project outcome mode is Stockpile Mode (Total Tokens).
+- Power Mode (Oracle-Weighted Score) remains explicitly available as an optional mode.
+- The selected outcome mode MUST be fixed before round start and MUST NOT switch mid-round.
 
 ## G) Operational/Test Discipline LOCKED ✅
 
@@ -87,7 +95,7 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
 - [ ] Trading/Farming Visibility: Trading and farming sections remain visible with explicit status text when disabled.
 - [ ] Chat Rules: Chat remains social-only, docked inline, internally scrollable, and non-gameplay.
 - [ ] Farming Scope: No Stage 3 farming scope was introduced.
-- [ ] Scoring: Default final oracle-weighted scoring remains intact; alternative outcomes are fixed before round start.
+- [ ] Scoring: Outcome mode is one of the four approved modes, selected before round start, and not switched mid-round.
 - [ ] Operational/Security Discipline: Tests remain green; changed behavior includes tests; no untrusted innerHTML usage.
 
 REDESIGN DECISION reminder:

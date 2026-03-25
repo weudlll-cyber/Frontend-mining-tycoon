@@ -132,7 +132,7 @@ The dashboard is organized into four key regions:
 1. **Status Bar (top)**: Game phase, remaining time, quick stats (score, rank, top score).
 2. **Seasonal Cards (left, 2×2 grid)**: Each season displays balance, mining output rate, and halving countdown. Inline upgrade controls are part of each card, showing all three upgrade paths (hashrate, efficiency, cooling) at once.
 3. **Player State Analytics (right panel)**: Per-token output, cumulative mined amount, seasonal balances, oracle prices, conversion parameters (fee and spread).
-4. **Bottom Bar**: Portfolio value, and placeholders for Trading and Farming status, even when disabled.
+4. **Bottom Bar**: Score context display, and placeholders for Trading and Farming status, even when disabled.
 
 ### Strategic Rationale
 
@@ -140,7 +140,7 @@ This layout supports long-term planning by making the whole economic landscape v
 
 - See which seasons are gaining value (via output rates and oracle prices)
 - Compare upgrade costs and returns across all seasons (inline side-by-side)
-- Track their total production and portfolio value instantly
+- Track their total production and current score context instantly
 - Understand conversion parameters before making trading decisions
 - Know which economic modes are available even if they're not currently enabled
 
@@ -195,6 +195,7 @@ Two round formats are part of the agreed model:
 - synchronous live event rounds (host-scheduled)
 
 Round conditions are defined at creation and do not change while the round is active.
+This fixed round definition includes `scoring_mode`, selected before round start and applied identically to all players.
 
 ### Host Control & Defaults
 
@@ -221,9 +222,9 @@ Hosts may override both trade count and trade timing before round start.
 
 ### Scoring & Leaderboards
 
-The default score metric is final portfolio value weighted by oracle-relative value.
+The default score metric is Stockpile Mode (Total Tokens), with other approved modes available when selected before round start.
 
-Only the final session state determines score, using the oracle context at the final update point. The default outcome is a top leaderboard ranking.
+Only the final session state determines score, evaluated by the selected pre-round outcome mode. The default outcome is a top leaderboard ranking.
 
 Alternative outcome formats may be selected by the host, but they must also be fixed before the round starts.
 
@@ -243,7 +244,7 @@ Chat is independent from individual session timing and independent from gameplay
 
 Trading is not free and always carries a cost.
 
-The agreed default is a value-based fee. Each trade applies a fixed fee based on the oracle-weighted value of the traded amount at the moment the trade is made.
+The agreed default is a conversion-ratio-based fee. Each trade applies a fixed fee derived from the oracle-weighted conversion amount at the moment the trade is made.
 
 This fee model is deterministic, identical for all players in the same round, and applied consistently across asynchronous challenge rounds and synchronous live event rounds.
 
