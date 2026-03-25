@@ -152,6 +152,11 @@ import {
   computeTradeUnlockOffsetsSeconds,
 } from './config/trading-control-data.js';
 import {
+  SCORING_CONTROL,
+  ASYNC_ROUND_DEFAULT_PRESET,
+  ASYNC_SESSION_DEFAULT_PRESET,
+} from './config/game-control-data.js';
+import {
   resolveDurationSecondsFromInputs,
   collectAdvancedOverridesFromInputs,
 } from './ui/setup-payload.js';
@@ -194,9 +199,7 @@ import {
   renderAllSeasonUpgrades,
 } from './ui/upgrade-panel-inline.js';
 import { initChatPanel, connectChat, disconnectChat } from './ui/chat-panel.js';
-import {
-  initTradingPanel,
-} from './ui/trading-panel.js';
+import { initTradingPanel } from './ui/trading-panel.js';
 import {
   initStreamController,
   startStream,
@@ -253,7 +256,9 @@ const asyncSessionDurationPresetInput = document.getElementById(
 const asyncHostAutoStartCheckbox = document.getElementById('async-auto-start');
 const tradeCountInput = document.getElementById('trade-count-input');
 const tradeCountModeNoteEl = document.getElementById('trade-count-mode-note');
-const tradeSchedulePreviewEl = document.getElementById('trade-schedule-preview');
+const tradeSchedulePreviewEl = document.getElementById(
+  'trade-schedule-preview'
+);
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
 
@@ -385,7 +390,7 @@ let tradeCountManuallyOverridden = false;
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
 
-const DEFAULT_SCORING_MODE = 'stockpile_total_tokens';
+const DEFAULT_SCORING_MODE = SCORING_CONTROL.DEFAULT_MODE;
 
 function normalizeScoringMode(rawMode) {
   const mode = String(rawMode || '')
@@ -445,7 +450,8 @@ function setSelectedScoringMode(mode) {
     scoringModePowerInput.checked = normalized === 'power_oracle_weighted';
   }
   if (scoringModeMiningTimeInput) {
-    scoringModeMiningTimeInput.checked = normalized === 'mining_time_equivalent';
+    scoringModeMiningTimeInput.checked =
+      normalized === 'mining_time_equivalent';
   }
   if (scoringModeEfficiencyInput) {
     scoringModeEfficiencyInput.checked =
@@ -470,7 +476,9 @@ function updateScoringModeUi(data = null) {
     scoreContextLabelEl.textContent = getScoringModeScoreLabel(mode);
   }
 
-  const status = String(data?.game_status || latestGameStatus || '').toLowerCase();
+  const status = String(
+    data?.game_status || latestGameStatus || ''
+  ).toLowerCase();
   const lockModeSelection = status === 'running' || status === 'finished';
   scoringModeInputs.forEach((input) => {
     input.disabled = lockModeSelection;
@@ -506,7 +514,10 @@ function formatOffsetLabel(seconds) {
 
 function getSelectedRoundDurationSecondsForTradingDefaults() {
   if (getSelectedRoundType() === 'async') {
-    return presetToSeconds(getAsyncDurationPreset(asyncHostDurationPresetInput)) || 600;
+    return (
+      presetToSeconds(getAsyncDurationPreset(asyncHostDurationPresetInput)) ||
+      600
+    );
   }
   let resolution;
   try {
@@ -526,7 +537,10 @@ function getSelectedTradeCount() {
 
 function getTradeUnlockOffsets() {
   const durationSeconds = getSelectedRoundDurationSecondsForTradingDefaults();
-  return computeTradeUnlockOffsetsSeconds(durationSeconds, getSelectedTradeCount());
+  return computeTradeUnlockOffsetsSeconds(
+    durationSeconds,
+    getSelectedTradeCount()
+  );
 }
 
 function renderTradeSchedulePreview() {
@@ -547,7 +561,9 @@ function renderTradeSchedulePreview() {
       tradeCountInput.disabled = true;
     }
     offsets = Array.isArray(metaRules.unlock_offsets_seconds)
-      ? metaRules.unlock_offsets_seconds.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+      ? metaRules.unlock_offsets_seconds
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value))
       : [];
     note = 'Using backend-authoritative trading rules for this game.';
   } else {
@@ -566,11 +582,15 @@ function renderTradeSchedulePreview() {
   }
 
   if (tradeCount <= 0 || !offsets.length) {
-    tradeSchedulePreviewEl.textContent = 'Trade schedule: no trades in this round.';
+    tradeSchedulePreviewEl.textContent =
+      'Trade schedule: no trades in this round.';
     return;
   }
 
-  const lines = offsets.map((offset, idx) => `Trade ${idx + 1} available at ${formatOffsetLabel(offset)}`);
+  const lines = offsets.map(
+    (offset, idx) =>
+      `Trade ${idx + 1} available at ${formatOffsetLabel(offset)}`
+  );
   tradeSchedulePreviewEl.textContent = lines.join(' | ');
 }
 
@@ -582,7 +602,9 @@ function syncTradeCountWithDuration({ forceDefault = false } = {}) {
   if (forceDefault || !tradeCountManuallyOverridden) {
     tradeCountInput.value = String(recommended);
   } else {
-    tradeCountInput.value = String(clampTradeCount(Number(tradeCountInput.value)));
+    tradeCountInput.value = String(
+      clampTradeCount(Number(tradeCountInput.value))
+    );
   }
   renderTradeSchedulePreview();
 }
@@ -1188,11 +1210,11 @@ function saveSettings() {
   setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
   setStorageItem(
     STORAGE_KEYS.asyncDurationPreset,
-    asyncHostDurationPresetInput?.value || '10m'
+    asyncHostDurationPresetInput?.value || ASYNC_ROUND_DEFAULT_PRESET
   );
   setStorageItem(
     STORAGE_KEYS.asyncDurationCustomMinutes,
-    asyncSessionDurationPresetInput?.value || '24h'
+    asyncSessionDurationPresetInput?.value || ASYNC_SESSION_DEFAULT_PRESET
   );
   setStorageItem(
     STORAGE_KEYS.asyncAutoStart,
@@ -1465,7 +1487,9 @@ function loadSettings() {
   const savedScoringMode = getStorageItem(STORAGE_KEYS.scoringMode);
   const savedRoundType = getStorageItem(STORAGE_KEYS.roundType);
   const savedTradeCount = getStorageItem(STORAGE_KEYS.tradeCount);
-  const savedTradeCountOverride = getStorageItem(STORAGE_KEYS.tradeCountOverride);
+  const savedTradeCountOverride = getStorageItem(
+    STORAGE_KEYS.tradeCountOverride
+  );
   const savedAsyncDurationPreset = getStorageItem(
     STORAGE_KEYS.asyncDurationPreset
   );
@@ -1825,7 +1849,9 @@ tradeCountInput?.setAttribute('max', String(TRADE_COUNT_LIMITS.max));
 tradeCountInput?.addEventListener('change', () => {
   tradeCountManuallyOverridden = true;
   if (tradeCountInput) {
-    tradeCountInput.value = String(clampTradeCount(Number(tradeCountInput.value)));
+    tradeCountInput.value = String(
+      clampTradeCount(Number(tradeCountInput.value))
+    );
   }
   renderTradeSchedulePreview();
   saveSettings();

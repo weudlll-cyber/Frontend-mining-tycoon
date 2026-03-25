@@ -50,6 +50,7 @@ Current status:
 - `src/services/` owns transport and action flows.
 - `src/utils/` stays utility-only.
 - `src/meta/` isolates contract/meta concerns.
+- `src/config/` is the control-data layer: `game-control-data.js` centralises all game setup tunables (duration presets, scoring defaults, session/enrollment limits) and `trading-control-data.js` holds trade-scheduling constants. All other modules must import from here; no tunable should be duplicated inline.
 
 #### Remaining large area
 
@@ -221,6 +222,40 @@ Well-documented purpose statement.
 - Don't split SSE/connection logic
 - Don't over-modularize pure functions
 - Keep main.js as orchestration hub
+
+---
+
+## 9. Multi-Page Entrypoints
+
+### Separate Admin & Player Builds
+
+This frontend is built with two entrypoints:
+
+- **`index.html`** — Player-facing dashboard (`dist/index.html`) linked as the main entry in `vite.config.js`
+- **`admin.html`** — Admin-only round setup UI (`dist/admin.html`) linked as a secondary entry in `vite.config.js`
+
+Both share the same global stylesheet (`src/style.css`) and may import from shared utility/service modules, but maintain separate DOM structures and control flows.
+
+### Admin Module Location
+
+- **`src/admin/admin-setup.js`** — Admin UI orchestration for round creation, configuration form binding, and API submission (POST /games with optional X-Admin-Token header)
+- **`src/admin/admin-setup.test.js`** — Dedicated tests for admin workflow
+
+### Admin Discoverability (Security)
+
+The admin link is intentionally **gated** in the player UI:
+
+- **Player page (`index.html`)** has a hidden `#admin-setup-link` element that is shown **only if the URL query parameter `?admin=1` is present**
+- This prevents accidental leakage of admin controls to casual players
+- Backend permission enforcement (via X-Admin-Token header and REQUIRE_ADMIN_FOR_GAME_CREATE flag) is the authoritative gate
+
+### Control Data Shared Across Pages
+
+Both pages import from the same control-data layer:
+
+- **`src/config/game-control-data.js`** — Centralized round setup tunables (duration presets, scoring modes, session/enrollment limits)
+- **`src/config/trading-control-data.js`** — Centralized trade scheduling constants
+- No tunable should be duplicated or hardcoded in UI modules on either entrypoint
 
 ---
 

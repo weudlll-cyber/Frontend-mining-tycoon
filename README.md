@@ -49,6 +49,56 @@ Key highlights:
 - Chat remains social-only, docked inline (not overlay), and non-gameplay.
 - Tests must remain green and new behavior must be covered; keep XSS-safe rendering patterns.
 
+## Admin Setup (Round Creation)
+
+Round configuration is **admin-only** and is managed separately from the player experience:
+
+### Player UI (`index.html`)
+- Players **cannot** configure rounds.
+- Players join an existing round by Game ID.
+- All tunable settings (scoring mode, trade count, duration, enrollment window) are snapshot-locked at creation.
+- Admin controls are hidden via `.admin-only` CSS class.
+
+### Admin Setup UI (`admin.html`)
+- Separate entrypoint for round operators.
+- All 7 configuration sections (Round Type, Duration, Scoring, Trading, Advanced Overrides) auto-populate from control-data constants.
+- Admin enters optional token if server enforces `REQUIRE_ADMIN_FOR_GAME_CREATE=true`.
+- Inline error messages if permission is denied.
+
+### How to Use
+
+**For Players (index.html)**
+1. Navigate to `http://localhost:5173`
+2. Enter Backend URL, Player Name, and Game ID (provided by admin)
+3. Click "Start Stream" to join and begin playing
+
+**For Admins (admin.html)**
+1. Navigate to `http://localhost:5173/admin.html`
+2. Select Round Type (Sync or Async)
+3. Configure Duration, Scoring Mode, and Trading Rules
+4. Review the summary and click "Create Round"
+5. Share the Game ID with players
+
+**Control Data & Defaults**
+All tunables come from `src/config/`:
+- `ROUND_DURATION_PRESETS` — available round durations
+- `ENROLLMENT_WINDOW_LIMITS` / `ENROLLMENT_WINDOW_DEFAULT_SECONDS` — join window
+- `SCORING_CONTROL` — allowed scoring modes
+- `TRADE_COUNT_LIMITS` — trading constraints
+- `computeTradeUnlockOffsetsSeconds()` — trade schedule calculation
+
+Do **not** hardcode tuning values in the UI; always import from control-data.
+
+### Permission Enforcement
+
+When the backend is configured with:
+- `REQUIRE_ADMIN_FOR_GAME_CREATE=true`
+- `ADMIN_TOKEN=<secret>`
+
+Game creation requires an `X-Admin-Token` header. The admin-setup UI prompts for the token. Player join routes are **never** gated.
+
+See [MANUAL_TEST_RUNBOOK.md](MANUAL_TEST_RUNBOOK.md) for full end-to-end test flows.
+
 When using Copilot, always instruct it to not violate LOCKED_DECISIONS.md.
 
 ## Documentation Map

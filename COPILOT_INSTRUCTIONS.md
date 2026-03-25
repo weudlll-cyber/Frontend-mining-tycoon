@@ -181,3 +181,46 @@ Additional output policy for this repository:
 - Keep changes minimal, safe, and reviewable.
 - Prefer small focused commits.
 - Do not mix refactors, behavior changes, and formatting unless justified.
+
+## 10) Control Data / Tuning Values (Steuerdaten)
+
+- All game setup tunables — duration presets, session/enrollment limits, scoring mode defaults, async defaults — must live in `src/config/game-control-data.js`.
+- Trade-scheduling tunables must live in `src/config/trading-control-data.js`.
+- `src/config/index.js` is the barrel export; external modules may import from either the barrel or the individual files.
+- Never hardcode tunable values inline in UI modules, service modules, or `main.js`. Import from `src/config` instead.
+- Equivalent backend policy constants must live in `app/policy/control_data.py`. Do not duplicate them in `game_service.py` or `schemas.py`.
+
+## 11) Admin Setup (Separate Entrypoint)
+
+### Separation of Concerns
+
+Game configuration is strictly **admin-only** and is managed via a separate entrypoint:
+
+- **Player entrypoint** (`index.html`): Joins existing rounds, plays games, views state, requests upgrades.
+- **Admin entrypoint** (`admin.html`): Creates and configures new rounds with snapshot-locked settings.
+
+### Key Rules
+
+- Admin setup must remain in a **separate file/module** (`src/admin/admin-setup.js`), not mixed into the player workflow.
+- Settings are **snapshot-locked** at round creation: once a round is created, no runtime override is possible (backend-enforced invariant from `LOCKED_DECISIONS.md`).
+- Admin link discoverability: The player page (`index.html`) has a **hidden** admin link that appears **only if `?admin=1` is in the URL query**. This prevents accidental exposure of admin controls.
+- Permission enforcement is **backend-authoritative**: frontend gating is convenience only; backend validates X-Admin-Token header per `REQUIRE_ADMIN_FOR_GAME_CREATE` env flag.
+- All admin-facing control data must be imported from `src/config/` (no hardcoded defaults in admin UI).
+
+### Frontend Admin Controls
+
+- Admin-only elements in `index.html` use the `.admin-only` CSS class and are hidden by default (display: none).
+- If a feature must show admin UI conditionally (rare), gate it explicitly in code and document the gate.
+- No admin controls should ever appear in the player UI without explicit gating.
+
+### Visual Distinction
+
+- Player page uses `body.page-player` styling with player-themed accents (cyan/teal).
+- Admin page uses `body.page-admin` styling with admin-themed accents (amber/warning).
+- Page banners clearly indicate context: "⏱ Player Dashboard" vs "⚙️ Admin Setup — round configuration is snapshot-locked".
+
+### No Admin In-Game Powers
+
+- Admins configure the round environment only; they have no special in-game capabilities once a round runs.
+- All players in a round see identical settings and are evaluated against identical scoring rules.
+- Outcome fairness is guaranteed by backend-authoritative deterministic simulation.

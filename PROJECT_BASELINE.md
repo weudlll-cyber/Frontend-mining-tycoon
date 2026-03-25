@@ -25,6 +25,7 @@ Implementation-factual contract:
 - Backend is authoritative for lifecycle, simulation, economy, event logic, validation, and security.
 - Frontend is SSE-driven display/intent orchestration and must not become client-authoritative for outcomes.
 - Deterministic behavior (oracle, halving, events, snapshot-locked settings) is a hard project constraint.
+- Admin configuration is separate from gameplay: settings are snapshot-locked at round creation and only admin can create rounds (via admin.html, not index.html).
 - Main gameplay UI is inline: seasonal cards with visible three-lane upgrades and read-only analytics.
 - Chat is optional, social-only, docked inline, and non-gameplay.
 - Trading and farming visibility is maintained in UI even when disabled (status remains explicit).
@@ -160,6 +161,7 @@ Frontend structure is modular:
 - Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
 - Halving display module: calculates and renders halving schedules and countdowns per token.
+- Control-data layer (`src/config/game-control-data.js`): centralises all game setup tunables — duration presets, round/session limits, enrollment window defaults, async defaults, and scoring mode constants. `src/config/trading-control-data.js` holds trade-scheduling tunables. UI modules and `main.js` import from here; constants are not duplicated inline.
 
 Frontend session-mode readiness:
 

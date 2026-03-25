@@ -16,12 +16,71 @@ Invariants:
 
 html,
 body {
-  height: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
   overflow: hidden;
 }
 
+/* Admin-only controls: hidden in the player UI (index.html).
+     These elements are visible only in admin.html. */
+.admin-only {
+  display: none !important;
+}
+
+/* Page theme variables — distinguish player vs admin visually */
+:root {
+  /* Player page accent: subtle blue-green */
+  --accent-player: #0891b2;
+  --banner-bg-player: #ecf0f1;
+  --banner-border-player: #bdc3c7;
+
+  /* Admin page accent: amber/warning to suggest elevated action */
+  --accent-admin: #d97706;
+  --banner-bg-admin: #fef3c7;
+  --banner-border-admin: #f59e0b;
+}
+
+/* Player page styling */
+body.page-player {
+  --current-accent: var(--accent-player);
+}
+
+body.page-player .page-banner {
+  background: var(--banner-bg-player);
+  border: 1px solid var(--banner-border-player);
+  color: #1a1a1a;
+}
+
+body.page-player .page-banner-icon {
+  color: var(--accent-player);
+}
+
+/* Admin page styling */
+body.page-admin {
+  --current-accent: var(--accent-admin);
+}
+
+body.page-admin .page-banner {
+  background: var(--banner-bg-admin);
+  border: 2px solid var(--banner-border-admin);
+  color: #92400e;
+  font-weight: 600;
+}
+
+body.page-admin .page-banner-icon {
+  color: var(--accent-admin);
+}
+
+/* Shared page banner styles */
+.page-banner {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Layout and color variables */
 :root {
   --bg-primary: #f5f5f5;
   --bg-secondary: #ffffff;

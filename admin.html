@@ -1,0 +1,556 @@
+<!--
+File: admin.html
+Purpose: Admin-only round setup page. Allows operators to create new game rounds
+         with full configuration (type, duration, scoring, trading) before sharing
+         a game ID with players.
+Security notes:
+  - Requires X-Admin-Token header on POST /games when REQUIRE_ADMIN_FOR_GAME_CREATE=true.
+  - Admin token is held in a session-scoped password input only; never persisted to storage.
+  - This page must NOT be linked from the player-facing app (index.html).
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Setup — Mining Tycoon</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #f5f5f5;
+        --card: #ffffff;
+        --border: #d0d0d0;
+        --text: #1a1a1a;
+        --text-muted: #666;
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --danger: #ef4444;
+        --warning-bg: #fef3c7;
+        --warning-border: #f59e0b;
+        --success-bg: #d1fae5;
+        --success-border: #10b981;
+        --error-bg: #fee2e2;
+        --error-border: #ef4444;
+        --radius: 8px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        padding: 1.5rem;
+        min-height: 100vh;
+      }
+
+      .admin-warning-banner {
+        background: var(--warning-bg);
+        border: 2px solid var(--warning-border);
+        border-radius: var(--radius);
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .page-header h1 {
+        font-size: 1.4rem;
+      }
+
+      .page-header a {
+        font-size: 0.85rem;
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      .page-header a:hover {
+        text-decoration: underline;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .card h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: var(--text);
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.5rem;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem 1.25rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .form-group.full-width {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+
+      input[type='text'],
+      input[type='number'],
+      input[type='password'],
+      select {
+        padding: 0.45rem 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        background: #fff;
+        color: var(--text);
+        width: 100%;
+      }
+
+      input:focus,
+      select:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 1px;
+        border-color: var(--primary);
+      }
+
+      .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-top: 0.1rem;
+      }
+
+      .radio-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        color: var(--text);
+      }
+
+      .radio-option input[type='radio'] {
+        width: auto;
+        margin-top: 0.15rem;
+        cursor: pointer;
+        accent-color: var(--primary);
+      }
+
+      .radio-option input[type='radio']:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .hidden-section {
+        display: none;
+      }
+
+      .schedule-preview {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        color: #0c4a6e;
+        font-family: monospace;
+        white-space: pre-wrap;
+        min-height: 1.8rem;
+      }
+
+      .derived-note {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+        font-style: italic;
+      }
+
+      .review-box {
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        font-size: 0.85rem;
+        line-height: 1.7;
+      }
+
+      .review-box dl {
+        display: grid;
+        grid-template-columns: 10rem 1fr;
+        gap: 0.1rem 0.75rem;
+      }
+
+      .review-box dt {
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+
+      .review-box dd {
+        color: var(--text);
+      }
+
+      .create-btn {
+        margin-top: 1rem;
+        padding: 0.6rem 1.5rem;
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .create-btn:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+
+      .create-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .result-box {
+        display: none;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+      }
+
+      .result-box.success {
+        background: var(--success-bg);
+        border: 1px solid var(--success-border);
+        color: #065f46;
+        display: block;
+      }
+
+      .result-box.error {
+        background: var(--error-bg);
+        border: 1px solid var(--error-border);
+        color: #991b1b;
+        display: block;
+      }
+
+      .result-box .game-id-display {
+        font-size: 1.1rem;
+        font-weight: 700;
+        font-family: monospace;
+        margin: 0.25rem 0;
+      }
+
+      .result-box .join-link {
+        font-size: 0.8rem;
+        color: var(--primary);
+        word-break: break-all;
+      }
+
+      .section-note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.1rem;
+        font-style: italic;
+      }
+
+      .async-fields {
+        margin-top: 0.5rem;
+        padding: 0.6rem 0.8rem;
+        border-left: 3px solid var(--primary);
+        background: #f0f9ff;
+        border-radius: 0 6px 6px 0;
+      }
+
+      @media (max-width: 640px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .review-box dl {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body class="page-admin">
+    <div class="page-banner">
+      <span class="page-banner-icon">⚙️</span>
+      <span>Admin Setup — round configuration is snapshot-locked at creation</span>
+    </div>
+
+    <div class="page-header">
+      <h1>⛏️ Mining Tycoon — Admin Setup</h1>
+      <a href="index.html">← Player UI</a>
+    </div>
+
+    <!-- Section 1: Connection -->
+    <section class="card" aria-labelledby="section-connection-title">
+      <h2 id="section-connection-title">1 — Connection</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="admin-backend-url">Backend URL</label>
+          <input
+            id="admin-backend-url"
+            type="text"
+            value="http://127.0.0.1:8000"
+            autocomplete="off"
+          />
+        </div>
+        <div class="form-group">
+          <label for="admin-token"
+            >Admin Token
+            <span class="section-note"
+              >(required when REQUIRE_ADMIN_FOR_GAME_CREATE=true)</span
+            ></label
+          >
+          <input
+            id="admin-token"
+            type="password"
+            placeholder="Leave blank if server allows open creation"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Round Type -->
+    <section class="card" aria-labelledby="section-round-type-title">
+      <h2 id="section-round-type-title">2 — Round Type</h2>
+      <div class="form-group">
+        <div class="radio-group" role="radiogroup" aria-label="Round Type">
+          <label class="radio-option" for="admin-round-type-sync">
+            <input
+              id="admin-round-type-sync"
+              name="admin-round-type"
+              type="radio"
+              value="sync"
+              checked
+            />
+            <span
+              ><strong>Sync</strong> — all players play simultaneously; one
+              shared enrollment window.</span
+            >
+          </label>
+          <label class="radio-option" for="admin-round-type-async">
+            <input
+              id="admin-round-type-async"
+              name="admin-round-type"
+              type="radio"
+              value="async"
+            />
+            <span
+              ><strong>Async (host)</strong> — players each open their own
+              session window within the round duration.</span
+            >
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Time Configuration -->
+    <section class="card" aria-labelledby="section-time-title">
+      <h2 id="section-time-title">3 — Time Configuration</h2>
+
+      <!-- Sync controls -->
+      <div id="admin-sync-fields" class="form-grid">
+        <div class="form-group">
+          <label for="admin-enrollment-window"
+            >Enrollment Window (seconds)</label
+          >
+          <input
+            id="admin-enrollment-window"
+            type="number"
+            value="600"
+            min="5"
+            max="3600"
+          />
+          <p class="derived-note">How long players can join before the round starts (5 – 3 600 s).</p>
+        </div>
+        <div class="form-group">
+          <label for="admin-duration-preset">Round Duration</label>
+          <select id="admin-duration-preset">
+            <!-- Populated by admin-setup.js from ROUND_DURATION_PRESETS -->
+          </select>
+        </div>
+        <div id="admin-duration-custom-row" class="form-group" style="display: none">
+          <label for="admin-duration-custom-value">Custom Duration Value</label>
+          <div style="display: flex; gap: 0.5rem">
+            <input
+              id="admin-duration-custom-value"
+              type="number"
+              placeholder="e.g., 120"
+              min="60"
+              max="2592000"
+              style="flex: 2"
+            />
+            <select id="admin-duration-custom-unit" style="flex: 1">
+              <option value="seconds">seconds</option>
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Async controls -->
+      <div id="admin-async-fields" class="form-grid hidden-section">
+        <div class="form-group">
+          <label for="admin-async-duration-preset">Round Duration</label>
+          <select id="admin-async-duration-preset">
+            <!-- Populated by admin-setup.js from ASYNC_ROUND_PRESET_IDS -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="admin-async-session-preset">Session Duration</label>
+          <select id="admin-async-session-preset">
+            <!-- Populated by admin-setup.js from ASYNC_SESSION_PRESET_IDS -->
+          </select>
+        </div>
+        <p class="section-note full-width">
+          Session duration must not exceed round duration. The UI will clamp it
+          automatically.
+        </p>
+      </div>
+    </section>
+
+    <!-- Section 4: Scoring Mode -->
+    <section class="card" aria-labelledby="section-scoring-title">
+      <h2 id="section-scoring-title">4 — Scoring Mode</h2>
+      <p class="section-note" style="margin-bottom: 0.6rem">
+        Snapshot-locked at round creation; players cannot change it.
+      </p>
+      <div class="form-group">
+        <div
+          id="admin-scoring-mode-group"
+          class="radio-group"
+          role="radiogroup"
+          aria-label="Scoring Mode"
+        >
+          <!-- Populated by admin-setup.js from SCORING_CONTROL -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: Trading Rules -->
+    <section class="card" aria-labelledby="section-trading-title">
+      <h2 id="section-trading-title">5 — Trading Rules</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="admin-trade-count"
+            >Trade Count (0 = trading disabled)</label
+          >
+          <input
+            id="admin-trade-count"
+            type="number"
+            value="0"
+            min="0"
+            max="10"
+            step="1"
+          />
+          <p id="admin-trade-count-note" class="derived-note"></p>
+        </div>
+        <div class="form-group">
+          <label>Trade Unlock Schedule Preview</label>
+          <div id="admin-trade-schedule-preview" class="schedule-preview">
+            No trades configured.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 6: Advanced Overrides -->
+    <section class="card" aria-labelledby="section-advanced-title">
+      <h2 id="section-advanced-title">6 — Advanced Overrides (optional)</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Leave all fields blank to use server defaults. Override only when fine
+        tuning emission rates or halving schedule.
+      </p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="admin-anchor-token">Anchor Token</label>
+          <select id="admin-anchor-token">
+            <option value="">— Use recommendation —</option>
+            <option value="spring">spring</option>
+            <option value="summer">summer</option>
+            <option value="autumn">autumn</option>
+            <option value="winter">winter</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="admin-anchor-rate">Anchor Tokens/sec</label>
+          <input
+            id="admin-anchor-rate"
+            type="number"
+            placeholder="e.g., 5.0"
+            step="0.1"
+            min="0"
+          />
+          <p class="derived-note">Base emission speed for anchor token.</p>
+        </div>
+        <div class="form-group">
+          <label for="admin-season-cycles">Season Cycles</label>
+          <input
+            id="admin-season-cycles"
+            type="number"
+            placeholder="e.g., 1"
+            step="1"
+            min="1"
+          />
+          <p class="derived-note">1 cycle = 4 halvings. Leave blank for server default.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 7: Review & Create -->
+    <section class="card" aria-labelledby="section-review-title">
+      <h2 id="section-review-title">7 — Review &amp; Create</h2>
+      <div id="admin-review-box" class="review-box" aria-live="polite">
+        <dl id="admin-review-dl">
+          <!-- Populated by admin-setup.js -->
+        </dl>
+      </div>
+      <button
+        id="admin-create-btn"
+        class="create-btn"
+        type="button"
+        aria-label="Create round"
+      >
+        Create Round
+      </button>
+
+      <div id="admin-result-box" class="result-box" aria-live="assertive"></div>
+    </section>
+
+    <script type="module" src="/src/admin/admin-setup.js"></script>
+  </body>
+</html>

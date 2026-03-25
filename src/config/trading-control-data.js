@@ -35,7 +35,10 @@ export function clampTradeCount(value) {
 }
 
 export function getDefaultTradeCount(durationSeconds) {
-  const duration = Math.max(0, Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) : 0);
+  const duration = Math.max(
+    0,
+    Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) : 0
+  );
 
   if (duration >= 86400) {
     return clampTradeCount(6);

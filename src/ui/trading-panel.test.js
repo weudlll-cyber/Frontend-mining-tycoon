@@ -8,62 +8,62 @@
  * Test file for src/ui/trading-panel.js
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   normalizeTradingCapability,
   initTradingPanel,
   renderTradingStatus,
   renderBottomBarTradingStatus,
-} from "./trading-panel.js";
+} from './trading-panel.js';
 
-describe("trading-panel", () => {
-  describe("normalizeTradingCapability", () => {
-    it("returns safe defaults when trading is null", () => {
+describe('trading-panel', () => {
+  describe('normalizeTradingCapability', () => {
+    it('returns safe defaults when trading is null', () => {
       const result = normalizeTradingCapability(null);
       expect(result.enabled).toBe(false);
-      expect(result.status).toBe("disabled");
-      expect(result.fee_model).toBe("value_fee_rate");
+      expect(result.status).toBe('disabled');
+      expect(result.fee_model).toBe('value_fee_rate');
       expect(result.value_fee_rate).toBe(0.02); // default fallback
     });
 
-    it("respects custom fallback fee rate when trading is null", () => {
+    it('respects custom fallback fee rate when trading is null', () => {
       const result = normalizeTradingCapability(null, 0.05);
       expect(result.value_fee_rate).toBe(0.05);
     });
 
-    it("preserves enabled=true and related scaffold fields", () => {
+    it('preserves enabled=true and related scaffold fields', () => {
       const raw = {
         enabled: false,
-        status: "disabled",
-        reason: "Trading scaffold: execution not yet implemented",
-        fee_model: "value_fee_rate",
+        status: 'disabled',
+        reason: 'Trading scaffold: execution not yet implemented',
+        fee_model: 'value_fee_rate',
         value_fee_rate: 0.02,
         max_trades_per_player: null,
         trade_opens_after_seconds: null,
       };
       const result = normalizeTradingCapability(raw);
       expect(result.enabled).toBe(false);
-      expect(result.status).toBe("disabled");
-      expect(result.reason).toContain("scaffold");
+      expect(result.status).toBe('disabled');
+      expect(result.reason).toContain('scaffold');
       expect(result.value_fee_rate).toBe(0.02);
     });
 
-    it("converts upper-case status to lower-case", () => {
-      const raw = { status: "DISABLED" };
+    it('converts upper-case status to lower-case', () => {
+      const raw = { status: 'DISABLED' };
       const result = normalizeTradingCapability(raw);
-      expect(result.status).toBe("disabled");
+      expect(result.status).toBe('disabled');
     });
 
-    it("uses fallback fee rate if trading.value_fee_rate is missing", () => {
-      const raw = { status: "disabled" };
+    it('uses fallback fee rate if trading.value_fee_rate is missing', () => {
+      const raw = { status: 'disabled' };
       const result = normalizeTradingCapability(raw, 0.03);
       expect(result.value_fee_rate).toBe(0.03);
     });
 
-    it("ignores invalid numeric fields, uses null instead", () => {
+    it('ignores invalid numeric fields, uses null instead', () => {
       const raw = {
-        status: "disabled",
-        max_trades_per_player: "not a number",
+        status: 'disabled',
+        max_trades_per_player: 'not a number',
         trade_opens_after_seconds: null,
       };
       const result = normalizeTradingCapability(raw);
@@ -72,18 +72,18 @@ describe("trading-panel", () => {
     });
   });
 
-  describe("renderTradingStatus", () => {
+  describe('renderTradingStatus', () => {
     let panelEl;
     let statusEl;
     let tooltipLayer;
 
     beforeEach(() => {
-      panelEl = document.createElement("div");
-      panelEl.id = "trading-panel";
-      statusEl = document.createElement("span");
-      statusEl.id = "trading-status";
-      tooltipLayer = document.createElement("div");
-      tooltipLayer.id = "tooltip-layer";
+      panelEl = document.createElement('div');
+      panelEl.id = 'trading-panel';
+      statusEl = document.createElement('span');
+      statusEl.id = 'trading-status';
+      tooltipLayer = document.createElement('div');
+      tooltipLayer.id = 'tooltip-layer';
       document.body.appendChild(panelEl);
       document.body.appendChild(statusEl);
       document.body.appendChild(tooltipLayer);
@@ -95,49 +95,49 @@ describe("trading-panel", () => {
       document.body.removeChild(tooltipLayer);
     });
 
-    it("renders unified conversion panel shell", () => {
+    it('renders unified conversion panel shell', () => {
       const trading = normalizeTradingCapability(null);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(panelEl.innerHTML).toContain("Convert Tokens");
-      expect(panelEl.innerHTML).toContain("Mode: Stockpile Mode");
-      expect(panelEl.innerHTML).toContain("PRIMARY RESULT (Net Effect)");
-      expect(panelEl.innerHTML).toContain("Total Tokens Change");
+      expect(panelEl.innerHTML).toContain('Convert Tokens');
+      expect(panelEl.innerHTML).toContain('Mode: Stockpile Mode');
+      expect(panelEl.innerHTML).toContain('PRIMARY RESULT (Net Effect)');
+      expect(panelEl.innerHTML).toContain('Total Tokens Change');
     });
 
-    it("renders bottom-bar status text", () => {
+    it('renders bottom-bar status text', () => {
       const trading = normalizeTradingCapability(null, 0.02);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(statusEl.textContent).toContain("Trading:");
-      expect(statusEl.textContent).toContain("Not Enabled");
-      expect(statusEl.textContent).toContain("2.0%");
+      expect(statusEl.textContent).toContain('Trading:');
+      expect(statusEl.textContent).toContain('Not Enabled');
+      expect(statusEl.textContent).toContain('2.0%');
     });
 
-    it("renders safe fallback panel content without throwing", () => {
+    it('renders safe fallback panel content without throwing', () => {
       const trading = normalizeTradingCapability(null, 0.05);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(panelEl.innerHTML).toContain("Convert Tokens");
-      expect(panelEl.innerHTML).toContain("Trade schedule");
+      expect(panelEl.innerHTML).toContain('Convert Tokens');
+      expect(panelEl.innerHTML).toContain('Trade schedule');
     });
 
-    it("handles missing panel ref gracefully", () => {
+    it('handles missing panel ref gracefully', () => {
       const trading = normalizeTradingCapability(null);
       expect(() => renderTradingStatus(trading, null, statusEl)).not.toThrow();
     });
 
-    it("handles missing status ref gracefully", () => {
+    it('handles missing status ref gracefully', () => {
       const trading = normalizeTradingCapability(null);
       expect(() => renderTradingStatus(trading, panelEl, null)).not.toThrow();
     });
   });
 
-  describe("renderBottomBarTradingStatus", () => {
+  describe('renderBottomBarTradingStatus', () => {
     let statusEl;
 
     beforeEach(() => {
-      statusEl = document.createElement("span");
+      statusEl = document.createElement('span');
       document.body.appendChild(statusEl);
     });
 
@@ -145,46 +145,46 @@ describe("trading-panel", () => {
       document.body.removeChild(statusEl);
     });
 
-    it("renders compact status text for disabled trading", () => {
+    it('renders compact status text for disabled trading', () => {
       const trading = normalizeTradingCapability(null, 0.02);
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.textContent).toContain("Not Enabled");
-      expect(statusEl.textContent).toContain("2.0%");
+      expect(statusEl.textContent).toContain('Not Enabled');
+      expect(statusEl.textContent).toContain('2.0%');
     });
 
-    it("applies trading-status-disabled class for disabled trading", () => {
+    it('applies trading-status-disabled class for disabled trading', () => {
       const trading = normalizeTradingCapability(null);
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe("trading-status-disabled");
+      expect(statusEl.className).toBe('trading-status-disabled');
     });
 
-    it("applies trading-status-enabled class for enabled trading", () => {
+    it('applies trading-status-enabled class for enabled trading', () => {
       const trading = {
         enabled: true,
         value_fee_rate: 0.01,
       };
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe("trading-status-enabled");
+      expect(statusEl.className).toBe('trading-status-enabled');
     });
 
-    it("handles null data gracefully", () => {
+    it('handles null data gracefully', () => {
       expect(() => renderBottomBarTradingStatus(null, statusEl)).not.toThrow();
     });
   });
 
-  describe("initTradingPanel", () => {
+  describe('initTradingPanel', () => {
     let panelEl;
     let statusEl;
     let tooltipLayer;
 
     beforeEach(() => {
-      panelEl = document.createElement("div");
-      statusEl = document.createElement("span");
-      tooltipLayer = document.createElement("div");
-      tooltipLayer.id = "tooltip-layer";
+      panelEl = document.createElement('div');
+      statusEl = document.createElement('span');
+      tooltipLayer = document.createElement('div');
+      tooltipLayer.id = 'tooltip-layer';
       document.body.appendChild(panelEl);
       document.body.appendChild(statusEl);
       document.body.appendChild(tooltipLayer);
@@ -196,22 +196,22 @@ describe("trading-panel", () => {
       document.body.removeChild(tooltipLayer);
     });
 
-    it("returns null when getGameMeta is not provided", () => {
+    it('returns null when getGameMeta is not provided', () => {
       const api = initTradingPanel({});
       // Should warn but not throw
       expect(api).toBeUndefined();
     });
 
-    it("warns when no refs are provided", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it('warns when no refs are provided', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       initTradingPanel({ getGameMeta: () => ({}) });
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("no refs provided")
+        expect.stringContaining('no refs provided')
       );
       warn.mockRestore();
     });
 
-    it("returns API with renderTradingStatus method when refs are provided", () => {
+    it('returns API with renderTradingStatus method when refs are provided', () => {
       const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
       const api = initTradingPanel({
         getGameMeta: getMeta,
@@ -221,10 +221,10 @@ describe("trading-panel", () => {
 
       expect(api).toBeDefined();
       expect(api.renderTradingStatus).toBeDefined();
-      expect(typeof api.renderTradingStatus).toBe("function");
+      expect(typeof api.renderTradingStatus).toBe('function');
     });
 
-    it("renderTradingStatus updates panel and status when called", () => {
+    it('renderTradingStatus updates panel and status when called', () => {
       const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
       const api = initTradingPanel({
         getGameMeta: getMeta,
@@ -234,15 +234,15 @@ describe("trading-panel", () => {
 
       api.renderTradingStatus();
 
-      expect(panelEl.innerHTML).toContain("trading-card");
-      expect(panelEl.innerHTML).toContain("Trades used:");
-      expect(statusEl.textContent).toContain("Trading:");
+      expect(panelEl.innerHTML).toContain('trading-card');
+      expect(panelEl.innerHTML).toContain('Trades used:');
+      expect(statusEl.textContent).toContain('Trading:');
     });
 
-    it("renders trades used / total and full schedule list", () => {
+    it('renders trades used / total and full schedule list', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
-        scoring_mode: "stockpile",
+        scoring_mode: 'stockpile',
         game_duration_seconds: 600,
         trading: null,
       });
@@ -264,19 +264,19 @@ describe("trading-panel", () => {
       });
       api.renderTradingStatus();
 
-      expect(panelEl.textContent).toContain("Trades used:");
-      expect(panelEl.textContent).toContain("1 / 3");
-      expect(panelEl.textContent).toContain("Trade 1 at 2m 0s");
-      expect(panelEl.textContent).toContain("Trade 2 at 6m 0s");
-      expect(panelEl.textContent).toContain("Trade 3 at 9m 0s");
-      expect(panelEl.textContent).toContain("Used");
-      expect(panelEl.textContent).toContain("Available in");
+      expect(panelEl.textContent).toContain('Trades used:');
+      expect(panelEl.textContent).toContain('1 / 3');
+      expect(panelEl.textContent).toContain('Trade 1 at 2m 0s');
+      expect(panelEl.textContent).toContain('Trade 2 at 6m 0s');
+      expect(panelEl.textContent).toContain('Trade 3 at 9m 0s');
+      expect(panelEl.textContent).toContain('Used');
+      expect(panelEl.textContent).toContain('Available in');
     });
 
-    it("shows Power Mode primary result when meta scoring_mode is power", () => {
+    it('shows Power Mode primary result when meta scoring_mode is power', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
-        scoring_mode: "power",
+        scoring_mode: 'power',
         trading: null,
       });
       const getLastGameData = () => ({
@@ -296,16 +296,16 @@ describe("trading-panel", () => {
       });
 
       api.renderTradingStatus();
-      expect(panelEl.innerHTML).toContain("Mode: Power Mode");
-      expect(panelEl.innerHTML).toContain("Weighted Score Change");
+      expect(panelEl.innerHTML).toContain('Mode: Power Mode');
+      expect(panelEl.innerHTML).toContain('Weighted Score Change');
       expect(panelEl.innerHTML).toMatch(/\+8[.,]2%/);
-      expect(panelEl.innerHTML).toContain("Score: 100.40 -&gt; 108.60");
+      expect(panelEl.innerHTML).toContain('Score: 100.40 -&gt; 108.60');
     });
 
-    it("shows Mining Time Equivalent primary result and tooltip hint", () => {
+    it('shows Mining Time Equivalent primary result and tooltip hint', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
-        scoring_mode: "mining_time_equivalent",
+        scoring_mode: 'mining_time_equivalent',
         trading: null,
       });
       const getLastGameData = () => ({
@@ -325,16 +325,16 @@ describe("trading-panel", () => {
       });
 
       api.renderTradingStatus();
-      expect(panelEl.innerHTML).toContain("Mode: Mining Time Equivalent Mode");
-      expect(panelEl.innerHTML).toContain("Mining Time Equivalent Change");
-      expect(panelEl.innerHTML).toContain("+4h 32m");
-      expect(panelEl.innerHTML).toContain("Metric info");
+      expect(panelEl.innerHTML).toContain('Mode: Mining Time Equivalent Mode');
+      expect(panelEl.innerHTML).toContain('Mining Time Equivalent Change');
+      expect(panelEl.innerHTML).toContain('+4h 32m');
+      expect(panelEl.innerHTML).toContain('Metric info');
     });
 
-    it("shows Efficiency primary result when mode is efficiency", () => {
+    it('shows Efficiency primary result when mode is efficiency', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
-        scoring_mode: "efficiency",
+        scoring_mode: 'efficiency',
         trading: null,
       });
       const getLastGameData = () => ({
@@ -354,12 +354,12 @@ describe("trading-panel", () => {
       });
 
       api.renderTradingStatus();
-      expect(panelEl.innerHTML).toContain("Mode: Efficiency Mode");
-      expect(panelEl.innerHTML).toContain("Efficiency Impact");
+      expect(panelEl.innerHTML).toContain('Mode: Efficiency Mode');
+      expect(panelEl.innerHTML).toContain('Efficiency Impact');
       expect(panelEl.innerHTML).toMatch(/\+6[.,]4%/);
     });
 
-    it("keeps stockpile mode as default and shows neutral placeholders when preview is unavailable", () => {
+    it('keeps stockpile mode as default and shows neutral placeholders when preview is unavailable', () => {
       const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
       const getLastGameData = () => ({ balances: { spring: 100 } });
 
@@ -371,15 +371,15 @@ describe("trading-panel", () => {
       });
 
       api.renderTradingStatus();
-      expect(panelEl.innerHTML).toContain("Mode: Stockpile Mode");
-      expect(panelEl.innerHTML).toContain("Total Tokens Change");
-      expect(panelEl.innerHTML).toContain("--");
+      expect(panelEl.innerHTML).toContain('Mode: Stockpile Mode');
+      expect(panelEl.innerHTML).toContain('Total Tokens Change');
+      expect(panelEl.innerHTML).toContain('--');
     });
 
-    it("getTrading normalizes meta.trading with conversion_fee_rate fallback", () => {
+    it('getTrading normalizes meta.trading with conversion_fee_rate fallback', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.03,
-        trading: { status: "disabled", value_fee_rate: 0.03 },
+        trading: { status: 'disabled', value_fee_rate: 0.03 },
       });
       const api = initTradingPanel({
         getGameMeta: getMeta,
@@ -389,10 +389,10 @@ describe("trading-panel", () => {
 
       const trading = api.getTrading();
       expect(trading.value_fee_rate).toBe(0.03);
-      expect(trading.status).toBe("disabled");
+      expect(trading.status).toBe('disabled');
     });
 
-    it("getTrading falls back to 0.02 if conversion_fee_rate is missing", () => {
+    it('getTrading falls back to 0.02 if conversion_fee_rate is missing', () => {
       const getMeta = () => ({});
       const api = initTradingPanel({
         getGameMeta: getMeta,
@@ -404,11 +404,11 @@ describe("trading-panel", () => {
       expect(trading.value_fee_rate).toBe(0.02);
     });
 
-    it("handles getGameMeta errors gracefully", () => {
+    it('handles getGameMeta errors gracefully', () => {
       const getMeta = () => {
-        throw new Error("Meta fetch failed");
+        throw new Error('Meta fetch failed');
       };
-      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
       const api = initTradingPanel({
         getGameMeta: getMeta,
         tradingPanelRef: panelEl,
@@ -419,7 +419,7 @@ describe("trading-panel", () => {
       expect(trading.enabled).toBe(false);
       expect(err).toHaveBeenCalled();
       const firstCall = err.mock.calls[0];
-      expect(firstCall[0]).toContain("[trading-panel] getTrading error");
+      expect(firstCall[0]).toContain('[trading-panel] getTrading error');
       err.mockRestore();
     });
   });
