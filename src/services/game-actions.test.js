@@ -38,6 +38,8 @@ function buildDeps(overrides = {}) {
     getPlayerName: vi.fn(() => 'Tester'),
     getEnrollmentWindow: vi.fn(() => 600),
     getSelectedScoringMode: vi.fn(() => 'stockpile_total_tokens'),
+    getSelectedTradeCount: vi.fn(() => 3),
+    getTradeUnlockOffsets: vi.fn(() => [120, 360, 600]),
     getSelectedRoundType: vi.fn(() => 'async'),
     getAsyncDurationPreset: vi.fn(() => '10m'),
     getAsyncSessionDurationSeconds: vi.fn(() => 86400),
@@ -96,6 +98,8 @@ describe('game-actions async host flow', () => {
     expect(createCall[0]).toBe('http://127.0.0.1:8000/games');
     expect(createBody.round_type).toBe('asynchronous');
     expect(createBody.scoring_mode).toBe('stockpile_total_tokens');
+    expect(createBody.trade_count).toBe(3);
+    expect(createBody.trade_unlock_offsets_seconds).toEqual([120, 360, 600]);
     expect(createBody.enrollment_window_seconds).toBe(0);
     expect(createBody.duration_mode).toBe('preset');
     expect(createBody.duration_preset).toBe('10m');

@@ -253,6 +253,22 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     </label>
                   </div>
                 </div>
+                <div class="form-group form-span-4">
+                  <label for="trade-count-input">Trades (fixed for this round):</label>
+                  <div class="async-host-row" aria-live="polite">
+                    <label class="async-host-field" for="trade-count-input">
+                      <span>Trade Count</span>
+                      <input
+                        id="trade-count-input"
+                        type="number"
+                        step="1"
+                        value="0"
+                      />
+                    </label>
+                    <span id="trade-count-mode-note" class="setup-actions-note"></span>
+                  </div>
+                  <div id="trade-schedule-preview" class="derived-emission-preview" style="display: block"></div>
+                </div>
                 <div
                   id="sync-host-controls"
                   class="form-group form-span-4 async-host-controls"

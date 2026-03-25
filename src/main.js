@@ -143,7 +143,14 @@ import {
   syncSessionDurationOptions,
   getAsyncDurationPreset,
   getAsyncSessionDurationSeconds,
+  presetToSeconds,
 } from './ui/async-duration.js';
+import {
+  TRADE_COUNT_LIMITS,
+  clampTradeCount,
+  getDefaultTradeCount,
+  computeTradeUnlockOffsetsSeconds,
+} from './config/trading-control-data.js';
 import {
   resolveDurationSecondsFromInputs,
   collectAdvancedOverridesFromInputs,
@@ -189,8 +196,6 @@ import {
 import { initChatPanel, connectChat, disconnectChat } from './ui/chat-panel.js';
 import {
   initTradingPanel,
-  normalizeTradingCapability,
-  renderTradingStatus,
 } from './ui/trading-panel.js';
 import {
   initStreamController,
@@ -246,6 +251,9 @@ const asyncSessionDurationPresetInput = document.getElementById(
   'async-session-duration-preset'
 );
 const asyncHostAutoStartCheckbox = document.getElementById('async-auto-start');
+const tradeCountInput = document.getElementById('trade-count-input');
+const tradeCountModeNoteEl = document.getElementById('trade-count-mode-note');
+const tradeSchedulePreviewEl = document.getElementById('trade-schedule-preview');
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
 
@@ -373,6 +381,7 @@ let asyncSessionSupportProbe = null;
 let asyncDiagnosticsProbeKey = '';
 let asyncDiagnosticsProbeInFlight = null;
 let selectedSetupRoundType = 'sync';
+let tradeCountManuallyOverridden = false;
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
 
@@ -473,6 +482,109 @@ function getSelectedRoundType() {
     return selectedSetupRoundType;
   }
   return roundTypeAsyncInput?.checked ? 'async' : 'sync';
+}
+
+function formatOffsetLabel(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  if (total < 3600) {
+    const mm = Math.floor(total / 60)
+      .toString()
+      .padStart(2, '0');
+    const ss = Math.floor(total % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${mm}:${ss}`;
+  }
+  const hh = Math.floor(total / 3600)
+    .toString()
+    .padStart(2, '0');
+  const mm = Math.floor((total % 3600) / 60)
+    .toString()
+    .padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function getSelectedRoundDurationSecondsForTradingDefaults() {
+  if (getSelectedRoundType() === 'async') {
+    return presetToSeconds(getAsyncDurationPreset(asyncHostDurationPresetInput)) || 600;
+  }
+  let resolution;
+  try {
+    resolution = resolveDurationSeconds();
+  } catch {
+    return 600;
+  }
+  if (resolution.mode === 'custom') {
+    return Number(resolution.customSeconds) || 600;
+  }
+  return presetToSeconds(resolution.preset) || 600;
+}
+
+function getSelectedTradeCount() {
+  return clampTradeCount(Number(tradeCountInput?.value || 0));
+}
+
+function getTradeUnlockOffsets() {
+  const durationSeconds = getSelectedRoundDurationSecondsForTradingDefaults();
+  return computeTradeUnlockOffsetsSeconds(durationSeconds, getSelectedTradeCount());
+}
+
+function renderTradeSchedulePreview() {
+  if (!tradeSchedulePreviewEl) return;
+
+  const gameId = String(gameIdInput?.value || '').trim();
+  const gameMeta = gameId ? getGameMeta(gameId) : null;
+  const metaRules = gameMeta?.trading_rules;
+
+  let tradeCount;
+  let offsets;
+  let note;
+
+  if (metaRules && Number.isFinite(Number(metaRules.trade_count))) {
+    tradeCount = clampTradeCount(Number(metaRules.trade_count));
+    if (tradeCountInput) {
+      tradeCountInput.value = String(tradeCount);
+      tradeCountInput.disabled = true;
+    }
+    offsets = Array.isArray(metaRules.unlock_offsets_seconds)
+      ? metaRules.unlock_offsets_seconds.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+      : [];
+    note = 'Using backend-authoritative trading rules for this game.';
+  } else {
+    if (tradeCountInput) {
+      tradeCountInput.disabled = false;
+    }
+    tradeCount = getSelectedTradeCount();
+    offsets = getTradeUnlockOffsets();
+    note = tradeCountManuallyOverridden
+      ? 'Manual override active (clamped to allowed limits).'
+      : 'Auto default from round duration.';
+  }
+
+  if (tradeCountModeNoteEl) {
+    tradeCountModeNoteEl.textContent = note;
+  }
+
+  if (tradeCount <= 0 || !offsets.length) {
+    tradeSchedulePreviewEl.textContent = 'Trade schedule: no trades in this round.';
+    return;
+  }
+
+  const lines = offsets.map((offset, idx) => `Trade ${idx + 1} available at ${formatOffsetLabel(offset)}`);
+  tradeSchedulePreviewEl.textContent = lines.join(' | ');
+}
+
+function syncTradeCountWithDuration({ forceDefault = false } = {}) {
+  if (!tradeCountInput) return;
+
+  const durationSeconds = getSelectedRoundDurationSecondsForTradingDefaults();
+  const recommended = getDefaultTradeCount(durationSeconds);
+  if (forceDefault || !tradeCountManuallyOverridden) {
+    tradeCountInput.value = String(recommended);
+  } else {
+    tradeCountInput.value = String(clampTradeCount(Number(tradeCountInput.value)));
+  }
+  renderTradeSchedulePreview();
 }
 
 function shouldAutoStartAsyncSession() {
@@ -1068,6 +1180,11 @@ function saveSettings() {
   );
   setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
   setStorageItem(STORAGE_KEYS.scoringMode, getSelectedScoringMode());
+  setStorageItem(STORAGE_KEYS.tradeCount, String(getSelectedTradeCount()));
+  setStorageItem(
+    STORAGE_KEYS.tradeCountOverride,
+    tradeCountManuallyOverridden ? 'true' : 'false'
+  );
   setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
   setStorageItem(
     STORAGE_KEYS.asyncDurationPreset,
@@ -1086,6 +1203,7 @@ function saveSettings() {
 
   renderDebugContext();
   updateScoringModeUi();
+  renderTradeSchedulePreview();
   updateSetupActionsState();
   void refreshAsyncDiagnostics({ force: true });
 }
@@ -1133,6 +1251,7 @@ function initializeModules() {
         warningEl: sessionDurationWarningEl,
         enforceLimit: getSelectedRoundType() === 'async',
       });
+      syncTradeCountWithDuration();
       updateSetupActionsState();
       saveSettings();
     },
@@ -1145,6 +1264,7 @@ function initializeModules() {
         warningEl: sessionDurationWarningEl,
         enforceLimit: getSelectedRoundType() === 'async',
       });
+      syncTradeCountWithDuration();
       updateAsyncHostControlsVisibility();
       updateSetupActionsState();
       saveSettings();
@@ -1212,6 +1332,8 @@ function initializeModules() {
   });
   tradingPanelApi = initTradingPanel({
     getGameMeta,
+    getLastGameData: () => lastGameData,
+    getActiveScoringMode: () => resolveActiveScoringMode(lastGameData),
     tradingPanelRef: tradingPanelEl,
     tradingStatusRef: tradingStatusEl,
   });
@@ -1269,6 +1391,8 @@ function initializeModules() {
     getEnrollmentWindow: () =>
       parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
     getSelectedScoringMode,
+    getSelectedTradeCount,
+    getTradeUnlockOffsets,
     getSelectedRoundType,
     getAsyncDurationPreset: () =>
       getAsyncDurationPreset(asyncHostDurationPresetInput),
@@ -1340,6 +1464,8 @@ function loadSettings() {
   const savedEnrollmentWindow = getStorageItem(STORAGE_KEYS.enrollmentWindow);
   const savedScoringMode = getStorageItem(STORAGE_KEYS.scoringMode);
   const savedRoundType = getStorageItem(STORAGE_KEYS.roundType);
+  const savedTradeCount = getStorageItem(STORAGE_KEYS.tradeCount);
+  const savedTradeCountOverride = getStorageItem(STORAGE_KEYS.tradeCountOverride);
   const savedAsyncDurationPreset = getStorageItem(
     STORAGE_KEYS.asyncDurationPreset
   );
@@ -1364,6 +1490,10 @@ function loadSettings() {
   if (savedEnrollmentWindow)
     enrollmentWindowInput.value = savedEnrollmentWindow;
   setSelectedScoringMode(savedScoringMode || DEFAULT_SCORING_MODE);
+  tradeCountManuallyOverridden = savedTradeCountOverride === 'true';
+  if (savedTradeCount && tradeCountInput) {
+    tradeCountInput.value = String(clampTradeCount(Number(savedTradeCount)));
+  }
   if (savedAsyncDurationPreset && asyncHostDurationPresetInput) {
     asyncHostDurationPresetInput.value = savedAsyncDurationPreset;
   }
@@ -1379,6 +1509,7 @@ function loadSettings() {
   setSelectedRoundType(savedRoundType === 'async' ? 'async' : 'sync');
   updateAsyncHostControlsVisibility();
   updateScoringModeUi();
+  syncTradeCountWithDuration({ forceDefault: !savedTradeCount });
 
   // Update visibility of custom duration input
   if (durationPresetInput.value === 'custom') {
@@ -1398,6 +1529,7 @@ function loadSettings() {
 
   renderMetaDebugLine();
   renderDebugContext();
+  renderTradeSchedulePreview();
   updateSetupActionsState();
   void refreshAsyncDiagnostics({ force: true });
 }
@@ -1473,6 +1605,7 @@ function applyUIUpdate(data) {
   renderEventBanner(data);
   annotateAffectedValues(data);
   updateScoringModeUi(data);
+  renderTradeSchedulePreview();
   if (tradingPanelApi?.renderTradingStatus) {
     tradingPanelApi.renderTradingStatus();
   }
@@ -1663,6 +1796,7 @@ if (durationPresetInput) {
     } else {
       durationCustomInput.style.display = 'none';
     }
+    syncTradeCountWithDuration();
     saveSettings();
   });
 }
@@ -1677,9 +1811,25 @@ if (showAdvancedCheckbox) {
 
 baseUrlInput?.addEventListener('change', saveSettings);
 playerNameInput?.addEventListener('change', saveSettings);
-durationCustomValueInput?.addEventListener('change', saveSettings);
-durationCustomUnitInput?.addEventListener('change', saveSettings);
+durationCustomValueInput?.addEventListener('change', () => {
+  syncTradeCountWithDuration();
+  saveSettings();
+});
+durationCustomUnitInput?.addEventListener('change', () => {
+  syncTradeCountWithDuration();
+  saveSettings();
+});
 enrollmentWindowInput?.addEventListener('change', saveSettings);
+tradeCountInput?.setAttribute('min', String(TRADE_COUNT_LIMITS.min));
+tradeCountInput?.setAttribute('max', String(TRADE_COUNT_LIMITS.max));
+tradeCountInput?.addEventListener('change', () => {
+  tradeCountManuallyOverridden = true;
+  if (tradeCountInput) {
+    tradeCountInput.value = String(clampTradeCount(Number(tradeCountInput.value)));
+  }
+  renderTradeSchedulePreview();
+  saveSettings();
+});
 gameIdInput?.addEventListener('change', saveSettings);
 playerIdInput?.addEventListener('change', saveSettings);
 anchorTokenInput?.addEventListener('change', saveSettings);
@@ -1706,6 +1856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     warningEl: sessionDurationWarningEl,
     enforceLimit: getSelectedRoundType() === 'async',
   });
+  syncTradeCountWithDuration({ forceDefault: !tradeCountManuallyOverridden });
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
   const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });

@@ -196,6 +196,8 @@ export async function createNewGameAndJoin() {
   const selectedRoundType = _deps.getSelectedRoundType?.() || 'sync';
   const selectedScoringMode =
     _deps.getSelectedScoringMode?.() || 'stockpile_total_tokens';
+  const selectedTradeCount = _deps.getSelectedTradeCount?.();
+  const selectedTradeUnlockOffsets = _deps.getTradeUnlockOffsets?.();
   const shouldAutoStartAsyncSession =
     _deps.shouldAutoStartAsyncSession?.() !== false;
   const isAsyncHostRound = selectedRoundType === 'async';
@@ -243,6 +245,8 @@ export async function createNewGameAndJoin() {
     const gamePayload = {
       enrollment_window_seconds: _deps.getEnrollmentWindow(),
       scoring_mode: selectedScoringMode,
+      trade_count: selectedTradeCount,
+      trade_unlock_offsets_seconds: selectedTradeUnlockOffsets,
       ...durationPayload,
       ...overrides,
     };
