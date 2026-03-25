@@ -62,6 +62,7 @@ Use these files as the current documentation set for the frontend repo:
 - `QUALITY_ENFORCEMENT.md`: mandatory local/CI enforcement policy and test-quality strategy
 - `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
 - `SECURITY_AUDIT.md`: frontend-relevant security and review notes
+- `AUDIT_MATRIX.md`: PR and nightly audit frequencies with blocking thresholds
 
 If a change affects backend contracts, update the sibling backend repo docs in the same workstream so both repos stay aligned.
 

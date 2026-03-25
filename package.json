@@ -20,6 +20,7 @@
     "test:ui": "vitest run --environment jsdom --run src/ui src/layout-css.test.js src/tooltip-parity.test.js",
     "test:services": "vitest run --environment jsdom --run src/services src/meta src/utils",
     "test:flows": "vitest run --environment jsdom --run src/main.test.js src/layout-controls.test.js src/async-session-flow.test.js src/security-rendering.test.js",
+    "test:contract": "vitest run --environment jsdom --run src/meta/meta-manager.test.js src/main.test.js",
     "test:fast": "npm run test:services && npm run test:ui",
     "test:watch": "vitest --environment jsdom",
     "test:coverage": "vitest run --coverage --environment jsdom"
