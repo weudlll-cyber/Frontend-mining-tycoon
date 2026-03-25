@@ -1,4 +1,4 @@
-/*
+/**
 File: src/utils/debug-log.js
 Purpose: Provide low-noise dev-only diagnostics logging for runtime predicate tracing.
 Role in system:

@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\ui-update-state.test.js
+ * Purpose: Regression tests for ui-update-state.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   deriveStreamSessionState,

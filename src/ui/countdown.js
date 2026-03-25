@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/countdown.js
 Purpose: Game and enrollment countdown timer display.
 Manages the countdown interval and renders remaining seconds into the provided DOM elements.

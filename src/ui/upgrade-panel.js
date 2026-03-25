@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/upgrade-panel.js
 Purpose: Render the legacy upgrade analytics panel with stable DOM nodes during SSE refreshes.
 Role in system:

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/setup-state.js
 Purpose: Pure setup-shell state builders used by main orchestration.
 */

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/chat-panel.test.js
 Purpose: Verify chat remains social-only, inline, and safely rendered.
 Role in system: Regression coverage for non-gameplay chat interactions.

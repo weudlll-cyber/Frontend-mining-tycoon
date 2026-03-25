@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\setup-payload.test.js
+ * Purpose: Regression tests for setup-payload.test.
+ */
+
 import {
   resolveDurationSecondsFromInputs,
   collectAdvancedOverridesFromInputs,

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/setup-shell.test.js
 Purpose: Verify setup-shell guards that preserve user intent and async session discoverability states.
 */

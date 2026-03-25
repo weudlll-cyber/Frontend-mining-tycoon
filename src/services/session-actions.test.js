@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/session-actions.test.js
 Purpose: Validate auth-aware async session request construction and policy error mapping.
 */

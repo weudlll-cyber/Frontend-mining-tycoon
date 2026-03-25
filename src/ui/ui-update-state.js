@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/ui-update-state.js
 Purpose: Pure state helpers for UI update/render orchestration.
 */

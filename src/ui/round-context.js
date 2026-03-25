@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/round-context.js
 Purpose: Resolve round mode and async session-start capability from setup/meta state.
 */

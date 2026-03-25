@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\setup-state.test.js
+ * Purpose: Regression tests for setup-state.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   buildSetupShellState,

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/stream-controller.test.js
 Purpose: Validate session-stream URL construction and auth-ticket behavior.
 */

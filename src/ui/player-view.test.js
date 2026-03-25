@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/player-view.test.js
 Purpose: Verify read-only analytics matrix and footer rendering behavior.
 Role in system: Regression coverage for player-state visibility and tooltip wiring.

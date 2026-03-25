@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\session-timers.test.js
+ * Purpose: Regression tests for session-timers.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   computeRoundRemainingSeconds,

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/utils/token-utils.js
 Purpose: Shared token and pricing helpers for frontend game UI.
 Key responsibilities:

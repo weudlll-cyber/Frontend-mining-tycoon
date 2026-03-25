@@ -1,4 +1,4 @@
-/*
+/**
 File: src/layout-css.test.js
 Purpose: Enforce desktop no-page-scroll and internal-scroll layout invariants.
 Role in system: Regression guard for LOCKED_DECISIONS UI constraints.

@@ -1,8 +1,12 @@
-/*
+/**
 File: src/main.test.js
 Purpose: Validate orchestration-level helper behavior and contract-safe frontend utilities.
-Role in system: Broad unit coverage for display/intent paths in main module without backend authority changes.
-Invariants/Security: Preserves deterministic helper behavior and safe rendering assumptions.
+Role in system:
+- Broad unit coverage for display and intent paths in main module without backend authority changes.
+Invariants:
+- Helper behavior remains deterministic for supported payload shapes.
+Security notes:
+- Assertions validate safe rendering assumptions and avoid HTML-injection behavior.
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1592,5 +1596,48 @@ describe('Portfolio Value with compact formatting', () => {
     // Clear with null data
     module.renderPortfolioValue(null);
     expect(portfolioEl.getAttribute('data-full-value')).toBeNull();
+  });
+});
+
+describe('main halving helper passthroughs', () => {
+  it('resets next-halving target only when hash changed', async () => {
+    const module = await loadMainModule();
+
+    expect(module.shouldResetNextHalvingCountdownTarget(null, null)).toBe(true);
+    expect(
+      module.shouldResetNextHalvingCountdownTarget(
+        { token: 'spring', halvingMonth: 3 },
+        { token: 'spring', halvingMonth: 3 }
+      )
+    ).toBe(false);
+    expect(
+      module.shouldResetNextHalvingCountdownTarget(
+        { token: 'spring', halvingMonth: 3 },
+        { token: 'summer', halvingMonth: 3 }
+      )
+    ).toBe(true);
+  });
+
+  it('returns null target when no future halving exists', async () => {
+    const module = await loadMainModule();
+
+    const target = module.resolveNextHalvingTarget({
+      game_id: 'g1',
+      phase: 'running',
+      server_time_seconds: 500,
+      cycle_seconds: 300,
+      emission: {
+        current_cycle_elapsed_seconds: 200,
+      },
+      global_events: {
+        halving: {
+          occurred_count: 4,
+          max_count: 4,
+          interval_cycles: 2,
+        },
+      },
+    });
+
+    expect(target).toBeNull();
   });
 });

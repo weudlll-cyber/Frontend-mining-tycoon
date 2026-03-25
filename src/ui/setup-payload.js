@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/setup-payload.js
 Purpose: Build setup payload fragments for game creation inputs.
 */

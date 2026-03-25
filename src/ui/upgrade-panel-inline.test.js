@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/upgrade-panel-inline.test.js
 Purpose: Verify inline upgrade lanes keep stable nodes and support per-lane pay-token previews.
 Role in system: Coverage for display-only cross-token preview behavior and upgrade intent payload wiring.

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/game-actions.js
 Purpose: Handle upgrade submissions and create-then-join game session flows.
 Role in system:

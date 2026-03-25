@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/badge.js
 Purpose: Status badge rendering helper for connection/game/enrollment lifecycle states.
 */

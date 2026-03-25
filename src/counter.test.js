@@ -1,4 +1,4 @@
-/*
+/**
 File: src/counter.test.js
 Purpose: Validate the sample counter utility behavior.
 Role in system: Guardrail test for safe text rendering in non-core demo code.

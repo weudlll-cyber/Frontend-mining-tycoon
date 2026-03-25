@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/game-actions.test.js
 Purpose: Validate setup-driven game creation/join flow for sync and host-style async rounds.
 Role in system:

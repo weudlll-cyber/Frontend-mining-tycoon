@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/setup-shell.js
 Purpose: Manage setup-shell visibility and setup action state while preserving user intent.
 Role in system:

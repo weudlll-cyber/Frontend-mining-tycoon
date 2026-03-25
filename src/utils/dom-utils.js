@@ -1,4 +1,4 @@
-/*
+/**
 File: src/utils/dom-utils.js
 Purpose: Shared DOM and formatting helpers for frontend rendering code.
 Role in system: Utility layer consumed by all UI modules; no upstream data-flow dependencies.

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/player-view.js
 Purpose: Compact player-state matrix renderer with optional non-blocking micro-tooltips.
 Constraints: Display-only analytics; backend remains source-of-truth for prices/balances/output.

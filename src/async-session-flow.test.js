@@ -1,4 +1,4 @@
-/*
+/**
 File: src/async-session-flow.test.js
 Purpose: Verify inline async-session policy error rendering from setup action flow.
 */

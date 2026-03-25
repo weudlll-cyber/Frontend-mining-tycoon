@@ -1,23 +1,14 @@
-/*
+/**
 File: src/utils/storage-utils.js
-Purpose: LocalStorage and backend URL helpers for frontend session/meta cache state.
+Purpose: LocalStorage and backend URL helpers for frontend session and metadata cache state.
 Role in system:
-- Keeps client-side persistence deterministic and scoped to setup/session metadata.
+- Keeps client-side persistence deterministic and scoped to setup and session metadata.
 Invariants:
-- Storage failures must remain non-fatal to gameplay.
+- Storage failures remain non-fatal to gameplay.
 - Keys remain namespaced to avoid collisions and accidental authority leaks.
-Key responsibilities:
-- Encapsulate localStorage read/write safety wrappers.
-- Manage per-game meta hash cache keys and retention cleanup.
-- Normalize backend base URL input to safe http/https URLs.
-Entry points / public functions:
-- STORAGE_KEYS, getPlayerTokenStorageKey, getStorageItem, setStorageItem,
-  normalizeBaseUrl, getGameMetaHashStorageKey, markGameMetaSeen,
-  cleanupGameMetaCache.
-Dependencies:
-- Browser localStorage and URL APIs.
-Last updated: 2026-03-12
-Author/Owner: Frontend Team
+Security notes:
+- URL normalization accepts only http and https origins.
+- Storage wrappers avoid throwing on browser quota or policy failures.
 */
 
 const GAME_META_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -160,13 +151,11 @@ export function cleanupGameMetaCache() {
 
   // TTL-based cleanup for entries with known timestamps.
   const ttlCutoff = now - GAME_META_CACHE_TTL_MS;
-  let removedByTtl = 0;
   entries.forEach((entry) => {
     if (entry.seenAt > 0 && entry.seenAt < ttlCutoff) {
       try {
         localStorage.removeItem(entry.key);
         delete seenMap[entry.gameId];
-        removedByTtl += 1;
       } catch (e) {
         console.warn(
           'Failed to remove stale game meta cache entry:',
@@ -193,14 +182,12 @@ export function cleanupGameMetaCache() {
 
   // Keep only the most recent N entries.
   remainingEntries.sort((a, b) => b.seenAt - a.seenAt);
-  let removedByCount = 0;
   if (remainingEntries.length > GAME_META_CACHE_MAX_ENTRIES) {
     const staleByCount = remainingEntries.slice(GAME_META_CACHE_MAX_ENTRIES);
     staleByCount.forEach((entry) => {
       try {
         localStorage.removeItem(entry.key);
         delete seenMap[entry.gameId];
-        removedByCount += 1;
       } catch (e) {
         console.warn(
           'Failed to remove overflow game meta cache entry:',
@@ -222,10 +209,4 @@ export function cleanupGameMetaCache() {
   });
 
   writeGameMetaSeenMap(seenMap);
-
-  if (removedByTtl > 0 || removedByCount > 0) {
-    console.debug(
-      `[meta-cache] cleanup removed ${removedByTtl} by TTL and ${removedByCount} by max-count; kept ${remainingGameIds.size}`
-    );
-  }
 }

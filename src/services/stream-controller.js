@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/stream-controller.js
 Purpose: Own SSE lifecycle, reconnect state, and timer cleanup around live game streaming.
 Role in system:

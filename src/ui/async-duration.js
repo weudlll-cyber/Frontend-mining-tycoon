@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/async-duration.js
 Purpose: Async host/session duration helper logic used by setup controls.
 Key responsibilities:

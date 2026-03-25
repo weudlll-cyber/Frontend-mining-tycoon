@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/session-actions.js
 Purpose: Build explicit async-session HTTP flows while keeping frontend display/intent only.
 Role in system:

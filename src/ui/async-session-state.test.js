@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\async-session-state.test.js
+ * Purpose: Regression tests for async-session-state.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   normalizeAsyncSessionStartFailure,

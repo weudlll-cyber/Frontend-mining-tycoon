@@ -1,4 +1,4 @@
-/*
+/**
 File: src/tooltip-parity.test.js
 Purpose: Repo-wide tooltip system parity assertions.
 Role in system:

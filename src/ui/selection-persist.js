@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/selection-persist.js
 Purpose: Preserve user text selections across live UI updates when DOM anchors remain attached.
 Role in system:

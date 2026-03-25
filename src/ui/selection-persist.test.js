@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/selection-persist.test.js
 Purpose: Verify live-render selection snapshots only restore when anchor nodes remain attached.
 Role in system: Regression coverage for non-blocking UI text selection during SSE refreshes.

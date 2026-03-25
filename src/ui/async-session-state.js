@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/async-session-state.js
 Purpose: Pure helpers for async session start result handling.
 */

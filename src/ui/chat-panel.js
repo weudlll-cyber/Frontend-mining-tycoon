@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/chat-panel.js
 Purpose: Minimal non-persistent chat panel (WebSocket side-channel only).
 */

@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\async-diagnostics.test.js
+ * Purpose: Regression tests for async-diagnostics.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   shouldResetAsyncDiagnostics,

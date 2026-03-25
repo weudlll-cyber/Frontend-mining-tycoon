@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/season-cards.js
 Purpose: Keep season card metrics and per-card halving timers in sync with SSE payloads.
 Role in system:

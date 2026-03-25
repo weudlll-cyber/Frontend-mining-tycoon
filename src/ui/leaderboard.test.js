@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/leaderboard.test.js
 Purpose: Verify leaderboard rendering uses backend-authoritative score values.
 */

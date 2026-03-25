@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/session-timers.js
 Purpose: Pure calculations used by async session and round hint timer orchestration.
 */

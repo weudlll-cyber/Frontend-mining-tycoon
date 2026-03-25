@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/season-cards.test.js
 Purpose: Validate season-card header normalization, tooltip stability, and tabular value styling.
 Role in system: Guards SSE-safe inline header behavior without remounting card nodes.

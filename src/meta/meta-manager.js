@@ -1,4 +1,4 @@
-/*
+/**
 File: src/meta/meta-manager.js
 Purpose: Game and global meta fetch/cache state, ETag-based deduplication, and contract version tracking.
 Call initMetaManager() once with required callbacks before use.

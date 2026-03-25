@@ -1,4 +1,4 @@
-/*
+/**
 File: src/main.js
 Purpose: Browser dashboard client for Mining Tycoon (SSE updates, upgrades, and capabilities metadata).
 Key responsibilities:

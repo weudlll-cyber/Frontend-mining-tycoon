@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\async-duration.test.js
+ * Purpose: Regression tests for async-duration.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import { syncSessionDurationOptions } from './async-duration.js';
 

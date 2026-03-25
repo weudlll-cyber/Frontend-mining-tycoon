@@ -1,3 +1,8 @@
+/**
+ * File: src\ui\round-context.test.js
+ * Purpose: Regression tests for round-context.test.
+ */
+
 import { describe, expect, it } from 'vitest';
 import {
   getRoundModeFromMeta,

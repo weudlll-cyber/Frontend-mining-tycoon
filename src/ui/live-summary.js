@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/live-summary.js
 Purpose: Render top-line score stats and bottom-bar portfolio value.
 Role in system:

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/async-diagnostics.js
 Purpose: Pure helper logic for async diagnostics probe flow.
 */
