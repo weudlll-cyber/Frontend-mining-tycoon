@@ -75,28 +75,34 @@ describe("trading-panel", () => {
   describe("renderTradingStatus", () => {
     let panelEl;
     let statusEl;
+    let tooltipLayer;
 
     beforeEach(() => {
       panelEl = document.createElement("div");
       panelEl.id = "trading-panel";
       statusEl = document.createElement("span");
       statusEl.id = "trading-status";
+      tooltipLayer = document.createElement("div");
+      tooltipLayer.id = "tooltip-layer";
       document.body.appendChild(panelEl);
       document.body.appendChild(statusEl);
+      document.body.appendChild(tooltipLayer);
     });
 
     afterEach(() => {
       document.body.removeChild(panelEl);
       document.body.removeChild(statusEl);
+      document.body.removeChild(tooltipLayer);
     });
 
-    it("renders panel card with disabled scaffold status", () => {
+    it("renders unified conversion panel shell", () => {
       const trading = normalizeTradingCapability(null);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(panelEl.innerHTML).toContain("trading-disabled");
-      expect(panelEl.innerHTML).toContain("Scaffold");
-      expect(panelEl.innerHTML).toContain("disabled");
+      expect(panelEl.innerHTML).toContain("Convert Tokens");
+      expect(panelEl.innerHTML).toContain("Mode: Stockpile Mode");
+      expect(panelEl.innerHTML).toContain("PRIMARY RESULT (Net Effect)");
+      expect(panelEl.innerHTML).toContain("Total Tokens Change");
     });
 
     it("renders bottom-bar status text", () => {
@@ -108,11 +114,12 @@ describe("trading-panel", () => {
       expect(statusEl.textContent).toContain("2.0%");
     });
 
-    it("renders fee rate as percentage in panel", () => {
+    it("renders safe fallback panel content without throwing", () => {
       const trading = normalizeTradingCapability(null, 0.05);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(panelEl.innerHTML).toContain("5.00%");
+      expect(panelEl.innerHTML).toContain("Convert Tokens");
+      expect(panelEl.innerHTML).toContain("Trade schedule");
     });
 
     it("handles missing panel ref gracefully", () => {
@@ -171,17 +178,22 @@ describe("trading-panel", () => {
   describe("initTradingPanel", () => {
     let panelEl;
     let statusEl;
+    let tooltipLayer;
 
     beforeEach(() => {
       panelEl = document.createElement("div");
       statusEl = document.createElement("span");
+      tooltipLayer = document.createElement("div");
+      tooltipLayer.id = "tooltip-layer";
       document.body.appendChild(panelEl);
       document.body.appendChild(statusEl);
+      document.body.appendChild(tooltipLayer);
     });
 
     afterEach(() => {
       document.body.removeChild(panelEl);
       document.body.removeChild(statusEl);
+      document.body.removeChild(tooltipLayer);
     });
 
     it("returns null when getGameMeta is not provided", () => {
@@ -223,7 +235,145 @@ describe("trading-panel", () => {
       api.renderTradingStatus();
 
       expect(panelEl.innerHTML).toContain("trading-card");
+      expect(panelEl.innerHTML).toContain("Trades used:");
       expect(statusEl.textContent).toContain("Trading:");
+    });
+
+    it("renders trades used / total and full schedule list", () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: "stockpile",
+        game_duration_seconds: 600,
+        trading: null,
+      });
+      const getLastGameData = () => ({
+        seconds_remaining: 600,
+        trades_used: 1,
+        trading_rules: {
+          trade_count: 3,
+          unlock_offsets_seconds: [120, 360, 540],
+        },
+        balances: { spring: 1000, summer: 900 },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+      api.renderTradingStatus();
+
+      expect(panelEl.textContent).toContain("Trades used:");
+      expect(panelEl.textContent).toContain("1 / 3");
+      expect(panelEl.textContent).toContain("Trade 1 at 2m 0s");
+      expect(panelEl.textContent).toContain("Trade 2 at 6m 0s");
+      expect(panelEl.textContent).toContain("Trade 3 at 9m 0s");
+      expect(panelEl.textContent).toContain("Used");
+      expect(panelEl.textContent).toContain("Available in");
+    });
+
+    it("shows Power Mode primary result when meta scoring_mode is power", () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: "power",
+        trading: null,
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 800 },
+        conversion_preview: {
+          weighted_score_change_pct: 8.2,
+          weighted_score_before: 100.4,
+          weighted_score_after: 108.6,
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      expect(panelEl.innerHTML).toContain("Mode: Power Mode");
+      expect(panelEl.innerHTML).toContain("Weighted Score Change");
+      expect(panelEl.innerHTML).toMatch(/\+8[.,]2%/);
+      expect(panelEl.innerHTML).toContain("Score: 100.40 -&gt; 108.60");
+    });
+
+    it("shows Mining Time Equivalent primary result and tooltip hint", () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: "mining_time_equivalent",
+        trading: null,
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 800 },
+        conversion_preview: {
+          mining_time_change_seconds: 16320,
+          mining_time_before_seconds: 3600,
+          mining_time_after_seconds: 19920,
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      expect(panelEl.innerHTML).toContain("Mode: Mining Time Equivalent Mode");
+      expect(panelEl.innerHTML).toContain("Mining Time Equivalent Change");
+      expect(panelEl.innerHTML).toContain("+4h 32m");
+      expect(panelEl.innerHTML).toContain("Metric info");
+    });
+
+    it("shows Efficiency primary result when mode is efficiency", () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: "efficiency",
+        trading: null,
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 800 },
+        conversion_preview: {
+          efficiency_change_pct: 6.4,
+          efficiency_before: 88,
+          efficiency_after: 94.4,
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      expect(panelEl.innerHTML).toContain("Mode: Efficiency Mode");
+      expect(panelEl.innerHTML).toContain("Efficiency Impact");
+      expect(panelEl.innerHTML).toMatch(/\+6[.,]4%/);
+    });
+
+    it("keeps stockpile mode as default and shows neutral placeholders when preview is unavailable", () => {
+      const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
+      const getLastGameData = () => ({ balances: { spring: 100 } });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      expect(panelEl.innerHTML).toContain("Mode: Stockpile Mode");
+      expect(panelEl.innerHTML).toContain("Total Tokens Change");
+      expect(panelEl.innerHTML).toContain("--");
     });
 
     it("getTrading normalizes meta.trading with conversion_fee_rate fallback", () => {
