@@ -22,6 +22,7 @@ Provide a concise generated summary of what changed and why.
 ## Documentation Notes
 
 - [ ] `README.md` / `PROJECT_BASELINE.md` / related docs were updated if behavior or workflow changed.
+- [ ] Cross-repo doc impact was reviewed; sibling backend docs were updated if API/runtime/security/runbook behavior changed.
 - [ ] If no docs changed, explain why no documentation update was required.
 
 ## Test Summary

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/halving.js
 Purpose: Pure halving timeline helpers shared by frontend rendering and tests.
 Key responsibilities:

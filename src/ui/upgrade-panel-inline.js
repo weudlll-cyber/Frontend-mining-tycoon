@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/upgrade-panel-inline.js
 Purpose: Inline upgrade rendering for season cards in a compact row-based layout.
 Context: Displays upgrade options inline in each season card; pay-token is selected per lane

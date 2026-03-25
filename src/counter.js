@@ -1,4 +1,4 @@
-/*
+/**
 File: src/counter.js
 Purpose: Minimal sample counter utility used by smoke-level frontend tests.
 Role in system: Non-gameplay demo helper; does not participate in authoritative game/session flows.

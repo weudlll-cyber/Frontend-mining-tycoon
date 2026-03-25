@@ -1,0 +1,109 @@
+name: security-compliance
+
+on:
+  pull_request:
+  schedule:
+    - cron: '45 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-compliance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  license-policy:
+    name: License policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Export dependency licenses
+        run: npx --yes license-checker --json --production > frontend-licenses.json
+      - name: Enforce license deny policy
+        run: node ./scripts/check_license_policy.mjs frontend-licenses.json
+
+  sbom:
+    name: Generate SBOM
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: frontend-sbom.cdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-sbom
+          path: frontend-sbom.cdx.json
+
+  compliance-summary:
+    name: Compliance summary gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - secret-scan
+      - license-policy
+      - sbom
+    steps:
+      - name: Summarize compliance results
+        shell: bash
+        run: |
+          set -euo pipefail
+          SECRET_RESULT="${{ needs.secret-scan.result }}"
+          LICENSE_RESULT="${{ needs.license-policy.result }}"
+          SBOM_RESULT="${{ needs.sbom.result }}"
+
+          COMPLIANCE_PASS="YES"
+          for result in "$SECRET_RESULT" "$LICENSE_RESULT"; do
+            if [ "$result" != "success" ]; then
+              COMPLIANCE_PASS="NO"
+            fi
+          done
+
+          if [ "$SBOM_RESULT" != "success" ] && [ "$SBOM_RESULT" != "skipped" ]; then
+            COMPLIANCE_PASS="NO"
+          fi
+
+          {
+            echo "## Security Compliance Summary"
+            echo ""
+            echo "- Secret scan: ${SECRET_RESULT}"
+            echo "- License policy: ${LICENSE_RESULT}"
+            echo "- SBOM generation: ${SBOM_RESULT}"
+            echo ""
+            echo "compliance-pass = ${COMPLIANCE_PASS}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$COMPLIANCE_PASS" = "YES" ]; then
+            exit 0
+          fi
+          exit 1

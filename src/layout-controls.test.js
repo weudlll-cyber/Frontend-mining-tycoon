@@ -1,4 +1,4 @@
-/*
+/**
 File: src/layout-controls.test.js
 Purpose: Guard setup action visibility/state rules across sync and async round flows.
 */

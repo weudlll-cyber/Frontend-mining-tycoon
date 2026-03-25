@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/leaderboard.js
 Purpose: Render the compact top-5 leaderboard table.
 */

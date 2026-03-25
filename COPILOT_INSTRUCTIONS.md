@@ -22,10 +22,11 @@ If a requested change would violate any locked invariant:
 
 When a task touches full-stack behavior, also read backend canonical docs:
 
-- `C:\Users\weudl\Mining tycoon\README.md`
-- `C:\Users\weudl\Mining tycoon\REQUIREMENTS.md`
-- `C:\Users\weudl\Mining tycoon\SECURITY.md`
-- `C:\Users\weudl\Mining tycoon\BACKEND_TEST_AUDIT.md`
+- sibling backend repo `README.md`
+- sibling backend repo `PROJECT_BASELINE.md`
+- sibling backend repo `REQUIREMENTS.md`
+- sibling backend repo `SECURITY.md`
+- sibling backend repo `BACKEND_TEST_AUDIT.md`
 
 Cross-repo rule:
 
@@ -124,18 +125,26 @@ For every source file touched or created:
 - Evaluate test impact; add/update Vitest tests for changed behavior.
 - Evaluate documentation impact:
   - update `README.md` and/or `PROJECT_BASELINE.md` when behavior/UI contract changes
+  - update other affected frontend docs (`CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `CODE_ORGANIZATION.md`, `SECURITY_AUDIT.md`, concept docs) when their statements become stale
+  - if the change affects backend contracts, runtime behavior, security posture, or operational steps, review and update sibling backend docs in the same workstream
   - if docs are unchanged, explicitly state why
 - Run all quality gates before push:
   - `npm run lint`
   - `npm run format:check`
   - `npm run test -- --run`
+  - `npm run test:coverage`
   - `npm run build`
-  - `npm audit --omit=dev`
+  - `npm audit --omit=dev --audit-level=high`
+
+- Prefer the audited push helper when pushing this repo:
+  - `& .\scripts\push_with_audit.ps1`
+  - ensure tracked hooks are enabled with `& .\scripts\enable_git_hooks.ps1`
 
 If backend files are touched in the same task, also run backend gates before push:
 
 - `python -m ruff check app tests scripts`
 - `python -m unittest discover -s tests -q`
+- `python -m pytest -q`
 - `python -m pip_audit -r requirements.txt`
 
 ## 8) Required Output Format

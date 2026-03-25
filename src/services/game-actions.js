@@ -1,4 +1,4 @@
-/*
+/**
 File: src/services/game-actions.js
 Purpose: Handle upgrade submissions and create-then-join game session flows.
 Role in system:
@@ -291,7 +291,7 @@ export async function createNewGameAndJoin() {
         `Join failed: ${joinResponse.status} ${joinResponse.statusText}`
       );
       if (code) {
-        console.debug('[join-policy] error code:', code);
+        // Join policy error code logged
       }
       throw new Error(detail);
     }

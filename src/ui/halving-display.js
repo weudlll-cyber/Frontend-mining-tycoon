@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/halving-display.js
 Purpose: Next-halving countdown clock and last-halving notice display.
 Owns the halvingCountdownInterval and the last-halving notice state.

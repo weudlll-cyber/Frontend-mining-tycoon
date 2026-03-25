@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/countdown.js
 Purpose: Game and enrollment countdown timer display.
 Manages the countdown interval and renders remaining seconds into the provided DOM elements.
@@ -28,7 +28,10 @@ export function formatCountdown(seconds) {
     return '-';
   }
   const s = Math.max(0, Math.floor(seconds));
-  return String(s).padStart(2, '0');
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
 function updateCountdown() {

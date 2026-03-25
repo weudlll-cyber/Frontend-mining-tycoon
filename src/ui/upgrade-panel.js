@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/upgrade-panel.js
 Purpose: Render the legacy upgrade analytics panel with stable DOM nodes during SSE refreshes.
 Role in system:
@@ -18,6 +18,12 @@ import {
 } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
 import { computePayCostPreview } from '../utils/token-utils.js';
+import {
+  ensureCurrentOutputRow,
+  ensureUpgradeSection,
+  hideUpgradeSection,
+  setStatRowContent,
+} from './upgrade-section-builder.js';
 
 let _upgradesEl = null;
 let _getActiveGameMeta = null;
@@ -105,129 +111,6 @@ function syncSelectOptions(
   selectEl.value = values.includes(previousValue)
     ? previousValue
     : values[0] || '';
-}
-
-function createUpgradeStat(labelText, extraClass = '') {
-  const row = document.createElement('div');
-  row.className = 'state-stat';
-
-  const label = document.createElement('span');
-  label.className = 'state-stat-label';
-  const labelNode = document.createTextNode(labelText);
-  label.appendChild(labelNode);
-
-  const value = document.createElement('span');
-  value.className = extraClass
-    ? `state-stat-value selectable ${extraClass}`
-    : 'state-stat-value selectable';
-  const valueNode = document.createTextNode('-');
-  value.appendChild(valueNode);
-
-  row.appendChild(label);
-  row.appendChild(value);
-  return { row, labelNode, valueNode, value };
-}
-
-function setStatRowContent(statRefs, labelText, valueText, hidden = false) {
-  if (!statRefs) return;
-  statRefs.row.style.display = hidden ? 'none' : '';
-  if (hidden) return;
-  setTextNodeValue(statRefs.labelNode, labelText);
-  setTextNodeValue(statRefs.valueNode, valueText);
-}
-
-function ensureCurrentOutputRow(refs) {
-  if (refs.currentOutput) {
-    return refs.currentOutput;
-  }
-
-  const statRefs = createUpgradeStat('Current Output', 'highlight');
-  refs.dynamicContent.appendChild(statRefs.row);
-  refs.currentOutput = statRefs;
-  return statRefs;
-}
-
-function ensureUpgradeSection(refs, type) {
-  if (refs.upgradeSections.has(type)) {
-    return refs.upgradeSections.get(type);
-  }
-
-  const title = type.charAt(0).toUpperCase() + type.slice(1);
-  const section = document.createElement('div');
-  section.className = 'upgrade-section';
-  section.style.display = 'none';
-
-  const heading = document.createElement('h3');
-  const headingPrefixNode = document.createTextNode(`${title} Upgrade `);
-  heading.appendChild(headingPrefixNode);
-
-  const levelSpan = document.createElement('span');
-  levelSpan.className = 'upgrade-level selectable';
-  const levelNode = document.createTextNode('Level 0');
-  levelSpan.appendChild(levelNode);
-  heading.appendChild(levelSpan);
-  section.appendChild(heading);
-
-  const costStat = createUpgradeStat('Cost:', 'upgrade-cost');
-  const previewStat = createUpgradeStat('Preview:', 'upgrade-current');
-  const outputIncreaseStat = createUpgradeStat(
-    'Output Increase:',
-    'upgrade-benefit'
-  );
-  const outputAfterStat = createUpgradeStat('Output After:', 'upgrade-current');
-  const breakevenStat = createUpgradeStat('Breakeven:', 'upgrade-roi');
-
-  [
-    costStat,
-    previewStat,
-    outputIncreaseStat,
-    outputAfterStat,
-    breakevenStat,
-  ].forEach((stat) => {
-    stat.row.style.display = 'none';
-    section.appendChild(stat.row);
-  });
-
-  const button = document.createElement('button');
-  button.className = 'btn-upgrade';
-  button.dataset.upgrade = type;
-  button.dataset.level = '0';
-  button.type = 'button';
-  button.addEventListener('click', () => {
-    const nextLevel = parseInt(button.dataset.level, 10) + 1;
-    _performUpgrade?.(type, nextLevel);
-  });
-  section.appendChild(button);
-
-  refs.dynamicContent.appendChild(section);
-
-  const sectionRefs = {
-    type,
-    section,
-    levelNode,
-    costStat,
-    previewStat,
-    outputIncreaseStat,
-    outputAfterStat,
-    breakevenStat,
-    button,
-  };
-  refs.upgradeSections.set(type, sectionRefs);
-  return sectionRefs;
-}
-
-function hideUpgradeSection(sectionRefs) {
-  if (!sectionRefs) return;
-  sectionRefs.section.style.display = 'none';
-  [
-    sectionRefs.costStat,
-    sectionRefs.previewStat,
-    sectionRefs.outputIncreaseStat,
-    sectionRefs.outputAfterStat,
-    sectionRefs.breakevenStat,
-  ].forEach((stat) => {
-    stat.row.style.display = 'none';
-  });
 }
 
 export function ensureUpgradePanelBuiltOnce() {
@@ -383,7 +266,13 @@ export function updateUpgradePanelDynamic(data, activeGameMeta) {
     renderedTypes.add(type);
 
     const level = selectedTokenLevels[type] || 0;
-    const sectionRefs = ensureUpgradeSection(refs, type);
+    const sectionRefs = ensureUpgradeSection(
+      refs,
+      type,
+      (upgradeType, nextLevel) => {
+        _performUpgrade?.(upgradeType, nextLevel);
+      }
+    );
     sectionRefs.section.style.display = '';
     setTextNodeValue(sectionRefs.levelNode, `Level ${level}`);
 

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/micro-tooltip.js
 Purpose: Lightweight non-blocking tooltip system (hover / focus / tap).
 Role in system:

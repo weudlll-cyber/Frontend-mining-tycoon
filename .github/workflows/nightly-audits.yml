@@ -1,0 +1,115 @@
+name: nightly-audits
+
+on:
+  schedule:
+    - cron: '15 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-audits-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-test-suite:
+    name: Full test suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run lint
+        run: npm run lint
+      - name: Run format check
+        run: npm run format:check
+      - name: Run full unit tests
+        run: npm run test -- --run
+      - name: Run coverage tests
+        run: npm run test:coverage
+      - name: Run production build
+        run: npm run build
+
+  flaky-detection:
+    name: Flaky detection (3x)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Repeat full test run 3 times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run in 1 2 3; do
+            echo "Flaky detection run ${run}/3"
+            npm run test -- --run
+          done
+
+  security-extended:
+    name: Extended security scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit production deps (moderate+)
+        run: npm audit --omit=dev --audit-level=moderate
+
+  nightly-summary:
+    name: Nightly summary gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - full-test-suite
+      - flaky-detection
+      - security-extended
+    steps:
+      - name: Summarize nightly results
+        shell: bash
+        run: |
+          set -euo pipefail
+          FULL_RESULT="${{ needs.full-test-suite.result }}"
+          FLAKY_RESULT="${{ needs.flaky-detection.result }}"
+          SECURITY_RESULT="${{ needs.security-extended.result }}"
+
+          NIGHTLY_PASS="YES"
+          for result in "$FULL_RESULT" "$FLAKY_RESULT" "$SECURITY_RESULT"; do
+            if [ "$result" != "success" ]; then
+              NIGHTLY_PASS="NO"
+            fi
+          done
+
+          {
+            echo "## Nightly Audit Summary"
+            echo ""
+            echo "- Full test suite: ${FULL_RESULT}"
+            echo "- Flaky detection (3x): ${FLAKY_RESULT}"
+            echo "- Extended security scan: ${SECURITY_RESULT}"
+            echo ""
+            echo "nightly-pass = ${NIGHTLY_PASS}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$NIGHTLY_PASS" = "YES" ]; then
+            exit 0
+          fi
+          exit 1

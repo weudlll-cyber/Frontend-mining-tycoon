@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/event-display.js
 Purpose: Active-event banner and in-place effect indicator system.
 Role in system:

@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/upgrade-panel.test.js
 Purpose: Verify the legacy upgrade panel keeps stable DOM nodes during live refreshes.
 Role in system: Regression coverage for SSE-safe upgrade panel rendering and action wiring.

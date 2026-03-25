@@ -1,4 +1,4 @@
-/*
+/**
 File: src/ui/live-summary.test.js
 Purpose: Verify async session badge rendering in top summary.
 */

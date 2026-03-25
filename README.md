@@ -50,6 +50,23 @@ Key highlights:
 
 When using Copilot, always instruct it to not violate LOCKED_DECISIONS.md.
 
+## Documentation Map
+
+Use these files as the current documentation set for the frontend repo:
+
+- `README.md`: quick start, UI behavior, runbook, and current implementation scope
+- `PROJECT_BASELINE.md`: canonical factual baseline of what is implemented right now
+- `SEASONAL_TYCOON_CONCEPT.md`: high-level game vision and product intent
+- `LOCKED_DECISIONS.md`: non-negotiable product and UX invariants
+- `CONTRIBUTING.md`: contribution rules, commenting expectations, and quality gates
+- `QUALITY_ENFORCEMENT.md`: mandatory local/CI enforcement policy and test-quality strategy
+- `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
+- `SECURITY_AUDIT.md`: frontend-relevant security and review notes
+- `AUDIT_MATRIX.md`: PR and nightly audit frequencies with blocking thresholds
+- `DEPLOY.md`: frontend-only VPS deployment and full-stack deployment handoff notes
+
+If a change affects backend contracts, update the sibling backend repo docs in the same workstream so both repos stay aligned.
+
 ## Requirements
 
 - Node.js (LTS recommended)
@@ -99,6 +116,64 @@ Sync/Async model (backend-aligned):
 - Async rounds allow repeated attempts one session at a time; backend computes authoritative best-of score.
 - Every new async session attempt starts from the same backend baseline state (balances/tracks/upgrades/cumulative mined reset for that player), so attempts are comparable and only your per-session decisions can change results.
 - In async mode, player analytics display `This session` and `Best this round` values from backend payload; these fields are hidden in sync mode.
+
+## VPS Deployment
+
+Frontend-only deploy to a VPS:
+
+```powershell
+& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game"
+```
+
+Preview without uploading:
+
+```powershell
+& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game" -DryRun
+```
+
+If you want frontend + backend on the same VPS, run the full-stack deploy from the sibling backend repo:
+
+```powershell
+Set-Location "..\Mining tycoon"
+& .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com"
+```
+
+Further deployment details live in [DEPLOY.md](DEPLOY.md).
+
+## Audited Push Workflow
+
+This repo now supports a tracked audited push workflow.
+
+One-time local setup:
+
+```powershell
+& .\scripts\enable_git_hooks.ps1
+```
+
+Daily usage:
+
+```powershell
+& .\scripts\push_with_audit.ps1
+```
+
+What happens before push:
+
+- required frontend docs presence check
+- `npm run lint`
+- `npm run format:check`
+- `npm run test -- --run`
+- `npm run test:coverage`
+- `npm run build`
+- `npm audit --omit=dev --audit-level=high`
+- advisory code-health audit (file-size hotspots, comment-header coverage, TODO/FIXME markers, debug-console scan)
+
+The push helper also prints a concise summary of commits and changed files since the last push so the outgoing change set is easy to review.
+
+Run the structural audit manually at any time:
+
+```powershell
+npm run audit:health
+```
 
 ## UI Layout
 
@@ -394,7 +469,7 @@ Oracle prices and conversion parameters are read from the latest game-scoped sna
 
 For full-stack local development with backend + frontend in one VS Code session, use the umbrella workspace file:
 
-- `C:\Users\weudl\mining-tycoon-umbrella.code-workspace`
+- your shared umbrella workspace file, if you keep one for opening frontend + backend together
 
 ## Events (Active Event Visibility & Effect Indicators)
 

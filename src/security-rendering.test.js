@@ -1,4 +1,4 @@
-/*
+/**
 File: src/security-rendering.test.js
 Purpose: Guard safe rendering posture across runtime entrypoints.
 Role in system: Prevent regressions to unsafe DOM APIs in core frontend modules.
