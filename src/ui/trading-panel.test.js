@@ -1,0 +1,276 @@
+/**
+ * File: src/ui/trading-panel.test.js
+ * Purpose: Test trading capability scaffold rendering and normalization.
+ * Key responsibilities:
+ * - Verify normalizeTradingCapability handles missing/null data with sensible defaults
+ * - Verify renderTradingStatus populates panel and bottom-bar correctly
+ * - Verify initTradingPanel handles dependency injection
+ * Test file for src/ui/trading-panel.js
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  normalizeTradingCapability,
+  initTradingPanel,
+  renderTradingStatus,
+  renderBottomBarTradingStatus,
+} from "./trading-panel.js";
+
+describe("trading-panel", () => {
+  describe("normalizeTradingCapability", () => {
+    it("returns safe defaults when trading is null", () => {
+      const result = normalizeTradingCapability(null);
+      expect(result.enabled).toBe(false);
+      expect(result.status).toBe("disabled");
+      expect(result.fee_model).toBe("value_fee_rate");
+      expect(result.value_fee_rate).toBe(0.02); // default fallback
+    });
+
+    it("respects custom fallback fee rate when trading is null", () => {
+      const result = normalizeTradingCapability(null, 0.05);
+      expect(result.value_fee_rate).toBe(0.05);
+    });
+
+    it("preserves enabled=true and related scaffold fields", () => {
+      const raw = {
+        enabled: false,
+        status: "disabled",
+        reason: "Trading scaffold: execution not yet implemented",
+        fee_model: "value_fee_rate",
+        value_fee_rate: 0.02,
+        max_trades_per_player: null,
+        trade_opens_after_seconds: null,
+      };
+      const result = normalizeTradingCapability(raw);
+      expect(result.enabled).toBe(false);
+      expect(result.status).toBe("disabled");
+      expect(result.reason).toContain("scaffold");
+      expect(result.value_fee_rate).toBe(0.02);
+    });
+
+    it("converts upper-case status to lower-case", () => {
+      const raw = { status: "DISABLED" };
+      const result = normalizeTradingCapability(raw);
+      expect(result.status).toBe("disabled");
+    });
+
+    it("uses fallback fee rate if trading.value_fee_rate is missing", () => {
+      const raw = { status: "disabled" };
+      const result = normalizeTradingCapability(raw, 0.03);
+      expect(result.value_fee_rate).toBe(0.03);
+    });
+
+    it("ignores invalid numeric fields, uses null instead", () => {
+      const raw = {
+        status: "disabled",
+        max_trades_per_player: "not a number",
+        trade_opens_after_seconds: null,
+      };
+      const result = normalizeTradingCapability(raw);
+      expect(result.max_trades_per_player).toBe(null);
+      expect(result.trade_opens_after_seconds).toBe(null);
+    });
+  });
+
+  describe("renderTradingStatus", () => {
+    let panelEl;
+    let statusEl;
+
+    beforeEach(() => {
+      panelEl = document.createElement("div");
+      panelEl.id = "trading-panel";
+      statusEl = document.createElement("span");
+      statusEl.id = "trading-status";
+      document.body.appendChild(panelEl);
+      document.body.appendChild(statusEl);
+    });
+
+    afterEach(() => {
+      document.body.removeChild(panelEl);
+      document.body.removeChild(statusEl);
+    });
+
+    it("renders panel card with disabled scaffold status", () => {
+      const trading = normalizeTradingCapability(null);
+      renderTradingStatus(trading, panelEl, statusEl);
+
+      expect(panelEl.innerHTML).toContain("trading-disabled");
+      expect(panelEl.innerHTML).toContain("Scaffold");
+      expect(panelEl.innerHTML).toContain("disabled");
+    });
+
+    it("renders bottom-bar status text", () => {
+      const trading = normalizeTradingCapability(null, 0.02);
+      renderTradingStatus(trading, panelEl, statusEl);
+
+      expect(statusEl.textContent).toContain("Trading:");
+      expect(statusEl.textContent).toContain("Not Enabled");
+      expect(statusEl.textContent).toContain("2.0%");
+    });
+
+    it("renders fee rate as percentage in panel", () => {
+      const trading = normalizeTradingCapability(null, 0.05);
+      renderTradingStatus(trading, panelEl, statusEl);
+
+      expect(panelEl.innerHTML).toContain("5.00%");
+    });
+
+    it("handles missing panel ref gracefully", () => {
+      const trading = normalizeTradingCapability(null);
+      expect(() => renderTradingStatus(trading, null, statusEl)).not.toThrow();
+    });
+
+    it("handles missing status ref gracefully", () => {
+      const trading = normalizeTradingCapability(null);
+      expect(() => renderTradingStatus(trading, panelEl, null)).not.toThrow();
+    });
+  });
+
+  describe("renderBottomBarTradingStatus", () => {
+    let statusEl;
+
+    beforeEach(() => {
+      statusEl = document.createElement("span");
+      document.body.appendChild(statusEl);
+    });
+
+    afterEach(() => {
+      document.body.removeChild(statusEl);
+    });
+
+    it("renders compact status text for disabled trading", () => {
+      const trading = normalizeTradingCapability(null, 0.02);
+      renderBottomBarTradingStatus(trading, statusEl);
+
+      expect(statusEl.textContent).toContain("Not Enabled");
+      expect(statusEl.textContent).toContain("2.0%");
+    });
+
+    it("applies trading-status-disabled class for disabled trading", () => {
+      const trading = normalizeTradingCapability(null);
+      renderBottomBarTradingStatus(trading, statusEl);
+
+      expect(statusEl.className).toBe("trading-status-disabled");
+    });
+
+    it("applies trading-status-enabled class for enabled trading", () => {
+      const trading = {
+        enabled: true,
+        value_fee_rate: 0.01,
+      };
+      renderBottomBarTradingStatus(trading, statusEl);
+
+      expect(statusEl.className).toBe("trading-status-enabled");
+    });
+
+    it("handles null data gracefully", () => {
+      expect(() => renderBottomBarTradingStatus(null, statusEl)).not.toThrow();
+    });
+  });
+
+  describe("initTradingPanel", () => {
+    let panelEl;
+    let statusEl;
+
+    beforeEach(() => {
+      panelEl = document.createElement("div");
+      statusEl = document.createElement("span");
+      document.body.appendChild(panelEl);
+      document.body.appendChild(statusEl);
+    });
+
+    afterEach(() => {
+      document.body.removeChild(panelEl);
+      document.body.removeChild(statusEl);
+    });
+
+    it("returns null when getGameMeta is not provided", () => {
+      const api = initTradingPanel({});
+      // Should warn but not throw
+      expect(api).toBeUndefined();
+    });
+
+    it("warns when no refs are provided", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      initTradingPanel({ getGameMeta: () => ({}) });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("no refs provided")
+      );
+      warn.mockRestore();
+    });
+
+    it("returns API with renderTradingStatus method when refs are provided", () => {
+      const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      expect(api).toBeDefined();
+      expect(api.renderTradingStatus).toBeDefined();
+      expect(typeof api.renderTradingStatus).toBe("function");
+    });
+
+    it("renderTradingStatus updates panel and status when called", () => {
+      const getMeta = () => ({ conversion_fee_rate: 0.02, trading: null });
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+
+      expect(panelEl.innerHTML).toContain("trading-card");
+      expect(statusEl.textContent).toContain("Trading:");
+    });
+
+    it("getTrading normalizes meta.trading with conversion_fee_rate fallback", () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.03,
+        trading: { status: "disabled", value_fee_rate: 0.03 },
+      });
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      const trading = api.getTrading();
+      expect(trading.value_fee_rate).toBe(0.03);
+      expect(trading.status).toBe("disabled");
+    });
+
+    it("getTrading falls back to 0.02 if conversion_fee_rate is missing", () => {
+      const getMeta = () => ({});
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      const trading = api.getTrading();
+      expect(trading.value_fee_rate).toBe(0.02);
+    });
+
+    it("handles getGameMeta errors gracefully", () => {
+      const getMeta = () => {
+        throw new Error("Meta fetch failed");
+      };
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      const trading = api.getTrading();
+      expect(trading.enabled).toBe(false);
+      expect(err).toHaveBeenCalled();
+      const firstCall = err.mock.calls[0];
+      expect(firstCall[0]).toContain("[trading-panel] getTrading error");
+      err.mockRestore();
+    });
+  });
+});

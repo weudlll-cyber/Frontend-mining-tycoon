@@ -194,6 +194,8 @@ export async function createNewGameAndJoin() {
 
   const playerName = _deps.getPlayerName();
   const selectedRoundType = _deps.getSelectedRoundType?.() || 'sync';
+  const selectedScoringMode =
+    _deps.getSelectedScoringMode?.() || 'stockpile_total_tokens';
   const shouldAutoStartAsyncSession =
     _deps.shouldAutoStartAsyncSession?.() !== false;
   const isAsyncHostRound = selectedRoundType === 'async';
@@ -240,6 +242,7 @@ export async function createNewGameAndJoin() {
     const overrides = _deps.collectAdvancedOverrides();
     const gamePayload = {
       enrollment_window_seconds: _deps.getEnrollmentWindow(),
+      scoring_mode: selectedScoringMode,
       ...durationPayload,
       ...overrides,
     };

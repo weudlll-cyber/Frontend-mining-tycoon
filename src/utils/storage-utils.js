@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   durationCustomValue: 'mining-tycoon:durationCustomValue',
   durationCustomUnit: 'mining-tycoon:durationCustomUnit',
   enrollmentWindow: 'mining-tycoon:enrollmentWindow',
+  scoringMode: 'mining-tycoon:scoringMode',
   roundType: 'mining-tycoon:roundType',
   asyncDurationPreset: 'mining-tycoon:asyncDurationPreset',
   asyncDurationCustomMinutes: 'mining-tycoon:asyncDurationCustomMinutes',

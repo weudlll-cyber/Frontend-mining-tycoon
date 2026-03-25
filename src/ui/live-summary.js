@@ -1,6 +1,6 @@
 /**
 File: src/ui/live-summary.js
-Purpose: Render top-line score stats and bottom-bar portfolio value.
+Purpose: Render top-line score stats and bottom-bar score context value.
 Role in system:
 - Renders compact read-only summary values and session status without changing gameplay state.
 Invariants:

@@ -37,6 +37,7 @@ function buildDeps(overrides = {}) {
     showNewGameStatus: vi.fn(),
     getPlayerName: vi.fn(() => 'Tester'),
     getEnrollmentWindow: vi.fn(() => 600),
+    getSelectedScoringMode: vi.fn(() => 'stockpile_total_tokens'),
     getSelectedRoundType: vi.fn(() => 'async'),
     getAsyncDurationPreset: vi.fn(() => '10m'),
     getAsyncSessionDurationSeconds: vi.fn(() => 86400),
@@ -94,6 +95,7 @@ describe('game-actions async host flow', () => {
 
     expect(createCall[0]).toBe('http://127.0.0.1:8000/games');
     expect(createBody.round_type).toBe('asynchronous');
+    expect(createBody.scoring_mode).toBe('stockpile_total_tokens');
     expect(createBody.enrollment_window_seconds).toBe(0);
     expect(createBody.duration_mode).toBe('preset');
     expect(createBody.duration_preset).toBe('10m');
@@ -101,6 +103,33 @@ describe('game-actions async host flow', () => {
     expect(createBody.emission_anchor_token).toBeUndefined();
     expect(createBody.emission_anchor_tokens_per_second).toBeUndefined();
     expect(createBody.season_cycles_per_game).toBeUndefined();
+  });
+
+  it('forwards selected scoring_mode in create payload', async () => {
+    const deps = buildDeps({
+      shouldAutoStartAsyncSession: vi.fn(() => false),
+      getSelectedScoringMode: vi.fn(() => 'power_oracle_weighted'),
+    });
+    initGameActions(deps);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ game_id: 'g-3' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ player_id: 'p-3' }),
+      });
+    globalThis.fetch = fetchMock;
+
+    await createNewGameAndJoin();
+
+    const createBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(createBody.scoring_mode).toBe('power_oracle_weighted');
   });
 
   it('auto-start ON triggers async session startup and avoids legacy start stream call', async () => {

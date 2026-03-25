@@ -188,6 +188,11 @@ import {
 } from './ui/upgrade-panel-inline.js';
 import { initChatPanel, connectChat, disconnectChat } from './ui/chat-panel.js';
 import {
+  initTradingPanel,
+  normalizeTradingCapability,
+  renderTradingStatus,
+} from './ui/trading-panel.js';
+import {
   initStreamController,
   startStream,
   stopLiveTimersAndHalving,
@@ -220,6 +225,16 @@ const durationCustomValueInput = document.getElementById(
 );
 const durationCustomUnitInput = document.getElementById('duration-custom-unit');
 const enrollmentWindowInput = document.getElementById('enrollment-window');
+const scoringModeStockpileInput = document.getElementById(
+  'scoring-mode-stockpile'
+);
+const scoringModePowerInput = document.getElementById('scoring-mode-power');
+const scoringModeMiningTimeInput = document.getElementById(
+  'scoring-mode-mining-time'
+);
+const scoringModeEfficiencyInput = document.getElementById(
+  'scoring-mode-efficiency'
+);
 const roundTypeSyncInput = document.getElementById('round-type-sync');
 const roundTypeAsyncInput = document.getElementById('round-type-async');
 const syncHostControlsEl = document.getElementById('sync-host-controls');
@@ -260,6 +275,7 @@ const gameStatusEl = document.getElementById('game-status');
 const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
 const asyncSessionStatusEl = document.getElementById('async-session-status');
+const scoringModeStatusEl = document.getElementById('scoring-mode-status');
 const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
 const roundModeBadgeEl = document.getElementById('round-mode-badge');
@@ -296,6 +312,10 @@ const chatFormEl = document.getElementById('chat-form');
 const chatInputEl = document.getElementById('chat-input');
 const chatStatusEl = document.getElementById('chat-status');
 
+// DOM elements - trading panel
+const tradingPanelEl = document.getElementById('trading-panel');
+const tradingStatusEl = document.getElementById('trading-status');
+
 // DOM elements - player and leaderboard
 const playerStateEl = document.getElementById('player-state');
 const leaderboardEl = document.getElementById('leaderboard');
@@ -306,6 +326,13 @@ const myScoreEl = document.getElementById('my-score');
 const myRankEl = document.getElementById('my-rank');
 const topScoreEl = document.getElementById('top-score');
 const portfolioValueEl = document.getElementById('portfolio-value');
+const scoreContextLabelEl = document.getElementById('score-context-label');
+const scoringModeInputs = [
+  scoringModeStockpileInput,
+  scoringModePowerInput,
+  scoringModeMiningTimeInput,
+  scoringModeEfficiencyInput,
+].filter(Boolean);
 const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
 const editableInputs = [
   baseUrlInput,
@@ -314,6 +341,7 @@ const editableInputs = [
   durationCustomValueInput,
   durationCustomUnitInput,
   enrollmentWindowInput,
+  ...scoringModeInputs,
   roundTypeSyncInput,
   roundTypeAsyncInput,
   asyncHostDurationPresetInput,
@@ -328,6 +356,7 @@ const editableInputs = [
 
 let lastGameData = null;
 let modulesInitialized = false;
+let tradingPanelApi = null;
 let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
@@ -346,6 +375,98 @@ let asyncDiagnosticsProbeInFlight = null;
 let selectedSetupRoundType = 'sync';
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
+
+const DEFAULT_SCORING_MODE = 'stockpile_total_tokens';
+
+function normalizeScoringMode(rawMode) {
+  const mode = String(rawMode || '')
+    .trim()
+    .toLowerCase();
+  if (!mode) return DEFAULT_SCORING_MODE;
+  if (mode === 'stockpile_total_tokens' || mode === 'stockpile') {
+    return 'stockpile_total_tokens';
+  }
+  if (
+    mode === 'power_oracle_weighted' ||
+    mode === 'power' ||
+    mode === 'oracle_weighted'
+  ) {
+    return 'power_oracle_weighted';
+  }
+  if (mode === 'mining_time_equivalent' || mode === 'mining_time') {
+    return 'mining_time_equivalent';
+  }
+  if (mode === 'efficiency_system_mastery' || mode === 'efficiency') {
+    return 'efficiency_system_mastery';
+  }
+  return DEFAULT_SCORING_MODE;
+}
+
+function formatScoringModeName(mode) {
+  const normalized = normalizeScoringMode(mode);
+  if (normalized === 'power_oracle_weighted') return 'Power Mode';
+  if (normalized === 'mining_time_equivalent') {
+    return 'Mining Time Equivalent Mode';
+  }
+  if (normalized === 'efficiency_system_mastery') return 'Efficiency Mode';
+  return 'Stockpile Mode';
+}
+
+function getScoringModeScoreLabel(mode) {
+  const normalized = normalizeScoringMode(mode);
+  if (normalized === 'power_oracle_weighted') return 'Weighted Score';
+  if (normalized === 'mining_time_equivalent') return 'Mining-Time Equivalent';
+  if (normalized === 'efficiency_system_mastery') return 'Efficiency Score';
+  return 'Total Tokens';
+}
+
+function getSelectedScoringMode() {
+  if (scoringModePowerInput?.checked) return 'power_oracle_weighted';
+  if (scoringModeMiningTimeInput?.checked) return 'mining_time_equivalent';
+  if (scoringModeEfficiencyInput?.checked) return 'efficiency_system_mastery';
+  return DEFAULT_SCORING_MODE;
+}
+
+function setSelectedScoringMode(mode) {
+  const normalized = normalizeScoringMode(mode);
+  if (scoringModeStockpileInput) {
+    scoringModeStockpileInput.checked = normalized === 'stockpile_total_tokens';
+  }
+  if (scoringModePowerInput) {
+    scoringModePowerInput.checked = normalized === 'power_oracle_weighted';
+  }
+  if (scoringModeMiningTimeInput) {
+    scoringModeMiningTimeInput.checked = normalized === 'mining_time_equivalent';
+  }
+  if (scoringModeEfficiencyInput) {
+    scoringModeEfficiencyInput.checked =
+      normalized === 'efficiency_system_mastery';
+  }
+}
+
+function resolveActiveScoringMode(data = null) {
+  const gameId = String(data?.game_id || gameIdInput?.value || '').trim();
+  const gameMeta = gameId ? getGameMeta(gameId) : null;
+  return normalizeScoringMode(
+    data?.scoring_mode || gameMeta?.scoring_mode || getSelectedScoringMode()
+  );
+}
+
+function updateScoringModeUi(data = null) {
+  const mode = resolveActiveScoringMode(data);
+  if (scoringModeStatusEl) {
+    scoringModeStatusEl.textContent = formatScoringModeName(mode);
+  }
+  if (scoreContextLabelEl) {
+    scoreContextLabelEl.textContent = getScoringModeScoreLabel(mode);
+  }
+
+  const status = String(data?.game_status || latestGameStatus || '').toLowerCase();
+  const lockModeSelection = status === 'running' || status === 'finished';
+  scoringModeInputs.forEach((input) => {
+    input.disabled = lockModeSelection;
+  });
+}
 
 function getSelectedRoundType() {
   if (selectedSetupRoundType === 'async' || selectedSetupRoundType === 'sync') {
@@ -808,6 +929,10 @@ function renderMetaDebugLine() {
       if (gameMeta.season_cycles_per_game) {
         text += ` | Cycles: ${gameMeta.season_cycles_per_game}`;
       }
+
+      if (gameMeta.scoring_mode) {
+        text += ` | Scoring: ${formatScoringModeName(gameMeta.scoring_mode)}`;
+      }
     }
   }
 
@@ -900,7 +1025,7 @@ function renderQuickStats(data) {
 
 function renderPortfolioValue(data) {
   initializeModules();
-  renderLivePortfolioValue(data);
+  renderLivePortfolioValue(data, resolveActiveScoringMode(data));
 }
 
 function renderLeaderboard(data) {
@@ -942,6 +1067,7 @@ function saveSettings() {
     durationCustomUnitInput.value
   );
   setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
+  setStorageItem(STORAGE_KEYS.scoringMode, getSelectedScoringMode());
   setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
   setStorageItem(
     STORAGE_KEYS.asyncDurationPreset,
@@ -959,6 +1085,7 @@ function saveSettings() {
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
 
   renderDebugContext();
+  updateScoringModeUi();
   updateSetupActionsState();
   void refreshAsyncDiagnostics({ force: true });
 }
@@ -1050,6 +1177,7 @@ function initializeModules() {
       if (lastGameData) {
         renderUpgradeMetrics(lastGameData);
       }
+      updateScoringModeUi(lastGameData);
       void refreshAsyncDiagnostics({ force: true });
     },
     showToast,
@@ -1081,6 +1209,11 @@ function initializeModules() {
     getPlayerToken: (gameId, playerId) =>
       getStorageItem(getPlayerTokenStorageKey(gameId, playerId)),
     showToast,
+  });
+  tradingPanelApi = initTradingPanel({
+    getGameMeta,
+    tradingPanelRef: tradingPanelEl,
+    tradingStatusRef: tradingStatusEl,
   });
   initStreamController({
     clearCountdownInterval,
@@ -1135,6 +1268,7 @@ function initializeModules() {
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
     getEnrollmentWindow: () =>
       parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
+    getSelectedScoringMode,
     getSelectedRoundType,
     getAsyncDurationPreset: () =>
       getAsyncDurationPreset(asyncHostDurationPresetInput),
@@ -1204,6 +1338,7 @@ function loadSettings() {
     STORAGE_KEYS.durationCustomUnit
   );
   const savedEnrollmentWindow = getStorageItem(STORAGE_KEYS.enrollmentWindow);
+  const savedScoringMode = getStorageItem(STORAGE_KEYS.scoringMode);
   const savedRoundType = getStorageItem(STORAGE_KEYS.roundType);
   const savedAsyncDurationPreset = getStorageItem(
     STORAGE_KEYS.asyncDurationPreset
@@ -1228,6 +1363,7 @@ function loadSettings() {
     durationCustomUnitInput.value = savedDurationCustomUnit;
   if (savedEnrollmentWindow)
     enrollmentWindowInput.value = savedEnrollmentWindow;
+  setSelectedScoringMode(savedScoringMode || DEFAULT_SCORING_MODE);
   if (savedAsyncDurationPreset && asyncHostDurationPresetInput) {
     asyncHostDurationPresetInput.value = savedAsyncDurationPreset;
   }
@@ -1242,6 +1378,7 @@ function loadSettings() {
 
   setSelectedRoundType(savedRoundType === 'async' ? 'async' : 'sync');
   updateAsyncHostControlsVisibility();
+  updateScoringModeUi();
 
   // Update visibility of custom duration input
   if (durationPresetInput.value === 'custom') {
@@ -1335,6 +1472,10 @@ function applyUIUpdate(data) {
   renderPortfolioValue(data);
   renderEventBanner(data);
   annotateAffectedValues(data);
+  updateScoringModeUi(data);
+  if (tradingPanelApi?.renderTradingStatus) {
+    tradingPanelApi.renderTradingStatus();
+  }
   updateSetupActionsState();
 }
 
@@ -1497,6 +1638,7 @@ if (newGameBtn) {
       setBadgeStatus(gameStatusEl, 'idle');
       setStartSessionStatus('', 'info');
       stopSessionElapsedTimer();
+      updateScoringModeUi({ game_status: 'idle' });
       saveSettings();
       updateSetupActionsState();
 
@@ -1543,6 +1685,12 @@ playerIdInput?.addEventListener('change', saveSettings);
 anchorTokenInput?.addEventListener('change', saveSettings);
 anchorRateInput?.addEventListener('change', saveSettings);
 seasonCyclesInput?.addEventListener('change', saveSettings);
+scoringModeInputs.forEach((input) => {
+  input.addEventListener('change', () => {
+    updateScoringModeUi();
+    saveSettings();
+  });
+});
 gameIdInput?.addEventListener('input', updateSetupActionsState);
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1570,6 +1718,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
+  updateScoringModeUi();
   void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
 });

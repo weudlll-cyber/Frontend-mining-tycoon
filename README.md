@@ -14,10 +14,11 @@ This app lets you:
   - choose pay token inline per upgrade lane (target token is the season card)
   - submit display-only intent; backend remains authoritative for conversion/cost outcome
 
-## Current Implementation Status (2026-03-23)
+## Current Implementation Status (2026-03-25)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
-- Trading and Farming UI implementation has not started yet; the dashboard currently exposes visibility/status placeholders only.
+- **Trading now has an initial scaffold**: read-only panel and capability-driven status both in dedicated UI panel and bottom-bar, but trade execution and fee calculation remain unimplemented.
+- Farming UI implementation has not started yet; the dashboard currently exposes visibility/status placeholders only.
 - Gameplay-balance validation is still pending through playtests, especially for:
   - mined output pacing over time
   - upgrade impact compared to upgrade cost progression
@@ -185,6 +186,7 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
 - **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and `Start Stream` remains gated until a valid async session exists.
+- **Scoring mode selection (pre-round only)**: Setup includes `Scoring Mode (fixed for this round)` with four options (Stockpile default, Power, Mining Time Equivalent, Efficiency). Selection is locked after the round starts.
 - **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
 - **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Ready` or `Async: Session Active`).
 - **Best-of visibility (async mode only)**: When playing async/best-of rounds, the Player State panel displays `This session` and `Best this round` score values inline with exact-value tooltips. These fields are hidden in sync mode.
@@ -214,8 +216,9 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
     - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
 - **Bottom Bar**:
-  - **Portfolio Value** shows the live oracle-weighted portfolio total used for scoring. Large values use compact notation (k/M/B) for scanability, with the exact full value available via tooltip on hover/focus. Updates live as balances and oracle prices change.
+  - **Score** shows the live score-context metric for the selected outcome mode. In Power Mode this is the oracle-weighted score; in other modes, this display follows that mode's evaluation context. Large values use compact notation (k/M/B) for scanability, with exact values available via tooltip on hover/focus.
   - Trading status, Farming status, and the Chat toggle button complete the bar.
+- **In-game mode visibility**: Header summary shows the active scoring mode as read-only text (for example `Scoring: Stockpile Mode`).
 - On desktop, the setup panel and season list use internal scrolling while the page itself does not scroll.
 - Season upgrades use a compact row-based layout to minimize vertical height and reduce scrolling.
 - Player analytics panel width is fixed through a CSS variable, while the left seasons column uses `min-width: 0` to prevent horizontal overflow.
@@ -279,7 +282,7 @@ Use this checklist to validate mining-only gameplay before Trading and Farming U
 - SPR/SUM/AUT/WIN balances
 - Out/s by token
 - Total Out/s
-- Portfolio value
+- Score (with active outcome mode noted)
 
 ### Output Pace Validation
 

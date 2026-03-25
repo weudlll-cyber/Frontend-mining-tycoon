@@ -68,6 +68,12 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               >Top <span id="top-score" class="summary-value">—</span></span
             >
             <span class="summary-item">
+              Scoring:
+              <span id="scoring-mode-status" class="badge badge-gray"
+                >Stockpile Mode</span
+              >
+            </span>
+            <span class="summary-item">
               Conn: <span id="conn-status" class="badge badge-gray">Idle</span>
             </span>
             <span class="summary-item">
@@ -198,6 +204,52 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                         value="async"
                       />
                       <span>Async (host)</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group form-span-4">
+                  <label>Scoring Mode (fixed for this round):</label>
+                  <div
+                    class="host-round-toggle"
+                    role="radiogroup"
+                    aria-label="Scoring Mode"
+                  >
+                    <label class="host-round-option" for="scoring-mode-stockpile">
+                      <input
+                        id="scoring-mode-stockpile"
+                        name="scoring-mode"
+                        type="radio"
+                        value="stockpile_total_tokens"
+                        checked
+                      />
+                      <span>Stockpile: highest total token count wins.</span>
+                    </label>
+                    <label class="host-round-option" for="scoring-mode-power">
+                      <input
+                        id="scoring-mode-power"
+                        name="scoring-mode"
+                        type="radio"
+                        value="power_oracle_weighted"
+                      />
+                      <span>Power: highest oracle-weighted score wins.</span>
+                    </label>
+                    <label class="host-round-option" for="scoring-mode-mining-time">
+                      <input
+                        id="scoring-mode-mining-time"
+                        name="scoring-mode"
+                        type="radio"
+                        value="mining_time_equivalent"
+                      />
+                      <span>Mining Time Equivalent: highest equivalent mining time wins.</span>
+                    </label>
+                    <label class="host-round-option" for="scoring-mode-efficiency">
+                      <input
+                        id="scoring-mode-efficiency"
+                        name="scoring-mode"
+                        type="radio"
+                        value="efficiency_system_mastery"
+                      />
+                      <span>Efficiency: best improvement from baseline wins.</span>
                     </label>
                   </div>
                 </div>
@@ -569,13 +621,17 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               </div>
             </div>
 
-            <!-- RIGHT: Analytics + Docked Chat (inline, non-overlay) -->
+            <!-- RIGHT: Analytics + Trading + Docked Chat (inline, non-overlay) -->
             <div class="right-column">
               <div class="analytics-panel">
                 <h3>Player State</h3>
                 <div id="player-state" class="analytics-content">
                   <p class="placeholder">Waiting for game data...</p>
                 </div>
+              </div>
+
+              <div id="trading-panel" class="trading-panel">
+                <!-- Trading capability card will be rendered here by trading-panel.js -->
               </div>
 
               <aside
@@ -608,10 +664,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             </div>
           </div>
 
-          <!-- Bottom Bar: Portfolio value, Trading status, Farming status -->
+          <!-- Bottom Bar: Score context, Trading status, Farming status -->
           <div class="bottom-bar">
             <div class="bottom-bar-item">
-              <span class="label">Portfolio Value</span>
+              <span id="score-context-label" class="label">Score</span>
               <span id="portfolio-value" class="bottom-bar-value">—</span>
             </div>
             <div class="bottom-bar-item trading-status">

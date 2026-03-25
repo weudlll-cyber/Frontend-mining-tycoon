@@ -8,6 +8,7 @@ Before proposing or applying any change, read and honor:
 
 - `LOCKED_DECISIONS.md` (hard invariants and change-control gate)
 - `PROJECT_BASELINE.md` (implemented truth)
+- `SCORING_MODES.md` (approved scoring/outcome mode definitions)
 - `README.md` (layout, behavior, runbooks)
 - `CONTRIBUTING.md` (process and contribution discipline)
 - `SECURITY_AUDIT.md` (security posture and safe patterns)
@@ -38,7 +39,9 @@ Cross-repo rule:
 - Backend remains authoritative and deterministic; frontend remains display/intent only.
 - Snapshot-locked economy/oracle/halving/events must not be weakened.
 - No P2P markets and no real-money mechanics.
-- Scoring stays final oracle-weighted portfolio value, fixed before round start.
+- Scoring supports four approved outcome modes: Stockpile (default), Power, Mining Time Equivalent, and Efficiency.
+- `scoring_mode` is a first-class round contract field set at creation and snapshot-locked for all players in that round.
+- Outcome mode must be fixed before round start and must not switch mid-round.
 
 ## 3) UI Invariants (Must Preserve)
 
