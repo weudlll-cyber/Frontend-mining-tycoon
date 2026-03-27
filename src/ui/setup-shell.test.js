@@ -159,7 +159,9 @@ describe('setup shell async readiness', () => {
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
     expect(document.getElementById('start-btn')?.disabled).toBe(true);
-    expect(note?.textContent).toContain('click + New Game for a fresh round');
+    expect(note?.textContent).toContain(
+      'Start Session (Async) to reconnect this game'
+    );
   });
 
   it('keeps Start Async Session disabled until player join is complete', () => {

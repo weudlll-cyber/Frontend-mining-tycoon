@@ -142,7 +142,6 @@ import {
 import {
   syncSessionDurationOptions,
   getAsyncDurationPreset,
-  getAsyncSessionDurationSeconds,
   presetToSeconds,
 } from './ui/async-duration.js';
 import {
@@ -210,7 +209,6 @@ import {
 import {
   initGameActions,
   performUpgrade,
-  createNewGameAndJoin,
 } from './services/game-actions.js';
 import {
   initSessionActions,
@@ -277,7 +275,6 @@ const derivedEmissionPreviewEl = document.getElementById(
 );
 
 // DOM elements - buttons
-const newGameBtn = document.getElementById('new-game-btn');
 const startBtn = document.getElementById('start-btn');
 const startSessionBtn = document.getElementById('start-session-btn');
 const stopBtn = document.getElementById('stop-btn');
@@ -289,7 +286,6 @@ const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
 const asyncSessionStatusEl = document.getElementById('async-session-status');
 const scoringModeStatusEl = document.getElementById('scoring-mode-status');
-const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
 const roundModeBadgeEl = document.getElementById('round-mode-badge');
 const startSessionStatusEl = document.getElementById('start-session-status');
@@ -1172,16 +1168,6 @@ function renderSeasonData(data) {
   renderSeasonCardData(data);
 }
 
-function showNewGameStatus(message, type = 'info') {
-  newGameStatusEl.textContent = message;
-  newGameStatusEl.className = `status-message ${type}`;
-}
-
-function clearNewGameStatus() {
-  newGameStatusEl.textContent = '';
-  newGameStatusEl.className = 'status-message empty';
-}
-
 function saveSettings() {
   const baseUrlValue = String(baseUrlInput?.value || '').trim();
   const effectiveBaseUrl = baseUrlValue || DEFAULT_BACKEND_URL;
@@ -1238,7 +1224,6 @@ function initializeModules() {
   initSetupShell({
     gameIdInput,
     playerIdInput,
-    newGameBtn,
     startBtn,
     startSessionBtn,
     stopBtn,
@@ -1407,38 +1392,7 @@ function initializeModules() {
       isSetupBusy = next;
       updateSetupActionsState();
     },
-    clearNewGameStatus,
-    showNewGameStatus,
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
-    getEnrollmentWindow: () =>
-      parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
-    getSelectedScoringMode,
-    getSelectedTradeCount,
-    getTradeUnlockOffsets,
-    getSelectedRoundType,
-    getAsyncDurationPreset: () =>
-      getAsyncDurationPreset(asyncHostDurationPresetInput),
-    getAsyncSessionDurationSeconds: () =>
-      getAsyncSessionDurationSeconds(asyncSessionDurationPresetInput),
-    shouldAutoStartAsyncSession,
-    cleanupGameMetaCache,
-    resolveDurationSeconds,
-    collectAdvancedOverrides,
-    setGameId(gameId) {
-      gameIdInput.value = gameId;
-    },
-    setPlayerId(playerId) {
-      playerIdInput.value = playerId;
-    },
-    setStorageItem,
-    markGameMetaSeen,
-    fetchMetaSnapshot,
-    saveSettings,
-    ensureInputsEditable,
-    startLiveStream,
-    autoStartAsyncSession: startAsyncSessionForGame,
-    setSetupCollapsed,
-    scrollToLiveBoard,
   });
   initSessionActions({
     getNormalizedBaseUrlOrNull,
@@ -1777,37 +1731,6 @@ if (stopBtn) {
     setLiveSessionActive(false);
     setStartSessionStatus('', 'info');
     updateSetupActionsState();
-  });
-}
-
-if (newGameBtn) {
-  newGameBtn.addEventListener('click', async () => {
-    try {
-      initializeModules();
-      showNewGameStatus('Starting new game...', 'info');
-
-      // Clear stale identifiers first so follow-up actions cannot target an old finished game.
-      gameIdInput.value = '';
-      playerIdInput.value = '';
-
-      activeSession = null;
-      latestGameStatus = null;
-      setBadgeStatus(gameStatusEl, 'idle');
-      setStartSessionStatus('', 'info');
-      stopSessionElapsedTimer();
-      updateScoringModeUi({ game_status: 'idle' });
-      saveSettings();
-      updateSetupActionsState();
-
-      await createNewGameAndJoin();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unexpected New Game error.';
-      showNewGameStatus(`Error: ${message}`, 'error');
-      showToast(`Error: ${message}`, 'error');
-      isSetupBusy = false;
-      updateSetupActionsState();
-    }
   });
 }
 

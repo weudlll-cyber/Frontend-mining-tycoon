@@ -219,6 +219,32 @@ function _getSelectedScoringMode() {
   return checked ? checked.value : SCORING_CONTROL.DEFAULT_MODE;
 }
 
+function toBackendScoringMode(selectedValue) {
+  // UI radios currently use canonical labels; backend contract expects short aliases.
+  for (const [alias, canonical] of Object.entries(SCORING_ALIAS_MAP)) {
+    if (canonical === selectedValue) return alias;
+  }
+  return selectedValue;
+}
+
+function formatApiDetail(detail) {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        const loc = Array.isArray(item?.loc) ? item.loc.join('.') : 'field';
+        const msg = item?.msg ?? JSON.stringify(item);
+        return `${loc}: ${msg}`;
+      })
+      .join('; ');
+  }
+  if (detail && typeof detail === 'object') {
+    return detail.message ?? JSON.stringify(detail);
+  }
+  return String(detail);
+}
+
 // ── Enrollment window helper ─────────────────────────────────────────────────
 
 function _getEnrollmentWindow() {
@@ -306,7 +332,7 @@ export function buildGamePayload() {
     durationSeconds,
     tradeCount
   );
-  const scoringMode = _getSelectedScoringMode();
+  const scoringMode = toBackendScoringMode(_getSelectedScoringMode());
 
   const preset =
     roundType === 'async'
@@ -391,7 +417,7 @@ async function createRound() {
       let detail = `${response.status} ${response.statusText}`;
       try {
         const body = await response.json();
-        if (body.detail) detail = body.detail;
+        if (body.detail) detail = formatApiDetail(body.detail);
       } catch {
         // ignore JSON parse error
       }

@@ -18,7 +18,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
       <main class="app-layout">
         <div class="page-banner">
           <span class="page-banner-icon">▶</span>
-          <span>Player Dashboard — join a round above to begin playing</span>
+          <span>Player Dashboard — join a round below to begin playing</span>
         </div>
         <header class="card game-header" aria-label="Game header">
           <div class="game-header-top">
@@ -150,10 +150,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             <section class="card setup-card" id="setup-panel">
               <div class="section-title-row">
                 <div>
-                  <h2>Game Setup</h2>
+                  <h2>Join Round</h2>
                   <p class="section-subtitle">
-                    Start or reconnect here, then work from the live board
-                    below.
+                    Enter your player details and a game ID, then start the
+                    live stream.
                   </p>
                 </div>
                 <button
@@ -166,7 +166,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                 </button>
               </div>
               <div class="setup-grid">
-                <div class="form-group form-span-2">
+                <div class="form-group form-span-2 player-core-field">
                   <label>Backend URL:</label>
                   <input
                     id="base-url"
@@ -174,7 +174,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     value="http://127.0.0.1:8000"
                   />
                 </div>
-                <div class="form-group form-span-2">
+                <div class="form-group form-span-2 player-core-field">
                   <label>Player Name:</label>
                   <input
                     id="player-name"
@@ -475,7 +475,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     style="display: none"
                   ></div>
                 </div>
-                <div class="form-group form-span-3">
+                <div class="form-group form-span-3 player-core-field">
                   <label>Game ID:</label>
                   <input
                     id="game-id"
@@ -507,13 +507,6 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   Auth can stay ○ when auth is disabled or not probed yet.
                 </p>
                 <div class="button-group">
-                  <button
-                    id="new-game-btn"
-                    class="btn-primary admin-only"
-                    aria-hidden="true"
-                  >
-                    + New Game
-                  </button>
                   <a
                     id="admin-setup-link"
                     href="admin.html"
@@ -547,7 +540,6 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   aria-live="polite"
                 ></p>
               </div>
-              <div id="new-game-status" class="status-message"></div>
             </section>
           </div>
         </section>

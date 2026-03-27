@@ -184,11 +184,9 @@ describe('buildGamePayload — sync round', () => {
     expect(payload.duration_preset).toBe('30m');
   });
 
-  it('sets scoring_mode to canonical value', () => {
+  it('sets scoring_mode to backend alias value', () => {
     const payload = buildGamePayload();
-    expect(payload.scoring_mode).toBe(
-      SCORING_CONTROL.CANONICAL_MODES.stockpile
-    );
+    expect(payload.scoring_mode).toBe('stockpile');
   });
 
   it('includes enrollment_window_seconds', () => {

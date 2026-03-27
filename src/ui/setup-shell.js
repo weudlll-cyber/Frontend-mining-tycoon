@@ -183,7 +183,7 @@ export function updateSetupActionsState() {
 
   if (!gameExists) {
     _refs.setupActionsNoteEl.textContent =
-      'Create a game first, then Start Stream to join the live board.';
+      'Enter a game ID from Admin Setup, then Start Stream to join the live board.';
     return;
   }
 
@@ -225,7 +225,7 @@ export function updateSetupActionsState() {
 
     if (!hasKnownGameStatus) {
       _refs.setupActionsNoteEl.textContent =
-        'Optional: Start Session (Async) to reconnect this game, or click + New Game for a fresh round.';
+        'Optional: Start Session (Async) to reconnect this game.';
       return;
     }
 
@@ -242,7 +242,7 @@ export function updateSetupActionsState() {
 
   _refs.setupActionsNoteEl.textContent = isAsyncRound
     ? 'Ready: start a session for async round streaming.'
-    : 'Ready: start stream or create a new game.';
+    : 'Ready: start stream for this game.';
 }
 
 export function setSetupStateForTests(partial = {}) {
