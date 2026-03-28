@@ -1302,9 +1302,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
     renderActiveGameOptions(games);
 
     if (!games.length) {
-      setActiveGamesStatus(
-        'There are no joinable games right now.'
-      );
+      setActiveGamesStatus('There are no joinable games right now.');
     } else {
       setActiveGamesStatus(
         `Loaded ${games.length} active game${games.length === 1 ? '' : 's'}.`
