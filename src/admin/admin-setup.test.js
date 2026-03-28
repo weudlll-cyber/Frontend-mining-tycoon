@@ -43,9 +43,9 @@ function buildDom({
       min="${ENROLLMENT_WINDOW_LIMITS.min}" max="${ENROLLMENT_WINDOW_LIMITS.max}" />
 
     <select id="admin-duration-preset">
-      <option value="5m">5m</option>
+      <option value="5m" selected>5m</option>
       <option value="10m">10m</option>
-      <option value="30m" selected>30m</option>
+      <option value="30m">30m</option>
       <option value="60m">60m</option>
       <option value="custom">Custom…</option>
     </select>
@@ -60,12 +60,13 @@ function buildDom({
 
     <select id="admin-async-duration-preset">
       <option value="5m">5m</option>
-      <option value="10m" ${roundType === 'async' ? 'selected' : ''}>10m</option>
+      <option value="10m">10m</option>
+      <option value="30m" ${roundType === 'async' ? 'selected' : ''}>30m</option>
       <option value="3d">3d</option>
     </select>
     <select id="admin-async-session-preset">
-      <option value="5m">5m</option>
-      <option value="24h" selected>24h</option>
+      <option value="5m" selected>5m</option>
+      <option value="24h">24h</option>
     </select>
 
     <div id="admin-scoring-mode-group">
@@ -181,14 +182,12 @@ describe('buildGamePayload — sync round', () => {
   it('sets duration_mode to preset', () => {
     const payload = buildGamePayload();
     expect(payload.duration_mode).toBe('preset');
-    expect(payload.duration_preset).toBe('30m');
+    expect(payload.duration_preset).toBe('5m');
   });
 
-  it('sets scoring_mode to canonical value', () => {
+  it('sets scoring_mode to backend alias value', () => {
     const payload = buildGamePayload();
-    expect(payload.scoring_mode).toBe(
-      SCORING_CONTROL.CANONICAL_MODES.stockpile
-    );
+    expect(payload.scoring_mode).toBe('stockpile');
   });
 
   it('includes enrollment_window_seconds', () => {

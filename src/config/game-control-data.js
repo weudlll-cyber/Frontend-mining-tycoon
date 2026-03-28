@@ -11,8 +11,8 @@
 
 // ── Duration presets ────────────────────────────────────────────────────────
 // Full preset table covering all sync and async round durations + session
-// durations. Values are in seconds.  '3h' is async-round-only; '20m' is
-// sync-only; '30m' appears in the session dropdown.
+// durations. Values are in seconds. '3h' is async-round-only; '20m' is
+// sync-only; '30m' is available in both async round and session dropdowns.
 export const ROUND_DURATION_PRESETS = {
   '5m': 300,
   '10m': 600,
@@ -38,6 +38,7 @@ export const ASYNC_ROUND_PRESET_IDS = [
   '5m',
   '10m',
   '15m',
+  '30m',
   '60m',
   '3h',
   '6h',
@@ -46,7 +47,7 @@ export const ASYNC_ROUND_PRESET_IDS = [
   '3d',
   '7d',
 ];
-export const ASYNC_ROUND_DEFAULT_PRESET = '10m';
+export const ASYNC_ROUND_DEFAULT_PRESET = '30m';
 
 // ── Async session duration ──────────────────────────────────────────────────
 // Preset IDs shown in the session duration dropdown.
@@ -60,11 +61,11 @@ export const ASYNC_SESSION_PRESET_IDS = [
   '12h',
   '24h',
 ];
-export const ASYNC_SESSION_DEFAULT_PRESET = '24h';
+export const ASYNC_SESSION_DEFAULT_PRESET = '5m';
 
 // ── Enrollment window ───────────────────────────────────────────────────────
 export const ENROLLMENT_WINDOW_LIMITS = { min: 5, max: 3600 }; // seconds
-export const ENROLLMENT_WINDOW_DEFAULT_SECONDS = 600;
+export const ENROLLMENT_WINDOW_DEFAULT_SECONDS = 10;
 
 // ── Scoring modes ───────────────────────────────────────────────────────────
 // DEFAULT_MODE is the full canonical mode used throughout the app.

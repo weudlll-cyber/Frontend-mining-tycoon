@@ -142,7 +142,6 @@ import {
 import {
   syncSessionDurationOptions,
   getAsyncDurationPreset,
-  getAsyncSessionDurationSeconds,
   presetToSeconds,
 } from './ui/async-duration.js';
 import {
@@ -207,11 +206,7 @@ import {
   closeEventSourceIfOpen,
   hasOpenStream,
 } from './services/stream-controller.js';
-import {
-  initGameActions,
-  performUpgrade,
-  createNewGameAndJoin,
-} from './services/game-actions.js';
+import { initGameActions, performUpgrade } from './services/game-actions.js';
 import {
   initSessionActions,
   createAsyncSession,
@@ -261,6 +256,11 @@ const tradeSchedulePreviewEl = document.getElementById(
 );
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
+const activeGameSelectInput = document.getElementById('active-game-select');
+const refreshActiveGamesBtn = document.getElementById(
+  'refresh-active-games-btn'
+);
+const activeGameStatusEl = document.getElementById('active-game-status');
 
 function setActiveMeta(meta) {
   initializeModules();
@@ -277,7 +277,6 @@ const derivedEmissionPreviewEl = document.getElementById(
 );
 
 // DOM elements - buttons
-const newGameBtn = document.getElementById('new-game-btn');
 const startBtn = document.getElementById('start-btn');
 const startSessionBtn = document.getElementById('start-session-btn');
 const stopBtn = document.getElementById('stop-btn');
@@ -289,7 +288,6 @@ const countdownEl = document.getElementById('countdown');
 const countdownLabelEl = document.getElementById('countdown-label');
 const asyncSessionStatusEl = document.getElementById('async-session-status');
 const scoringModeStatusEl = document.getElementById('scoring-mode-status');
-const newGameStatusEl = document.getElementById('new-game-status');
 const setupActionsNoteEl = document.getElementById('setup-actions-note');
 const roundModeBadgeEl = document.getElementById('round-mode-badge');
 const startSessionStatusEl = document.getElementById('start-session-status');
@@ -360,6 +358,7 @@ const editableInputs = [
   asyncHostDurationPresetInput,
   asyncSessionDurationPresetInput,
   asyncHostAutoStartCheckbox,
+  activeGameSelectInput,
   gameIdInput,
   playerIdInput,
   anchorTokenInput,
@@ -389,6 +388,8 @@ let selectedSetupRoundType = 'sync';
 let tradeCountManuallyOverridden = false;
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
+let activeGamesById = new Map();
+let activeGamesRefreshInterval = null;
 
 const DEFAULT_SCORING_MODE = SCORING_CONTROL.DEFAULT_MODE;
 
@@ -1167,19 +1168,200 @@ function renderLeaderboard(data) {
   renderTopLeaderboard(data);
 }
 
+function formatActiveGameOptionLabel(game = {}) {
+  const gameId = String(game?.game_id || '').trim();
+  if (!gameId) {
+    return 'Unknown game';
+  }
+
+  const status = String(game?.game_status || '')
+    .trim()
+    .toLowerCase();
+  const playersCount = Number(game?.players_count || 0);
+  const playersText = `${playersCount} player${playersCount === 1 ? '' : 's'}`;
+
+  if (status === 'enrolling') {
+    const remaining = Number(game?.enrollment_remaining_seconds || 0);
+    return `${gameId} • enrolling • starts in ${formatDurationCompact(Math.max(0, remaining))} • ${playersText}`;
+  }
+
+  if (status === 'running') {
+    const remaining = Number(game?.run_remaining_seconds || 0);
+    return `${gameId} • running • ${formatDurationCompact(Math.max(0, remaining))} left • ${playersText}`;
+  }
+
+  return `${gameId} • ${status || 'unknown'} • ${playersText}`;
+}
+
+function setActiveGamesStatus(message) {
+  if (!activeGameStatusEl) return;
+  activeGameStatusEl.textContent = message;
+}
+
+function syncActiveGameSelectFromInput(games = []) {
+  if (!activeGameSelectInput) return;
+  const currentGameId = String(gameIdInput?.value || '').trim();
+  const availableIdsFromGames = games
+    .map((game) => String(game?.game_id || '').trim())
+    .filter(Boolean);
+  const availableIdsFromSelect = Array.from(activeGameSelectInput.options)
+    .map((option) => String(option?.value || '').trim())
+    .filter(Boolean);
+  const availableGameIds = availableIdsFromGames.length
+    ? availableIdsFromGames
+    : availableIdsFromSelect;
+
+  if (!currentGameId) {
+    activeGameSelectInput.value = '';
+    return;
+  }
+
+  if (
+    activeGamesById.has(currentGameId) ||
+    availableGameIds.includes(currentGameId)
+  ) {
+    activeGameSelectInput.value = currentGameId;
+    return;
+  }
+
+  const [firstActiveGameId] = availableGameIds.length
+    ? availableGameIds
+    : activeGamesById.keys();
+  const normalizedFirstActiveGameId = String(firstActiveGameId || '').trim();
+
+  if (normalizedFirstActiveGameId) {
+    activeGameSelectInput.value = normalizedFirstActiveGameId;
+    applySelectedActiveGame(normalizedFirstActiveGameId, {
+      notifyOnPlayerReset: false,
+    });
+    return;
+  }
+
+  activeGameSelectInput.value = '';
+}
+
+function renderActiveGameOptions(games = []) {
+  if (!activeGameSelectInput) return;
+
+  clearNode(activeGameSelectInput);
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent =
+    games.length > 0 ? 'Choose an active game...' : 'No joinable games found';
+  activeGameSelectInput.appendChild(placeholderOption);
+
+  games.forEach((game) => {
+    const option = document.createElement('option');
+    option.value = String(game.game_id || '').trim();
+    option.textContent = formatActiveGameOptionLabel(game);
+    activeGameSelectInput.appendChild(option);
+  });
+
+  syncActiveGameSelectFromInput(games);
+}
+
+async function fetchActiveGames(baseUrl) {
+  const response = await fetch(`${baseUrl}/games/active`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const detail = await getApiErrorDetail(
+      response,
+      `${response.status} ${response.statusText}`
+    );
+    throw new Error(`Failed to load active games: ${detail}`);
+  }
+
+  const payload = await response.json();
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload;
+}
+
+async function refreshActiveGames({ notifyOnError = true } = {}) {
+  if (!activeGameSelectInput) {
+    return [];
+  }
+
+  const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
+  if (!baseUrl) {
+    activeGamesById = new Map();
+    renderActiveGameOptions([]);
+    setActiveGamesStatus('Enter a valid backend URL to load joinable games.');
+    return [];
+  }
+
+  try {
+    const games = await fetchActiveGames(baseUrl);
+    activeGamesById = new Map(
+      games.map((game) => [String(game?.game_id || '').trim(), game])
+    );
+    renderActiveGameOptions(games);
+
+    if (!games.length) {
+      setActiveGamesStatus('There are no joinable games right now.');
+    } else {
+      setActiveGamesStatus(
+        `Loaded ${games.length} active game${games.length === 1 ? '' : 's'}.`
+      );
+    }
+
+    return games;
+  } catch (error) {
+    activeGamesById = new Map();
+    renderActiveGameOptions([]);
+    setActiveGamesStatus('Could not load joinable games.');
+    if (notifyOnError) {
+      showToast(error.message, 'error');
+    }
+    return [];
+  }
+}
+
+function startActiveGamesAutoRefresh() {
+  if (!activeGameSelectInput) {
+    return;
+  }
+  if (activeGamesRefreshInterval) {
+    clearInterval(activeGamesRefreshInterval);
+  }
+  activeGamesRefreshInterval = setInterval(() => {
+    void refreshActiveGames({ notifyOnError: false });
+  }, 5000);
+}
+
+function applySelectedActiveGame(
+  nextGameId,
+  { notifyOnPlayerReset = true } = {}
+) {
+  const selectedGameId = String(nextGameId || '').trim();
+  if (!selectedGameId) {
+    return;
+  }
+
+  const previousGameId = String(gameIdInput?.value || '').trim();
+  gameIdInput.value = selectedGameId;
+
+  if (previousGameId && previousGameId !== selectedGameId && playerIdInput) {
+    playerIdInput.value = '';
+    setStorageItem(STORAGE_KEYS.playerId, '');
+    if (notifyOnPlayerReset) {
+      showToast(
+        'Selected game changed. Cleared Player ID to avoid mismatch.',
+        'info'
+      );
+    }
+  }
+
+  saveSettings();
+}
+
 function renderSeasonData(data) {
   initializeModules();
   renderSeasonCardData(data);
-}
-
-function showNewGameStatus(message, type = 'info') {
-  newGameStatusEl.textContent = message;
-  newGameStatusEl.className = `status-message ${type}`;
-}
-
-function clearNewGameStatus() {
-  newGameStatusEl.textContent = '';
-  newGameStatusEl.className = 'status-message empty';
 }
 
 function saveSettings() {
@@ -1222,6 +1404,7 @@ function saveSettings() {
   );
   setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
+  syncActiveGameSelectFromInput();
 
   renderDebugContext();
   updateScoringModeUi();
@@ -1238,7 +1421,6 @@ function initializeModules() {
   initSetupShell({
     gameIdInput,
     playerIdInput,
-    newGameBtn,
     startBtn,
     startSessionBtn,
     stopBtn,
@@ -1407,38 +1589,7 @@ function initializeModules() {
       isSetupBusy = next;
       updateSetupActionsState();
     },
-    clearNewGameStatus,
-    showNewGameStatus,
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
-    getEnrollmentWindow: () =>
-      parseInt(enrollmentWindowInput?.value || '0', 10) || 0,
-    getSelectedScoringMode,
-    getSelectedTradeCount,
-    getTradeUnlockOffsets,
-    getSelectedRoundType,
-    getAsyncDurationPreset: () =>
-      getAsyncDurationPreset(asyncHostDurationPresetInput),
-    getAsyncSessionDurationSeconds: () =>
-      getAsyncSessionDurationSeconds(asyncSessionDurationPresetInput),
-    shouldAutoStartAsyncSession,
-    cleanupGameMetaCache,
-    resolveDurationSeconds,
-    collectAdvancedOverrides,
-    setGameId(gameId) {
-      gameIdInput.value = gameId;
-    },
-    setPlayerId(playerId) {
-      playerIdInput.value = playerId;
-    },
-    setStorageItem,
-    markGameMetaSeen,
-    fetchMetaSnapshot,
-    saveSettings,
-    ensureInputsEditable,
-    startLiveStream,
-    autoStartAsyncSession: startAsyncSessionForGame,
-    setSetupCollapsed,
-    scrollToLiveBoard,
   });
   initSessionActions({
     getNormalizedBaseUrlOrNull,
@@ -1529,6 +1680,11 @@ function loadSettings() {
   }
   if (savedGameId) gameIdInput.value = savedGameId;
   if (savedPlayerId) playerIdInput.value = savedPlayerId;
+  syncActiveGameSelectFromInput();
+  if (savedGameId && savedPlayerId) {
+    // Keep setup out of the way once the player already joined a game.
+    setSetupCollapsed(true);
+  }
 
   setSelectedRoundType(savedRoundType === 'async' ? 'async' : 'sync');
   updateAsyncHostControlsVisibility();
@@ -1680,6 +1836,121 @@ async function startLiveStream(gameId, playerId, options = {}) {
   });
 }
 
+async function getApiErrorDetail(response, fallback) {
+  try {
+    const payload = await response.json();
+    if (
+      payload &&
+      typeof payload.detail === 'string' &&
+      payload.detail.trim()
+    ) {
+      return payload.detail;
+    }
+  } catch {
+    // Ignore JSON parse errors and keep fallback.
+  }
+  return fallback;
+}
+
+async function canReusePlayerForGame({ baseUrl, gameId, playerId }) {
+  const normalizedGameId = String(gameId || '').trim();
+  const normalizedPlayerId = String(playerId || '').trim();
+  if (!normalizedGameId || !normalizedPlayerId) {
+    return false;
+  }
+
+  const headers = {};
+  const storedToken = getStorageItem(
+    getPlayerTokenStorageKey(normalizedGameId, normalizedPlayerId)
+  );
+  if (storedToken) {
+    headers['X-Player-Token'] = storedToken;
+  }
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/games/${encodeURIComponent(normalizedGameId)}/state?player_id=${encodeURIComponent(normalizedPlayerId)}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    );
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const payload = await response.json();
+    return (
+      String(payload?.game_id || '') === normalizedGameId &&
+      String(payload?.player_id || '') === normalizedPlayerId
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function ensurePlayerJoinedForStream({ baseUrl, gameId, playerId }) {
+  const normalizedGameId = String(gameId || '').trim();
+  const existingPlayerId = String(playerId || '').trim();
+
+  if (!normalizedGameId) {
+    throw new Error('Enter a game ID before starting the stream.');
+  }
+
+  if (existingPlayerId) {
+    const canReuse = await canReusePlayerForGame({
+      baseUrl,
+      gameId: normalizedGameId,
+      playerId: existingPlayerId,
+    });
+    if (canReuse) {
+      return existingPlayerId;
+    }
+
+    // Existing player id does not belong to the selected game anymore.
+    playerIdInput.value = '';
+    setStorageItem(STORAGE_KEYS.playerId, '');
+  }
+
+  const playerName = String(playerNameInput?.value || '').trim() || 'Player';
+  const joinResponse = await fetch(
+    `${baseUrl}/games/${encodeURIComponent(normalizedGameId)}/join`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: playerName }),
+    }
+  );
+
+  if (!joinResponse.ok) {
+    const detail = await getApiErrorDetail(
+      joinResponse,
+      `${joinResponse.status} ${joinResponse.statusText}`
+    );
+    throw new Error(`Join failed: ${detail}`);
+  }
+
+  const joinData = await joinResponse.json();
+  const joinedPlayerId = String(joinData?.player_id || '').trim();
+  if (!joinedPlayerId) {
+    throw new Error('Join succeeded but no player_id was returned.');
+  }
+
+  playerIdInput.value = joinedPlayerId;
+  if (joinData.player_token) {
+    setStorageItem(
+      getPlayerTokenStorageKey(normalizedGameId, joinedPlayerId),
+      joinData.player_token
+    );
+  }
+  setStorageItem(STORAGE_KEYS.gameId, normalizedGameId);
+  setStorageItem(STORAGE_KEYS.playerId, joinedPlayerId);
+  setSetupCollapsed(true);
+
+  return joinedPlayerId;
+}
+
 async function startAsyncSessionForGame({ gameId, playerId }) {
   setStartSessionStatus('Starting async session...', 'info');
   isSetupBusy = true;
@@ -1719,9 +1990,22 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
 
 async function handleStartAsyncSession() {
   const gameId = gameIdInput.value;
-  const playerId = playerIdInput.value;
+  const existingPlayerId = playerIdInput.value;
   const baseUrl = getNormalizedBaseUrlOrNull();
   if (!baseUrl) {
+    return;
+  }
+
+  let playerId;
+  try {
+    playerId = await ensurePlayerJoinedForStream({
+      baseUrl,
+      gameId,
+      playerId: existingPlayerId,
+    });
+  } catch (error) {
+    showToast(error.message, 'error');
+    setStartSessionStatus(error.message, 'error');
     return;
   }
 
@@ -1731,9 +2015,21 @@ async function handleStartAsyncSession() {
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
     const gameId = gameIdInput.value;
-    const playerId = playerIdInput.value;
+    const existingPlayerId = playerIdInput.value;
     const baseUrl = getNormalizedBaseUrlOrNull();
     if (!baseUrl) {
+      return;
+    }
+
+    let playerId;
+    try {
+      playerId = await ensurePlayerJoinedForStream({
+        baseUrl,
+        gameId,
+        playerId: existingPlayerId,
+      });
+    } catch (error) {
+      showToast(error.message, 'error');
       return;
     }
 
@@ -1744,6 +2040,12 @@ if (startBtn) {
       await fetchMetaSnapshot(baseUrl, gameId);
     } catch (e) {
       console.warn('Initial meta fetch failed before stream start:', e);
+    }
+
+    const roundMode = getCurrentRoundContext().roundMode;
+    if (roundMode === 'async' && !activeSession?.sessionId) {
+      await startAsyncSessionForGame({ gameId, playerId });
+      return;
     }
 
     await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
@@ -1780,37 +2082,6 @@ if (stopBtn) {
   });
 }
 
-if (newGameBtn) {
-  newGameBtn.addEventListener('click', async () => {
-    try {
-      initializeModules();
-      showNewGameStatus('Starting new game...', 'info');
-
-      // Clear stale identifiers first so follow-up actions cannot target an old finished game.
-      gameIdInput.value = '';
-      playerIdInput.value = '';
-
-      activeSession = null;
-      latestGameStatus = null;
-      setBadgeStatus(gameStatusEl, 'idle');
-      setStartSessionStatus('', 'info');
-      stopSessionElapsedTimer();
-      updateScoringModeUi({ game_status: 'idle' });
-      saveSettings();
-      updateSetupActionsState();
-
-      await createNewGameAndJoin();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unexpected New Game error.';
-      showNewGameStatus(`Error: ${message}`, 'error');
-      showToast(`Error: ${message}`, 'error');
-      isSetupBusy = false;
-      updateSetupActionsState();
-    }
-  });
-}
-
 // P2.4: Duration preset and advanced overrides event listeners
 if (durationPresetInput) {
   durationPresetInput.addEventListener('change', () => {
@@ -1833,7 +2104,10 @@ if (showAdvancedCheckbox) {
   });
 }
 
-baseUrlInput?.addEventListener('change', saveSettings);
+baseUrlInput?.addEventListener('change', () => {
+  saveSettings();
+  void refreshActiveGames({ notifyOnError: false });
+});
 playerNameInput?.addEventListener('change', saveSettings);
 durationCustomValueInput?.addEventListener('change', () => {
   syncTradeCountWithDuration();
@@ -1857,6 +2131,12 @@ tradeCountInput?.addEventListener('change', () => {
   saveSettings();
 });
 gameIdInput?.addEventListener('change', saveSettings);
+activeGameSelectInput?.addEventListener('change', () => {
+  applySelectedActiveGame(activeGameSelectInput.value);
+});
+refreshActiveGamesBtn?.addEventListener('click', () => {
+  void refreshActiveGames({ notifyOnError: true });
+});
 playerIdInput?.addEventListener('change', saveSettings);
 anchorTokenInput?.addEventListener('change', saveSettings);
 anchorRateInput?.addEventListener('change', saveSettings);
@@ -1895,6 +2175,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
+  await refreshActiveGames({ notifyOnError: false });
+  startActiveGamesAutoRefresh();
   updateScoringModeUi();
   void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
@@ -1922,6 +2204,8 @@ export {
   applyHalvingTextAndSeverity,
   syncSeasonHalvingTicker,
   stopSeasonHalvingTimers,
+  formatActiveGameOptionLabel,
+  renderActiveGameOptions,
   renderSeasonData,
   computePortfolioValue,
   renderPortfolioValue,
@@ -1929,6 +2213,7 @@ export {
   setActiveMeta,
   setSetupStateForTests,
   updateSetupActionsState,
+  ensurePlayerJoinedForStream,
   handleStartAsyncSession,
   setSetupCollapsed,
   toggleSetupCollapsed,

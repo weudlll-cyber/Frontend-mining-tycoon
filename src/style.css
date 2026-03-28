@@ -53,6 +53,20 @@ body.page-player .page-banner-icon {
   color: var(--accent-player);
 }
 
+/* Player page: show only join essentials in setup panel. */
+body.page-player #setup-panel .setup-grid .form-group {
+  display: none;
+}
+
+body.page-player #setup-panel .setup-grid .form-group.player-core-field {
+  display: block;
+}
+
+body.page-player #setup-panel #async-diagnostics-help,
+body.page-player #setup-panel #round-mode-badge {
+  display: none;
+}
+
 /* Admin page styling */
 body.page-admin {
   --current-accent: var(--accent-admin);

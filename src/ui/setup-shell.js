@@ -132,14 +132,11 @@ export function updateSetupActionsState() {
   }
 
   if (_refs.startBtn) {
-    // WHY: Async rounds must always open a session-scoped stream and cannot use the legacy game stream.
-    const requiresSessionStart = isAsyncRound && !_state.sessionActive;
     _refs.startBtn.disabled =
       _state.isSetupBusy ||
       !gameExists ||
       gameFinished ||
-      _state.isStreamActive ||
-      requiresSessionStart;
+      _state.isStreamActive;
   }
 
   if (_refs.startSessionBtn) {
@@ -183,7 +180,7 @@ export function updateSetupActionsState() {
 
   if (!gameExists) {
     _refs.setupActionsNoteEl.textContent =
-      'Create a game first, then Start Stream to join the live board.';
+      'Enter a game ID from Admin Setup, then Start Game to join and play.';
     return;
   }
 
@@ -212,7 +209,7 @@ export function updateSetupActionsState() {
 
   if (isAsyncRound && _state.sessionActive) {
     _refs.setupActionsNoteEl.textContent =
-      'Async session active. Use Start Stream to reconnect the session view.';
+      'Async session active. Use Start Game to reconnect the session view.';
     return;
   }
 
@@ -225,12 +222,12 @@ export function updateSetupActionsState() {
 
     if (!hasKnownGameStatus) {
       _refs.setupActionsNoteEl.textContent =
-        'Optional: Start Session (Async) to reconnect this game, or click + New Game for a fresh round.';
+        'Start Game handles join, async session start, and live connection.';
       return;
     }
 
     _refs.setupActionsNoteEl.textContent =
-      'Start Session (Async) first, then stream uses the session-scoped channel.';
+      'Start Game will create the async session and connect the live view.';
     return;
   }
 
@@ -241,8 +238,8 @@ export function updateSetupActionsState() {
   }
 
   _refs.setupActionsNoteEl.textContent = isAsyncRound
-    ? 'Ready: start a session for async round streaming.'
-    : 'Ready: start stream or create a new game.';
+    ? 'Ready: start this async game.'
+    : 'Ready: start this game.';
 }
 
 export function setSetupStateForTests(partial = {}) {

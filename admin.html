@@ -389,7 +389,7 @@ Security notes:
           <input
             id="admin-enrollment-window"
             type="number"
-            value="600"
+            value="10"
             min="5"
             max="3600"
           />
@@ -549,6 +549,79 @@ Security notes:
       </button>
 
       <div id="admin-result-box" class="result-box" aria-live="assertive"></div>
+    </section>
+
+    <!-- Section 8: Game Management -->
+    <section class="card" aria-labelledby="section-games-title">
+      <h2 id="section-games-title">8 — Game Management</h2>
+      <p class="section-note" style="margin-bottom: 1rem">
+        View and control all games. Sync games show player enrollment; async games accept new players during their session window.
+        Delete a game to stop it and free up resources.
+      </p>
+      
+      <div style="margin-bottom: 1rem">
+        <button
+          id="admin-refresh-games-btn"
+          type="button"
+          style="
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background 0.15s;
+          "
+        >
+          🔄 Refresh Game List
+        </button>
+      </div>
+
+      <div id="admin-games-loading" style="display: none; padding: 1rem; color: var(--text-muted)">
+        Loading games...
+      </div>
+
+      <div id="admin-games-error" class="result-box error" style="display: none"></div>
+
+      <div id="admin-games-list-container" style="
+        display: none;
+        overflow-x: auto;
+      ">
+        <table style="
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.875rem;
+        ">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); background: #f9f9f9">
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Game ID</th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Status</th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Type</th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Time Remaining</th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Players</th>
+              <th style="text-align: center; padding: 0.75rem; font-weight: 600">Action</th>
+            </tr>
+          </thead>
+          <tbody id="admin-games-tbody">
+            <!-- Populated by admin-setup.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="admin-games-empty" style="
+        display: none;
+        padding: 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+        background: #f9f9f9;
+        border-radius: var(--radius);
+        border: 1px dashed var(--border);
+      ">
+        No games found. Create one to get started!
+      </div>
+
+      <div id="admin-delete-result" class="result-box" style="display: none; margin-top: 1rem"></div>
     </section>
 
     <script type="module" src="/src/admin/admin-setup.js"></script>

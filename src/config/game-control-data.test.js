@@ -88,8 +88,8 @@ describe('ASYNC_ROUND_PRESET_IDS', () => {
     expect(ASYNC_ROUND_PRESET_IDS).not.toContain('20m');
   });
 
-  it('does not include 30m (session-only in async context)', () => {
-    expect(ASYNC_ROUND_PRESET_IDS).not.toContain('30m');
+  it('includes 30m for async round testing', () => {
+    expect(ASYNC_ROUND_PRESET_IDS).toContain('30m');
   });
 
   it('includes the 3h async-only preset', () => {
@@ -98,8 +98,8 @@ describe('ASYNC_ROUND_PRESET_IDS', () => {
 });
 
 describe('ASYNC_ROUND_DEFAULT_PRESET', () => {
-  it('is 10m', () => {
-    expect(ASYNC_ROUND_DEFAULT_PRESET).toBe('10m');
+  it('is 30m', () => {
+    expect(ASYNC_ROUND_DEFAULT_PRESET).toBe('30m');
   });
 
   it('is in ASYNC_ROUND_PRESET_IDS', () => {
@@ -124,8 +124,8 @@ describe('ASYNC_SESSION_PRESET_IDS', () => {
 });
 
 describe('ASYNC_SESSION_DEFAULT_PRESET', () => {
-  it('is 24h', () => {
-    expect(ASYNC_SESSION_DEFAULT_PRESET).toBe('24h');
+  it('is 5m', () => {
+    expect(ASYNC_SESSION_DEFAULT_PRESET).toBe('5m');
   });
 
   it('is in ASYNC_SESSION_PRESET_IDS', () => {
@@ -147,8 +147,8 @@ describe('ENROLLMENT_WINDOW_LIMITS', () => {
 });
 
 describe('ENROLLMENT_WINDOW_DEFAULT_SECONDS', () => {
-  it('is 600', () => {
-    expect(ENROLLMENT_WINDOW_DEFAULT_SECONDS).toBe(600);
+  it('is 10', () => {
+    expect(ENROLLMENT_WINDOW_DEFAULT_SECONDS).toBe(10);
   });
 
   it('is within ENROLLMENT_WINDOW_LIMITS', () => {

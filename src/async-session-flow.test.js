@@ -33,7 +33,7 @@ function buildDomFixture() {
               </div>
               <div class="button-group">
                 <button id="new-game-btn" class="btn-primary" type="button">+ New Game</button>
-                <button id="start-btn" class="btn-secondary" type="button">Start Stream</button>
+                <button id="start-btn" class="btn-secondary" type="button">Start Game</button>
                 <button id="start-session-btn" class="btn-secondary" type="button" hidden>Start Async Session</button>
                 <button id="stop-btn" class="btn-secondary" type="button">Stop Stream</button>
               </div>
@@ -54,6 +54,9 @@ function buildDomFixture() {
       <select id="duration-custom-unit"><option value="seconds">seconds</option></select>
       <input id="enrollment-window" value="60" />
       <input id="game-id" value="game-1" />
+      <select id="active-game-select"><option value="">none</option></select>
+      <button id="refresh-active-games-btn" type="button">Refresh</button>
+      <div id="active-game-status"></div>
       <input id="player-id" value="player-1" />
       <input id="show-advanced-overrides" type="checkbox" />
       <div id="advanced-overrides" style="display:none"></div>
@@ -113,7 +116,15 @@ async function loadMainModuleWithSessionMock(mockResult) {
 
 describe('async session error states', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     buildDomFixture();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ game_id: 'game-1', player_id: 'player-1' }),
+      })
+    );
   });
 
   it('shows inline policy message for 403/409 responses', async () => {

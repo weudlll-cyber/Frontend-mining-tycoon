@@ -32,8 +32,7 @@ function buildDomFixture() {
                 <span id="round-mode-badge">Round: Sync</span>
               </div>
               <div class="button-group">
-                <button id="new-game-btn" class="btn-primary" type="button">+ New Game</button>
-                <button id="start-btn" class="btn-secondary" type="button">Start Stream</button>
+                <button id="start-btn" class="btn-secondary" type="button">Start Game</button>
                 <button id="start-session-btn" class="btn-secondary" type="button" hidden>Start Session</button>
                 <button id="stop-btn" class="btn-secondary" type="button">Stop Stream</button>
               </div>
@@ -163,7 +162,6 @@ describe('layout controls', () => {
     const setupShell = document.getElementById('setup-shell');
     expect(setupShell.classList.contains('setup-collapsed')).toBe(false);
 
-    expect(document.getElementById('new-game-btn')).not.toBeNull();
     expect(document.getElementById('start-btn')).not.toBeNull();
     expect(document.getElementById('start-session-btn')).not.toBeNull();
     expect(document.getElementById('stop-btn')).not.toBeNull();
@@ -172,26 +170,20 @@ describe('layout controls', () => {
     );
   });
 
-  it('disables New Game while running and keeps it enabled when not running', async () => {
+  it('shows running-state guidance while game is running', async () => {
     const module = await loadMainModule();
 
-    const newGameBtn = document.getElementById('new-game-btn');
     const noteEl = document.getElementById('setup-actions-note');
 
     module.setSetupStateForTests({ gameStatus: 'running' });
 
-    expect(newGameBtn.disabled).toBe(true);
     expect(noteEl.textContent).toContain('currently running');
-
-    module.setSetupStateForTests({ gameStatus: 'idle' });
-    expect(newGameBtn.disabled).toBe(false);
   });
 
   it('applies Start/Stop enable rules based on game and stream state', async () => {
     const module = await loadMainModule();
 
     const gameIdInput = document.getElementById('game-id');
-    const newGameBtn = document.getElementById('new-game-btn');
     const startBtn = document.getElementById('start-btn');
     const startSessionBtn = document.getElementById('start-session-btn');
     const stopBtn = document.getElementById('stop-btn');
@@ -199,7 +191,6 @@ describe('layout controls', () => {
     gameIdInput.value = '';
     module.setSetupStateForTests({ streamActive: false, gameStatus: 'idle' });
     module.updateSetupActionsState();
-    expect(newGameBtn.disabled).toBe(false);
     expect(startBtn.disabled).toBe(true);
     expect(stopBtn.disabled).toBe(true);
 
@@ -218,9 +209,7 @@ describe('layout controls', () => {
       streamActive: false,
       gameStatus: 'running',
     });
-    expect(newGameBtn.disabled).toBe(true);
 
-    expect(document.getElementById('new-game-btn')).not.toBeNull();
     expect(document.getElementById('start-btn')).not.toBeNull();
     expect(document.getElementById('stop-btn')).not.toBeNull();
   });
