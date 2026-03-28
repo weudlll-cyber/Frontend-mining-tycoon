@@ -22,10 +22,39 @@ function buildDomFixture() {
       <input id="base-url" value="http://127.0.0.1:8000" />
       <input id="player-name" value="Tester" />
       <input id="game-duration" value="300" />
+      <select id="duration-preset">
+        <option value="5m" selected>5 minutes</option>
+      </select>
+      <input id="duration-custom-value" value="" />
+      <select id="duration-custom-unit">
+        <option value="minutes" selected>minutes</option>
+      </select>
       <input id="enrollment-window" value="60" />
+      <label>
+        <input type="radio" name="scoring-mode" value="balance" checked />
+      </label>
+      <label>
+        <input type="radio" name="scoring-mode" value="portfolio" />
+      </label>
+      <input id="trade-count" value="10" />
+      <label>
+        <input id="round-type-sync" type="radio" name="round-type" value="sync" checked />
+      </label>
+      <label>
+        <input id="round-type-async" type="radio" name="round-type" value="async" />
+      </label>
+      <select id="async-duration-preset">
+        <option value="30m" selected>30m</option>
+      </select>
+      <select id="async-session-duration-preset">
+        <option value="5m" selected>5m</option>
+      </select>
+      <label>
+        <input id="async-auto-start" type="checkbox" />
+      </label>
       <input id="game-id" value="1" />
       <select id="active-game-select">
-        <option value="">No enrolling/running games</option>
+        <option value="">No joinable games found</option>
       </select>
       <button id="refresh-active-games-btn" type="button"></button>
       <div id="active-game-status"></div>
@@ -175,6 +204,48 @@ describe('Seasonal Oracle frontend helpers', () => {
         players_count: 3,
       })
     ).toContain('02:05 left');
+  });
+
+  it('auto-selects the first joinable game when the current game id is not active', async () => {
+    localStorage.clear();
+    const module = await loadMainModule();
+
+    const gameIdEl = document.getElementById('game-id');
+    gameIdEl.value = '1';
+
+    module.renderActiveGameOptions([
+      {
+        game_id: 248,
+        game_status: 'enrolling',
+        enrollment_remaining_seconds: 45,
+        players_count: 1,
+      },
+    ]);
+
+    expect(document.getElementById('active-game-select').value).toBe('248');
+    expect(gameIdEl.value).toBe('248');
+  });
+
+  it('shows a clear empty-state message when no joinable games are available', async () => {
+    localStorage.clear();
+    await loadMainModule();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document
+      .getElementById('refresh-active-games-btn')
+      .dispatchEvent(new Event('click'));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(document.getElementById('active-game-status').textContent).toBe(
+      'There are no joinable games right now. Start one in Admin Setup.'
+    );
+    expect(document.getElementById('active-game-select').value).toBe('');
   });
 
   it('normalizes token names with safe fallback to defaults', async () => {

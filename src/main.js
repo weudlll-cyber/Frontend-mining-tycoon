@@ -1198,17 +1198,42 @@ function setActiveGamesStatus(message) {
   activeGameStatusEl.textContent = message;
 }
 
-function syncActiveGameSelectFromInput() {
+function syncActiveGameSelectFromInput(games = []) {
   if (!activeGameSelectInput) return;
   const currentGameId = String(gameIdInput?.value || '').trim();
+  const availableIdsFromGames = games
+    .map((game) => String(game?.game_id || '').trim())
+    .filter(Boolean);
+  const availableIdsFromSelect = Array.from(activeGameSelectInput.options)
+    .map((option) => String(option?.value || '').trim())
+    .filter(Boolean);
+  const availableGameIds = availableIdsFromGames.length
+    ? availableIdsFromGames
+    : availableIdsFromSelect;
 
   if (!currentGameId) {
     activeGameSelectInput.value = '';
     return;
   }
 
-  if (activeGamesById.has(currentGameId)) {
+  if (
+    activeGamesById.has(currentGameId) ||
+    availableGameIds.includes(currentGameId)
+  ) {
     activeGameSelectInput.value = currentGameId;
+    return;
+  }
+
+  const [firstActiveGameId] = availableGameIds.length
+    ? availableGameIds
+    : activeGamesById.keys();
+  const normalizedFirstActiveGameId = String(firstActiveGameId || '').trim();
+
+  if (normalizedFirstActiveGameId) {
+    activeGameSelectInput.value = normalizedFirstActiveGameId;
+    applySelectedActiveGame(normalizedFirstActiveGameId, {
+      notifyOnPlayerReset: false,
+    });
     return;
   }
 
@@ -1222,9 +1247,7 @@ function renderActiveGameOptions(games = []) {
   const placeholderOption = document.createElement('option');
   placeholderOption.value = '';
   placeholderOption.textContent =
-    games.length > 0
-      ? 'Select active game...'
-      : 'No enrolling or async-running games';
+    games.length > 0 ? 'Choose an active game...' : 'No joinable games found';
   activeGameSelectInput.appendChild(placeholderOption);
 
   games.forEach((game) => {
@@ -1234,7 +1257,7 @@ function renderActiveGameOptions(games = []) {
     activeGameSelectInput.appendChild(option);
   });
 
-  syncActiveGameSelectFromInput();
+  syncActiveGameSelectFromInput(games);
 }
 
 async function fetchActiveGames(baseUrl) {
@@ -1267,7 +1290,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
   if (!baseUrl) {
     activeGamesById = new Map();
     renderActiveGameOptions([]);
-    setActiveGamesStatus('Enter a valid backend URL to load active games.');
+    setActiveGamesStatus('Enter a valid backend URL to load joinable games.');
     return [];
   }
 
@@ -1280,7 +1303,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
 
     if (!games.length) {
       setActiveGamesStatus(
-        'No enrolling or async-running games found. Create one in Admin Setup.'
+        'There are no joinable games right now. Start one in Admin Setup.'
       );
     } else {
       setActiveGamesStatus(
@@ -1292,7 +1315,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
   } catch (error) {
     activeGamesById = new Map();
     renderActiveGameOptions([]);
-    setActiveGamesStatus('Could not load active games.');
+    setActiveGamesStatus('Could not load joinable games.');
     if (notifyOnError) {
       showToast(error.message, 'error');
     }
@@ -1312,7 +1335,10 @@ function startActiveGamesAutoRefresh() {
   }, 5000);
 }
 
-function applySelectedActiveGame(nextGameId) {
+function applySelectedActiveGame(
+  nextGameId,
+  { notifyOnPlayerReset = true } = {}
+) {
   const selectedGameId = String(nextGameId || '').trim();
   if (!selectedGameId) {
     return;
@@ -1324,10 +1350,12 @@ function applySelectedActiveGame(nextGameId) {
   if (previousGameId && previousGameId !== selectedGameId && playerIdInput) {
     playerIdInput.value = '';
     setStorageItem(STORAGE_KEYS.playerId, '');
-    showToast(
-      'Selected game changed. Cleared Player ID to avoid mismatch.',
-      'info'
-    );
+    if (notifyOnPlayerReset) {
+      showToast(
+        'Selected game changed. Cleared Player ID to avoid mismatch.',
+        'info'
+      );
+    }
   }
 
   saveSettings();
@@ -2179,6 +2207,7 @@ export {
   syncSeasonHalvingTicker,
   stopSeasonHalvingTimers,
   formatActiveGameOptionLabel,
+  renderActiveGameOptions,
   renderSeasonData,
   computePortfolioValue,
   renderPortfolioValue,
