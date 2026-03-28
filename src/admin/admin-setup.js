@@ -550,6 +550,40 @@ function formatDuration(seconds) {
   return `${minutes}m`;
 }
 
+function formatTimeRemaining(game) {
+  const now = Date.now();
+  let endMs = null;
+
+  if (game.status === 'enrolling' && game.enrollment_ends_at) {
+    endMs = new Date(game.enrollment_ends_at).getTime();
+  } else if (
+    game.status === 'running' &&
+    game.run_started_at &&
+    game.real_duration_seconds
+  ) {
+    endMs =
+      new Date(game.run_started_at).getTime() +
+      game.real_duration_seconds * 1000;
+  }
+
+  if (endMs === null || isNaN(endMs))
+    return formatDuration(game.real_duration_seconds);
+
+  const remainingMs = endMs - now;
+  if (remainingMs <= 0) return 'Ending soon';
+
+  const totalSecs = Math.floor(remainingMs / 1000);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  const hours = Math.floor(mins / 60);
+  if (hours > 0) {
+    const m = mins % 60;
+    return `${hours}h ${m}m left`;
+  }
+  if (mins > 0) return `${mins}m ${secs}s left`;
+  return `${secs}s left`;
+}
+
 function getStatusBadgeColor(status) {
   switch (status) {
     case 'enrolling':
@@ -660,7 +694,7 @@ async function fetchAndDisplayGames() {
 
       const durationCell = document.createElement('td');
       durationCell.style.padding = '0.75rem';
-      durationCell.textContent = formatDuration(game.real_duration_seconds);
+      durationCell.textContent = formatTimeRemaining(game);
 
       const playersCell = document.createElement('td');
       playersCell.style.padding = '0.75rem';
