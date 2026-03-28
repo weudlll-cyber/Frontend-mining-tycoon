@@ -1303,7 +1303,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
 
     if (!games.length) {
       setActiveGamesStatus(
-        'There are no joinable games right now. Start one in Admin Setup.'
+        'There are no joinable games right now.'
       );
     } else {
       setActiveGamesStatus(

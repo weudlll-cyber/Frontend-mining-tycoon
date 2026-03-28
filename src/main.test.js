@@ -243,7 +243,7 @@ describe('Seasonal Oracle frontend helpers', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(document.getElementById('active-game-status').textContent).toBe(
-      'There are no joinable games right now. Start one in Admin Setup.'
+      'There are no joinable games right now.'
     );
     expect(document.getElementById('active-game-select').value).toBe('');
   });
