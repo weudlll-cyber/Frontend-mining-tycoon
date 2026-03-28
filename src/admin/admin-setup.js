@@ -613,14 +613,19 @@ async function fetchAndDisplayGames() {
 
     loadingEl.style.display = 'none';
 
-    if (games.length === 0) {
+    // Filter to show only running or enrolling games (skip finished)
+    const activeGames = games.filter(
+      (g) => g.status === 'running' || g.status === 'enrolling'
+    );
+
+    if (activeGames.length === 0) {
       emptyEl.style.display = 'block';
       return;
     }
 
     // Populate table
     tbodyEl.innerHTML = '';
-    games.forEach((game) => {
+    activeGames.forEach((game) => {
       const row = document.createElement('tr');
       row.style.borderBottom = '1px solid var(--border)';
 
@@ -729,6 +734,11 @@ async function deleteGame(gameId, buttonEl) {
       headers['X-Admin-Token'] = adminToken;
     }
 
+    console.log(`[DELETE] Attempting to delete game ${gameId}`, {
+      url: `${baseUrl}/admin/games/${gameId}`,
+      hasToken: !!adminToken,
+    });
+
     const response = await fetch(
       `${baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
       {
@@ -737,16 +747,23 @@ async function deleteGame(gameId, buttonEl) {
       }
     );
 
+    console.log(`[DELETE] Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
       try {
         const body = await response.json();
+        console.log('[DELETE] Error response body:', body);
         if (body.detail) detail = body.detail;
-      } catch {
+      } catch (parseErr) {
         // Ignore JSON parse errors, use fallback detail
+        console.log('[DELETE] Could not parse error response:', parseErr.message);
       }
       throw new Error(detail);
     }
+
+    const responseData = await response.json();
+    console.log('[DELETE] Success response:', responseData);
 
     resultEl.className = 'result-box success';
     resultEl.textContent = `✅ Game ${gameId} deleted successfully.`;
@@ -755,11 +772,11 @@ async function deleteGame(gameId, buttonEl) {
     // Refresh the games list after a short delay
     setTimeout(fetchAndDisplayGames, 800);
   } catch (error) {
-    console.error('Delete error:', error);
+    console.error('[DELETE] Catch block error:', error.message, error.stack);
     buttonEl.disabled = false;
     buttonEl.textContent = '🗑 Delete';
     resultEl.className = 'result-box error';
-    resultEl.textContent = `❌ Failed to delete game: ${error.message}`;
+    resultEl.textContent = `❌ Failed to delete game: ${error.message}. Check browser console for details.`;
     resultEl.style.display = 'block';
   }
 }
