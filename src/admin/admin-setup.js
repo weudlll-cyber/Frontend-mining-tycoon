@@ -747,7 +747,9 @@ async function deleteGame(gameId, buttonEl) {
       }
     );
 
-    console.log(`[DELETE] Response status: ${response.status} ${response.statusText}`);
+    console.log(
+      `[DELETE] Response status: ${response.status} ${response.statusText}`
+    );
 
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
@@ -757,7 +759,10 @@ async function deleteGame(gameId, buttonEl) {
         if (body.detail) detail = body.detail;
       } catch (parseErr) {
         // Ignore JSON parse errors, use fallback detail
-        console.log('[DELETE] Could not parse error response:', parseErr.message);
+        console.log(
+          '[DELETE] Could not parse error response:',
+          parseErr.message
+        );
       }
       throw new Error(detail);
     }
