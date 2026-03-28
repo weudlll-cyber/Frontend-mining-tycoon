@@ -206,10 +206,7 @@ import {
   closeEventSourceIfOpen,
   hasOpenStream,
 } from './services/stream-controller.js';
-import {
-  initGameActions,
-  performUpgrade,
-} from './services/game-actions.js';
+import { initGameActions, performUpgrade } from './services/game-actions.js';
 import {
   initSessionActions,
   createAsyncSession,
@@ -1177,7 +1174,9 @@ function formatActiveGameOptionLabel(game = {}) {
     return 'Unknown game';
   }
 
-  const status = String(game?.game_status || '').trim().toLowerCase();
+  const status = String(game?.game_status || '')
+    .trim()
+    .toLowerCase();
   const playersCount = Number(game?.players_count || 0);
   const playersText = `${playersCount} player${playersCount === 1 ? '' : 's'}`;
 
@@ -1325,7 +1324,10 @@ function applySelectedActiveGame(nextGameId) {
   if (previousGameId && previousGameId !== selectedGameId && playerIdInput) {
     playerIdInput.value = '';
     setStorageItem(STORAGE_KEYS.playerId, '');
-    showToast('Selected game changed. Cleared Player ID to avoid mismatch.', 'info');
+    showToast(
+      'Selected game changed. Cleared Player ID to avoid mismatch.',
+      'info'
+    );
   }
 
   saveSettings();
@@ -1811,7 +1813,11 @@ async function startLiveStream(gameId, playerId, options = {}) {
 async function getApiErrorDetail(response, fallback) {
   try {
     const payload = await response.json();
-    if (payload && typeof payload.detail === 'string' && payload.detail.trim()) {
+    if (
+      payload &&
+      typeof payload.detail === 'string' &&
+      payload.detail.trim()
+    ) {
       return payload.detail;
     }
   } catch {

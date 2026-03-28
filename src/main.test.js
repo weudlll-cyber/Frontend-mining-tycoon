@@ -121,7 +121,11 @@ describe('stream start join behavior', () => {
     const module = await loadMainModule();
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ player_id: 88, player_token: 'token-88' }),
