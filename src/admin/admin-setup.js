@@ -639,13 +639,19 @@ async function fetchAndDisplayGames() {
       statusBadge.style.fontSize = '0.8rem';
       statusBadge.style.fontWeight = '600';
       statusBadge.style.backgroundColor = getStatusBadgeColor(game.status);
-      statusBadge.style.color = game.status === 'running' || game.status === 'enrolling' ? '#fff' : '#1a1a1a';
-      statusBadge.textContent = game.status.charAt(0).toUpperCase() + game.status.slice(1);
+      statusBadge.style.color =
+        game.status === 'running' || game.status === 'enrolling'
+          ? '#fff'
+          : '#1a1a1a';
+      statusBadge.textContent =
+        game.status.charAt(0).toUpperCase() + game.status.slice(1);
       statusCell.appendChild(statusBadge);
 
       const typeCell = document.createElement('td');
       typeCell.style.padding = '0.75rem';
-      typeCell.textContent = getRoundTypeLabel(game.round_type || 'synchronous');
+      typeCell.textContent = getRoundTypeLabel(
+        game.round_type || 'synchronous'
+      );
 
       const durationCell = document.createElement('td');
       durationCell.style.padding = '0.75rem';
@@ -700,7 +706,11 @@ async function fetchAndDisplayGames() {
 }
 
 async function deleteGame(gameId, buttonEl) {
-  if (!confirm(`Are you sure you want to delete game ${gameId}? This cannot be undone.`)) {
+  if (
+    !confirm(
+      `Are you sure you want to delete game ${gameId}? This cannot be undone.`
+    )
+  ) {
     return;
   }
 
@@ -719,10 +729,13 @@ async function deleteGame(gameId, buttonEl) {
       headers['X-Admin-Token'] = adminToken;
     }
 
-    const response = await fetch(`${baseUrl}/admin/games/${encodeURIComponent(gameId)}`, {
-      method: 'DELETE',
-      headers,
-    });
+    const response = await fetch(
+      `${baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
+      {
+        method: 'DELETE',
+        headers,
+      }
+    );
 
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
