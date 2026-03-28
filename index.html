@@ -483,6 +483,24 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     placeholder="e.g., game-123"
                   />
                 </div>
+                <div class="form-group form-span-3 player-core-field">
+                  <label for="active-game-select">Active Games:</label>
+                  <div class="async-host-row">
+                    <select id="active-game-select">
+                      <option value="">No enrolling/running games</option>
+                    </select>
+                    <button
+                      id="refresh-active-games-btn"
+                      type="button"
+                      class="btn-secondary"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <p id="active-game-status" class="field-help">
+                    Shows enrolling games and async games in running state.
+                  </p>
+                </div>
                 <div class="form-group form-span-3">
                   <label>Player ID:</label>
                   <input
@@ -520,7 +538,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     >+ New Game (Admin)</a
                   >
                   <button id="start-btn" class="btn-secondary">
-                    Start Stream
+                    Start Game
                   </button>
                   <button id="start-session-btn" class="btn-secondary" hidden>
                     Start Session (Async)

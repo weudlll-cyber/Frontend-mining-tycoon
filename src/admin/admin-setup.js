@@ -35,8 +35,8 @@ const SCORING_LABELS = {
 // Short-alias → canonical mode value accepted by backend
 const SCORING_ALIAS_MAP = SCORING_CONTROL.CANONICAL_MODES;
 
-// Default sync preset (30m)
-const SYNC_DEFAULT_PRESET = '30m';
+// Default sync preset for manual testing
+const SYNC_DEFAULT_PRESET = '5m';
 
 // ── DOM helpers ──────────────────────────────────────────────────────────────
 

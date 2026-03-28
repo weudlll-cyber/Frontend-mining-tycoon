@@ -301,11 +301,15 @@ The current baseline is stable for the implemented mining-focused loop: backend-
 
 At the same time, the project is still in an iterative phase. Some major areas are intentionally left open so that future decisions can be evaluated against the implemented baseline rather than assumed from design intent alone.
 
-Implementation checkpoint (2026-03-23):
+Implementation checkpoint (2026-03-28):
 
 - Mining is the only fully implemented and validated gameplay pillar at this time.
+- Active game discovery and selection flow is implemented for players, including backend filtering rules and frontend auto-refresh.
+- Active game list behavior is constrained to joinable states: enrolling rounds plus asynchronous rounds already running; running synchronous rounds are excluded.
+- Player setup panel now auto-collapses after successful join to preserve gameplay screen space.
 - Trading UI and Farming UI work are not started yet beyond explicit placeholder visibility/status in the layout.
 - Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
+- Auth/account system implementation is approved as the top priority next workstream and is not yet implemented in this repo baseline.
 
 ### Round Formats & Shared Chat (Non-Binding Status)
 
@@ -381,6 +385,13 @@ Immediate validation backlog (mining-first):
 - Validate per-upgrade gains against upgrade price progression.
 - Validate halving timing and post-halving output behavior end-to-end.
 
+Immediate delivery backlog (security-first auth):
+
+- Phase 1: backend auth core (users, sessions, role flags, register/login/logout/me/change-password, rate limiting, tests).
+- Phase 2: frontend auth/lobby/game split with persistent login/session validation and clean screen routing.
+- Phase 3: security hardening and audit polish (headers, stricter validation, audit log coverage, dependency/security audits).
+- Phase 4 (explicitly deferred): forgot-password via email, reset-token flow, email templates, and related end-to-end tests.
+
 ### Release Preparation (Not Started)
 
 No release process has been initiated at the current stage.
@@ -393,6 +404,31 @@ Release preparation is understood only at a high level and includes:
 - deployment hardening
 
 Release timing remains intentionally undecided in the current project state.
+
+## 11) Operational Tracking Protocol (Mandatory)
+
+This project now follows a strict high-level documentation protocol so onboarding and handovers remain reliable.
+
+Required updates after each meaningful implementation batch:
+
+- Update this file with a factual checkpoint date and completed items.
+- Update next-step and missing-work bullets so a new developer can continue without tribal context.
+- Keep README aligned with the same status and phase ordering.
+- Reflect test-impact changes explicitly when behavior/contracts change.
+
+Required status content in each checkpoint:
+
+- What is completed and verified (implementation + tests).
+- What is in progress right now.
+- What is next in sequence.
+- What remains intentionally deferred.
+- Known risks, open decisions, and validation gaps.
+
+Source-of-truth rule:
+
+- This baseline remains the canonical technical state.
+- Vision/intent remains in SEASONAL_TYCOON_CONCEPT.md.
+- Locked invariants remain in LOCKED_DECISIONS.md.
 
 ## Concept Alignment & Remaining Work (Non-Binding)
 

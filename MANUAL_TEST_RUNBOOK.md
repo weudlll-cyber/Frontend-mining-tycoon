@@ -45,7 +45,7 @@ Confirm Vite listens on `http://localhost:5173` and both entries build:
 2. If `REQUIRE_ADMIN_FOR_GAME_CREATE=true`: Enter Admin Token as `test-admin-secret`
 3. **Round Type**: Select "Sync"
 4. **Time Configuration**:
-   - Enrollment Window: 30 seconds (default 600)
+   - Enrollment Window: 10 seconds (default 10)
    - Round Duration: 5 minutes (preset)
 5. **Scoring Mode**: Leave as "Stockpile" (default)
 6. **Trading Rules**: Leave as 0 trades (default for 5m round)
@@ -59,14 +59,14 @@ Confirm Vite listens on `http://localhost:5173` and both entries build:
 ### 1.3 — Create an Async Round
 1. **Round Type**: Select "Async (host)"
 2. **Time Configuration**:
-   - Round Duration: 10 minutes
-   - Session Duration: 1 hour
+   - Round Duration: 30 minutes
+   - Session Duration: 5 minutes
 3. **Scoring Mode**: Select "Power"
 4. Review summary shows:
    - Round type: Async (host)
    - Scoring mode: Power
-   - Duration: 10m
-   - Session duration: 1h
+   - Duration: 30m
+   - Session duration: 5m
 5. Click "Create Round" and verify success
 
 ### 1.4 — Permission Enforcement (if enabled)
@@ -98,7 +98,7 @@ Confirm Vite listens on `http://localhost:5173` and both entries build:
 ### 2.3 — Join Created Round
 1. Enter the Game ID from admin setup (e.g., `12345`)
 2. Enter any Player Name (e.g., "TestPlayer")
-3. Click "Start Stream"
+3. Click "Start Game"
 4. Verify player connects and sees:
    - Countdown timer (⏱ shows round remaining time)
    - Game status badge
@@ -165,10 +165,10 @@ Confirm Vite listens on `http://localhost:5173` and both entries build:
 
 ### 5.1 — Admin Defaults Match Library
 1. Open admin setup and verify defaults match `src/config/`:
-   - Enrollment window default: 600 seconds ✓
-   - Default round duration: 30 minutes (sync) ✓
-   - Default async round: shown from `ASYNC_ROUND_PRESET_IDS` ✓
-   - Default session duration: shown from `ASYNC_SESSION_PRESET_IDS` ✓
+   - Enrollment window default: 10 seconds ✓
+   - Default round duration: 5 minutes (sync) ✓
+   - Default async round duration: 30 minutes ✓
+   - Default session duration: 5 minutes ✓
    - Trade count limits: 0–10 (from `TRADE_COUNT_LIMITS`) ✓
 
 ### 5.2 — Trading Schedule Calculation

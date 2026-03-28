@@ -32,7 +32,7 @@ function buildDomFixture() {
                 <span id="round-mode-badge">Round: Sync</span>
               </div>
               <div class="button-group">
-                <button id="start-btn" class="btn-secondary" type="button">Start Stream</button>
+                <button id="start-btn" class="btn-secondary" type="button">Start Game</button>
                 <button id="start-session-btn" class="btn-secondary" type="button" hidden>Start Session</button>
                 <button id="stop-btn" class="btn-secondary" type="button">Stop Stream</button>
               </div>

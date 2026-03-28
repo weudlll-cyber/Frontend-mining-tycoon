@@ -10,6 +10,11 @@ Security notes:
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  STORAGE_KEYS,
+  getPlayerTokenStorageKey,
+  getStorageItem,
+} from './utils/storage-utils.js';
 
 function buildDomFixture() {
   document.body.innerHTML = `
@@ -19,6 +24,11 @@ function buildDomFixture() {
       <input id="game-duration" value="300" />
       <input id="enrollment-window" value="60" />
       <input id="game-id" value="1" />
+      <select id="active-game-select">
+        <option value="">No enrolling/running games</option>
+      </select>
+      <button id="refresh-active-games-btn" type="button"></button>
+      <div id="active-game-status"></div>
       <input id="player-id" value="1" />
       <input id="show-advanced-overrides" type="checkbox" />
       <div id="advanced-overrides" style="display:none"></div>
@@ -58,8 +68,80 @@ async function loadMainModule() {
 
 beforeEach(() => {
   vi.resetModules();
+  vi.unstubAllGlobals();
   buildDomFixture();
 });
+
+describe('stream start join behavior', () => {
+  it('auto-joins and persists player context when player id is missing', async () => {
+    const module = await loadMainModule();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ player_id: 42, player_token: 'token-42' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const playerId = await module.ensurePlayerJoinedForStream({
+      baseUrl: 'http://127.0.0.1:8000',
+      gameId: 'game-7',
+      playerId: '',
+    });
+
+    expect(playerId).toBe('42');
+    expect(document.getElementById('player-id').value).toBe('42');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain('/games/game-7/join');
+    expect(getStorageItem(STORAGE_KEYS.gameId)).toBe('game-7');
+    expect(getStorageItem(STORAGE_KEYS.playerId)).toBe('42');
+    expect(getStorageItem(getPlayerTokenStorageKey('game-7', '42'))).toBe(
+      'token-42'
+    );
+  });
+
+  it('does not call join endpoint when player id is already present', async () => {
+    const module = await loadMainModule();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ game_id: 'game-7', player_id: '77' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const playerId = await module.ensurePlayerJoinedForStream({
+      baseUrl: 'http://127.0.0.1:8000',
+      gameId: 'game-7',
+      playerId: '77',
+    });
+
+    expect(playerId).toBe('77');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain('/games/game-7/state');
+  });
+
+  it('re-joins when existing player id does not belong to selected game', async () => {
+    const module = await loadMainModule();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ player_id: 88, player_token: 'token-88' }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const playerId = await module.ensurePlayerJoinedForStream({
+      baseUrl: 'http://127.0.0.1:8000',
+      gameId: 'game-7',
+      playerId: '77',
+    });
+
+    expect(playerId).toBe('88');
+    expect(document.getElementById('player-id').value).toBe('88');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toContain('/games/game-7/state');
+    expect(fetchMock.mock.calls[1][0]).toContain('/games/game-7/join');
+  });
+});
+
 describe('Seasonal Oracle frontend helpers', () => {
   it('accepts contract version 2 and rejects unsupported versions', async () => {
     const module = await loadMainModule();
@@ -67,6 +149,28 @@ describe('Seasonal Oracle frontend helpers', () => {
     expect(module.isContractVersionSupported(2)).toBe(true);
     expect(module.isContractVersionSupported(3)).toBe(false);
     expect(module.isContractVersionSupported(0)).toBe(false);
+  });
+
+  it('formats active-game labels for enrolling and running states', async () => {
+    const module = await loadMainModule();
+
+    expect(
+      module.formatActiveGameOptionLabel({
+        game_id: 12,
+        game_status: 'enrolling',
+        enrollment_remaining_seconds: 9,
+        players_count: 1,
+      })
+    ).toContain('starts in 00:09');
+
+    expect(
+      module.formatActiveGameOptionLabel({
+        game_id: 21,
+        game_status: 'running',
+        run_remaining_seconds: 125,
+        players_count: 3,
+      })
+    ).toContain('02:05 left');
   });
 
   it('normalizes token names with safe fallback to defaults', async () => {

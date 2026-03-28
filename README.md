@@ -24,6 +24,35 @@ This app lets you:
   - upgrade impact compared to upgrade cost progression
   - halving trigger and post-halving behavior
 
+## Current Delivery Status (2026-03-28)
+
+This section is an operational handover snapshot for incoming developers.
+
+- Completed recently:
+  - Active game discovery flow is available for players.
+  - Active game list filtering shows enrolling rounds and running asynchronous rounds only.
+  - Active game list auto-refreshes every 5 seconds.
+  - Setup/join panel auto-collapses after successful join.
+- Approved and next (not yet implemented):
+  - Phase 1: core backend auth and role support.
+  - Phase 2: frontend auth/lobby/game screen split.
+  - Phase 3: security hardening and audit polish.
+- Explicitly deferred:
+  - Forgot-password and email-reset flow (moved to later phase after core auth is stable).
+
+If this section and PROJECT_BASELINE.md differ, treat PROJECT_BASELINE.md as the source of truth and update this section in the same workstream.
+
+## Documentation Update Rule (Mandatory)
+
+After every meaningful behavior change:
+
+- Update PROJECT_BASELINE.md with current factual implementation status.
+- Update this README delivery snapshot (completed, next, missing, deferred).
+- Update relevant runbook/API/security docs when contract behavior changes.
+- Include test-impact notes whenever behavior or interfaces change.
+
+Goal: a new developer should be able to join and continue work without private context.
+
 ## Project Baseline (Authoritative)
 
 The current implemented state of the game is documented in [PROJECT_BASELINE.md](PROJECT_BASELINE.md).
@@ -70,7 +99,7 @@ Round configuration is **admin-only** and is managed separately from the player 
 **For Players (index.html)**
 1. Navigate to `http://localhost:5173`
 2. Enter Backend URL, Player Name, and Game ID (provided by admin)
-3. Click "Start Stream" to join and begin playing
+3. Click "Start Game" to join and begin playing
 
 **For Admins (admin.html)**
 1. Navigate to `http://localhost:5173/admin.html`
@@ -146,7 +175,7 @@ If port `5173` is already used, Vite automatically selects the next free port.
 
 - keep Backend URL as `http://127.0.0.1:8000`
 - click `+ New Game`
-- click `Start Stream`
+- click `Start Game`
 
 For async rounds, use the explicit session action:
 
@@ -235,9 +264,9 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Compact Game Header (top)**: One-line gameplay stats (countdown, phase, score, rank, top, connection) with an inline **Debug** disclosure panel.
 - **Debug (inline toggle, collapsed by default)**: Shows contract/meta details and runtime diagnostics (meta hash, duration, emission/cycles metadata, backend URL, game/player IDs) without using overlays.
 - **Setup Panel (collapsible)**: "Menu / Setup" toggle collapses setup during play; setup area has its own internal scroll and never blocks the live board.
-- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Stream`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` appears only for async rounds and `Start Stream` remains gated until a valid async session exists.
+- **Primary Setup Actions and round mode context**: The Setup panel always shows `+ New Game`, `Start Game`, and `Stop Stream`, plus a `Round: Sync/Async` badge. `Start Session` remains available as an explicit async control, but `Start Game` is the one-click path that handles join plus any required async session setup before connecting the live view.
 - **Scoring mode selection (pre-round only)**: Setup includes `Scoring Mode (fixed for this round)` with four options (Stockpile default, Power, Mining Time Equivalent, Efficiency). Selection is locked after the round starts.
-- **Explicit async session start flow**: In async mode with backend session support, `Start Stream` is intentionally gated until `Start Async Session` succeeds. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
+- **Explicit async session start flow**: In async mode with backend session support, `Start Game` is the primary one-click action and will start the required async session before connecting the live view. Policy-window denials are shown inline in setup (`Session cannot be started now (policy window closed).`) without modal interruptions.
 - **Top summary async badge**: A small non-blocking status badge appears in the header summary line for async rounds (`Async: Ready` or `Async: Session Active`).
 - **Best-of visibility (async mode only)**: When playing async/best-of rounds, the Player State panel displays `This session` and `Best this round` score values inline with exact-value tooltips. These fields are hidden in sync mode.
 - **Session active badge**: After successful async start, the header summary line shows `Async: Session Active`.
@@ -325,7 +354,7 @@ Use this checklist to validate mining-only gameplay before Trading and Farming U
 
 1. Start backend and worker, then confirm backend status endpoint is healthy.
 2. Start frontend and create a new round in Sync mode.
-3. Join as one player and start stream.
+3. Join as one player and start the game.
 4. Record initial values in a notes table:
 
 - Time
@@ -442,7 +471,7 @@ Setup panel placement (desktop):
 
 ```text
 Primary Actions
-[ + New Game ] [ Start Stream ] [ Start Session (Async) ] [ Stop Stream ]
+[ + New Game ] [ Start Game ] [ Start Session (Async) ] [ Stop Stream ]
                  (enabled after async session exists)
 ```
 

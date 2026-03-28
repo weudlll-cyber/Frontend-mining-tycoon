@@ -42,7 +42,7 @@ function buildFixture() {
     <input id="game-id" value="game-1" />
     <input id="player-id" value="player-1" />
     <button id="new-game-btn" type="button">+ New Game</button>
-    <button id="start-btn" type="button">Start Stream</button>
+    <button id="start-btn" type="button">Start Game</button>
     <button id="start-session-btn" type="button" hidden>Start Session</button>
     <button id="stop-btn" type="button">Stop Stream</button>
     <span id="round-mode-badge">Round: Sync</span>
@@ -158,9 +158,9 @@ describe('setup shell async readiness', () => {
     expect(asyncStatus?.textContent).toContain('Async: Ready');
     expect(startSessionBtn?.hidden).toBe(false);
     expect(startSessionBtn?.disabled).toBe(false);
-    expect(document.getElementById('start-btn')?.disabled).toBe(true);
+    expect(document.getElementById('start-btn')?.disabled).toBe(false);
     expect(note?.textContent).toContain(
-      'Start Session (Async) to reconnect this game'
+      'Start Game handles join, async session start, and live connection'
     );
   });
 
