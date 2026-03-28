@@ -1,3 +1,4 @@
+// Tests portfolio value display formatting and tooltip metadata.
 import { describe, expect, it } from 'vitest';
 import {
   installMainTestHooks,

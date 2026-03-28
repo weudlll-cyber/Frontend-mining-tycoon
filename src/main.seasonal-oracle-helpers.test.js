@@ -1,3 +1,4 @@
+// Tests helper functions used by the seasonal oracle main UI.
 import { describe, expect, it, vi } from 'vitest';
 import {
   installMainTestHooks,

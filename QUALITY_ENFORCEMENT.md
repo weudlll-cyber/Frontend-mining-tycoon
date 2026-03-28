@@ -32,7 +32,7 @@ Mandatory local gate command (run directly or via hook):
 Required blocking checks in local gate:
 
 - docs presence + non-empty validation
-- eslint
+- clean source audit (`npm run clean:audit`)
 - prettier format check
 - vitest unit tests
 - vitest coverage run

@@ -33,10 +33,16 @@ This section is an operational handover snapshot for incoming developers.
   - Active game list filtering shows enrolling rounds and running asynchronous rounds only.
   - Active game list auto-refreshes every 5 seconds.
   - Setup/join panel auto-collapses after successful join.
+  - Admin game management in `admin.html` now supports delete actions, round-type labels, active-only filtering, and status-based time remaining display.
+  - Pre-merge quality checks now include `npm run clean:audit` (strict unused-code/dependency checks).
 - Approved and next (not yet implemented):
   - Phase 1: core backend auth and role support.
   - Phase 2: frontend auth/lobby/game screen split.
   - Phase 3: security hardening and audit polish.
+- Open/missing right now:
+  - Trading execution is still not implemented (status/visibility only).
+  - Farming gameplay is still not implemented (status/visibility only).
+  - Large-file refactors are tracked as advisory code-health follow-up work.
 - Explicitly deferred:
   - Forgot-password and email-reset flow (moved to later phase after core auth is stable).
 
@@ -93,6 +99,10 @@ Round configuration is **admin-only** and is managed separately from the player 
 - All 7 configuration sections (Round Type, Duration, Scoring, Trading, Advanced Overrides) auto-populate from control-data constants.
 - Admin enters optional token if server enforces `REQUIRE_ADMIN_FOR_GAME_CREATE=true`.
 - Inline error messages if permission is denied.
+- Section 8 game management lists active rounds only (enrolling/running), shows sync/async labels, and supports game delete from UI.
+- Time remaining in game management is status-aware:
+  - enrolling -> enrollment window time left
+  - running -> running duration time left
 
 ### How to Use
 
@@ -239,7 +249,7 @@ Daily usage:
 What happens before push:
 
 - required frontend docs presence check
-- `npm run lint`
+- `npm run clean:audit` (eslint + strict unused checks + dependency/file usage scan)
 - `npm run format:check`
 - `npm run test -- --run`
 - `npm run test:coverage`
@@ -253,6 +263,7 @@ Run the structural audit manually at any time:
 
 ```powershell
 npm run audit:health
+npm run clean:audit
 ```
 
 ## UI Layout

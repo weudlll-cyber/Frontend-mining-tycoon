@@ -41,13 +41,20 @@ Use this file as the source of truth for local push gates, CI merge requirements
 
 All of the following must pass before merge:
 
-- `npm run lint`
+- `npm run clean:audit`
 - `npm run format:check`
 - `npm run test -- --run`
 - `npm run test:coverage`
 - `Changed lines coverage` (CI PR check)
 - `npm run build`
 - `npm audit --omit=dev --audit-level=high`
+
+Development execution cadence (required):
+
+- During implementation: run targeted checks/tests only for changed modules to keep iteration fast.
+- Before every commit: run full local gate (`npm run check:all`).
+- Before every push and merge: ensure the same full gate is green (hook/script will enforce again).
+- If behavior/contracts changed, complete doc updates in the same change before commit.
 
 Recommended structural audit before larger merges:
 

@@ -1,3 +1,4 @@
+// Tests deterministic trading schedule defaults and unlock offsets.
 import { describe, expect, it } from 'vitest';
 import {
   TRADE_COUNT_LIMITS,

@@ -1,3 +1,4 @@
+// Tests compact number formatting for UI value rendering.
 import { describe, expect, it } from 'vitest';
 import {
   installMainTestHooks,
