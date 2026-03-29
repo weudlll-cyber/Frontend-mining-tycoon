@@ -32,7 +32,6 @@ if (-not (Test-Path $StateFile)) {
 
 $state = Get-Content -Path $StateFile -Raw | ConvertFrom-Json
 $procId = [int]$state.pid
-$marker = [string]$state.marker
 $expectedPort = [int]$state.port
 
 if ($procId -le 0) {

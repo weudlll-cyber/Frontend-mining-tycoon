@@ -56,12 +56,6 @@ Write-Host "✓ Build complete" -ForegroundColor Green
 # Step 2: Create deployment manifest
 Write-Host "Creating deployment package..." -ForegroundColor Cyan
 
-$deploymentFiles = @(
-    "dist/*",
-    "public/*",
-    "index.html"
-)
-
 $excludePatterns = @(
     "src/",
     "scripts/",
