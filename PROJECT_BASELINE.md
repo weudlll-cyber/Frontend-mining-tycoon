@@ -302,21 +302,24 @@ The current baseline is stable for the implemented mining-focused loop: backend-
 
 At the same time, the project is still in an iterative phase. Some major areas are intentionally left open so that future decisions can be evaluated against the implemented baseline rather than assumed from design intent alone.
 
-Implementation checkpoint (2026-03-28):
+Implementation checkpoint (2026-03-30):
 
 - Mining is the only fully implemented and validated gameplay pillar at this time.
 - Active game discovery and selection flow is implemented for players, including backend filtering rules and frontend auto-refresh.
 - Active game list behavior is constrained to joinable states: enrolling rounds plus asynchronous rounds already running; running synchronous rounds are excluded.
+- Async joinability applies a duration-fit guard: rounds are hidden when `session_duration_seconds >= run_remaining_seconds`.
 - Player setup panel now auto-collapses after successful join to preserve gameplay screen space.
 - Frontend now uses a split entry flow: `index.html` for auth/lobby and `player.html` for the live board.
 - Login no longer auto-enters gameplay. Players must select an open game first, then explicitly enter the live board.
 - Player live board now includes an inline return panel with `Open Games` and `Last Game Highscores` so players can re-enter the join flow without leaving `player.html`.
 - The frontend persists the most recent finished-round highscore snapshot locally and restores it into the player return panel.
+- Game-over handling is aligned for async session expiry from both server-driven finish transitions and client-side elapsed-session fallback paths.
+- Start/autostart path is wrapped in defensive error handling to prevent unhandled flow errors from collapsing player state transitions.
 - Lobby now consumes the provided seasonal start background asset from `public/assets/backgrounds/Seasonal Enterteinment.png`.
+- Temporary fast-test preset `1m` is available in round/session setup control data; this is a local testing convenience and a release blocker for production default cleanup.
 - Trading UI and Farming UI work are not started yet beyond explicit placeholder visibility/status in the layout.
 - Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
-- Backend support for rich registration persistence (display name/discord/telegram) and strict unique-username enforcement is still pending for full end-to-end completion.
-- Backend forgot-password reset endpoint support is still pending for full end-to-end completion.
+- Stable rollback tag for this checkpoint: `checkpoint/2026-03-30-stable-01`.
 
 ### Round Formats & Shared Chat (Non-Binding Status)
 

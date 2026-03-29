@@ -1,10 +1,16 @@
 # Frontend Test Audit Report (2026-03-25)
 
+Status note as of 2026-03-30:
+- This is a point-in-time test audit snapshot.
+- It should be read as historical audit context, not as the latest authoritative test count.
+- The current verified repo state is tracked in `README.md`, `PROJECT_BASELINE.md`, and the pre-push gate outputs.
+- Latest verified full-suite count at the 2026-03-30 stable checkpoint: `372 passed`.
+
 ## Scope
 
 This audit summarizes current frontend test coverage quality, practical risk gaps, and execution structure improvements.
 
-## Current Snapshot
+## Current Snapshot At Audit Time
 
 - Test framework: Vitest + jsdom
 - Coverage enforcement: global thresholds in `vitest.config.js`

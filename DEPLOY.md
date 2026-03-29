@@ -1,9 +1,12 @@
 # VPS Deployment Guide
 
-## Quick Start (3 Schritte)
+This file is the current frontend deployment guide.
+For the current implementation state, always cross-check with `README.md`, `PROJECT_BASELINE.md`, and `DOCS_STATUS.md`.
+
+## Quick Start (3 Steps)
 
 ```powershell
-# 1. Deploy mit dem Script
+# 1. Deploy with the script
 .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/game"
 
 # 2. Or with SSH key
@@ -13,38 +16,38 @@
 .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/game" -DryRun
 ```
 
-Wenn Frontend und Backend gemeinsam auf dieselbe VPS sollen, verwende stattdessen das Full-Stack-Script aus dem sibling backend repo:
+If frontend and backend should be deployed to the same VPS, use the full-stack script from the sibling backend repo instead:
 
 ```powershell
 Set-Location "..\Mining tycoon"
 & .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com"
 ```
 
-## Was wird deployed?
+## What Gets Deployed?
 
-✅ **Mitgesendet (Production):**
+Included in production deploy:
 - `dist/` - Compiled & optimized app
 - `public/` - Assets (favicon, etc.)
 - `index.html` - Entry point
 
-❌ **NICHT mitgesendet (Dev only):**
+Not deployed:
 - `src/` - Source code
 - `node_modules/` - Dependencies
 - `scripts/` - Build scripts
 - `*.test.js` - Test files
 - `.github/`, `.git/` - VCS stuff
-- Dokumentation (*.md)
+- Documentation (`*.md`)
 
-## Was brauchst du auf dem VPS?
+## What You Need On The VPS
 
-**Minimal Setup:**
-1. **Ein Web-Server** (nginx, Apache, oder Node.js http-server)
-2. **Deine Backend-URL** (in den App-Settings z.B. http://api.your-game.com)
-3. **CORS konfiguriert** (falls Backend auf anderem Server)
+Minimum setup:
+1. A web server such as nginx, Apache, or a static file server
+2. Your backend URL, for example `http://api.your-game.com`
+3. Correct backend CORS configuration if frontend and backend are on different origins
 
-Hinweis: Dieses Frontend-Script deployed nur die statischen Produktionsdateien. Das Backend-Bootstraping mit `venv`, `systemd` und Healthcheck passiert im Backend-Script `..\Mining tycoon\scripts\deploy-backend.ps1` oder gesammelt über `..\Mining tycoon\deploy-full-stack.ps1`.
+Note: this frontend script deploys only the static production assets. Backend bootstrap work such as `venv`, `systemd`, and health checks is handled by `..\Mining tycoon\scripts\deploy-backend.ps1` or by `..\Mining tycoon\deploy-full-stack.ps1`.
 
-## Nginx Config (Beispiel)
+## Example Nginx Config
 
 ```nginx
 server {
@@ -53,12 +56,12 @@ server {
     root /var/www/game;
     index index.html;
     
-    # Single Page App - alle Anfragen auf index.html
+    # Single-page app fallback
     location / {
         try_files $uri /index.html;
     }
     
-    # Static Assets - cachen
+    # Cache static assets
     location ~* \.(js|css|svg|png|jpg|gif)$ {
         expires 7d;
         add_header Cache-Control "public, immutable";
@@ -66,17 +69,17 @@ server {
 }
 ```
 
-## Ohne rsync deployen?
+## Deploy Without `rsync`
 
-Falls dein VPS kein rsync hat, nutze diese Alternativen:
+If your VPS does not have `rsync`, use one of these alternatives.
 
-### Option 1: ZIP + Upload
+### Option 1: ZIP + upload
 ```powershell
 # Lokal:
 npm run build
 Compress-Archive -Path dist, public, index.html -DestinationPath deploy.zip
 
-# Dann deploy.zip auf VPS hochladen und entpacken
+# Then upload deploy.zip to the VPS and extract it
 unzip deploy.zip -d /var/www/game
 ```
 
@@ -88,35 +91,35 @@ npm run build
 # (oder im VPS ein post-receive hook mit npm run build)
 ```
 
-### Option 3: FTP/SFTP (Fallback)
-Mit WinSCP oder FileZilla:
+### Option 3: FTP/SFTP fallback
+Using WinSCP or FileZilla:
 1. Lokal: `npm run build`
 2. Upload `dist/`, `public/`, `index.html` in VPS-Pfad
 
-## Backend konfigurieren
+## Configure The Backend URL
 
-Der App braucht zu wissen, wo der Backend ist. Das stellst du im Spiel in den Settings ein, z.B.:
+The app must know where the backend is. Configure it in the app settings, for example:
 ```
 http://api.your-vps.com:5000
 ```
 
-Stell sicher:
-- Backend hat CORS headers für deine Frontend-Domain
-- Backend läuft und ist erreichbar
-- Firewall erlaubt die Verbindung
+Make sure:
+- the backend sends CORS headers for your frontend origin
+- the backend is reachable
+- firewall rules allow the connection
 
 ## Troubleshooting
 
-**"dist/ Fehler"**
+**"dist/" errors**
 ```powershell
-npm run build  # Manuell ausführen, Fehler beheben
+npm run build  # Run manually and fix the reported build errors
 ```
 
 **"rsync: command not found"**
-→ rsync auf VPS installieren: `sudo apt install rsync`
+Install `rsync` on the VPS: `sudo apt install rsync`
 
-**"404 beim Neuladen einer Route"**
-→ Web-server konfiguriert richtig (try_files $uri /index.html)?
+**"404 when reloading a route"**
+Check whether your web server is configured with `try_files $uri /index.html`.
 
-**"CORS Fehler im Browser"**
-→ Backend muss `Access-Control-Allow-Origin` header setzen
+**"CORS error in browser"**
+The backend must send `Access-Control-Allow-Origin` for the frontend origin.

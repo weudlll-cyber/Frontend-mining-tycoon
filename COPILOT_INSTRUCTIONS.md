@@ -34,6 +34,21 @@ Cross-repo rule:
 - Keep frontend and backend contracts aligned; do not change one side in ways that silently break the other.
 - If contracts diverge, update docs/tests on both sides or stop and raise change-control requirements.
 
+## 1.2) Umbrella Workspace Context
+
+When a task changes startup flow, testing workflow, full-stack handover, or other cross-repo operator guidance, also review umbrella workspace docs under `C:\Users\weudl\`:
+
+- `DOCS_STATUS.md`
+- `FULL_STACK_AUDIT_SUMMARY.md`
+- `HOW_TO_START_THE_GAME_STEP_BY_STEP.txt`
+- `HOW_TO_RUN_TESTS_AND_CHECKS_STEP_BY_STEP.txt`
+- `PRINT_ME_DAILY_GAME_START_CHECKLIST.txt`
+- `QUICK_START_TESTS_AND_CHECKS.txt`
+
+Rule:
+
+- Important umbrella docs must be kept aligned before PR or merge whenever the described workflow or handover behavior changes.
+
 ## 2) Architecture & Gameplay Invariants (Must Preserve)
 
 - Backend remains authoritative and deterministic; frontend remains display/intent only.
@@ -130,6 +145,7 @@ For every source file touched or created:
   - update `README.md` and/or `PROJECT_BASELINE.md` when behavior/UI contract changes
   - update other affected frontend docs (`CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `CODE_ORGANIZATION.md`, `SECURITY_AUDIT.md`, concept docs) when their statements become stale
   - if the change affects backend contracts, runtime behavior, security posture, or operational steps, review and update sibling backend docs in the same workstream
+  - if the change affects startup/testing/full-stack workflow or handover guidance, review and update the important umbrella workspace docs in the same workstream
   - if docs are unchanged, explicitly state why
 - Run all quality gates before push:
   - `npm run lint`

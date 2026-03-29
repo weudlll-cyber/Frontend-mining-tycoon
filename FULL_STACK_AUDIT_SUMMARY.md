@@ -4,6 +4,11 @@ Date: 2026-03-19
 Branch: chore/audit-refresh-20260319
 Status: In progress
 
+Status note as of 2026-03-30:
+- This file is an incomplete historical audit snapshot from 2026-03-19.
+- It is not the current full-stack source of truth.
+- Use the umbrella `C:\Users\weudl\FULL_STACK_AUDIT_SUMMARY.md` plus repo `README.md`, `PROJECT_BASELINE.md`, and `DOCS_STATUS.md` files for the current state.
+
 ## Step 0 Discovery
 
 Frontend repo:

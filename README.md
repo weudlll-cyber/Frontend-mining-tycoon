@@ -14,7 +14,7 @@ This app lets you:
   - choose pay token inline per upgrade lane (target token is the season card)
   - submit display-only intent; backend remains authoritative for conversion/cost outcome
 
-## Current Implementation Status (2026-03-25)
+## Current Implementation Status (2026-03-30)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
 - **Trading now has an initial scaffold**: read-only panel and capability-driven status both in dedicated UI panel and bottom-bar, but trade execution and fee calculation remain unimplemented.
@@ -24,7 +24,7 @@ This app lets you:
   - upgrade impact compared to upgrade cost progression
   - halving trigger and post-halving behavior
 
-## Current Delivery Status (2026-03-28)
+## Current Delivery Status (2026-03-30)
 
 This section is an operational handover snapshot for incoming developers.
 
@@ -38,13 +38,16 @@ This section is an operational handover snapshot for incoming developers.
   - Lobby applies the provided background image from `public/assets/backgrounds/Seasonal Enterteinment.png`.
   - Admin game management in `admin.html` now supports delete actions, round-type labels, active-only filtering, and status-based time remaining display.
   - Pre-merge quality checks now include `npm run clean:audit` (strict unused-code/dependency checks).
+  - Async fallback flow now shows the same `Game Over` handling when a session ends from the client-side expiry path.
+  - Start and auto-start flow hardening prevents unhandled start errors from breaking the UI flow.
+  - Lobby join filtering now excludes async rounds where `session_duration_seconds >= run_remaining_seconds`.
+  - Temporary `1m` duration preset is enabled for fast local/manual test cycles and must be removed before production rollout.
+  - Stable rollback checkpoint tag is available: `checkpoint/2026-03-30-stable-01`.
 - Approved and next (not yet implemented):
   - Phase 1: core backend auth and role support.
   - Phase 2: frontend auth/lobby/game screen split.
   - Phase 3: security hardening and audit polish.
 - Open/missing right now:
-  - Backend extension for rich registration persistence and strict unique username enforcement is required to fully satisfy all lobby form fields.
-  - Backend forgot-password endpoint support is required for full end-to-end reset flow from the lobby dialog.
   - Trading execution is still not implemented (status/visibility only).
   - Farming gameplay is still not implemented (status/visibility only).
   - Large-file refactors are tracked as advisory code-health follow-up work.
@@ -64,6 +67,18 @@ After every meaningful behavior change:
 - Include test-impact notes whenever behavior or interfaces change.
 
 Goal: a new developer should be able to join and continue work without private context.
+
+## New Chat Bootstrap Prompt (Reusable)
+
+Use this prompt whenever you start a new chat and want immediate continuity:
+
+```text
+New session for Mining Tycoon.
+Please load context from PROJECT_BASELINE.md and README.md in both frontend and backend repos.
+Use checkpoint tag checkpoint/2026-03-30-stable-01 as the latest known stable rollback point.
+Current objective: <replace with today's goal>.
+Constraints: backend-authoritative behavior only, update docs with code changes, and run full frontend+backend gates before push.
+```
 
 ## Project Baseline (Authoritative)
 
@@ -161,6 +176,7 @@ When using Copilot, always instruct it to not violate LOCKED_DECISIONS.md.
 
 Use these files as the current documentation set for the frontend repo:
 
+- `DOCS_STATUS.md`: quick index of which docs are canonical current vs historical snapshots
 - `README.md`: quick start, UI behavior, runbook, and current implementation scope
 - `PROJECT_BASELINE.md`: canonical factual baseline of what is implemented right now
 - `SEASONAL_TYCOON_CONCEPT.md`: high-level game vision and product intent
@@ -234,6 +250,7 @@ For async rounds, use the explicit session action:
 
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
+- set `Round Duration` (1m temporary test preset, 5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (5m, 10m, 30m, 1h, 6h, 12h, 1d)
 - keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
 - click `+ New Game`
