@@ -28,12 +28,14 @@ describe('ui-update-state helpers', () => {
       streamSession: { session_id: 's1', status: 'finished' },
     });
     expect(ended.shouldClearActiveSession).toBe(true);
+    expect(ended.clearReason).toBe('ended');
 
     const replaced = deriveStreamSessionState({
       activeSession: { sessionId: 's1', sessionStartUnix: 100 },
       streamSession: { session_id: 's2', status: 'running' },
     });
     expect(replaced.shouldClearActiveSession).toBe(true);
+    expect(replaced.clearReason).toBe('replaced');
   });
 
   it('resolves countdown modes from game status and session activity', () => {

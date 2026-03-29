@@ -58,6 +58,133 @@ describe('Seasonal Oracle frontend helpers', () => {
     expect(gameIdEl.value).toBe('248');
   });
 
+  it('auto-selects the first visible joinable game when the current game id is empty', async () => {
+    localStorage.clear();
+    const module = await loadMainModule();
+
+    const gameIdEl = document.getElementById('game-id');
+    gameIdEl.value = '';
+
+    module.renderActiveGameOptions([
+      {
+        game_id: 'game-22',
+        game_status: 'enrolling',
+        enrollment_remaining_seconds: 18,
+        players_count: 1,
+      },
+    ]);
+
+    expect(document.getElementById('active-game-select').value).toBe('game-22');
+    expect(gameIdEl.value).toBe('game-22');
+  });
+
+  it('filters finished games out of the joinable open-games list', async () => {
+    localStorage.clear();
+    const module = await loadMainModule();
+
+    expect(
+      module.normalizeJoinableActiveGames([
+        {
+          game_id: 'game-finished',
+          game_status: 'finished',
+          players_count: 1,
+        },
+        {
+          game_id: 'game-open',
+          game_status: 'enrolling',
+          players_count: 2,
+          enrollment_remaining_seconds: 12,
+        },
+      ])
+    ).toEqual([
+      {
+        game_id: 'game-open',
+        game_status: 'enrolling',
+        players_count: 2,
+        enrollment_remaining_seconds: 12,
+      },
+    ]);
+    module.renderActiveGameOptions([
+      {
+        game_id: 'game-finished',
+        game_status: 'finished',
+        players_count: 1,
+      },
+      {
+        game_id: 'game-open',
+        game_status: 'enrolling',
+        players_count: 2,
+        enrollment_remaining_seconds: 12,
+      },
+    ]);
+
+    const optionValues = Array.from(
+      document.getElementById('active-game-select').options
+    ).map((option) => option.value);
+
+    expect(optionValues).toEqual(['', 'game-open']);
+  });
+
+  it('resolves the selected visible game when the stored game id is stale', async () => {
+    localStorage.clear();
+    const module = await loadMainModule();
+
+    const gameIdEl = document.getElementById('game-id');
+    const activeGameSelectEl = document.getElementById('active-game-select');
+
+    gameIdEl.value = 'finished-game';
+    module.renderActiveGameOptions([
+      {
+        game_id: 'game-open',
+        game_status: 'enrolling',
+        players_count: 2,
+        enrollment_remaining_seconds: 12,
+      },
+    ]);
+    activeGameSelectEl.value = 'game-open';
+
+    expect(module.resolveRequestedGameId()).toBe('game-open');
+    expect(gameIdEl.value).toBe('game-open');
+  });
+
+  it('reports the same count as the rendered joinable options', async () => {
+    localStorage.clear();
+    await loadMainModule();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          game_id: 'game-finished',
+          game_status: 'finished',
+          players_count: 1,
+        },
+        {
+          game_id: 'game-open',
+          game_status: 'enrolling',
+          enrollment_remaining_seconds: 12,
+          players_count: 2,
+        },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document
+      .getElementById('refresh-active-games-btn')
+      .dispatchEvent(new Event('click'));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(document.getElementById('active-game-status').textContent).toBe(
+      'Loaded 1 active game.'
+    );
+    expect(
+      Array.from(document.getElementById('active-game-select').options).map(
+        (option) => option.value
+      )
+    ).toEqual(['', 'game-open']);
+  });
+
   it('shows a clear empty-state message when no joinable games are available', async () => {
     localStorage.clear();
     await loadMainModule();

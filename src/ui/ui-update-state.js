@@ -16,6 +16,7 @@ export function deriveStreamSessionState({ activeSession, streamSession }) {
     streamSessionId.length > 0 || streamSessionStatus.length > 0;
 
   let shouldClearActiveSession = false;
+  let clearReason = null;
   if (activeSession?.sessionId) {
     const localSessionId = String(activeSession.sessionId);
     const thisSessionEndedExplicitly =
@@ -26,6 +27,11 @@ export function deriveStreamSessionState({ activeSession, streamSession }) {
       streamSessionRunning;
     shouldClearActiveSession =
       thisSessionEndedExplicitly || differentSessionTookOver;
+    if (thisSessionEndedExplicitly) {
+      clearReason = 'ended';
+    } else if (differentSessionTookOver) {
+      clearReason = 'replaced';
+    }
   }
 
   const hasActiveSession =
@@ -37,6 +43,7 @@ export function deriveStreamSessionState({ activeSession, streamSession }) {
     streamSessionRunning,
     hasExplicitSessionSignal,
     shouldClearActiveSession,
+    clearReason,
     hasActiveSession,
     elapsedFromPayload: Number(streamSession?.session_elapsed_seconds),
   };

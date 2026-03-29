@@ -1,0 +1,10 @@
+﻿{
+    "project_root":  "C:\\Users\\weudl\\frontend mining tycoon",
+    "host":  "127.0.0.1",
+    "port":  5173,
+    "started_at":  "2026-03-29T01:32:09.9703393+01:00",
+    "pid":  37780,
+    "marker":  "vite --host 127.0.0.1 --port 5173",
+    "stdout_log":  "C:\\Users\\weudl\\frontend mining tycoon\\data\\frontend_dev_stdout.log",
+    "stderr_log":  "C:\\Users\\weudl\\frontend mining tycoon\\data\\frontend_dev_stderr.log"
+}

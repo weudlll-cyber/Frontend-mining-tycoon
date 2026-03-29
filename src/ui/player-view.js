@@ -157,6 +157,10 @@ export function resetPlayerStateView() {
     _disposeHalvingClock = null;
   }
 
+  if (!_playerStateEl) {
+    return;
+  }
+
   clearNode(_playerStateEl);
   const placeholder = document.createElement('p');
   placeholder.className = 'placeholder';

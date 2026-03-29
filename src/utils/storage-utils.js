@@ -16,6 +16,10 @@ const GAME_META_CACHE_MAX_ENTRIES = 30;
 
 export const STORAGE_KEYS = {
   baseUrl: 'mining-tycoon:baseUrl',
+  authToken: 'mining-tycoon:authToken',
+  authUsername: 'mining-tycoon:authUsername',
+  authDisplayName: 'mining-tycoon:authDisplayName',
+  lastPlayedGameSnapshot: 'mining-tycoon:lastPlayedGameSnapshot',
   playerName: 'mining-tycoon:playerName',
   durationPreset: 'mining-tycoon:durationPreset',
   durationCustomValue: 'mining-tycoon:durationCustomValue',

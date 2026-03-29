@@ -4,7 +4,11 @@ Purpose: Verify async session badge rendering in top summary.
 */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { initLiveSummary, renderAsyncSessionBadge } from './live-summary.js';
+import {
+  initLiveSummary,
+  renderAsyncSessionBadge,
+  renderQuickStats,
+} from './live-summary.js';
 
 describe('live-summary async badge', () => {
   beforeEach(() => {
@@ -85,5 +89,46 @@ describe('live-summary async badge', () => {
     expect(badge.hidden).toBe(false);
     expect(badge.textContent).toContain('Async: Ready');
     expect(badge.classList.contains('badge-blue')).toBe(true);
+  });
+
+  it('uses stable comma formatting for score values', () => {
+    renderQuickStats({
+      player_id: '42',
+      leaderboard_top_5: [
+        { player_id: '42', score: 6343 },
+      ],
+      player_state: { score: 6343 },
+    });
+
+    expect(document.getElementById('my-score')?.textContent).toBe('6,343');
+    expect(document.getElementById('top-score')?.textContent).toBe('6,343');
+  });
+
+  it('shows live async score while session is running even before finalized leaderboard score exists', () => {
+    initLiveSummary({
+      myScoreEl: document.getElementById('my-score'),
+      myRankEl: document.getElementById('my-rank'),
+      topScoreEl: document.getElementById('top-score'),
+      portfolioValueEl: document.getElementById('portfolio-value'),
+      asyncSessionStatusEl: document.getElementById('async-session-status'),
+      getGameMeta: () => ({
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+        oracle_prices: { spring: 10, summer: 10, autumn: 10, winter: 10 },
+      }),
+      defaultTokenNames: ['spring', 'summer', 'autumn', 'winter'],
+    });
+
+    renderQuickStats({
+      game_id: '77',
+      player_id: '1',
+      session: { status: 'running' },
+      leaderboard_top_5: [{ player_id: '1', score: 0 }],
+      player_state: {
+        balances: { spring: 2, summer: 3, autumn: 0, winter: 0 },
+      },
+    });
+
+    expect(document.getElementById('my-score')?.textContent).toBe('50');
+    expect(document.getElementById('top-score')?.textContent).toBe('50');
   });
 });

@@ -183,14 +183,15 @@ Frontend session-mode readiness:
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
 - Tooltip module (`micro-tooltip.js`): single shared non-blocking tooltip contract (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`) used by player-status and season-header info triggers, with hover-stable behavior across SSE ticks.
 
-Dashboard layout (inline, no overlays):
+Dashboard layout (inline during play, post-game overlay allowed after finish):
 
 - **Status Bar (top)**: connection status, game phase, countdown timer, quick stats.
 - **Main Grid (2 columns)**:
   - Left (~65%): 2×2 seasonal card grid with inline upgrade lanes (Hashrate, Efficiency, Cooling) and compact row-table headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP`.
-  - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), with fixed panel width variable and optional docked inline chat below.
+  - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), followed by a split player-return panel (`Open Games` + `Last Game Highscores`) and optional docked inline chat below.
 - **Bottom Bar**: score-context metric display, trading status, farming status, chat toggle.
 - **Chat Panel (docked inline, optional)**: toggleable via bottom bar button; expands/collapses inline in the right column with internal message scrolling only.
+- **Post-game return overlay**: when `game_status=finished`, the player sees a full-screen `Game Over` overlay; clicking it clears the ended game/player context and returns focus to the inline Open Games panel.
 - Desktop no-page-scroll remains enforced; setup and seasons use internal scroll containers, and left column overflow is constrained with `min-width: 0`.
 
 Responsive behavior:
@@ -307,9 +308,15 @@ Implementation checkpoint (2026-03-28):
 - Active game discovery and selection flow is implemented for players, including backend filtering rules and frontend auto-refresh.
 - Active game list behavior is constrained to joinable states: enrolling rounds plus asynchronous rounds already running; running synchronous rounds are excluded.
 - Player setup panel now auto-collapses after successful join to preserve gameplay screen space.
+- Frontend now uses a split entry flow: `index.html` for auth/lobby and `player.html` for the live board.
+- Login no longer auto-enters gameplay. Players must select an open game first, then explicitly enter the live board.
+- Player live board now includes an inline return panel with `Open Games` and `Last Game Highscores` so players can re-enter the join flow without leaving `player.html`.
+- The frontend persists the most recent finished-round highscore snapshot locally and restores it into the player return panel.
+- Lobby now consumes the provided seasonal start background asset from `public/assets/backgrounds/Seasonal Enterteinment.png`.
 - Trading UI and Farming UI work are not started yet beyond explicit placeholder visibility/status in the layout.
 - Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
-- Auth/account system implementation is approved as the top priority next workstream and is not yet implemented in this repo baseline.
+- Backend support for rich registration persistence (display name/discord/telegram) and strict unique-username enforcement is still pending for full end-to-end completion.
+- Backend forgot-password reset endpoint support is still pending for full end-to-end completion.
 
 ### Round Formats & Shared Chat (Non-Binding Status)
 
@@ -387,8 +394,8 @@ Immediate validation backlog (mining-first):
 
 Immediate delivery backlog (security-first auth):
 
-- Phase 1: backend auth core (users, sessions, role flags, register/login/logout/me/change-password, rate limiting, tests).
-- Phase 2: frontend auth/lobby/game split with persistent login/session validation and clean screen routing.
+- Phase 1: backend auth/profile extension (strict unique username, required contact fields persistence, rate limiting, tests).
+- Phase 2: frontend auth/lobby/game split with persistent login/session validation and clean screen routing. (implemented)
 - Phase 3: security hardening and audit polish (headers, stricter validation, audit log coverage, dependency/security audits).
 - Phase 4 (explicitly deferred): forgot-password via email, reset-token flow, email templates, and related end-to-end tests.
 
@@ -469,3 +476,5 @@ Required future work to realize the agreed concept:
 ### D) Frontend / UX Layer
 
 ### E) Platform / Operations
+
+- Integrate approved visual asset pipeline for lobby/background and season artwork from `public/assets/backgrounds` and `public/assets/seasons`.

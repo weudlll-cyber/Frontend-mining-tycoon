@@ -1,6 +1,6 @@
 /**
 File: src/main.js
-Purpose: Browser dashboard client for Mining Tycoon (SSE updates, upgrades, and capabilities metadata).
+Purpose: Browser dashboard client for Mining Tycoon (SSE updates, upgrades, capabilities metadata, and post-game return flow).
 Key responsibilities:
 - Manage SSE lifecycle and reconnect behavior.
 - Fetch/cache meta contracts with ETag, dedupe/throttle, and retention cleanup.
@@ -8,7 +8,7 @@ Key responsibilities:
 - Drive explicit async session creation and session-scoped stream orchestration.
 Invariants:
 - Frontend remains display/intent only; backend stays authoritative for deterministic session policy and timing.
-- No overlays/modals for core gameplay; inline status only.
+- Core gameplay stays inline; only the end-of-game return overlay may block input after a round finishes.
 - Desktop core view must avoid page scroll; only internal panels may scroll.
 Security notes:
 - Use safe DOM APIs only and never render untrusted HTML.
@@ -120,6 +120,11 @@ import {
   initLeaderboard,
   renderLeaderboard as renderTopLeaderboard,
 } from './ui/leaderboard.js';
+import {
+  initLastGameHighscores,
+  buildLastGameSnapshot,
+  renderLastGameHighscores,
+} from './ui/last-game-highscores.js';
 import {
   snapSelection,
   restoreSelectionIfValid,
@@ -261,6 +266,17 @@ const refreshActiveGamesBtn = document.getElementById(
   'refresh-active-games-btn'
 );
 const activeGameStatusEl = document.getElementById('active-game-status');
+const playerReturnPanelEl = document.getElementById('player-return-panel');
+const lastGameSummaryEl = document.getElementById('last-game-summary');
+const lastGameHighscoresEl = document.getElementById('last-game-highscores');
+const gameOverOverlayEl = document.getElementById('game-over-overlay');
+const gameOverTitleEl = document.getElementById('game-over-title');
+const gameOverMessageEl = document.getElementById('game-over-message');
+
+initLastGameHighscores({
+  summaryEl: lastGameSummaryEl,
+  listEl: lastGameHighscoresEl,
+});
 
 function setActiveMeta(meta) {
   initializeModules();
@@ -390,6 +406,11 @@ let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
 let activeGamesById = new Map();
 let activeGamesRefreshInterval = null;
+let lastFinishedGameSnapshot = null;
+let lastFinishedGameId = null;
+let currentViewedGameId = '';
+let hasSeenPlayableStateForCurrentView = false;
+let lastGameStatusForCurrentView = null;
 
 const DEFAULT_SCORING_MODE = SCORING_CONTROL.DEFAULT_MODE;
 
@@ -1119,6 +1140,216 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+function readStoredLastPlayedGameSnapshot() {
+  const raw = getStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeLastPlayedGameSnapshot(snapshot) {
+  if (!snapshot) {
+    setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, '');
+    return;
+  }
+
+  setStorageItem(
+    STORAGE_KEYS.lastPlayedGameSnapshot,
+    JSON.stringify(snapshot)
+  );
+}
+
+function renderLastFinishedGameSnapshot(snapshot) {
+  lastFinishedGameSnapshot = snapshot || null;
+  renderLastGameHighscores(lastFinishedGameSnapshot);
+}
+
+function captureLastPlayedGameSnapshot(data) {
+  const snapshot = buildLastGameSnapshot({
+    data,
+    gameId: data?.game_id || gameIdInput?.value,
+    scoringModeLabel: formatScoringModeName(resolveActiveScoringMode(data)),
+  });
+
+  if (!snapshot) {
+    return null;
+  }
+
+  lastFinishedGameId = snapshot.gameId;
+  renderLastFinishedGameSnapshot(snapshot);
+  storeLastPlayedGameSnapshot(snapshot);
+  return snapshot;
+}
+
+function showGameOverOverlay(gameId = '', options = {}) {
+  if (!gameOverOverlayEl) {
+    console.warn('[Game Over] Overlay element not found in DOM');
+    return;
+  }
+
+  const normalizedGameId = String(gameId || '').trim();
+  const title = String(options?.title || 'Game Over').trim() || 'Game Over';
+  const message = String(options?.message || '').trim();
+  
+  console.log('[Game Over] Showing overlay for game:', normalizedGameId, 'Title:', title);
+  
+  if (gameOverTitleEl) {
+    gameOverTitleEl.textContent = title;
+  }
+  if (gameOverMessageEl) {
+    gameOverMessageEl.textContent = message ||
+      (normalizedGameId
+        ? `Round ${normalizedGameId} finished. Click anywhere to return to the login lobby.`
+        : 'Round finished. Click anywhere to return to the login lobby.');
+  }
+
+  gameOverOverlayEl.hidden = false;
+  console.log('[Game Over] Overlay is now visible');
+}
+
+function isGameOverOverlayEligible({
+  previousGameStatus,
+  gameStatus,
+  gameId,
+  currentGameId,
+} = {}) {
+  const normalizedPreviousStatus = String(previousGameStatus || '')
+    .trim()
+    .toLowerCase();
+  const normalizedCurrentStatus = String(gameStatus || '')
+    .trim()
+    .toLowerCase();
+  const normalizedGameId = String(gameId || '').trim();
+  const normalizedCurrentGameId = String(currentGameId || '').trim();
+
+  return (
+    normalizedPreviousStatus === 'running' &&
+    normalizedCurrentStatus === 'finished' &&
+    Boolean(normalizedGameId) &&
+    normalizedGameId === normalizedCurrentGameId
+  );
+}
+
+function hideGameOverOverlay() {
+  if (!gameOverOverlayEl) {
+    return;
+  }
+  gameOverOverlayEl.hidden = true;
+}
+
+function resetLiveBoardState({ clearPlayerContext = false } = {}) {
+  try {
+    cancelPendingUiRender();
+  } catch (e) {
+    console.error('[Reset] Error canceling pending UI render:', e);
+  }
+  isStreamActive = false;
+  latestGameStatus = null;
+  activeSession = null;
+  currentViewedGameId = '';
+  hasSeenPlayableStateForCurrentView = false;
+  lastGameStatusForCurrentView = null;
+  try {
+    closeEventSourceIfOpen();
+  } catch (e) {
+    console.error('[Reset] Error closing event source:', e);
+  }
+  try {
+    stopLiveTimersAndHalving();
+  } catch (e) {
+    console.error('[Reset] Error stopping live timers:', e);
+  }
+  try {
+    disconnectChat();
+  } catch (e) {
+    console.error('[Reset] Error disconnecting chat:', e);
+  }
+  try {
+    stopSessionElapsedTimer();
+  } catch (e) {
+    console.error('[Reset] Error stopping session timer:', e);
+  }
+  setBadgeStatus(connStatusEl, 'idle');
+  setBadgeStatus(gameStatusEl, 'idle');
+  stopCountdownTimer();
+  lastGameData = null;
+  resetPlayerStateView();
+  resetSectionPlaceholder(leaderboardEl, 'Waiting for game data...');
+  if (myScoreEl) myScoreEl.textContent = '—';
+  if (myRankEl) myRankEl.textContent = '—';
+  if (topScoreEl) topScoreEl.textContent = '—';
+  resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
+  ensureInputsEditable();
+  setLiveSessionActive(false);
+  setStartSessionStatus('', 'info');
+
+  if (clearPlayerContext) {
+    if (gameIdInput) gameIdInput.value = '';
+    if (playerIdInput) playerIdInput.value = '';
+    setStorageItem(STORAGE_KEYS.gameId, '');
+    setStorageItem(STORAGE_KEYS.playerId, '');
+    syncActiveGameSelectFromInput();
+  }
+
+  updateSetupActionsState();
+}
+
+function returnToPlayerPanel({
+  clearPlayerContext = true,
+  statusMessage = '',
+} = {}) {
+  resetLiveBoardState({ clearPlayerContext });
+  setSetupCollapsed(false);
+
+  if (statusMessage) {
+    setActiveGamesStatus(statusMessage);
+  }
+
+  const returnTarget = activeGameSelectInput || playerReturnPanelEl;
+  if (returnTarget?.scrollIntoView) {
+    returnTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (returnTarget?.focus) {
+    returnTarget.focus();
+  }
+
+  void refreshActiveGames({ notifyOnError: false });
+}
+
+function acknowledgeGameOverOverlay() {
+  try {
+    hideGameOverOverlay();
+    resetLiveBoardState({ clearPlayerContext: true });
+  } catch (error) {
+    console.error('[Game Over] Failed to reset live board state:', error);
+    // Fallback: ensure overlay is hidden and navigate anyway
+    try {
+      gameOverOverlayEl.hidden = true;
+    } catch (e) {
+      // Ignore
+    }
+  }
+  // Always attempt navigation, even if reset failed
+  try {
+    window.location.assign('/index.html');
+  } catch (error) {
+    console.error('[Game Over] Navigation failed:', error);
+    // Last resort: use href
+    window.location.href = '/index.html';
+  }
+}
+
 function setLiveSessionActive(isActive) {
   document.body.classList.toggle('live-session', Boolean(isActive));
 }
@@ -1198,6 +1429,21 @@ function setActiveGamesStatus(message) {
   activeGameStatusEl.textContent = message;
 }
 
+function normalizeJoinableActiveGames(games = []) {
+  return games.filter((game) => {
+    const gameId = String(game?.game_id || '').trim();
+    const status = String(game?.game_status || '')
+      .trim()
+      .toLowerCase();
+
+    if (!gameId) {
+      return false;
+    }
+
+    return status === 'enrolling' || status === 'running';
+  });
+}
+
 function syncActiveGameSelectFromInput(games = []) {
   if (!activeGameSelectInput) return;
   const currentGameId = String(gameIdInput?.value || '').trim();
@@ -1212,6 +1458,17 @@ function syncActiveGameSelectFromInput(games = []) {
     : availableIdsFromSelect;
 
   if (!currentGameId) {
+    const [firstAvailableGameId] = availableGameIds;
+    const normalizedFirstAvailableGameId = String(firstAvailableGameId || '').trim();
+
+    if (normalizedFirstAvailableGameId) {
+      activeGameSelectInput.value = normalizedFirstAvailableGameId;
+      applySelectedActiveGame(normalizedFirstAvailableGameId, {
+        notifyOnPlayerReset: false,
+      });
+      return;
+    }
+
     activeGameSelectInput.value = '';
     return;
   }
@@ -1243,21 +1500,25 @@ function syncActiveGameSelectFromInput(games = []) {
 function renderActiveGameOptions(games = []) {
   if (!activeGameSelectInput) return;
 
+  const joinableGames = normalizeJoinableActiveGames(games);
+
   clearNode(activeGameSelectInput);
   const placeholderOption = document.createElement('option');
   placeholderOption.value = '';
   placeholderOption.textContent =
-    games.length > 0 ? 'Choose an active game...' : 'No joinable games found';
+    joinableGames.length > 0
+      ? 'Choose an active game...'
+      : 'No joinable games found';
   activeGameSelectInput.appendChild(placeholderOption);
 
-  games.forEach((game) => {
+  joinableGames.forEach((game) => {
     const option = document.createElement('option');
     option.value = String(game.game_id || '').trim();
     option.textContent = formatActiveGameOptionLabel(game);
     activeGameSelectInput.appendChild(option);
   });
 
-  syncActiveGameSelectFromInput(games);
+  syncActiveGameSelectFromInput(joinableGames);
 }
 
 async function fetchActiveGames(baseUrl) {
@@ -1295,7 +1556,7 @@ async function refreshActiveGames({ notifyOnError = true } = {}) {
   }
 
   try {
-    const games = await fetchActiveGames(baseUrl);
+    const games = normalizeJoinableActiveGames(await fetchActiveGames(baseUrl));
     activeGamesById = new Map(
       games.map((game) => [String(game?.game_id || '').trim(), game])
     );
@@ -1330,7 +1591,48 @@ function startActiveGamesAutoRefresh() {
   }
   activeGamesRefreshInterval = setInterval(() => {
     void refreshActiveGames({ notifyOnError: false });
-  }, 5000);
+  }, 10000);
+}
+
+function getRoundModeHintFromActiveGames(gameId) {
+  const normalizedGameId = String(gameId || '').trim();
+  if (!normalizedGameId) return null;
+  const game = activeGamesById.get(normalizedGameId);
+  const roundType = String(game?.round_type || '').trim().toLowerCase();
+  if (roundType === 'asynchronous' || roundType === 'async') {
+    return 'async';
+  }
+  if (roundType === 'synchronous' || roundType === 'sync') {
+    return 'sync';
+  }
+  return null;
+}
+
+function resolveRequestedGameId() {
+  const inputGameId = String(gameIdInput?.value || '').trim();
+  const selectedGameId = String(activeGameSelectInput?.value || '').trim();
+  const inputIsJoinable = inputGameId && activeGamesById.has(inputGameId);
+  const selectedIsJoinable = selectedGameId && activeGamesById.has(selectedGameId);
+
+  if (selectedIsJoinable && (!inputGameId || !inputIsJoinable)) {
+    applySelectedActiveGame(selectedGameId, {
+      notifyOnPlayerReset: false,
+    });
+    return selectedGameId;
+  }
+
+  if (inputGameId) {
+    return inputGameId;
+  }
+
+  if (selectedIsJoinable) {
+    applySelectedActiveGame(selectedGameId, {
+      notifyOnPlayerReset: false,
+    });
+    return selectedGameId;
+  }
+
+  return '';
 }
 
 function applySelectedActiveGame(
@@ -1493,6 +1795,10 @@ function initializeModules() {
     defaultTokenNames: PLAYER_STATE_TOKENS,
   });
   initLeaderboard({ leaderboardEl });
+  initLastGameHighscores({
+    summaryEl: lastGameSummaryEl,
+    listEl: lastGameHighscoresEl,
+  });
   initSeasonCards({ getGameMeta });
   initMetaManager({
     onMetaChanged() {
@@ -1562,6 +1868,32 @@ function initializeModules() {
     onSessionStreamError(message) {
       setStartSessionStatus(message, 'error');
       showToast(message, 'error');
+    },
+    onSessionStreamFinished(data) {
+      const sessionStatus = String(data?.session?.status || '')
+        .trim()
+        .toLowerCase();
+      console.log('[Async Session] Stream finished, sessionStatus:', sessionStatus);
+      if (sessionStatus !== 'finished') {
+        console.log('[Async Session] Session status is not "finished", skipping overlay');
+        return;
+      }
+
+      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      if (finishedGameId && finishedGameId !== lastFinishedGameId) {
+        captureLastPlayedGameSnapshot(data);
+      }
+
+      console.log('[Async Session] Showing game over overlay for async game:', finishedGameId);
+      showGameOverOverlay(finishedGameId, {
+        title: 'Session Finished',
+        message:
+          'Your async session has finished. Click anywhere to return to the login lobby.',
+      });
+      setStartSessionStatus(
+        'Async session ended. Start a new session to continue.',
+        'info'
+      );
     },
     disconnectChat,
     onGameStatusChange(next) {
@@ -1708,6 +2040,7 @@ function loadSettings() {
   }
 
   renderMetaDebugLine();
+  renderLastFinishedGameSnapshot(readStoredLastPlayedGameSnapshot());
   renderDebugContext();
   renderTradeSchedulePreview();
   updateSetupActionsState();
@@ -1715,6 +2048,26 @@ function loadSettings() {
 }
 
 function applyUIUpdate(data) {
+  const normalizedGameStatus = String(data?.game_status || '').trim().toLowerCase();
+  const normalizedDataGameId = String(data?.game_id || '').trim();
+  const isCurrentViewedGame =
+    Boolean(normalizedDataGameId) && normalizedDataGameId === currentViewedGameId;
+  const previousGameStatusForCurrentView = lastGameStatusForCurrentView;
+
+  if (isCurrentViewedGame) {
+    // WHY: Only 'running' counts as having actually played a game.
+    // 'enrolling' is a waiting-room state — the player has not played at all.
+    // If the game jumps from enrolling directly to finished (e.g. cancelled or
+    // too few players), showing the Game Over overlay would be wrong.
+    if (normalizedGameStatus === 'running') {
+      hasSeenPlayableStateForCurrentView = true;
+    }
+
+    if (normalizedGameStatus) {
+      lastGameStatusForCurrentView = normalizedGameStatus;
+    }
+  }
+
   const streamSession = data?.session || null;
   const sessionRenderState = deriveStreamSessionState({
     activeSession,
@@ -1727,12 +2080,25 @@ function applyUIUpdate(data) {
   // data yet (e.g. first tick after session creation), keep the local session intact
   // to avoid a false drop on startup.
   if (sessionRenderState.shouldClearActiveSession) {
+    const clearReason = String(sessionRenderState.clearReason || '');
     activeSession = null;
     stopSessionElapsedTimer();
     setStartSessionStatus(
       'Async session ended. Start a new session to continue.',
       'info'
     );
+
+    if (clearReason === 'ended') {
+      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      if (finishedGameId) {
+        captureLastPlayedGameSnapshot(data);
+      }
+      showGameOverOverlay(finishedGameId, {
+        title: 'Session Finished',
+        message:
+          'Your async session has finished. Click anywhere to return to the login lobby.',
+      });
+    }
   }
 
   const hasActiveSession = sessionRenderState.hasActiveSession;
@@ -1773,6 +2139,26 @@ function applyUIUpdate(data) {
       countdownLabelEl.textContent = 'Time Remaining';
       stopCountdownTimer();
       stopNextHalvingCountdown();
+      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      if (finishedGameId) {
+        const shouldCaptureSnapshot = finishedGameId !== lastFinishedGameId;
+        const shouldShowOverlay = isGameOverOverlayEligible({
+          previousGameStatus: previousGameStatusForCurrentView,
+          gameStatus: data.game_status,
+          gameId: finishedGameId,
+          currentGameId: currentViewedGameId,
+        });
+
+        if (shouldCaptureSnapshot) {
+          captureLastPlayedGameSnapshot(data);
+        }
+
+        if (shouldShowOverlay) {
+          showGameOverOverlay(finishedGameId);
+        } else {
+          hideGameOverOverlay();
+        }
+      }
     }
   }
 
@@ -1826,6 +2212,12 @@ function updateUI(data) {
 }
 
 async function startLiveStream(gameId, playerId, options = {}) {
+  const normalizedGameId = String(gameId || '').trim();
+  currentViewedGameId = normalizedGameId;
+  hasSeenPlayableStateForCurrentView = false;
+  lastGameStatusForCurrentView = null;
+  hideGameOverOverlay();
+
   const sessionId = activeSession?.sessionId || null;
 
   startStream(gameId, playerId, {
@@ -1984,15 +2376,19 @@ async function startAsyncSessionForGame({ gameId, playerId }) {
 
   await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
   setSetupCollapsed(true);
-  scrollToLiveBoard();
   return { ok: true, sessionId: result.sessionId };
 }
 
 async function handleStartAsyncSession() {
-  const gameId = gameIdInput.value;
+  const gameId = resolveRequestedGameId();
   const existingPlayerId = playerIdInput.value;
   const baseUrl = getNormalizedBaseUrlOrNull();
   if (!baseUrl) {
+    return;
+  }
+
+  if (!gameId) {
+    setStartSessionStatus('Choose an active game before starting a session.', 'error');
     return;
   }
 
@@ -2012,73 +2408,61 @@ async function handleStartAsyncSession() {
   await startAsyncSessionForGame({ gameId, playerId });
 }
 
+async function handleStartGameFlow() {
+  const gameId = resolveRequestedGameId();
+  const existingPlayerId = playerIdInput.value;
+  const baseUrl = getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    return;
+  }
+
+  if (!gameId) {
+    showToast('Choose an active game before entering the game.', 'error');
+    return;
+  }
+
+  let playerId;
+  try {
+    playerId = await ensurePlayerJoinedForStream({
+      baseUrl,
+      gameId,
+      playerId: existingPlayerId,
+    });
+  } catch (error) {
+    showToast(error.message, 'error');
+    return;
+  }
+
+  cleanupGameMetaCache();
+  markGameMetaSeen(gameId);
+
+  try {
+    await fetchMetaSnapshot(baseUrl, gameId);
+  } catch (e) {
+    console.warn('Initial meta fetch failed before stream start:', e);
+  }
+
+  const roundMode =
+    getRoundModeHintFromActiveGames(gameId) || getCurrentRoundContext().roundMode;
+  if (roundMode === 'async' && !activeSession?.sessionId) {
+    await startAsyncSessionForGame({ gameId, playerId });
+    return;
+  }
+
+  await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
+  setSetupCollapsed(true);
+}
+
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
-    const gameId = gameIdInput.value;
-    const existingPlayerId = playerIdInput.value;
-    const baseUrl = getNormalizedBaseUrlOrNull();
-    if (!baseUrl) {
-      return;
-    }
-
-    let playerId;
-    try {
-      playerId = await ensurePlayerJoinedForStream({
-        baseUrl,
-        gameId,
-        playerId: existingPlayerId,
-      });
-    } catch (error) {
-      showToast(error.message, 'error');
-      return;
-    }
-
-    cleanupGameMetaCache();
-    markGameMetaSeen(gameId);
-
-    try {
-      await fetchMetaSnapshot(baseUrl, gameId);
-    } catch (e) {
-      console.warn('Initial meta fetch failed before stream start:', e);
-    }
-
-    const roundMode = getCurrentRoundContext().roundMode;
-    if (roundMode === 'async' && !activeSession?.sessionId) {
-      await startAsyncSessionForGame({ gameId, playerId });
-      return;
-    }
-
-    await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
-    setSetupCollapsed(true);
-    scrollToLiveBoard();
+    await handleStartGameFlow();
   });
 }
 
 if (stopBtn) {
   stopBtn.addEventListener('click', () => {
-    cancelPendingUiRender();
-    isStreamActive = false;
-    latestGameStatus = null;
-    closeEventSourceIfOpen();
-    stopLiveTimersAndHalving();
-    disconnectChat();
-    stopSessionElapsedTimer();
-    setBadgeStatus(connStatusEl, 'idle');
-    setBadgeStatus(gameStatusEl, 'idle');
-    stopCountdownTimer();
-    lastGameData = null;
-    // Reset player-view module state so cached text-node refs do not point to
-    // detached nodes after manual stop/start stream cycles.
-    resetPlayerStateView();
-    resetSectionPlaceholder(leaderboardEl, 'Waiting for game data...');
-    if (myScoreEl) myScoreEl.textContent = '—';
-    if (myRankEl) myRankEl.textContent = '—';
-    if (topScoreEl) topScoreEl.textContent = '—';
-    resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
-    ensureInputsEditable();
-    setLiveSessionActive(false);
-    setStartSessionStatus('', 'info');
-    updateSetupActionsState();
+    hideGameOverOverlay();
+    resetLiveBoardState();
   });
 }
 
@@ -2132,10 +2516,22 @@ tradeCountInput?.addEventListener('change', () => {
 });
 gameIdInput?.addEventListener('change', saveSettings);
 activeGameSelectInput?.addEventListener('change', () => {
+  hideGameOverOverlay();
   applySelectedActiveGame(activeGameSelectInput.value);
 });
 refreshActiveGamesBtn?.addEventListener('click', () => {
   void refreshActiveGames({ notifyOnError: true });
+});
+
+gameOverOverlayEl?.addEventListener('click', () => {
+  acknowledgeGameOverOverlay();
+});
+
+gameOverOverlayEl?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    acknowledgeGameOverOverlay();
+  }
 });
 playerIdInput?.addEventListener('change', saveSettings);
 anchorTokenInput?.addEventListener('change', saveSettings);
@@ -2180,6 +2576,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateScoringModeUi();
   void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
+
+  const params = new URLSearchParams(window.location.search);
+  const shouldAutostart = params.get('autostart') === '1';
+  if (shouldAutostart && String(gameIdInput?.value || '').trim()) {
+    await handleStartGameFlow();
+    params.delete('autostart');
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', nextUrl);
+  }
 });
 
 export {
@@ -2205,7 +2611,9 @@ export {
   syncSeasonHalvingTicker,
   stopSeasonHalvingTimers,
   formatActiveGameOptionLabel,
+  normalizeJoinableActiveGames,
   renderActiveGameOptions,
+  resolveRequestedGameId,
   renderSeasonData,
   computePortfolioValue,
   renderPortfolioValue,
@@ -2219,4 +2627,9 @@ export {
   toggleSetupCollapsed,
   autoCollapseSetupForLiveState,
   scrollToLiveBoard,
+  captureLastPlayedGameSnapshot,
+  showGameOverOverlay,
+  hideGameOverOverlay,
+  acknowledgeGameOverOverlay,
+  isGameOverOverlayEligible,
 };

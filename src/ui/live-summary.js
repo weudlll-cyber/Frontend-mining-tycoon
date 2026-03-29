@@ -44,7 +44,7 @@ export function initLiveSummary(deps) {
 
 function formatScore(value) {
   if (!Number.isFinite(value)) return '—';
-  return Math.floor(value).toLocaleString();
+  return Math.floor(value).toLocaleString('en-US');
 }
 
 function formatPortfolioValue(value) {
@@ -160,11 +160,29 @@ function extractOwnScore(data) {
   return null;
 }
 
+function computeLiveAsyncScore(data) {
+  if (!data) return null;
+
+  const activeGameMeta = _getGameMeta?.(String(data.game_id || ''));
+  const tokenNames = normalizeTokenNames(
+    Array.isArray(data.token_names)
+      ? data.token_names
+      : activeGameMeta?.token_names || _defaultTokenNames
+  );
+  const balances =
+    data?.player_state?.balances || data?.player_state?.tokens || null;
+  const oraclePrices =
+    activeGameMeta?.oracle_prices || data?.oracle_prices || null;
+
+  const computed = computePortfolioValue(balances, oraclePrices, tokenNames);
+  return Number.isFinite(computed) ? computed : null;
+}
+
 export function renderQuickStats(data) {
   if (!_refs?.myScoreEl || !_refs?.myRankEl || !_refs?.topScoreEl) return;
 
   const leaderboard = data?.leaderboard_top_5 || data?.leaderboard || [];
-  const topScore = leaderboard.length
+  let topScore = leaderboard.length
     ? Number(leaderboard[0]?.score)
     : Number.NaN;
 
@@ -181,6 +199,19 @@ export function renderQuickStats(data) {
         ownScore = rankedScore;
       }
     }
+  }
+
+  const sessionStatus = String(data?.session?.status || '').toLowerCase();
+  const isAsyncSessionActive = sessionStatus === 'running';
+  if (isAsyncSessionActive && (!Number.isFinite(ownScore) || ownScore <= 0)) {
+    const liveAsyncScore = computeLiveAsyncScore(data);
+    if (Number.isFinite(liveAsyncScore)) {
+      ownScore = liveAsyncScore;
+    }
+  }
+
+  if (ownRank === 1 && Number.isFinite(ownScore) && (!Number.isFinite(topScore) || topScore < ownScore)) {
+    topScore = ownScore;
   }
 
   setElementTextValue(_refs.myScoreEl, formatScore(ownScore));
