@@ -2462,9 +2462,21 @@ async function handleStartGameFlow() {
   setSetupCollapsed(true);
 }
 
+async function runStartGameFlowSafely({ source = 'manual' } = {}) {
+  try {
+    await handleStartGameFlow();
+  } catch (error) {
+    const detail = String(error?.message || error || 'Unknown error');
+    console.error(`[Start Flow][${source}] Unhandled error:`, error);
+    showToast(`Could not start game: ${detail}`, 'error');
+    isSetupBusy = false;
+    updateSetupActionsState();
+  }
+}
+
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
-    await handleStartGameFlow();
+    await runStartGameFlowSafely({ source: 'start-button' });
   });
 }
 
@@ -2589,7 +2601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(window.location.search);
   const shouldAutostart = params.get('autostart') === '1';
   if (shouldAutostart && String(gameIdInput?.value || '').trim()) {
-    await handleStartGameFlow();
+    await runStartGameFlowSafely({ source: 'autostart' });
     params.delete('autostart');
     const nextQuery = params.toString();
     const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
