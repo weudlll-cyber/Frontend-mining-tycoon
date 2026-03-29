@@ -78,7 +78,9 @@ export async function register(baseUrl, payload) {
       },
     });
   } catch (error) {
-    throw new Error(mapRegisterErrorMessage(error?.message || 'Registration failed'));
+    throw new Error(
+      mapRegisterErrorMessage(error?.message || 'Registration failed')
+    );
   }
 }
 
@@ -123,16 +125,21 @@ export async function joinGame(baseUrl, { gameId, playerName, authToken }) {
     headers.Authorization = `Bearer ${safeTrim(authToken)}`;
   }
 
-  const response = await fetch(`${baseUrl}/games/${encodeURIComponent(safeTrim(gameId))}/join`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: safeTrim(playerName) || 'Player',
-    }),
-  });
+  const response = await fetch(
+    `${baseUrl}/games/${encodeURIComponent(safeTrim(gameId))}/join`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: safeTrim(playerName) || 'Player',
+      }),
+    }
+  );
 
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not join selected game.'));
+    throw new Error(
+      await parseError(response, 'Could not join selected game.')
+    );
   }
   return await response.json();
 }

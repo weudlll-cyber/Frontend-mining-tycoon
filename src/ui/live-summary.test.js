@@ -94,9 +94,7 @@ describe('live-summary async badge', () => {
   it('uses stable comma formatting for score values', () => {
     renderQuickStats({
       player_id: '42',
-      leaderboard_top_5: [
-        { player_id: '42', score: 6343 },
-      ],
+      leaderboard_top_5: [{ player_id: '42', score: 6343 }],
       player_state: { score: 6343 },
     });
 

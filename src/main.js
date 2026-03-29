@@ -806,7 +806,8 @@ function handleActiveSessionExpired() {
   const expiredGameId = String(gameIdInput?.value || '').trim();
   showGameOverOverlay(expiredGameId, {
     title: 'Session Finished',
-    message: 'Your async session has ended. Click anywhere to return to the login lobby.',
+    message:
+      'Your async session has ended. Click anywhere to return to the login lobby.',
   });
 }
 
@@ -1173,10 +1174,7 @@ function storeLastPlayedGameSnapshot(snapshot) {
     return;
   }
 
-  setStorageItem(
-    STORAGE_KEYS.lastPlayedGameSnapshot,
-    JSON.stringify(snapshot)
-  );
+  setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, JSON.stringify(snapshot));
 }
 
 function renderLastFinishedGameSnapshot(snapshot) {
@@ -1210,14 +1208,20 @@ function showGameOverOverlay(gameId = '', options = {}) {
   const normalizedGameId = String(gameId || '').trim();
   const title = String(options?.title || 'Game Over').trim() || 'Game Over';
   const message = String(options?.message || '').trim();
-  
-  console.log('[Game Over] Showing overlay for game:', normalizedGameId, 'Title:', title);
-  
+
+  console.log(
+    '[Game Over] Showing overlay for game:',
+    normalizedGameId,
+    'Title:',
+    title
+  );
+
   if (gameOverTitleEl) {
     gameOverTitleEl.textContent = title;
   }
   if (gameOverMessageEl) {
-    gameOverMessageEl.textContent = message ||
+    gameOverMessageEl.textContent =
+      message ||
       (normalizedGameId
         ? `Round ${normalizedGameId} finished. Click anywhere to return to the login lobby.`
         : 'Round finished. Click anywhere to return to the login lobby.');
@@ -1468,7 +1472,9 @@ function syncActiveGameSelectFromInput(games = []) {
 
   if (!currentGameId) {
     const [firstAvailableGameId] = availableGameIds;
-    const normalizedFirstAvailableGameId = String(firstAvailableGameId || '').trim();
+    const normalizedFirstAvailableGameId = String(
+      firstAvailableGameId || ''
+    ).trim();
 
     if (normalizedFirstAvailableGameId) {
       activeGameSelectInput.value = normalizedFirstAvailableGameId;
@@ -1607,7 +1613,9 @@ function getRoundModeHintFromActiveGames(gameId) {
   const normalizedGameId = String(gameId || '').trim();
   if (!normalizedGameId) return null;
   const game = activeGamesById.get(normalizedGameId);
-  const roundType = String(game?.round_type || '').trim().toLowerCase();
+  const roundType = String(game?.round_type || '')
+    .trim()
+    .toLowerCase();
   if (roundType === 'asynchronous' || roundType === 'async') {
     return 'async';
   }
@@ -1621,7 +1629,8 @@ function resolveRequestedGameId() {
   const inputGameId = String(gameIdInput?.value || '').trim();
   const selectedGameId = String(activeGameSelectInput?.value || '').trim();
   const inputIsJoinable = inputGameId && activeGamesById.has(inputGameId);
-  const selectedIsJoinable = selectedGameId && activeGamesById.has(selectedGameId);
+  const selectedIsJoinable =
+    selectedGameId && activeGamesById.has(selectedGameId);
 
   if (selectedIsJoinable && (!inputGameId || !inputIsJoinable)) {
     applySelectedActiveGame(selectedGameId, {
@@ -1882,18 +1891,28 @@ function initializeModules() {
       const sessionStatus = String(data?.session?.status || '')
         .trim()
         .toLowerCase();
-      console.log('[Async Session] Stream finished, sessionStatus:', sessionStatus);
+      console.log(
+        '[Async Session] Stream finished, sessionStatus:',
+        sessionStatus
+      );
       if (sessionStatus !== 'finished') {
-        console.log('[Async Session] Session status is not "finished", skipping overlay');
+        console.log(
+          '[Async Session] Session status is not "finished", skipping overlay'
+        );
         return;
       }
 
-      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      const finishedGameId = String(
+        data?.game_id || gameIdInput?.value || ''
+      ).trim();
       if (finishedGameId && finishedGameId !== lastFinishedGameId) {
         captureLastPlayedGameSnapshot(data);
       }
 
-      console.log('[Async Session] Showing game over overlay for async game:', finishedGameId);
+      console.log(
+        '[Async Session] Showing game over overlay for async game:',
+        finishedGameId
+      );
       showGameOverOverlay(finishedGameId, {
         title: 'Session Finished',
         message:
@@ -2057,10 +2076,13 @@ function loadSettings() {
 }
 
 function applyUIUpdate(data) {
-  const normalizedGameStatus = String(data?.game_status || '').trim().toLowerCase();
+  const normalizedGameStatus = String(data?.game_status || '')
+    .trim()
+    .toLowerCase();
   const normalizedDataGameId = String(data?.game_id || '').trim();
   const isCurrentViewedGame =
-    Boolean(normalizedDataGameId) && normalizedDataGameId === currentViewedGameId;
+    Boolean(normalizedDataGameId) &&
+    normalizedDataGameId === currentViewedGameId;
   const previousGameStatusForCurrentView = lastGameStatusForCurrentView;
 
   if (isCurrentViewedGame) {
@@ -2098,7 +2120,9 @@ function applyUIUpdate(data) {
     );
 
     if (clearReason === 'ended') {
-      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      const finishedGameId = String(
+        data?.game_id || gameIdInput?.value || ''
+      ).trim();
       if (finishedGameId) {
         captureLastPlayedGameSnapshot(data);
       }
@@ -2148,7 +2172,9 @@ function applyUIUpdate(data) {
       countdownLabelEl.textContent = 'Time Remaining';
       stopCountdownTimer();
       stopNextHalvingCountdown();
-      const finishedGameId = String(data?.game_id || gameIdInput?.value || '').trim();
+      const finishedGameId = String(
+        data?.game_id || gameIdInput?.value || ''
+      ).trim();
       if (finishedGameId) {
         const shouldCaptureSnapshot = finishedGameId !== lastFinishedGameId;
         const shouldShowOverlay = isGameOverOverlayEligible({
@@ -2397,7 +2423,10 @@ async function handleStartAsyncSession() {
   }
 
   if (!gameId) {
-    setStartSessionStatus('Choose an active game before starting a session.', 'error');
+    setStartSessionStatus(
+      'Choose an active game before starting a session.',
+      'error'
+    );
     return;
   }
 
@@ -2452,7 +2481,8 @@ async function handleStartGameFlow() {
   }
 
   const roundMode =
-    getRoundModeHintFromActiveGames(gameId) || getCurrentRoundContext().roundMode;
+    getRoundModeHintFromActiveGames(gameId) ||
+    getCurrentRoundContext().roundMode;
   if (roundMode === 'async' && !activeSession?.sessionId) {
     await startAsyncSessionForGame({ gameId, playerId });
     return;

@@ -47,8 +47,16 @@ body::after {
   z-index: -1;
   background:
     linear-gradient(130deg, rgba(7, 16, 28, 0.68), rgba(7, 24, 40, 0.52)),
-    radial-gradient(circle at 12% 18%, rgba(243, 180, 49, 0.24), transparent 44%),
-    radial-gradient(circle at 88% 10%, rgba(43, 193, 147, 0.18), transparent 48%);
+    radial-gradient(
+      circle at 12% 18%,
+      rgba(243, 180, 49, 0.24),
+      transparent 44%
+    ),
+    radial-gradient(
+      circle at 88% 10%,
+      rgba(43, 193, 147, 0.18),
+      transparent 48%
+    );
 }
 
 .lobby-shell {
@@ -131,7 +139,11 @@ button:focus-visible {
 .auth-button {
   margin-top: 0.2rem;
   border: 0;
-  background: linear-gradient(140deg, var(--lobby-accent), var(--lobby-accent-strong));
+  background: linear-gradient(
+    140deg,
+    var(--lobby-accent),
+    var(--lobby-accent-strong)
+  );
   color: #1e1200;
   border-radius: 10px;
   padding: 0.65rem 0.85rem;
@@ -352,7 +364,9 @@ button:focus-visible {
   padding: 0.8rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  transition: background-color 120ms ease, transform 120ms ease;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
 }
 
 .game-list-item:hover {

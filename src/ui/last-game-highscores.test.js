@@ -43,7 +43,9 @@ describe('last game highscores', () => {
 
     renderLastGameHighscores(snapshot);
 
-    const items = Array.from(document.querySelectorAll('.last-game-score-item'));
+    const items = Array.from(
+      document.querySelectorAll('.last-game-score-item')
+    );
     expect(snapshot?.leaderboard).toEqual([
       { rank: 1, name: 'Alice', score: '120' },
       { rank: 2, name: 'p2', score: '99' },

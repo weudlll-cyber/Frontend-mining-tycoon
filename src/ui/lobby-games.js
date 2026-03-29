@@ -4,7 +4,9 @@ Purpose: Shared helpers for formatting and normalizing open game records in the 
 */
 
 function normalizeStatus(rawStatus) {
-  const status = String(rawStatus || '').trim().toLowerCase();
+  const status = String(rawStatus || '')
+    .trim()
+    .toLowerCase();
   if (status === 'enrolling' || status === 'running' || status === 'finished') {
     return status;
   }
@@ -12,7 +14,9 @@ function normalizeStatus(rawStatus) {
 }
 
 function normalizeRoundTypeLabel(rawRoundType) {
-  const value = String(rawRoundType || '').trim().toLowerCase();
+  const value = String(rawRoundType || '')
+    .trim()
+    .toLowerCase();
   if (value === 'asynchronous' || value === 'async') {
     return 'Async';
   }
@@ -58,7 +62,10 @@ export function normalizeGameItem(rawGame = {}) {
   let remainingLabel = 'n/a';
 
   if (status === 'enrolling') {
-    remainingSeconds = Math.max(0, Number(rawGame?.enrollment_remaining_seconds || 0));
+    remainingSeconds = Math.max(
+      0,
+      Number(rawGame?.enrollment_remaining_seconds || 0)
+    );
     remainingLabel = `Starts in ${formatDurationLabel(remainingSeconds)}`;
   } else if (status === 'running') {
     remainingSeconds = Math.max(0, Number(rawGame?.run_remaining_seconds || 0));

@@ -36,16 +36,16 @@
                 required
               />
             </label>
-            <button
-              id="open-forgot-password"
-              class="inline-link"
-              type="button"
-            >
+            <button id="open-forgot-password" class="inline-link" type="button">
               Forgot password?
             </button>
             <button class="auth-button" type="submit">Sign in</button>
             <div class="auth-helpers">
-              <button id="open-register-dialog" class="create-account-btn" type="button">
+              <button
+                id="open-register-dialog"
+                class="create-account-btn"
+                type="button"
+              >
                 Create account
               </button>
               <button id="logout-btn" class="logout-btn" type="button" disabled>
@@ -55,20 +55,30 @@
             </div>
           </form>
 
-          <p id="auth-message" class="message" data-kind="info" aria-live="polite"></p>
+          <p
+            id="auth-message"
+            class="message"
+            data-kind="info"
+            aria-live="polite"
+          ></p>
         </article>
 
         <article class="panel lobby-panel" aria-label="Open games panel">
           <div class="panel-header">
             <h2>Open Games</h2>
           </div>
-          <p id="account-summary" class="message" data-kind="info">Not signed in.</p>
+          <p id="account-summary" class="message" data-kind="info">
+            Not signed in.
+          </p>
           <ul
             id="open-games-list"
             class="open-games-list"
             aria-label="Open games"
           ></ul>
-          <section class="lobby-last-game-panel" aria-label="Last game highscores">
+          <section
+            class="lobby-last-game-panel"
+            aria-label="Last game highscores"
+          >
             <h3>Last Game Highscores</h3>
             <p id="last-game-summary" class="message" data-kind="info">
               No finished game recorded yet.
@@ -76,8 +86,18 @@
             <div id="last-game-highscores" class="lobby-last-game-scores"></div>
           </section>
           <div class="lobby-actions">
-            <p id="lobby-message" class="message" data-kind="info" aria-live="polite"></p>
-            <button id="join-selected-btn" class="join-btn" type="button" disabled>
+            <p
+              id="lobby-message"
+              class="message"
+              data-kind="info"
+              aria-live="polite"
+            ></p>
+            <button
+              id="join-selected-btn"
+              class="join-btn"
+              type="button"
+              disabled
+            >
               Enter game
             </button>
           </div>
@@ -174,7 +194,10 @@
             autocomplete="new-password"
             required
           />
-          <small class="field-hint">Min. 12 characters &bull; upper &amp; lowercase &bull; digit &bull; special character (e.g. !@#$)</small>
+          <small class="field-hint"
+            >Min. 12 characters &bull; upper &amp; lowercase &bull; digit &bull;
+            special character (e.g. !@#$)</small
+          >
         </label>
         <label class="auth-form-row" for="register-password-confirm">
           <span>Confirm password</span>
@@ -186,7 +209,12 @@
             required
           />
         </label>
-        <p id="register-message" class="message" data-kind="info" aria-live="polite"></p>
+        <p
+          id="register-message"
+          class="message"
+          data-kind="info"
+          aria-live="polite"
+        ></p>
         <div class="dialog-actions">
           <button id="cancel-register-dialog" type="button">Cancel</button>
           <button type="submit" class="auth-button">Create account</button>

@@ -13,7 +13,10 @@ vi.mock('./services/auth-client.js', () => ({
 }));
 
 function loadLobbyFixture() {
-  const html = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
+  const html = fs.readFileSync(
+    path.resolve(process.cwd(), 'index.html'),
+    'utf8'
+  );
   const match = html.match(/<body([^>]*)>([\s\S]*)<\/body>/i);
   document.body.innerHTML = match?.[2] || '';
   document.body.className = /class="([^"]+)"/.exec(match?.[1] || '')?.[1] || '';

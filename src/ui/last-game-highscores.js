@@ -71,7 +71,10 @@ export function renderLastGameHighscores(snapshot = null) {
     `${snapshot.gameId} • ${snapshot.scoringModeLabel} • Last finished game`
   );
 
-  if (!Array.isArray(snapshot.leaderboard) || snapshot.leaderboard.length === 0) {
+  if (
+    !Array.isArray(snapshot.leaderboard) ||
+    snapshot.leaderboard.length === 0
+  ) {
     renderPlaceholder('No leaderboard snapshot was available for that round.');
     return;
   }

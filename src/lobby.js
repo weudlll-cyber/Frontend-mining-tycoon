@@ -31,7 +31,9 @@ const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const registerMessageEl = document.getElementById('register-message');
 const registerUsernameInput = document.getElementById('register-username');
-const registerDisplayNameInput = document.getElementById('register-display-name');
+const registerDisplayNameInput = document.getElementById(
+  'register-display-name'
+);
 const registerDialog = document.getElementById('register-dialog');
 const openRegisterBtn = document.getElementById('open-register-dialog');
 const logoutBtn = document.getElementById('logout-btn');
@@ -116,10 +118,12 @@ function updateJoinButtonState() {
 }
 
 function setAuthenticatedSession(payload) {
-  const token =
-    String(payload?.access_token || payload?.token || payload?.session_token || '').trim();
-  const username =
-    String(payload?.username || payload?.user?.username || payload?.login || '').trim();
+  const token = String(
+    payload?.access_token || payload?.token || payload?.session_token || ''
+  ).trim();
+  const username = String(
+    payload?.username || payload?.user?.username || payload?.login || ''
+  ).trim();
   const displayName = String(
     payload?.display_name || payload?.user?.display_name || username || 'Player'
   ).trim();
@@ -205,10 +209,15 @@ function renderOpenGames(games = []) {
 
     row.addEventListener('click', () => {
       selectedGameId = game.gameId;
-      Array.from(openGamesListEl.querySelectorAll('.game-list-item')).forEach((item) => {
-        item.classList.toggle('selected', item === row);
-      });
-      setLobbyMessage(`Selected ${game.gameId}. You can now enter the game.`, 'success');
+      Array.from(openGamesListEl.querySelectorAll('.game-list-item')).forEach(
+        (item) => {
+          item.classList.toggle('selected', item === row);
+        }
+      );
+      setLobbyMessage(
+        `Selected ${game.gameId}. You can now enter the game.`,
+        'success'
+      );
       updateJoinButtonState();
     });
 
@@ -266,8 +275,14 @@ function canJoinFromLobby(rawGame) {
     return true;
   }
 
-  const availableSeconds = Math.max(0, Number(rawGame?.run_remaining_seconds || 0));
-  const sessionSeconds = Math.max(0, Number(rawGame?.session_duration_seconds || 0));
+  const availableSeconds = Math.max(
+    0,
+    Number(rawGame?.run_remaining_seconds || 0)
+  );
+  const sessionSeconds = Math.max(
+    0,
+    Number(rawGame?.session_duration_seconds || 0)
+  );
   if (availableSeconds <= 0 || sessionSeconds <= 0) {
     return true;
   }
@@ -345,7 +360,10 @@ async function handleLoginSubmit(event) {
     if (!authState.isAuthenticated) {
       throw new Error('Login response did not include an access token.');
     }
-    setAuthMessage('Login successful. Please select a game from the open list.', 'success');
+    setAuthMessage(
+      'Login successful. Please select a game from the open list.',
+      'success'
+    );
   } catch (error) {
     setAuthMessage(error.message, 'error');
   }
@@ -357,10 +375,13 @@ function validateEmail(email) {
 
 function validatePasswordClient(password) {
   if (password.length < 12) return 'Password must be at least 12 characters.';
-  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter.';
-  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter.';
-  if (!/[0-9]/.test(password)) return 'Password must contain at least one digit.';
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password))
+  if (!/[A-Z]/.test(password))
+    return 'Password must contain at least one uppercase letter.';
+  if (!/[a-z]/.test(password))
+    return 'Password must contain at least one lowercase letter.';
+  if (!/[0-9]/.test(password))
+    return 'Password must contain at least one digit.';
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password))
     return 'Password must contain at least one special character (e.g. !@#$)';
   return null;
 }
@@ -434,7 +455,10 @@ async function handleForgotPasswordSubmit(event) {
       email: formData.get('email'),
       newPassword: formData.get('newPassword'),
     });
-    setAuthMessage('Password reset succeeded. Please sign in with your new password.', 'success');
+    setAuthMessage(
+      'Password reset succeeded. Please sign in with your new password.',
+      'success'
+    );
     forgotDialog?.close();
   } catch (error) {
     setAuthMessage(error.message, 'error');
@@ -461,7 +485,10 @@ async function handleLogoutClick() {
     selectedGameId = '';
     setAuthenticatedSession({ access_token: '' });
     setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
-    setLobbyMessage('You are logged out. Open games keep auto-refreshing.', 'info');
+    setLobbyMessage(
+      'You are logged out. Open games keep auto-refreshing.',
+      'info'
+    );
     return;
   }
 
@@ -484,11 +511,16 @@ async function handleLogoutClick() {
   clearAuthSessionData();
   selectedGameId = '';
   setAuthenticatedSession({ access_token: '' });
-  Array.from(openGamesListEl?.querySelectorAll('.game-list-item.selected') || []).forEach((item) => {
+  Array.from(
+    openGamesListEl?.querySelectorAll('.game-list-item.selected') || []
+  ).forEach((item) => {
     item.classList.remove('selected');
   });
   setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
-  setLobbyMessage('You are logged out. Open games keep auto-refreshing.', 'info');
+  setLobbyMessage(
+    'You are logged out. Open games keep auto-refreshing.',
+    'info'
+  );
 }
 
 function startLobbyRefreshLoop() {
@@ -506,9 +538,15 @@ function hydrateFromStorage() {
     setStorageItem(STORAGE_KEYS.baseUrl, DEFAULT_BACKEND_URL);
   }
 
-  const savedToken = String(localStorage.getItem(STORAGE_KEYS.authToken) || '').trim();
-  const savedUsername = String(localStorage.getItem(STORAGE_KEYS.authUsername) || '').trim();
-  const savedDisplayName = String(localStorage.getItem(STORAGE_KEYS.authDisplayName) || '').trim();
+  const savedToken = String(
+    localStorage.getItem(STORAGE_KEYS.authToken) || ''
+  ).trim();
+  const savedUsername = String(
+    localStorage.getItem(STORAGE_KEYS.authUsername) || ''
+  ).trim();
+  const savedDisplayName = String(
+    localStorage.getItem(STORAGE_KEYS.authDisplayName) || ''
+  ).trim();
 
   if (savedToken) {
     setAuthenticatedSession({
@@ -516,7 +554,10 @@ function hydrateFromStorage() {
       username: savedUsername,
       display_name: savedDisplayName,
     });
-    setAuthMessage('Session restored. Select an open game to continue.', 'info');
+    setAuthMessage(
+      'Session restored. Select an open game to continue.',
+      'info'
+    );
   } else {
     setAuthMessage('Sign in or create a new account to join a game.', 'info');
     setAuthenticatedSession({ access_token: '' });
@@ -544,13 +585,20 @@ function bindEvents() {
   registerUsernameInput?.addEventListener('input', () => {
     if (!registerDisplayNameInput) return;
     if (!displayNameUserEdited) {
-      registerDisplayNameInput.value = String(registerUsernameInput.value || '').trim();
+      registerDisplayNameInput.value = String(
+        registerUsernameInput.value || ''
+      ).trim();
     }
   });
   registerUsernameInput?.addEventListener('blur', () => {
     if (!registerDisplayNameInput) return;
-    if (!displayNameUserEdited && !String(registerDisplayNameInput.value || '').trim()) {
-      registerDisplayNameInput.value = String(registerUsernameInput.value || '').trim();
+    if (
+      !displayNameUserEdited &&
+      !String(registerDisplayNameInput.value || '').trim()
+    ) {
+      registerDisplayNameInput.value = String(
+        registerUsernameInput.value || ''
+      ).trim();
     }
   });
   joinSelectedBtn?.addEventListener('click', () => {

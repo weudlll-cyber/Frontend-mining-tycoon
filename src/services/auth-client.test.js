@@ -65,7 +65,9 @@ describe('auth-client', () => {
         displayName: 'Alice',
         discord: 'alice#1111',
       })
-    ).rejects.toThrow('This email address is already in use, or the username is already taken.');
+    ).rejects.toThrow(
+      'This email address is already in use, or the username is already taken.'
+    );
   });
 
   it('fetches open games list', async () => {

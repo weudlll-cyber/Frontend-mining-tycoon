@@ -210,7 +210,11 @@ export function renderQuickStats(data) {
     }
   }
 
-  if (ownRank === 1 && Number.isFinite(ownScore) && (!Number.isFinite(topScore) || topScore < ownScore)) {
+  if (
+    ownRank === 1 &&
+    Number.isFinite(ownScore) &&
+    (!Number.isFinite(topScore) || topScore < ownScore)
+  ) {
     topScore = ownScore;
   }
 
