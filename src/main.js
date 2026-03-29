@@ -799,6 +799,15 @@ function handleActiveSessionExpired() {
 
   updateSetupActionsState();
   renderDebugContext();
+
+  // Show game-over overlay so the player is prompted to return to the lobby.
+  // This is the primary path for async session expiry — the client-side elapsed
+  // timer fires here before (or instead of) the backend's final SSE packet.
+  const expiredGameId = String(gameIdInput?.value || '').trim();
+  showGameOverOverlay(expiredGameId, {
+    title: 'Session Finished',
+    message: 'Your async session has ended. Click anywhere to return to the login lobby.',
+  });
 }
 
 function updateRoundRemainingHint() {
