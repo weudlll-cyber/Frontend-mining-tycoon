@@ -134,4 +134,42 @@ describe('lobby last game highscores', () => {
     expect(lobbyMessage?.textContent).toContain('Loaded 0 open games');
     expect(document.querySelectorAll('.game-list-item')).toHaveLength(0);
   });
+
+  it('filters out async games when session duration is equal or longer than available game time', async () => {
+    const authClient = await import('./services/auth-client.js');
+    const fetchOpenGamesMock = vi.mocked(authClient.fetchOpenGames);
+    fetchOpenGamesMock.mockResolvedValue([
+      {
+        game_id: 'game-hidden',
+        game_status: 'running',
+        round_type: 'asynchronous',
+        scoring_mode: 'mining_time',
+        trade_count: 0,
+        players_count: 1,
+        run_remaining_seconds: 315,
+        session_duration_seconds: 600,
+      },
+      {
+        game_id: 'game-visible',
+        game_status: 'running',
+        round_type: 'asynchronous',
+        scoring_mode: 'stockpile',
+        trade_count: 1,
+        players_count: 2,
+        run_remaining_seconds: 900,
+        session_duration_seconds: 300,
+      },
+    ]);
+
+    localStorage.setItem('mining-tycoon:authToken', 'token');
+    localStorage.setItem('mining-tycoon:authUsername', 'weudl');
+
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await Promise.resolve();
+
+    const rows = document.querySelectorAll('.game-list-item');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.getAttribute('data-game-id')).toBe('game-visible');
+  });
 });

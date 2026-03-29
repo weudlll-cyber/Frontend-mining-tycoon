@@ -233,10 +233,7 @@ async function refreshOpenGames({ showSuccess = false } = {}) {
 
   try {
     const rawGames = await fetchOpenGames(baseUrl);
-    const joinableGames = rawGames.filter((game) => {
-      const status = String(game?.game_status || '').toLowerCase();
-      return status === 'enrolling' || status === 'running';
-    });
+    const joinableGames = rawGames.filter((game) => canJoinFromLobby(game));
     renderOpenGames(joinableGames);
     if (showSuccess || authState.isAuthenticated) {
       setLobbyMessage(
@@ -255,6 +252,27 @@ function refreshOnPageVisible() {
     return;
   }
   void refreshOpenGames({ showSuccess: true });
+}
+
+function canJoinFromLobby(rawGame) {
+  const status = String(rawGame?.game_status || '').toLowerCase();
+  if (status !== 'enrolling' && status !== 'running') {
+    return false;
+  }
+
+  const roundType = String(rawGame?.round_type || '').toLowerCase();
+  const isAsyncRound = roundType === 'asynchronous' || roundType === 'async';
+  if (!isAsyncRound) {
+    return true;
+  }
+
+  const availableSeconds = Math.max(0, Number(rawGame?.run_remaining_seconds || 0));
+  const sessionSeconds = Math.max(0, Number(rawGame?.session_duration_seconds || 0));
+  if (availableSeconds <= 0 || sessionSeconds <= 0) {
+    return true;
+  }
+
+  return sessionSeconds < availableSeconds;
 }
 
 async function handleJoinSelectedGame() {
