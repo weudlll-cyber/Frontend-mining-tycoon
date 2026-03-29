@@ -14,6 +14,8 @@
 // durations. Values are in seconds. '3h' is async-round-only; '20m' is
 // sync-only; '30m' is available in both async round and session dropdowns.
 export const ROUND_DURATION_PRESETS = {
+  // NOTE: '1m' is for testing only — remove before production
+  '1m': 60,
   '5m': 300,
   '10m': 600,
   '15m': 900,
@@ -35,6 +37,8 @@ export const ROUND_DURATION_LIMITS = { min: 60, max: 2592000 }; // 2592000 = 30 
 // Preset IDs shown in the async round duration dropdown.
 // Must be a subset of ROUND_DURATION_PRESETS keys.
 export const ASYNC_ROUND_PRESET_IDS = [
+  // NOTE: '1m' is for testing only — remove before production
+  '1m',
   '5m',
   '10m',
   '15m',
@@ -53,6 +57,8 @@ export const ASYNC_ROUND_DEFAULT_PRESET = '30m';
 // Preset IDs shown in the session duration dropdown.
 // Must be a subset of ROUND_DURATION_PRESETS keys.
 export const ASYNC_SESSION_PRESET_IDS = [
+  // NOTE: '1m' is for testing only — remove before production
+  '1m',
   '5m',
   '10m',
   '30m',
