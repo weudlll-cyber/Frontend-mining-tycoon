@@ -18,19 +18,19 @@ beforeEach(() => {
   localStorage.clear();
   loadPlayerFixture();
 
-  global.fetch = vi.fn().mockResolvedValue({
+  globalThis.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => [],
   });
 
-  if (!global.requestAnimationFrame) {
-    global.requestAnimationFrame = (callback) => {
+  if (!globalThis.requestAnimationFrame) {
+    globalThis.requestAnimationFrame = (callback) => {
       callback();
       return 1;
     };
   }
-  if (!global.cancelAnimationFrame) {
-    global.cancelAnimationFrame = () => {};
+  if (!globalThis.cancelAnimationFrame) {
+    globalThis.cancelAnimationFrame = () => {};
   }
 
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {

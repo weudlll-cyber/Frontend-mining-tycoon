@@ -409,7 +409,7 @@ let activeGamesRefreshInterval = null;
 let lastFinishedGameSnapshot = null;
 let lastFinishedGameId = null;
 let currentViewedGameId = '';
-let hasSeenPlayableStateForCurrentView = false;
+let _hasSeenPlayableStateForCurrentView = false;
 let lastGameStatusForCurrentView = null;
 
 const DEFAULT_SCORING_MODE = SCORING_CONTROL.DEFAULT_MODE;
@@ -1267,7 +1267,7 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
   latestGameStatus = null;
   activeSession = null;
   currentViewedGameId = '';
-  hasSeenPlayableStateForCurrentView = false;
+  _hasSeenPlayableStateForCurrentView = false;
   lastGameStatusForCurrentView = null;
   try {
     closeEventSourceIfOpen();
@@ -1314,7 +1314,7 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
   updateSetupActionsState();
 }
 
-function returnToPlayerPanel({
+function _returnToPlayerPanel({
   clearPlayerContext = true,
   statusMessage = '',
 } = {}) {
@@ -1345,7 +1345,7 @@ function acknowledgeGameOverOverlay() {
     // Fallback: ensure overlay is hidden and navigate anyway
     try {
       gameOverOverlayEl.hidden = true;
-    } catch (e) {
+    } catch {
       // Ignore
     }
   }
@@ -2069,7 +2069,7 @@ function applyUIUpdate(data) {
     // If the game jumps from enrolling directly to finished (e.g. cancelled or
     // too few players), showing the Game Over overlay would be wrong.
     if (normalizedGameStatus === 'running') {
-      hasSeenPlayableStateForCurrentView = true;
+      _hasSeenPlayableStateForCurrentView = true;
     }
 
     if (normalizedGameStatus) {
@@ -2223,7 +2223,7 @@ function updateUI(data) {
 async function startLiveStream(gameId, playerId, options = {}) {
   const normalizedGameId = String(gameId || '').trim();
   currentViewedGameId = normalizedGameId;
-  hasSeenPlayableStateForCurrentView = false;
+  _hasSeenPlayableStateForCurrentView = false;
   lastGameStatusForCurrentView = null;
   hideGameOverOverlay();
 
