@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
-function Run-Step {
+function Invoke-Step {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][scriptblock]$Action,
@@ -48,7 +48,7 @@ $requiredDocs = @(
     "SECURITY.md"
 )
 
-Run-Step -Name "Required docs present" -Action {
+Invoke-Step -Name "Required docs present" -Action {
     foreach ($doc in $requiredDocs) {
         if (-not (Test-Path $doc)) {
             throw "Missing required doc: $doc"
@@ -60,15 +60,15 @@ Run-Step -Name "Required docs present" -Action {
     }
 }
 
-Run-Step -Name "ESLint" -Action { & npm run lint }
-Run-Step -Name "Prettier format check" -Action { & npm run format:check }
-Run-Step -Name "Vitest unit tests" -Action { & npm run test -- --run }
-Run-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
-Run-Step -Name "Production build" -Action { & npm run build }
-Run-Step -Name "npm audit (prod, high+)" -Action {
+Invoke-Step -Name "ESLint" -Action { & npm run lint }
+Invoke-Step -Name "Prettier format check" -Action { & npm run format:check }
+Invoke-Step -Name "Vitest unit tests" -Action { & npm run test -- --run }
+Invoke-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
+Invoke-Step -Name "Production build" -Action { & npm run build }
+Invoke-Step -Name "npm audit (prod, high+)" -Action {
     & npm audit --omit=dev --audit-level=high
 }
-Run-Step -Name "Code health audit (advisory)" -Action {
+Invoke-Step -Name "Code health audit (advisory)" -Action {
     & (Join-Path $PSScriptRoot "code_health_audit.ps1")
 } -WarningOnly
 
