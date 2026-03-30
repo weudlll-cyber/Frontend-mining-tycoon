@@ -11,6 +11,7 @@ param(
     [string]$Branch,
     [switch]$SkipAudit,
     [switch]$ForceAudit,
+    [ValidateSet("fast", "full")][string]$Profile = "fast",
     [switch]$AllowDirty
 )
 
@@ -33,7 +34,7 @@ if (-not $AllowDirty) {
 }
 
 if (-not $SkipAudit) {
-    & (Join-Path $PSScriptRoot "pre_push_gate.ps1") -Force:$ForceAudit
+    & (Join-Path $PSScriptRoot "pre_push_gate.ps1") -Force:$ForceAudit -Profile $Profile
 }
 
 $upstream = & git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>$null

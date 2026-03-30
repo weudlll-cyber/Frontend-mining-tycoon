@@ -1,0 +1,14 @@
+title = "Frontend Mining Tycoon gitleaks config"
+
+[[allowlists]]
+description = "Allow obvious documentation-only placeholder admin tokens"
+paths = [
+  '''MANUAL_TEST_RUNBOOK\.md''',
+  '''README\.md'''
+]
+regexTarget = "line"
+regexes = [
+  '''demo-admin-token-placeholder''',
+  '''invalid-demo-token-placeholder''',
+  '''ADMIN_TOKEN=<set-locally-to-your-admin-token>'''
+]

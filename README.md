@@ -164,7 +164,7 @@ Do **not** hardcode tuning values in the UI; always import from control-data.
 
 When the backend is configured with:
 - `REQUIRE_ADMIN_FOR_GAME_CREATE=true`
-- `ADMIN_TOKEN=<secret>`
+- `ADMIN_TOKEN=<set-locally-to-your-admin-token>`
 
 Game creation requires an `X-Admin-Token` header. The admin-setup UI prompts for the token. Player join routes are **never** gated.
 
@@ -306,18 +306,31 @@ Daily usage:
 & .\scripts\push_with_audit.ps1
 ```
 
+Fast/full profiles:
+
+```powershell
+# Fast (default): lint + format + unit tests + build
+& .\scripts\push_with_audit.ps1 -Profile fast
+
+# Full: fast + coverage + npm audit + advisory code health
+& .\scripts\push_with_audit.ps1 -Profile full
+```
+
 If the exact same clean HEAD already passed the local gate, the helper and the
 tracked pre-push hook now reuse that successful result and skip rerunning the
-full gate. Use `& .\scripts\push_with_audit.ps1 -ForceAudit` to force a fresh rerun.
+same profile. Use `& .\scripts\push_with_audit.ps1 -ForceAudit` to force a fresh rerun.
 
-What happens before push:
+What happens before push (`-Profile fast`, default):
 
 - required frontend docs presence check
 - `npm run clean:audit` (eslint + strict unused checks + dependency/file usage scan)
 - `npm run format:check`
 - `npm run test -- --run`
-- `npm run test:coverage`
 - `npm run build`
+
+Additional checks in `-Profile full`:
+
+- `npm run test:coverage`
 - `npm audit --omit=dev --audit-level=high`
 - advisory code-health audit (file-size hotspots, comment-header coverage, TODO/FIXME markers, debug-console scan)
 

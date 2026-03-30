@@ -11,7 +11,8 @@ security checks that must pass before pushing the frontend branch.
 #>
 
 param(
-    [switch]$Force
+    [switch]$Force,
+    [ValidateSet("fast", "full")][string]$Profile = "fast"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,7 +21,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 $gitDir = (& git rev-parse --git-dir).Trim()
 $gateCacheDir = Join-Path $gitDir "gate-cache"
-$gateCachePath = Join-Path $gateCacheDir "frontend-pre-push.json"
+$gateCachePath = Join-Path $gateCacheDir "frontend-pre-push-$Profile.json"
 
 function Get-CurrentGateFingerprint {
     $head = (& git rev-parse HEAD).Trim()
@@ -107,9 +108,11 @@ function Invoke-Step {
 
 if (Test-CanSkipGate) {
     $cache = Get-GateCache
-    Write-Host "Frontend pre-push gate already passed for this clean HEAD at $($cache.passedAtUtc). Skipping rerun."
+    Write-Host "Frontend pre-push gate ($Profile) already passed for this clean HEAD at $($cache.passedAtUtc). Skipping rerun."
     return
 }
+
+Write-Host "Running frontend pre-push gate profile: $Profile"
 
 $requiredDocs = @(
     "README.md",
@@ -136,16 +139,19 @@ Invoke-Step -Name "Required docs present" -Action {
 Invoke-Step -Name "ESLint" -Action { & npm run lint }
 Invoke-Step -Name "Prettier format check" -Action { & npm run format:check }
 Invoke-Step -Name "Vitest unit tests" -Action { & npm run test -- --run }
-Invoke-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
 Invoke-Step -Name "Production build" -Action { & npm run build }
-Invoke-Step -Name "npm audit (prod, high+)" -Action {
-    & npm audit --omit=dev --audit-level=high
+
+if ($Profile -eq "full") {
+    Invoke-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
+    Invoke-Step -Name "npm audit (prod, high+)" -Action {
+        & npm audit --omit=dev --audit-level=high
+    }
+    Invoke-Step -Name "Code health audit (advisory)" -Action {
+        & (Join-Path $PSScriptRoot "code_health_audit.ps1")
+    } -WarningOnly
 }
-Invoke-Step -Name "Code health audit (advisory)" -Action {
-    & (Join-Path $PSScriptRoot "code_health_audit.ps1")
-} -WarningOnly
 
 Save-GateCache
 
-Write-Host "`nFrontend pre-push gate completed successfully."
+Write-Host "`nFrontend pre-push gate ($Profile) completed successfully."
 
