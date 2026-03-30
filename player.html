@@ -545,6 +545,53 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
           <div class="dashboard-main">
             <!-- LEFT: Explicit internal scroll container for seasons -->
             <div class="seasons-scroll">
+              <div
+                id="season-focus-strip"
+                class="season-focus-strip"
+                role="tablist"
+                aria-label="Season focus"
+              >
+                <button
+                  id="season-focus-spring"
+                  class="season-focus-btn"
+                  type="button"
+                  role="tab"
+                  data-season-focus="spring"
+                  aria-selected="true"
+                >
+                  Spring
+                </button>
+                <button
+                  id="season-focus-summer"
+                  class="season-focus-btn"
+                  type="button"
+                  role="tab"
+                  data-season-focus="summer"
+                  aria-selected="false"
+                >
+                  Summer
+                </button>
+                <button
+                  id="season-focus-autumn"
+                  class="season-focus-btn"
+                  type="button"
+                  role="tab"
+                  data-season-focus="autumn"
+                  aria-selected="false"
+                >
+                  Autumn
+                </button>
+                <button
+                  id="season-focus-winter"
+                  class="season-focus-btn"
+                  type="button"
+                  role="tab"
+                  data-season-focus="winter"
+                  aria-selected="false"
+                >
+                  Winter
+                </button>
+              </div>
               <div class="seasons-grid">
                 <div
                   id="season-spring"
@@ -680,72 +727,195 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   <p class="placeholder">Waiting for game data...</p>
                 </div>
               </div>
-
-
-              <div id="trading-panel" class="trading-panel">
-                <!-- Trading capability card will be rendered here by trading-panel.js -->
-              </div>
-
-              <aside
-                id="chat-panel"
-                class="card chat-card"
-                aria-label="Chat panel"
-              >
-                <div class="chat-card-header">
-                  <h2>Chat</h2>
-                  <span id="chat-status" class="chat-status" data-level="idle"
-                    >Offline</span
-                  >
-                </div>
-                <ul
-                  id="chat-messages"
-                  class="chat-messages"
-                  aria-live="polite"
-                ></ul>
-                <form id="chat-form" class="chat-form">
-                  <input
-                    id="chat-input"
-                    type="text"
-                    maxlength="200"
-                    autocomplete="off"
-                    placeholder="Type a message (max 200 chars)"
-                  />
-                  <button type="submit" class="btn-secondary">Send</button>
-                </form>
-              </aside>
             </div>
           </div>
 
-          <!-- Bottom Bar: Score context, Trading status, Farming status -->
-          <div class="bottom-bar">
+          <!-- Action Bar: score context and quick access for optional panels -->
+          <div class="bottom-bar action-bar" aria-label="Live board quick actions">
             <div class="bottom-bar-item">
               <span id="score-context-label" class="label">Score</span>
               <span id="portfolio-value" class="bottom-bar-value">—</span>
             </div>
-            <div class="bottom-bar-item trading-status">
-              <span class="label">Trading</span>
-              <span id="trading-status" class="bottom-bar-value"
-                >Not enabled</span
+            <div class="bottom-bar-item">
+              <button
+                id="trade-drawer-btn"
+                class="btn-secondary drawer-open-btn"
+                type="button"
+                aria-controls="live-drawer"
+                data-live-tab="trade"
               >
+                Trade
+              </button>
             </div>
-            <div class="bottom-bar-item farming-status">
-              <span class="label">Farming</span>
-              <span id="farming-status" class="bottom-bar-value"
-                >Not enabled</span
+            <div class="bottom-bar-item">
+              <button
+                id="farm-drawer-btn"
+                class="btn-secondary drawer-open-btn"
+                type="button"
+                aria-controls="live-drawer"
+                data-live-tab="farm"
               >
+                Farm
+              </button>
             </div>
             <div class="bottom-bar-item chat-toggle-wrapper">
               <button
                 id="chat-toggle-btn"
-                class="btn-secondary chat-toggle-btn"
+                class="btn-secondary chat-toggle-btn drawer-open-btn"
                 type="button"
-                aria-expanded="false"
-                aria-controls="chat-panel"
+                aria-controls="live-drawer"
+                data-live-tab="chat"
               >
                 💬 Chat
+                <span id="chat-unread-badge" class="chat-unread-badge" hidden
+                  >0</span
+                >
               </button>
             </div>
+            <div class="bottom-bar-item trading-status status-pill">
+              <span class="label">Trading</span>
+              <span id="trading-status" class="bottom-bar-value">Not enabled</span>
+            </div>
+            <div class="bottom-bar-item farming-status status-pill">
+              <span class="label">Farming</span>
+              <span id="farming-status" class="bottom-bar-value">Not enabled</span>
+            </div>
           </div>
+
+          <button
+            id="chat-dock-btn"
+            class="chat-dock-btn"
+            type="button"
+            aria-controls="live-drawer"
+            data-live-tab="chat"
+          >
+            <span class="chat-dock-icon" aria-hidden="true">💬</span>
+            <span id="chat-dock-preview" class="chat-dock-preview"
+              >Chat is ready</span
+            >
+            <span id="chat-dock-unread" class="chat-dock-unread" hidden>0</span>
+          </button>
+
+          <section
+            id="live-drawer"
+            class="live-drawer"
+            hidden
+            aria-label="Live board tools"
+          >
+            <div id="live-drawer-backdrop" class="live-drawer-backdrop"></div>
+            <div class="live-drawer-surface" role="dialog" aria-modal="false">
+              <div class="live-drawer-header">
+                <div class="live-drawer-tabs" role="tablist" aria-label="Tools">
+                  <button
+                    id="live-tab-trade"
+                    class="live-drawer-tab"
+                    type="button"
+                    role="tab"
+                    data-live-tab="trade"
+                    aria-controls="live-panel-trade"
+                    aria-selected="true"
+                  >
+                    Trade
+                  </button>
+                  <button
+                    id="live-tab-farm"
+                    class="live-drawer-tab"
+                    type="button"
+                    role="tab"
+                    data-live-tab="farm"
+                    aria-controls="live-panel-farm"
+                    aria-selected="false"
+                  >
+                    Farm
+                  </button>
+                  <button
+                    id="live-tab-chat"
+                    class="live-drawer-tab"
+                    type="button"
+                    role="tab"
+                    data-live-tab="chat"
+                    aria-controls="live-panel-chat"
+                    aria-selected="false"
+                  >
+                    Chat
+                  </button>
+                </div>
+                <button
+                  id="live-drawer-close-btn"
+                  class="btn-secondary live-drawer-close-btn"
+                  type="button"
+                  aria-label="Close tools"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div class="live-drawer-body">
+                <section
+                  id="live-panel-trade"
+                  class="live-drawer-panel"
+                  role="tabpanel"
+                  data-live-panel="trade"
+                >
+                  <div id="trading-panel" class="trading-panel">
+                    <!-- Trading capability card will be rendered here by trading-panel.js -->
+                  </div>
+                </section>
+
+                <section
+                  id="live-panel-farm"
+                  class="live-drawer-panel"
+                  role="tabpanel"
+                  data-live-panel="farm"
+                  hidden
+                >
+                  <div class="card farming-placeholder-card">
+                    <h2>Farming</h2>
+                    <p>
+                      Farming panel is planned and will be available here.
+                      Status stays visible in the action bar.
+                    </p>
+                  </div>
+                </section>
+
+                <section
+                  id="live-panel-chat"
+                  class="live-drawer-panel"
+                  role="tabpanel"
+                  data-live-panel="chat"
+                  hidden
+                >
+                  <aside
+                    id="chat-panel"
+                    class="card chat-card"
+                    aria-label="Chat panel"
+                  >
+                    <div class="chat-card-header">
+                      <h2>Chat</h2>
+                      <span id="chat-status" class="chat-status" data-level="idle"
+                        >Offline</span
+                      >
+                    </div>
+                    <ul
+                      id="chat-messages"
+                      class="chat-messages"
+                      aria-live="polite"
+                    ></ul>
+                    <form id="chat-form" class="chat-form">
+                      <input
+                        id="chat-input"
+                        type="text"
+                        maxlength="200"
+                        autocomplete="off"
+                        placeholder="Type a message (max 200 chars)"
+                      />
+                      <button type="submit" class="btn-secondary">Send</button>
+                    </form>
+                  </aside>
+                </section>
+              </div>
+            </div>
+          </section>
         </section>
       </main>
     </div>

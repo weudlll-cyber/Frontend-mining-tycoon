@@ -18,7 +18,7 @@ Confirm backend listens on `http://127.0.0.1:8000` and `/meta` returns the contr
 To test permission enforcement, set environment variables **before** starting the backend:
 ```powershell
 $env:REQUIRE_ADMIN_FOR_GAME_CREATE = "true"
-$env:ADMIN_TOKEN = "test-admin-secret"
+$env:ADMIN_TOKEN = "demo-admin-token-placeholder"
 ```
 Without these, game creation is open to all (default behavior).
 
@@ -42,7 +42,7 @@ Confirm Vite listens on `http://localhost:5173` and both entries build:
 
 ### 1.2 — Create a Sync Round (with defaults)
 1. **Connection**: Leave Backend URL as `http://127.0.0.1:8000`
-2. If `REQUIRE_ADMIN_FOR_GAME_CREATE=true`: Enter Admin Token as `test-admin-secret`
+2. If `REQUIRE_ADMIN_FOR_GAME_CREATE=true`: Enter Admin Token as `demo-admin-token-placeholder`
 3. **Round Type**: Select "Sync"
 4. **Time Configuration**:
    - Enrollment Window: 10 seconds (default 10)
@@ -197,7 +197,7 @@ Expect: **403 Forbidden** with message "Admin permission required…"
 ```bash
 curl -X POST http://127.0.0.1:8000/games \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Token: test-admin-secret" \
+   -H "X-Admin-Token: demo-admin-token-placeholder" \
   -d '{"duration_mode":"preset","duration_preset":"5m","enrollment_window_seconds":30,"scoring_mode":"stockpile"}'
 ```
 Expect: **200 OK** with `{ "game_id": <number> }`
@@ -206,7 +206,7 @@ Expect: **200 OK** with `{ "game_id": <number> }`
 ```bash
 curl -X POST http://127.0.0.1:8000/games \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Token: wrong-secret" \
+   -H "X-Admin-Token: invalid-demo-token-placeholder" \
   -d '{"duration_mode":"preset","duration_preset":"5m"}'
 ```
 Expect: **403 Forbidden**

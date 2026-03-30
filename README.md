@@ -7,7 +7,7 @@ This app lets you:
 - create and join games
 - start/stop live SSE stream updates
 - view player state, upgrades, and leaderboard in real time
-- use an optional chat side-panel (WebSocket, non-persistent, no gameplay impact)
+- use an optional chat tool panel (WebSocket, non-persistent, no gameplay impact)
 - play Seasonal Oracle upgrades (API contract v2):
   - view 4 seasonal balances and per-token upgrade tracks
   - view oracle prices and fee/spread hints
@@ -17,8 +17,8 @@ This app lets you:
 ## Current Implementation Status (2026-03-30)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
-- **Trading now has an initial scaffold**: read-only panel and capability-driven status both in dedicated UI panel and bottom-bar, but trade execution and fee calculation remain unimplemented.
-- Farming UI implementation has not started yet; the dashboard currently exposes visibility/status placeholders only.
+- **Trading now has an initial scaffold**: read-only panel and capability-driven status in the action bar plus the live tools drawer. Trade execution and fee calculation remain unimplemented.
+- Farming gameplay implementation has not started yet; the dashboard exposes a drawer placeholder plus status visibility in the action bar.
 - Gameplay-balance validation is still pending through playtests, especially for:
   - mined output pacing over time
   - upgrade impact compared to upgrade cost progression
@@ -98,11 +98,11 @@ Key highlights:
 - Deterministic oracle/halving/events with snapshot-locked game settings.
 - No P2P markets and no real-money mechanics.
 - Desktop gameplay view keeps core information visible without page scrolling.
-- No overlays/modals/popups during active gameplay interactions; a post-game return overlay is allowed once a round finishes.
+- No blocking overlays/modals/popups during active gameplay interactions; a post-game return overlay is allowed once a round finishes.
 - Seasonal upgrades stay inline with three visible lanes: hashrate, efficiency, cooling.
 - Analytics stays read-only and visible with per-token output, cumulative mined, balances, oracle prices, and fee/spread.
-- Trading and farming remain visible as sections even when disabled.
-- Chat remains social-only, docked inline (not overlay), and non-gameplay.
+- Trading and farming remain visible as status plus on-demand tool panels.
+- Chat remains social-only, accessible from anywhere via action bar/chat dock, and non-gameplay.
 - Tests must remain green and new behavior must be covered; keep XSS-safe rendering patterns.
 
 ## Admin Setup (Round Creation)
@@ -164,7 +164,7 @@ Do **not** hardcode tuning values in the UI; always import from control-data.
 
 When the backend is configured with:
 - `REQUIRE_ADMIN_FOR_GAME_CREATE=true`
-- `ADMIN_TOKEN=<secret>`
+- `ADMIN_TOKEN=<set-locally-to-your-admin-token>`
 
 Game creation requires an `X-Admin-Token` header. The admin-setup UI prompts for the token. Player join routes are **never** gated.
 
@@ -306,14 +306,31 @@ Daily usage:
 & .\scripts\push_with_audit.ps1
 ```
 
-What happens before push:
+Fast/full profiles:
+
+```powershell
+# Fast (default): lint + format + unit tests + build
+& .\scripts\push_with_audit.ps1 -Profile fast
+
+# Full: fast + coverage + npm audit + advisory code health
+& .\scripts\push_with_audit.ps1 -Profile full
+```
+
+If the exact same clean HEAD already passed the local gate, the helper and the
+tracked pre-push hook now reuse that successful result and skip rerunning the
+same profile. Use `& .\scripts\push_with_audit.ps1 -ForceAudit` to force a fresh rerun.
+
+What happens before push (`-Profile fast`, default):
 
 - required frontend docs presence check
 - `npm run clean:audit` (eslint + strict unused checks + dependency/file usage scan)
 - `npm run format:check`
 - `npm run test -- --run`
-- `npm run test:coverage`
 - `npm run build`
+
+Additional checks in `-Profile full`:
+
+- `npm run test:coverage`
 - `npm audit --omit=dev --audit-level=high`
 - advisory code-health audit (file-size hotspots, comment-header coverage, TODO/FIXME markers, debug-console scan)
 
@@ -364,17 +381,20 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
       - Line 1: Next halving | Mined
       - Line 2: Fee X / Y with anchored ⓘ tooltip
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
-    - **Player return panel directly below analytics** split into:
-      - `Open Games` quick-select list for the next joinable round
-      - `Last Game Highscores` snapshot of the most recently finished round
-    - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
-- **Bottom Bar**:
+    - Player analytics remains always visible while optional tools move to the on-demand drawer.
+- **Bottom Action Bar**:
   - **Score** shows the live score-context metric for the selected outcome mode. In Power Mode this is the oracle-weighted score; in other modes, this display follows that mode's evaluation context. Large values use compact notation (k/M/B) for scanability, with exact values available via tooltip on hover/focus.
-  - Trading status, Farming status, and the Chat toggle button complete the bar.
+  - Trading and Farming status pills stay visible.
+  - `Trade`, `Farm`, and `Chat` buttons open the non-core tools drawer.
+  - Chat also exposes a persistent preview dock with unread badge so messages are always visible at a glance.
+- **Live Tools Drawer (inline, non-blocking)**:
+  - Hosts `Trade`, `Farm`, and `Chat` tabs so non-core tools are always reachable without crowding the main board.
+  - Chat remains non-persistent and social-only.
 - **In-game mode visibility**: Header summary shows the active scoring mode as read-only text (for example `Scoring: Stockpile Mode`).
 - On desktop, the setup panel and season list use internal scrolling while the page itself does not scroll.
 - Season upgrades use a compact row-based layout to minimize vertical height and reduce scrolling.
 - Player analytics panel width is fixed through a CSS variable, while the left seasons column uses `min-width: 0` to prevent horizontal overflow.
+- On mobile, a season-focus strip keeps one full season card visible at a time to reduce vertical scrolling while preserving quick switching between all four seasons.
 
 ### Key Principles
 
@@ -385,8 +405,8 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 - **Player State uses a fixed-column matrix for fast scan**: Labels left-aligned, numeric values right-aligned in monospace fonts. Tooltip icons (ⓘ) are placed at the end of each row to avoid disrupting the visual flow of data. All matrix values fully visible without scrolling.
 - **Halving countdown updates smoothly and remains copyable**: Season-card halving timers tick client-side every second between SSE sync points, and countdown text is selectable/copyable.
 - **Stable DOM updates under SSE**: rendering paths update text/attributes incrementally (no untrusted `innerHTML` rebuilds), preserving cursor/selection anchors and per-lane pay-select persistence during live updates.
-- **Chat is docked inline (no overlays); internal scroll only.** Messages scroll inside the chat panel, and collapsing chat reclaims right-column space for analytics.
-- **Mining/Trading/Farming visibility**: All three economic pillars are displayed as sections, even if disabled, allowing players to see what is "not enabled" or "available later".
+- **Chat is always reachable and glanceable**: action-bar chat button plus persistent preview dock with unread badge; full chat opens in the tools drawer.
+- **Mining/Trading/Farming visibility**: Mining remains on the main board; Trading/Farming are exposed as visible status plus on-demand drawer tabs, even when disabled.
 - **Responsive**:
   - **Tablet (768px–1200px)**: Main grid stacks to single column; seasons may arrange 1×4 or 2×2 depending on available space. Scrolling is minimal.
   - **Mobile (<768px)**: Stacked single-column layout. Season cards show one at a time using a tabbed interface. Analytics panel collapses into an accordion for compact viewing.

@@ -202,8 +202,19 @@ import {
   initInlineUpgrades,
   renderAllSeasonUpgrades,
 } from './ui/upgrade-panel-inline.js';
-import { initChatPanel, connectChat, disconnectChat } from './ui/chat-panel.js';
+import {
+  initChatPanel,
+  connectChat,
+  disconnectChat,
+  setChatPanelOpen,
+} from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
+import {
+  initLiveDrawer,
+  getLiveDrawerTab,
+  isLiveDrawerOpen,
+} from './ui/live-drawer.js';
+import { initSeasonFocus } from './ui/season-focus.js';
 import {
   initStreamController,
   startStream,
@@ -338,10 +349,25 @@ const chatMessagesEl = document.getElementById('chat-messages');
 const chatFormEl = document.getElementById('chat-form');
 const chatInputEl = document.getElementById('chat-input');
 const chatStatusEl = document.getElementById('chat-status');
+const chatUnreadBadgeEl = document.getElementById('chat-unread-badge');
+const chatDockBtnEl = document.getElementById('chat-dock-btn');
+const chatDockPreviewEl = document.getElementById('chat-dock-preview');
+const chatDockUnreadEl = document.getElementById('chat-dock-unread');
 
 // DOM elements - trading panel
 const tradingPanelEl = document.getElementById('trading-panel');
 const tradingStatusEl = document.getElementById('trading-status');
+const tradeDrawerBtnEl = document.getElementById('trade-drawer-btn');
+const farmDrawerBtnEl = document.getElementById('farm-drawer-btn');
+const liveDrawerEl = document.getElementById('live-drawer');
+const liveDrawerBackdropEl = document.getElementById('live-drawer-backdrop');
+const liveDrawerCloseBtnEl = document.getElementById('live-drawer-close-btn');
+const liveDrawerTabTradeEl = document.getElementById('live-tab-trade');
+const liveDrawerTabFarmEl = document.getElementById('live-tab-farm');
+const liveDrawerTabChatEl = document.getElementById('live-tab-chat');
+const liveDrawerPanelTradeEl = document.getElementById('live-panel-trade');
+const liveDrawerPanelFarmEl = document.getElementById('live-panel-farm');
+const liveDrawerPanelChatEl = document.getElementById('live-panel-chat');
 
 // DOM elements - player and leaderboard
 const playerStateEl = document.getElementById('player-state');
@@ -349,6 +375,11 @@ const leaderboardEl = document.getElementById('leaderboard');
 const upgradesEl =
   document.getElementById('upgrades') || document.createElement('div'); // Fallback for safety
 const seasonScrollEl = document.querySelector('.seasons-scroll');
+const seasonFocusStripEl = document.getElementById('season-focus-strip');
+const seasonFocusButtons = Array.from(
+  document.querySelectorAll('[data-season-focus]')
+);
+const seasonCards = Array.from(document.querySelectorAll('.season-card'));
 const myScoreEl = document.getElementById('my-score');
 const myRankEl = document.getElementById('my-rank');
 const topScoreEl = document.getElementById('top-score');
@@ -388,6 +419,8 @@ let tradingPanelApi = null;
 let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
+let chatUnreadCount = 0;
+let lastChatPreview = 'Chat is ready';
 let sessionStartSupported = true;
 let setupRoundModeOverride = null;
 let activeSession = null;
@@ -404,6 +437,56 @@ let selectedSetupRoundType = 'sync';
 let tradeCountManuallyOverridden = false;
 let pendingUiRenderFrame = null;
 let pendingUiRenderData = null;
+
+function renderChatPreviewState() {
+  const unreadText = chatUnreadCount > 99 ? '99+' : String(chatUnreadCount);
+
+  if (chatUnreadBadgeEl) {
+    chatUnreadBadgeEl.hidden = chatUnreadCount <= 0;
+    chatUnreadBadgeEl.textContent = unreadText;
+  }
+
+  if (chatDockUnreadEl) {
+    chatDockUnreadEl.hidden = chatUnreadCount <= 0;
+    chatDockUnreadEl.textContent = unreadText;
+  }
+
+  if (chatDockPreviewEl) {
+    chatDockPreviewEl.textContent = lastChatPreview;
+  }
+}
+
+function isChatTabVisible() {
+  return isLiveDrawerOpen() && getLiveDrawerTab() === 'chat';
+}
+
+function markChatAsRead() {
+  if (chatUnreadCount <= 0) return;
+  chatUnreadCount = 0;
+  renderChatPreviewState();
+}
+
+function handleChatMessagePreview(message) {
+  const user = String(message?.user || 'player').trim() || 'player';
+  const text = String(message?.text || '').trim();
+  lastChatPreview = text ? `${user}: ${text}` : `${user}: (empty message)`;
+
+  if (!isChatTabVisible()) {
+    chatUnreadCount += 1;
+  }
+
+  renderChatPreviewState();
+}
+
+function handleLiveDrawerStateChange(nextState) {
+  const chatVisible = Boolean(
+    nextState?.isOpen && nextState?.activeTab === 'chat'
+  );
+  setChatPanelOpen(chatVisible);
+  if (chatVisible) {
+    markChatAsRead();
+  }
+}
 let activeGamesById = new Map();
 let activeGamesRefreshInterval = null;
 let lastFinishedGameSnapshot = null;
@@ -1844,6 +1927,35 @@ function initializeModules() {
     getActiveUpgradeDefinitions,
     performUpgrade,
   });
+  initSeasonFocus({
+    stripEl: seasonFocusStripEl,
+    buttons: seasonFocusButtons,
+    cards: seasonCards,
+    defaultSeason: 'spring',
+  });
+  initLiveDrawer({
+    rootEl: liveDrawerEl,
+    backdropEl: liveDrawerBackdropEl,
+    closeBtnEl: liveDrawerCloseBtnEl,
+    tabButtons: [
+      liveDrawerTabTradeEl,
+      liveDrawerTabFarmEl,
+      liveDrawerTabChatEl,
+    ],
+    panels: [
+      liveDrawerPanelTradeEl,
+      liveDrawerPanelFarmEl,
+      liveDrawerPanelChatEl,
+    ],
+    openButtons: [
+      tradeDrawerBtnEl,
+      farmDrawerBtnEl,
+      chatToggleBtnEl,
+      chatDockBtnEl,
+    ],
+    defaultTab: 'trade',
+    onStateChanged: handleLiveDrawerStateChange,
+  });
   initChatPanel({
     panelEl: chatPanelEl,
     toggleBtnEl: chatToggleBtnEl,
@@ -1857,7 +1969,15 @@ function initializeModules() {
     getPlayerToken: (gameId, playerId) =>
       getStorageItem(getPlayerTokenStorageKey(gameId, playerId)),
     showToast,
+    onMessage: handleChatMessagePreview,
+    onPanelVisibilityChanged(isOpen) {
+      if (isOpen) {
+        markChatAsRead();
+      }
+    },
+    manageToggleInternally: false,
   });
+  renderChatPreviewState();
   tradingPanelApi = initTradingPanel({
     getGameMeta,
     getLastGameData: () => lastGameData,
