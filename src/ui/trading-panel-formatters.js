@@ -1,3 +1,4 @@
+// Pure formatting and normalization helpers for the trading panel UI.
 const DEFAULT_SCORING_MODE = 'stockpile_total_tokens';
 
 export function normalizeScoringMode(rawMode) {

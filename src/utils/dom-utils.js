@@ -20,6 +20,7 @@ export function clearElementChildren(el) {
 }
 
 export function clearNode(node) {
+  if (!node) return;
   while (node.firstChild) {
     node.removeChild(node.firstChild);
   }

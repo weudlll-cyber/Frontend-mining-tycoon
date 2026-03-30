@@ -4,7 +4,7 @@ Provide a concise generated summary of what changed and why.
 
 ## Invariant Compliance
 
-- [ ] Canonical docs reviewed before implementation (`LOCKED_DECISIONS.md`, `PROJECT_BASELINE.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY_AUDIT.md`).
+- [ ] Canonical docs reviewed before implementation (`LOCKED_DECISIONS.md`, `PROJECT_BASELINE.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`).
 - [ ] Backend authority is preserved; frontend remains display/intent only.
 - [ ] Snapshot-locked economy/oracle/halving/events behavior remains deterministic.
 - [ ] No overlays/modals/popups were introduced for core gameplay.

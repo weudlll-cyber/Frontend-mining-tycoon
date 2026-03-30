@@ -1,789 +1,227 @@
-<!--
-File: index.html
-Purpose: Static application shell for the Mining Tycoon frontend.
-Role in system: Hosts the inline dashboard, setup panel, gear-toggled debug panel, and live summary regions wired by src/main.js.
-Invariants: No modal shell markup for gameplay; async-session status and debug session id stay inline and non-sensitive.
-Security notes: Static DOM scaffold only; runtime text is populated with safe DOM APIs.
--->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mining Tycoon</title>
+    <title>Mining Tycoon | Start</title>
   </head>
-  <body class="page-player">
-    <div id="app">
-      <main class="app-layout">
-        <div class="page-banner">
-          <span class="page-banner-icon">▶</span>
-          <span>Player Dashboard — join a round below to begin playing</span>
-        </div>
-        <header class="card game-header" aria-label="Game header">
-          <div class="game-header-top">
-            <h1>⛏️ Mining Tycoon</h1>
-            <div class="header-actions">
+  <body>
+    <main class="lobby-shell">
+      <section class="lobby-stage" aria-label="Authentication and lobby">
+        <article class="panel auth-panel" aria-label="Authentication panel">
+          <h1 class="brand-title">Mining Tycoon</h1>
+          <p class="brand-subtitle">
+            Sign in first, then choose one of the open games to enter the live
+            board.
+          </p>
+
+          <form id="login-form" class="auth-form" aria-label="Login form">
+            <label class="auth-form-row" for="login-username">
+              <span>Username</span>
+              <input
+                id="login-username"
+                name="username"
+                type="text"
+                autocomplete="username"
+                required
+              />
+            </label>
+            <label class="auth-form-row" for="login-password">
+              <span>Password</span>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <button id="open-forgot-password" class="inline-link" type="button">
+              Forgot password?
+            </button>
+            <button class="auth-button" type="submit">Sign in</button>
+            <div class="auth-helpers">
               <button
-                id="setup-toggle-btn"
-                class="btn-secondary"
+                id="open-register-dialog"
+                class="create-account-btn"
                 type="button"
-                aria-expanded="true"
-                aria-controls="setup-shell"
               >
-                Hide Setup
+                Create account
               </button>
-              <button
-                id="jump-live-btn"
-                class="btn-secondary"
-                type="button"
-                aria-controls="live-board"
-              >
-                Jump to Live Board
+              <button id="logout-btn" class="logout-btn" type="button" disabled>
+                Logout
               </button>
-              <button
-                id="debug-toggle-btn"
-                class="btn-secondary debug-toggle-btn"
-                type="button"
-                aria-expanded="false"
-                aria-controls="debug-panel"
-                aria-label="Expand debug panel"
-                title="Debug"
-              >
-                ⚙️
-              </button>
+              <a class="link-button" href="/admin.html">Admin setup</a>
             </div>
-          </div>
+          </form>
 
-          <div class="game-summary-line" aria-live="polite">
-            <span class="summary-item"
-              >⏱ <span id="countdown" class="summary-value">—</span></span
-            >
-            <span class="summary-item">
-              Phase: <span id="game-status" class="badge badge-gray">—</span>
-            </span>
-            <span class="summary-item"
-              >Score: <span id="my-score" class="summary-value">—</span></span
-            >
-            <span class="summary-item"
-              >Rank <span id="my-rank" class="summary-value">—</span></span
-            >
-            <span class="summary-item"
-              >Top <span id="top-score" class="summary-value">—</span></span
-            >
-            <span class="summary-item">
-              Scoring:
-              <span id="scoring-mode-status" class="badge badge-gray"
-                >Stockpile Mode</span
-              >
-            </span>
-            <span class="summary-item">
-              Conn: <span id="conn-status" class="badge badge-gray">Idle</span>
-            </span>
-            <span class="summary-item">
-              <span id="async-session-status" class="badge badge-gray" hidden
-                >Async: n/a</span
-              >
-            </span>
-            <span id="countdown-label" class="summary-label"
-              >Time Remaining</span
-            >
-            <!--
-              Round-remaining hint — visible only while an async session is
-              active.  Gives the player a second reference point so they can
-              distinguish:
-                • "How long am I playing this session?" → Session Elapsed (⏱)
-                • "How long until the round ends?"      → Round left (this)
-              Visibility is managed by startSessionElapsedTimer() /
-              stopSessionElapsedTimer() in main.js.
-            -->
-            <span
-              id="round-remaining-hint"
-              class="summary-item summary-item--muted"
-              hidden
-            >
-              Round left:
-              <span id="round-remaining" class="summary-value">—</span>
-            </span>
-          </div>
+          <p
+            id="auth-message"
+            class="message"
+            data-kind="info"
+            aria-live="polite"
+          ></p>
+        </article>
 
+        <article class="panel lobby-panel" aria-label="Open games panel">
+          <div class="panel-header">
+            <h2>Open Games</h2>
+          </div>
+          <p id="account-summary" class="message" data-kind="info">
+            Not signed in.
+          </p>
+          <ul
+            id="open-games-list"
+            class="open-games-list"
+            aria-label="Open games"
+          ></ul>
           <section
-            id="debug-panel"
-            class="debug-panel"
-            aria-label="Debug details"
-            hidden
+            class="lobby-last-game-panel"
+            aria-label="Last game highscores"
           >
-            <div class="debug-grid">
-              <div class="debug-row">
-                <span class="debug-label">Contract</span>
-                <span id="meta-debug" class="debug-value"
-                  >contract v— | meta_hash —</span
-                >
-              </div>
-              <div class="debug-row">
-                <span class="debug-label">Backend URL</span>
-                <span id="debug-backend-url" class="debug-value">—</span>
-              </div>
-              <div class="debug-row">
-                <span class="debug-label">Game ID</span>
-                <span id="debug-game-id" class="debug-value">—</span>
-              </div>
-              <div class="debug-row">
-                <span class="debug-label">Player ID</span>
-                <span id="debug-player-id" class="debug-value">—</span>
-              </div>
-              <div class="debug-row">
-                <span class="debug-label">Session ID</span>
-                <span id="debug-session-id" class="debug-value">—</span>
-              </div>
-            </div>
+            <h3>Last Game Highscores</h3>
+            <p id="last-game-summary" class="message" data-kind="info">
+              No finished game recorded yet.
+            </p>
+            <div id="last-game-highscores" class="lobby-last-game-scores"></div>
           </section>
-        </header>
-
-        <!-- Connection & Controls -->
-        <section
-          id="setup-shell"
-          class="setup-shell setup-open"
-          aria-label="Setup shell"
-        >
-          <div class="setup-shell-scroll">
-            <section class="card setup-card" id="setup-panel">
-              <div class="section-title-row">
-                <div>
-                  <h2>Join Round</h2>
-                  <p class="section-subtitle">
-                    Enter your player details and a game ID, then start the live
-                    stream.
-                  </p>
-                </div>
-                <button
-                  class="jump-link"
-                  id="jump-live-btn-setup"
-                  type="button"
-                  aria-controls="live-board"
-                >
-                  Jump to Live Board
-                </button>
-              </div>
-              <div class="setup-grid">
-                <div class="form-group form-span-2 player-core-field">
-                  <label>Backend URL:</label>
-                  <input
-                    id="base-url"
-                    type="text"
-                    value="http://127.0.0.1:8000"
-                  />
-                </div>
-                <div class="form-group form-span-2 player-core-field">
-                  <label>Player Name:</label>
-                  <input
-                    id="player-name"
-                    type="text"
-                    value="Player"
-                    placeholder="e.g., Alice"
-                  />
-                </div>
-                <div class="form-group form-span-2">
-                  <label>Round Type:</label>
-                  <div
-                    class="host-round-toggle admin-only"
-                    role="radiogroup"
-                    aria-label="Round Type"
-                  >
-                    <label class="host-round-option" for="round-type-sync">
-                      <input
-                        id="round-type-sync"
-                        name="round-type"
-                        type="radio"
-                        value="sync"
-                        checked
-                      />
-                      <span>Sync</span>
-                    </label>
-                    <label class="host-round-option" for="round-type-async">
-                      <input
-                        id="round-type-async"
-                        name="round-type"
-                        type="radio"
-                        value="async"
-                      />
-                      <span>Async (host)</span>
-                    </label>
-                  </div>
-                </div>
-                <div class="form-group form-span-4">
-                  <label>Scoring Mode (fixed for this round):</label>
-                  <div
-                    class="host-round-toggle admin-only"
-                    role="radiogroup"
-                    aria-label="Scoring Mode"
-                  >
-                    <label
-                      class="host-round-option"
-                      for="scoring-mode-stockpile"
-                    >
-                      <input
-                        id="scoring-mode-stockpile"
-                        name="scoring-mode"
-                        type="radio"
-                        value="stockpile_total_tokens"
-                        checked
-                      />
-                      <span>Stockpile: highest total token count wins.</span>
-                    </label>
-                    <label class="host-round-option" for="scoring-mode-power">
-                      <input
-                        id="scoring-mode-power"
-                        name="scoring-mode"
-                        type="radio"
-                        value="power_oracle_weighted"
-                      />
-                      <span>Power: highest oracle-weighted score wins.</span>
-                    </label>
-                    <label
-                      class="host-round-option"
-                      for="scoring-mode-mining-time"
-                    >
-                      <input
-                        id="scoring-mode-mining-time"
-                        name="scoring-mode"
-                        type="radio"
-                        value="mining_time_equivalent"
-                      />
-                      <span
-                        >Mining Time Equivalent: highest equivalent mining time
-                        wins.</span
-                      >
-                    </label>
-                    <label
-                      class="host-round-option"
-                      for="scoring-mode-efficiency"
-                    >
-                      <input
-                        id="scoring-mode-efficiency"
-                        name="scoring-mode"
-                        type="radio"
-                        value="efficiency_system_mastery"
-                      />
-                      <span
-                        >Efficiency: best improvement from baseline wins.</span
-                      >
-                    </label>
-                  </div>
-                </div>
-                <div class="form-group form-span-4">
-                  <label for="trade-count-input"
-                    >Trades (fixed for this round):</label
-                  >
-                  <div class="async-host-row admin-only" aria-live="polite">
-                    <label class="async-host-field" for="trade-count-input">
-                      <span>Trade Count</span>
-                      <input
-                        id="trade-count-input"
-                        type="number"
-                        step="1"
-                        value="0"
-                      />
-                    </label>
-                    <span
-                      id="trade-count-mode-note"
-                      class="setup-actions-note"
-                    ></span>
-                  </div>
-                  <div
-                    id="trade-schedule-preview"
-                    class="derived-emission-preview"
-                    style="display: block"
-                  ></div>
-                </div>
-                <div
-                  id="sync-host-controls"
-                  class="form-group form-span-4 async-host-controls admin-only"
-                >
-                  <div class="async-host-row" aria-live="polite">
-                    <label class="async-host-field" for="enrollment-window">
-                      <span>Enrollment Window (seconds)</span>
-                      <input
-                        id="enrollment-window"
-                        type="number"
-                        value="600"
-                        min="5"
-                        max="3600"
-                      />
-                    </label>
-                    <label class="async-host-field" for="duration-preset">
-                      <span>Round Duration</span>
-                      <select id="duration-preset">
-                        <option value="5m">5 minutes</option>
-                        <option value="10m">10 minutes</option>
-                        <option value="15m">15 minutes</option>
-                        <option value="20m">20 minutes</option>
-                        <option value="30m" selected>30 minutes</option>
-                        <option value="60m">60 minutes</option>
-                        <option value="6h">6 hours</option>
-                        <option value="12h">12 hours</option>
-                        <option value="24h">24 hours</option>
-                        <option value="3d">3 days</option>
-                        <option value="7d">7 days</option>
-                        <option value="custom">Custom...</option>
-                      </select>
-                    </label>
-                    <div
-                      id="duration-custom-input"
-                      class="duration-custom-input"
-                      style="display: none"
-                    >
-                      <input
-                        id="duration-custom-value"
-                        type="number"
-                        placeholder="e.g., 120"
-                        min="60"
-                        max="2592000"
-                      />
-                      <select id="duration-custom-unit">
-                        <option value="seconds">seconds</option>
-                        <option value="minutes">minutes</option>
-                        <option value="hours">hours</option>
-                        <option value="days">days</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  id="async-host-controls"
-                  class="form-group form-span-4 async-host-controls admin-only"
-                  hidden
-                >
-                  <div class="async-host-row" aria-live="polite">
-                    <label class="async-host-field" for="async-duration-preset">
-                      <span>Round Duration</span>
-                      <select id="async-duration-preset">
-                        <option value="5m">5m</option>
-                        <option value="10m">10m</option>
-                        <option value="15m">15m</option>
-                        <option value="60m">1h</option>
-                        <option value="3h">3h</option>
-                        <option value="6h">6h</option>
-                        <option value="12h">12h</option>
-                        <option value="24h">1d</option>
-                        <option value="3d" selected>3d</option>
-                        <option value="7d">7d</option>
-                      </select>
-                    </label>
-                    <label
-                      class="async-host-field"
-                      for="async-session-duration-preset"
-                    >
-                      <span>Session Duration</span>
-                      <select id="async-session-duration-preset">
-                        <option value="5m">5m</option>
-                        <option value="10m">10m</option>
-                        <option value="30m">30m</option>
-                        <option value="60m">1h</option>
-                        <option value="6h">6h</option>
-                        <option value="12h">12h</option>
-                        <option value="24h" selected>1d</option>
-                      </select>
-                    </label>
-                    <!--
-                      Session-duration guard warning.
-                      Shown only when the selected session duration exceeded the
-                      round duration and the UI auto-clamped it to a valid value.
-                      Hidden by default; visibility is toggled by
-                      syncSessionDurationOptions() in main.js.
-                    -->
-                    <span
-                      id="session-duration-warning"
-                      class="async-session-warning"
-                      hidden
-                      aria-live="polite"
-                    ></span>
-                    <label class="async-host-checkbox" for="async-auto-start">
-                      <input id="async-auto-start" type="checkbox" checked />
-                      <span
-                        >Auto-start async session after game creation and
-                        join</span
-                      >
-                    </label>
-                  </div>
-                </div>
-                <!-- P2.4: Optional advanced overrides (collapsed by default) -->
-                <div class="form-group form-span-2">
-                  <label>
-                    <input
-                      type="checkbox"
-                      id="show-advanced-overrides"
-                      class="admin-only"
-                    />
-                    Advanced Overrides (optional)
-                  </label>
-                </div>
-                <div
-                  id="advanced-overrides"
-                  class="advanced-overrides admin-only"
-                  style="display: none"
-                >
-                  <p class="advanced-overrides-help" aria-live="polite">
-                    Override math: total halving checkpoints across the game =
-                    season cycles x 4 (spring, summer, autumn, winter).
-                  </p>
-                  <div class="form-group">
-                    <label>Anchor Token:</label>
-                    <select id="anchor-token">
-                      <option value="">— Use recommendation —</option>
-                      <option value="spring">spring</option>
-                      <option value="summer">summer</option>
-                      <option value="autumn">autumn</option>
-                      <option value="winter">winter</option>
-                    </select>
-                    <p class="field-help">
-                      The anchor token is the reference token used to derive all
-                      other base emission rates by fixed ratios.
-                    </p>
-                  </div>
-                  <div class="form-group">
-                    <label>Anchor Tokens/sec:</label>
-                    <input
-                      id="anchor-rate"
-                      type="number"
-                      placeholder="e.g., 5.0"
-                      step="0.1"
-                      min="0"
-                    />
-                    <p class="field-help">
-                      Base emission speed for the anchor token (tokens per real
-                      second). Other tokens are scaled from this value.
-                    </p>
-                  </div>
-                  <div class="form-group">
-                    <label>Season Cycles (not total halvings):</label>
-                    <input
-                      id="season-cycles"
-                      type="number"
-                      placeholder="e.g., 1 (short sessions)"
-                      step="1"
-                      min="1"
-                    />
-                    <p class="field-help">
-                      One cycle contains 4 halving checkpoints. Example: cycles
-                      = 4 means up to 16 halving checkpoints over the game.
-                    </p>
-                  </div>
-                  <div
-                    id="derived-emission-preview"
-                    class="derived-emission-preview"
-                    style="display: none"
-                  ></div>
-                </div>
-                <div class="form-group form-span-3 player-core-field">
-                  <label>Game ID:</label>
-                  <input
-                    id="game-id"
-                    type="text"
-                    placeholder="e.g., game-123"
-                  />
-                </div>
-                <div class="form-group form-span-3 player-core-field">
-                  <label for="active-game-select">Active Games:</label>
-                  <div class="async-host-row">
-                    <select id="active-game-select">
-                      <option value="">No joinable games found</option>
-                    </select>
-                    <button
-                      id="refresh-active-games-btn"
-                      type="button"
-                      class="btn-secondary"
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  <p id="active-game-status" class="field-help">
-                    Shows enrolling games and async games in running state.
-                  </p>
-                </div>
-                <div class="form-group form-span-3">
-                  <label>Player ID:</label>
-                  <input
-                    id="player-id"
-                    type="text"
-                    placeholder="e.g., player-456"
-                  />
-                </div>
-              </div>
-              <div class="setup-actions">
-                <div class="setup-actions-header">
-                  <h3>Primary Actions</h3>
-                  <span id="round-mode-badge" class="round-mode-badge">
-                    Round: Sync
-                  </span>
-                </div>
-                <p id="async-diagnostics-help" class="async-diagnostics-help">
-                  Chip meaning: Async = round mode is async. Window = session
-                  window is open. Joined = player joined this game. SessionAPI =
-                  backend supports async sessions. NoSession = no active session
-                  for this player. Auth = backend requires player auth token.
-                  Auth can stay ○ when auth is disabled or not probed yet.
-                </p>
-                <div class="button-group">
-                  <a
-                    id="admin-setup-link"
-                    href="admin.html"
-                    class="btn-secondary"
-                    style="
-                      text-decoration: none;
-                      display: none;
-                      align-items: center;
-                    "
-                    title="Open Admin Setup to create a new round"
-                    >+ New Game (Admin)</a
-                  >
-                  <button id="start-btn" class="btn-secondary">
-                    Start Game
-                  </button>
-                  <button id="start-session-btn" class="btn-secondary" hidden>
-                    Start Session (Async)
-                  </button>
-                  <button id="stop-btn" class="btn-secondary">
-                    Stop Stream
-                  </button>
-                </div>
-                <p
-                  id="start-session-status"
-                  class="setup-session-status"
-                  aria-live="polite"
-                ></p>
-                <p
-                  id="setup-actions-note"
-                  class="setup-actions-note"
-                  aria-live="polite"
-                ></p>
-              </div>
-            </section>
+          <div class="lobby-actions">
+            <p
+              id="lobby-message"
+              class="message"
+              data-kind="info"
+              aria-live="polite"
+            ></p>
+            <button
+              id="join-selected-btn"
+              class="join-btn"
+              type="button"
+              disabled
+            >
+              Enter game
+            </button>
           </div>
-        </section>
+        </article>
+      </section>
+    </main>
 
-        <section class="dashboard-shell" id="live-board">
-          <!-- Main Dashboard Grid (2 columns: left 65% seasons, right 35% analytics) -->
-          <div class="dashboard-main">
-            <!-- LEFT: Explicit internal scroll container for seasons -->
-            <div class="seasons-scroll">
-              <div class="seasons-grid">
-                <div
-                  id="season-spring"
-                  class="season-card"
-                  data-season="spring"
-                >
-                  <div class="season-header">
-                    <h3>🌱 Spring</h3>
-                  </div>
-                  <div class="season-body">
-                    <div class="season-meta">
-                      <div class="meta-item">
-                        <span class="meta-label">Balance</span>
-                        <span class="season-balance">—</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item">
-                        <span class="meta-label">Output</span>
-                        <span class="season-output">—/s</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item halving-item">
-                        <span class="meta-label">Halving</span>
-                        <span class="season-halving">—</span>
-                      </div>
-                    </div>
-                    <div class="season-upgrades">
-                      <!-- Upgrade columns will be inserted here -->
-                    </div>
-                  </div>
-                </div>
+    <dialog id="forgot-password-dialog" aria-label="Forgot password form">
+      <form id="forgot-password-form" class="dialog-form" method="dialog">
+        <h3>Reset password</h3>
+        <label class="auth-form-row" for="forgot-username">
+          <span>Username</span>
+          <input id="forgot-username" name="username" type="text" required />
+        </label>
+        <label class="auth-form-row" for="forgot-email">
+          <span>Email</span>
+          <input id="forgot-email" name="email" type="email" required />
+        </label>
+        <label class="auth-form-row" for="forgot-new-password">
+          <span>New password</span>
+          <input
+            id="forgot-new-password"
+            name="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <div class="dialog-actions">
+          <button id="cancel-forgot-password" type="button">Cancel</button>
+          <button type="submit" class="auth-button">Reset</button>
+        </div>
+      </form>
+    </dialog>
 
-                <div
-                  id="season-summer"
-                  class="season-card"
-                  data-season="summer"
-                >
-                  <div class="season-header">
-                    <h3>☀️ Summer</h3>
-                  </div>
-                  <div class="season-body">
-                    <div class="season-meta">
-                      <div class="meta-item">
-                        <span class="meta-label">Balance</span>
-                        <span class="season-balance">—</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item">
-                        <span class="meta-label">Output</span>
-                        <span class="season-output">—/s</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item halving-item">
-                        <span class="meta-label">Halving</span>
-                        <span class="season-halving">—</span>
-                      </div>
-                    </div>
-                    <div class="season-upgrades">
-                      <!-- Upgrade columns will be inserted here -->
-                    </div>
-                  </div>
-                </div>
+    <dialog id="register-dialog" aria-label="Register account form">
+      <form id="register-form" class="dialog-form">
+        <h3>Create account</h3>
+        <label class="auth-form-row" for="register-username">
+          <span>Username</span>
+          <input
+            id="register-username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="register-display-name">
+          <span>Display name</span>
+          <input
+            id="register-display-name"
+            name="displayName"
+            type="text"
+            autocomplete="nickname"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="register-email">
+          <span>Email</span>
+          <input
+            id="register-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="register-discord">
+          <span>Discord handle</span>
+          <input
+            id="register-discord"
+            name="discord"
+            type="text"
+            placeholder="name#1234"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="register-telegram">
+          <span>Telegram handle (optional)</span>
+          <input
+            id="register-telegram"
+            name="telegram"
+            type="text"
+            placeholder="@name"
+          />
+        </label>
+        <label class="auth-form-row" for="register-password">
+          <span>Password</span>
+          <input
+            id="register-password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+          <small class="field-hint"
+            >Min. 12 characters &bull; upper &amp; lowercase &bull; digit &bull;
+            special character (e.g. !@#$)</small
+          >
+        </label>
+        <label class="auth-form-row" for="register-password-confirm">
+          <span>Confirm password</span>
+          <input
+            id="register-password-confirm"
+            name="passwordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <p
+          id="register-message"
+          class="message"
+          data-kind="info"
+          aria-live="polite"
+        ></p>
+        <div class="dialog-actions">
+          <button id="cancel-register-dialog" type="button">Cancel</button>
+          <button type="submit" class="auth-button">Create account</button>
+        </div>
+      </form>
+    </dialog>
 
-                <div
-                  id="season-autumn"
-                  class="season-card"
-                  data-season="autumn"
-                >
-                  <div class="season-header">
-                    <h3>🍂 Autumn</h3>
-                  </div>
-                  <div class="season-body">
-                    <div class="season-meta">
-                      <div class="meta-item">
-                        <span class="meta-label">Balance</span>
-                        <span class="season-balance">—</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item">
-                        <span class="meta-label">Output</span>
-                        <span class="season-output">—/s</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item halving-item">
-                        <span class="meta-label">Halving</span>
-                        <span class="season-halving">—</span>
-                      </div>
-                    </div>
-                    <div class="season-upgrades">
-                      <!-- Upgrade columns will be inserted here -->
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  id="season-winter"
-                  class="season-card"
-                  data-season="winter"
-                >
-                  <div class="season-header">
-                    <h3>❄️ Winter</h3>
-                  </div>
-                  <div class="season-body">
-                    <div class="season-meta">
-                      <div class="meta-item">
-                        <span class="meta-label">Balance</span>
-                        <span class="season-balance">—</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item">
-                        <span class="meta-label">Output</span>
-                        <span class="season-output">—/s</span>
-                      </div>
-                      <span class="meta-sep" aria-hidden="true">|</span>
-                      <div class="meta-item halving-item">
-                        <span class="meta-label">Halving</span>
-                        <span class="season-halving">—</span>
-                      </div>
-                    </div>
-                    <div class="season-upgrades">
-                      <!-- Upgrade columns will be inserted here -->
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- RIGHT: Analytics + Trading + Docked Chat (inline, non-overlay) -->
-            <div class="right-column">
-              <div class="analytics-panel">
-                <h3>Player State</h3>
-                <div id="player-state" class="analytics-content">
-                  <p class="placeholder">Waiting for game data...</p>
-                </div>
-              </div>
-
-              <div id="trading-panel" class="trading-panel">
-                <!-- Trading capability card will be rendered here by trading-panel.js -->
-              </div>
-
-              <aside
-                id="chat-panel"
-                class="card chat-card"
-                aria-label="Chat panel"
-              >
-                <div class="chat-card-header">
-                  <h2>Chat</h2>
-                  <span id="chat-status" class="chat-status" data-level="idle"
-                    >Offline</span
-                  >
-                </div>
-                <ul
-                  id="chat-messages"
-                  class="chat-messages"
-                  aria-live="polite"
-                ></ul>
-                <form id="chat-form" class="chat-form">
-                  <input
-                    id="chat-input"
-                    type="text"
-                    maxlength="200"
-                    autocomplete="off"
-                    placeholder="Type a message (max 200 chars)"
-                  />
-                  <button type="submit" class="btn-secondary">Send</button>
-                </form>
-              </aside>
-            </div>
-          </div>
-
-          <!-- Bottom Bar: Score context, Trading status, Farming status -->
-          <div class="bottom-bar">
-            <div class="bottom-bar-item">
-              <span id="score-context-label" class="label">Score</span>
-              <span id="portfolio-value" class="bottom-bar-value">—</span>
-            </div>
-            <div class="bottom-bar-item trading-status">
-              <span class="label">Trading</span>
-              <span id="trading-status" class="bottom-bar-value"
-                >Not enabled</span
-              >
-            </div>
-            <div class="bottom-bar-item farming-status">
-              <span class="label">Farming</span>
-              <span id="farming-status" class="bottom-bar-value"
-                >Not enabled</span
-              >
-            </div>
-            <div class="bottom-bar-item chat-toggle-wrapper">
-              <button
-                id="chat-toggle-btn"
-                class="btn-secondary chat-toggle-btn"
-                type="button"
-                aria-expanded="false"
-                aria-controls="chat-panel"
-              >
-                💬 Chat
-              </button>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
-    <div id="tooltip-layer" class="tooltip-layer"></div>
-    <script type="module" src="/src/main.js"></script>
-    <script>
-      /**
-       * Admin link gate: show the "+ New Game (Admin)" link only if ?admin=1 is present.
-       * This prevents accidental navigation and keeps player UI clean.
-       */
-      (function () {
-        const params = new URLSearchParams(window.location.search);
-        const adminLink = document.getElementById('admin-setup-link');
-        if (params.get('admin') === '1' && adminLink) {
-          adminLink.style.display = 'inline-flex';
-        }
-      })();
-    </script>
+    <script type="module" src="/src/lobby.js"></script>
   </body>
 </html>

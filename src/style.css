@@ -5,7 +5,7 @@ Role in system:
 - Preserves the locked inline dashboard layout while allowing internal panel scrolling only.
 Invariants:
 - No page scroll on desktop core gameplay view.
-- Inline status elements must remain non-blocking and must not introduce overlay behavior.
+- Gameplay status stays inline; only the post-game overlay may block interaction after a round ends.
 */
 
 * {
@@ -230,6 +230,11 @@ body {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  display: none;
+}
+
+#round-remaining-hint {
+  display: none !important;
 }
 
 .debug-panel {
@@ -652,6 +657,14 @@ body {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+.player-panel-split {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-height: 280px;
+  max-height: 360px;
 }
 
 /* 2x2 Season Grid */
@@ -1123,6 +1136,118 @@ body {
   gap: 0.35rem;
   font-size: 0.85rem;
   padding: 0;
+}
+
+.quick-join-panel,
+.last-game-panel {
+  overflow: hidden;
+}
+
+.panel-field {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.panel-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-inline-actions select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.last-game-score-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.last-game-score-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border-light);
+  border-radius: calc(var(--radius) / 1.5);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.last-game-score-rank,
+.last-game-score-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+}
+
+.last-game-score-rank {
+  color: var(--status-blue);
+}
+
+.last-game-score-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-over-overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.game-over-overlay[hidden] {
+  display: none !important;
+}
+
+.game-over-card {
+  width: min(520px, 100%);
+  padding: 2rem 2.25rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 42%),
+    linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.96) 0%,
+      rgba(30, 41, 59, 0.96) 100%
+    );
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+  text-align: center;
+  color: #f8fafc;
+}
+
+.game-over-eyebrow {
+  margin-bottom: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.game-over-card h2 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  line-height: 1;
+}
+
+.game-over-card p:last-child {
+  margin-top: 0.85rem;
+  font-size: 1rem;
+  color: rgba(241, 245, 249, 0.88);
 }
 
 /* Bottom Bar */
@@ -2267,6 +2392,12 @@ button {
     overflow: visible;
   }
 
+  .player-panel-split {
+    grid-template-rows: auto auto;
+    min-height: 0;
+    max-height: none;
+  }
+
   .seasons-grid {
     grid-template-columns: 1fr;
   }
@@ -2292,6 +2423,15 @@ button {
   .chat-card {
     max-height: none;
     min-height: 220px;
+  }
+
+  .panel-inline-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .game-over-card {
+    padding: 1.5rem;
   }
 
   .bottom-bar {
@@ -2355,5 +2495,9 @@ button {
         var(--player-panel-width),
         320px
       );
+  }
+
+  .player-panel-split {
+    min-height: 240px;
   }
 }

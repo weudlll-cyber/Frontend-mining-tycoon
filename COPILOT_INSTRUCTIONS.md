@@ -11,7 +11,7 @@ Before proposing or applying any change, read and honor:
 - `SCORING_MODES.md` (approved scoring/outcome mode definitions)
 - `README.md` (layout, behavior, runbooks)
 - `CONTRIBUTING.md` (process and contribution discipline)
-- `SECURITY_AUDIT.md` (security posture and safe patterns)
+- `SECURITY.md` (current security posture and safe patterns)
 
 If a requested change would violate any locked invariant:
 
@@ -27,12 +27,27 @@ When a task touches full-stack behavior, also read backend canonical docs:
 - sibling backend repo `PROJECT_BASELINE.md`
 - sibling backend repo `REQUIREMENTS.md`
 - sibling backend repo `SECURITY.md`
-- sibling backend repo `BACKEND_TEST_AUDIT.md`
+- sibling backend repo `TESTING.md`
 
 Cross-repo rule:
 
 - Keep frontend and backend contracts aligned; do not change one side in ways that silently break the other.
 - If contracts diverge, update docs/tests on both sides or stop and raise change-control requirements.
+
+## 1.2) Umbrella Workspace Context
+
+When a task changes startup flow, testing workflow, full-stack handover, or other cross-repo operator guidance, also review umbrella workspace docs under `C:\Users\weudl\`:
+
+- `DOCS_STATUS.md`
+- `FULL_STACK_AUDIT_SUMMARY.md`
+- `HOW_TO_START_THE_GAME_STEP_BY_STEP.txt`
+- `HOW_TO_RUN_TESTS_AND_CHECKS_STEP_BY_STEP.txt`
+- `PRINT_ME_DAILY_GAME_START_CHECKLIST.txt`
+- `QUICK_START_TESTS_AND_CHECKS.txt`
+
+Rule:
+
+- Important umbrella docs must be kept aligned before PR or merge whenever the described workflow or handover behavior changes.
 
 ## 2) Architecture & Gameplay Invariants (Must Preserve)
 
@@ -64,7 +79,7 @@ Cross-repo rule:
 - Never introduce untrusted or dynamic `innerHTML`.
 - Guard JSON parsing with `try/catch` and safe early return.
 - Encode/normalize IDs and URLs.
-- Keep security posture consistent so `SECURITY_AUDIT.md` remains accurate/green.
+- Keep security posture consistent so `SECURITY.md` remains accurate.
 
 ## 5) Commenting Requirements (MUST - All Files)
 
@@ -128,8 +143,9 @@ For every source file touched or created:
 - Evaluate test impact; add/update Vitest tests for changed behavior.
 - Evaluate documentation impact:
   - update `README.md` and/or `PROJECT_BASELINE.md` when behavior/UI contract changes
-  - update other affected frontend docs (`CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `CODE_ORGANIZATION.md`, `SECURITY_AUDIT.md`, concept docs) when their statements become stale
+  - update other affected frontend docs (`CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `CODE_ORGANIZATION.md`, `SECURITY.md`, concept docs) when their statements become stale
   - if the change affects backend contracts, runtime behavior, security posture, or operational steps, review and update sibling backend docs in the same workstream
+  - if the change affects startup/testing/full-stack workflow or handover guidance, review and update the important umbrella workspace docs in the same workstream
   - if docs are unchanged, explicitly state why
 - Run all quality gates before push:
   - `npm run lint`

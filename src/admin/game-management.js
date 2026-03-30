@@ -1,3 +1,4 @@
+// Admin game management helpers: list active games and handle deletes.
 function el(id) {
   return document.getElementById(id);
 }
@@ -247,11 +248,6 @@ async function deleteGame(gameId, buttonEl) {
       headers['X-Admin-Token'] = adminToken;
     }
 
-    console.log(`[DELETE] Attempting to delete game ${gameId}`, {
-      url: `${baseUrl}/admin/games/${gameId}`,
-      hasToken: !!adminToken,
-    });
-
     const response = await fetch(
       `${baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
       {
@@ -259,29 +255,19 @@ async function deleteGame(gameId, buttonEl) {
         headers,
       }
     );
-
-    console.log(
-      `[DELETE] Response status: ${response.status} ${response.statusText}`
-    );
-
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
       try {
         const body = await response.json();
-        console.log('[DELETE] Error response body:', body);
         if (body.detail) detail = body.detail;
       } catch (parseErr) {
         // Ignore JSON parse errors, use fallback detail.
-        console.log(
-          '[DELETE] Could not parse error response:',
-          parseErr.message
-        );
+        void parseErr;
       }
       throw new Error(detail);
     }
 
-    const responseData = await response.json();
-    console.log('[DELETE] Success response:', responseData);
+    await response.json();
 
     resultEl.className = 'result-box success';
     resultEl.textContent = `✅ Game ${gameId} deleted successfully.`;
@@ -293,7 +279,7 @@ async function deleteGame(gameId, buttonEl) {
     buttonEl.disabled = false;
     buttonEl.textContent = '🗑 Delete';
     resultEl.className = 'result-box error';
-    resultEl.textContent = `❌ Failed to delete game: ${error.message}. Check browser console for details.`;
+    resultEl.textContent = `❌ Failed to delete game: ${error.message}.`;
     resultEl.style.display = 'block';
   }
 }

@@ -2,7 +2,13 @@
 
 Purpose: Track the transition from temporary test defaults to production-ready defaults.
 
+Status note as of 2026-03-30:
+- This checklist is still active.
+- The temporary `1m` preset remains intentionally available for local/manual testing.
+- That preset is a release blocker until production defaults are confirmed and the temporary value is removed.
+
 ## Current Temporary Test Defaults (Do Not Ship)
+- Temporary fast-test preset present in control data: `1m`
 - Enrollment window default: 10 seconds
 - Sync round default: 5 minutes
 - Async round default: 30 minutes

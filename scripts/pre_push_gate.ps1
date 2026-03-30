@@ -45,7 +45,7 @@ $requiredDocs = @(
     "LOCKED_DECISIONS.md",
     "SEASONAL_TYCOON_CONCEPT.md",
     "CODE_ORGANIZATION.md",
-    "SECURITY_AUDIT.md"
+    "SECURITY.md"
 )
 
 Run-Step -Name "Required docs present" -Action {

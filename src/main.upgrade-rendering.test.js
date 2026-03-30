@@ -1,3 +1,4 @@
+// Tests upgrade rendering state and interaction wiring.
 import { describe, expect, it } from 'vitest';
 import {
   installMainTestHooks,

@@ -38,6 +38,11 @@ export function closeEventSourceIfOpen() {
 }
 
 export function stopLiveTimersAndHalving() {
+  if (!_deps) {
+    clearWaitingTimer();
+    return;
+  }
+
   _deps.clearCountdownInterval();
   _deps.stopNextHalvingCountdown();
   _deps.stopSeasonHalvingTimers();
@@ -155,6 +160,20 @@ export function startStream(gameId, playerId, streamContext = {}) {
         }
 
         _deps.onData(data);
+
+        const sessionStatus = String(data?.session?.status || '').toLowerCase();
+        if (sessionStatus === 'finished') {
+          _intentionalClose = true;
+          _deps.onStreamStateChange(false);
+          closeEventSourceIfOpen();
+          _deps.clearCountdownInterval();
+          _deps.stopNextHalvingCountdown();
+          clearWaitingTimer();
+          _deps.disconnectChat();
+          _deps.updateSetupActionsState();
+          _deps.onSessionStreamFinished?.(data);
+          return;
+        }
 
         if (data?.game_status === 'finished') {
           _intentionalClose = true;

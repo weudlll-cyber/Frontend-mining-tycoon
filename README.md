@@ -14,7 +14,7 @@ This app lets you:
   - choose pay token inline per upgrade lane (target token is the season card)
   - submit display-only intent; backend remains authoritative for conversion/cost outcome
 
-## Current Implementation Status (2026-03-25)
+## Current Implementation Status (2026-03-30)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
 - **Trading now has an initial scaffold**: read-only panel and capability-driven status both in dedicated UI panel and bottom-bar, but trade execution and fee calculation remain unimplemented.
@@ -24,7 +24,7 @@ This app lets you:
   - upgrade impact compared to upgrade cost progression
   - halving trigger and post-halving behavior
 
-## Current Delivery Status (2026-03-28)
+## Current Delivery Status (2026-03-30)
 
 This section is an operational handover snapshot for incoming developers.
 
@@ -33,10 +33,25 @@ This section is an operational handover snapshot for incoming developers.
   - Active game list filtering shows enrolling rounds and running asynchronous rounds only.
   - Active game list auto-refreshes every 5 seconds.
   - Setup/join panel auto-collapses after successful join.
+  - `index.html` is now a dedicated auth/lobby start screen with login/register tabs, forgot-password dialog, and open-games selection.
+  - Gameplay board moved to `player.html`; post-login flow is now explicit: select open game -> join -> enter live board.
+  - Lobby applies the provided background image from `public/assets/backgrounds/Seasonal Enterteinment.png`.
+  - Admin game management in `admin.html` now supports delete actions, round-type labels, active-only filtering, and status-based time remaining display.
+  - Pre-merge quality checks now include `npm run clean:audit` (strict unused-code/dependency checks).
+  - Async fallback flow now shows the same `Game Over` handling when a session ends from the client-side expiry path.
+  - Start and auto-start flow hardening prevents unhandled start errors from breaking the UI flow.
+  - Lobby join filtering now excludes async rounds where `session_duration_seconds >= run_remaining_seconds`.
+  - Temporary `1m` duration preset is enabled for fast local/manual test cycles and must be removed before production rollout.
+  - Stable rollback checkpoint tag is available: `checkpoint/2026-03-30-stable-01`.
 - Approved and next (not yet implemented):
   - Phase 1: core backend auth and role support.
   - Phase 2: frontend auth/lobby/game screen split.
   - Phase 3: security hardening and audit polish.
+- Open/missing right now:
+  - Trading execution is still not implemented (status/visibility only).
+  - Farming gameplay is still not implemented (status/visibility only).
+  - Large-file refactors are tracked as advisory code-health follow-up work.
+  - Seasonal artwork integration (spring/summer/autumn/winter images) is planned but not yet implemented.
 - Explicitly deferred:
   - Forgot-password and email-reset flow (moved to later phase after core auth is stable).
 
@@ -52,6 +67,18 @@ After every meaningful behavior change:
 - Include test-impact notes whenever behavior or interfaces change.
 
 Goal: a new developer should be able to join and continue work without private context.
+
+## New Chat Bootstrap Prompt (Reusable)
+
+Use this prompt whenever you start a new chat and want immediate continuity:
+
+```text
+New session for Mining Tycoon.
+Please load context from PROJECT_BASELINE.md and README.md in both frontend and backend repos.
+Use checkpoint tag checkpoint/2026-03-30-stable-01 as the latest known stable rollback point.
+Current objective: <replace with today's goal>.
+Constraints: backend-authoritative behavior only, update docs with code changes, and run full frontend+backend gates before push.
+```
 
 ## Project Baseline (Authoritative)
 
@@ -71,7 +98,7 @@ Key highlights:
 - Deterministic oracle/halving/events with snapshot-locked game settings.
 - No P2P markets and no real-money mechanics.
 - Desktop gameplay view keeps core information visible without page scrolling.
-- No overlays/modals/popups for core gameplay interactions.
+- No overlays/modals/popups during active gameplay interactions; a post-game return overlay is allowed once a round finishes.
 - Seasonal upgrades stay inline with three visible lanes: hashrate, efficiency, cooling.
 - Analytics stays read-only and visible with per-token output, cumulative mined, balances, oracle prices, and fee/spread.
 - Trading and farming remain visible as sections even when disabled.
@@ -82,24 +109,39 @@ Key highlights:
 
 Round configuration is **admin-only** and is managed separately from the player experience:
 
-### Player UI (`index.html`)
+### Player UI (`player.html`)
 - Players **cannot** configure rounds.
-- Players join an existing round by Game ID.
+- Players join an existing round by Game ID or by selecting it from the inline Open Games panel.
 - All tunable settings (scoring mode, trade count, duration, enrollment window) are snapshot-locked at creation.
 - Admin controls are hidden via `.admin-only` CSS class.
+- When a round finishes, a full-screen `Game Over` overlay appears; clicking anywhere dismisses it, clears the ended session context, and returns focus to the player-side Open Games panel.
+- The player-side return panel is split into two halves: `Open Games` on top and `Last Game Highscores` below.
+
+### Start/Lobby UI (`index.html`)
+- Login and registration forms are rendered on the start screen.
+- Forgot-password flow is exposed through a dedicated dialog.
+- Open games are shown in a scrollable list with status badges and remaining-time labels.
+- Joining is blocked unless authenticated.
+- Logging in does not auto-enter a game; player must select a game first.
 
 ### Admin Setup UI (`admin.html`)
 - Separate entrypoint for round operators.
 - All 7 configuration sections (Round Type, Duration, Scoring, Trading, Advanced Overrides) auto-populate from control-data constants.
 - Admin enters optional token if server enforces `REQUIRE_ADMIN_FOR_GAME_CREATE=true`.
 - Inline error messages if permission is denied.
+- Section 8 game management lists active rounds only (enrolling/running), shows sync/async labels, and supports game delete from UI.
+- Time remaining in game management is status-aware:
+  - enrolling -> enrollment window time left
+  - running -> running duration time left
 
 ### How to Use
 
-**For Players (index.html)**
+**For Players (index.html -> player.html)**
 1. Navigate to `http://localhost:5173`
-2. Enter Backend URL, Player Name, and Game ID (provided by admin)
-3. Click "Start Game" to join and begin playing
+2. Sign in or register on the start screen
+3. Select one open game from the list and click `Enter live board`
+4. The app opens `player.html` and starts the live stream for the selected game
+5. When the round ends, click the `Game Over` overlay to return to the player panel and choose the next open game
 
 **For Admins (admin.html)**
 1. Navigate to `http://localhost:5173/admin.html`
@@ -134,6 +176,7 @@ When using Copilot, always instruct it to not violate LOCKED_DECISIONS.md.
 
 Use these files as the current documentation set for the frontend repo:
 
+- `DOCS_STATUS.md`: quick index of which docs are canonical current vs historical snapshots
 - `README.md`: quick start, UI behavior, runbook, and current implementation scope
 - `PROJECT_BASELINE.md`: canonical factual baseline of what is implemented right now
 - `SEASONAL_TYCOON_CONCEPT.md`: high-level game vision and product intent
@@ -141,7 +184,7 @@ Use these files as the current documentation set for the frontend repo:
 - `CONTRIBUTING.md`: contribution rules, commenting expectations, and quality gates
 - `QUALITY_ENFORCEMENT.md`: mandatory local/CI enforcement policy and test-quality strategy
 - `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
-- `SECURITY_AUDIT.md`: frontend-relevant security and review notes
+- `SECURITY.md`: current frontend security posture and safe-rendering expectations
 - `AUDIT_MATRIX.md`: PR and nightly audit frequencies with blocking thresholds
 - `DEPLOY.md`: frontend-only VPS deployment and full-stack deployment handoff notes
 
@@ -153,6 +196,16 @@ If a change affects backend contracts, update the sibling backend repo docs in t
 - npm
 - Backend running on `http://127.0.0.1:8000` (default)
 
+## Visual Asset Drop Location
+
+Place image files in:
+
+- `public/assets/backgrounds/` for start/lobby backgrounds
+- `public/assets/seasons/` for season-specific images
+- `public/assets/ui/` for other UI artwork
+
+See `public/assets/README.md` for naming recommendations.
+
 ## Quick Start
 
 1. Install dependencies:
@@ -161,7 +214,13 @@ If a change affects backend contracts, update the sibling backend repo docs in t
 npm ci
 ```
 
-2. Start development server:
+2. Start development server (stable detached mode):
+
+```powershell
+& .\scripts\dev_frontend_start.ps1
+```
+
+Alternative interactive mode:
 
 ```bash
 npm run dev
@@ -169,7 +228,17 @@ npm run dev
 
 3. Open the URL shown by Vite (usually `http://127.0.0.1:5173`).
 
-If port `5173` is already used, Vite automatically selects the next free port.
+The stable script enforces `5173` using `--strictPort` and keeps PID/log tracking in:
+
+- `data/frontend_dev_process.json`
+- `data/frontend_dev_stdout.log`
+- `data/frontend_dev_stderr.log`
+
+Stop the stable detached server with:
+
+```powershell
+& .\scripts\dev_frontend_stop.ps1
+```
 
 4. In the UI:
 
@@ -181,6 +250,7 @@ For async rounds, use the explicit session action:
 
 - select `Round Type = Async (host)` in Setup
 - set `Round Duration` (5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
+- set `Round Duration` (1m temporary test preset, 5m, 10m, 15m, 1h, 3h, 6h, 12h, 1d, 3d, 7d)
 - set `Session Duration` (5m, 10m, 30m, 1h, 6h, 12h, 1d)
 - keep `Auto-start async session after game creation and join` enabled if you want one-click create/join/session start
 - click `+ New Game`
@@ -239,7 +309,7 @@ Daily usage:
 What happens before push:
 
 - required frontend docs presence check
-- `npm run lint`
+- `npm run clean:audit` (eslint + strict unused checks + dependency/file usage scan)
 - `npm run format:check`
 - `npm run test -- --run`
 - `npm run test:coverage`
@@ -253,6 +323,7 @@ Run the structural audit manually at any time:
 
 ```powershell
 npm run audit:health
+npm run clean:audit
 ```
 
 ## UI Layout
@@ -293,6 +364,9 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
       - Line 1: Next halving | Mined
       - Line 2: Fee X / Y with anchored ⓘ tooltip
     - **Non-blocking micro-tooltips**: Hover, focus, or tap ⓘ icons to reveal precision values and explanations. Tooltips never block interaction or hide data.
+    - **Player return panel directly below analytics** split into:
+      - `Open Games` quick-select list for the next joinable round
+      - `Last Game Highscores` snapshot of the most recently finished round
     - **Docked chat panel directly below analytics** (toggleable, inline, non-overlay)
 - **Bottom Bar**:
   - **Score** shows the live score-context metric for the selected outcome mode. In Power Mode this is the oracle-weighted score; in other modes, this display follows that mode's evaluation context. Large values use compact notation (k/M/B) for scanability, with exact values available via tooltip on hover/focus.
@@ -304,7 +378,7 @@ The dashboard uses an **inline 2-column layout** designed for desktop viewing wi
 
 ### Key Principles
 
-- **No overlays/modals**: All important information remains visible on one screen. Upgrade controls are inline within season cards, not in separate popups.
+- **No overlays/modals during live play**: Upgrade controls and gameplay information remain inline; only the end-of-round return overlay interrupts input after a game has already finished.
 - **Core data stays inline; non-blocking micro-tooltips are allowed**: Tooltips are positioned in a fixed layer above all content (never clipped), provide optional explanation and precision (4-decimal accuracy), and never block interaction or hide required information.
 - **One shared micro-tooltip contract across player and season headers**: all header triggers use `.ps-tip-trigger` and bubbles use `.ps-tip-bubble` in `#tooltip-layer`; close behavior is hover/leave + keyboard Escape (no timeout auto-hide).
 - **Setup never blocks gameplay**: Setup is collapsible and bounded by max height with internal scroll only.

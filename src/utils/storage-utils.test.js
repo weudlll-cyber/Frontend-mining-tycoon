@@ -33,6 +33,15 @@ describe('storage-utils', () => {
     );
   });
 
+  it('exposes stable auth key names for lobby state', () => {
+    expect(STORAGE_KEYS.authToken).toBe('mining-tycoon:authToken');
+    expect(STORAGE_KEYS.authUsername).toBe('mining-tycoon:authUsername');
+    expect(STORAGE_KEYS.authDisplayName).toBe('mining-tycoon:authDisplayName');
+    expect(STORAGE_KEYS.lastPlayedGameSnapshot).toBe(
+      'mining-tycoon:lastPlayedGameSnapshot'
+    );
+  });
+
   it('normalizes backend URL and strips trailing slashes', () => {
     expect(normalizeBaseUrl(' https://example.com:8080/path/// ')).toBe(
       'https://example.com:8080/path'

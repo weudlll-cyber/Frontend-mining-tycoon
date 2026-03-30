@@ -4,6 +4,11 @@ Date: 2026-03-19
 Branch: chore/audit-refresh-20260319
 Status: In progress
 
+Status note as of 2026-03-30:
+- This file is an incomplete historical audit snapshot from 2026-03-19.
+- It is not the current full-stack source of truth.
+- Use the umbrella `C:\Users\weudl\FULL_STACK_AUDIT_SUMMARY.md` plus repo `README.md`, `PROJECT_BASELINE.md`, and `DOCS_STATUS.md` files for the current state.
+
 ## Step 0 Discovery
 
 Frontend repo:
@@ -15,7 +20,7 @@ Frontend repo:
   - `npm run format:check`
   - `npm run test -- --run`
   - `npm run build`
-- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- CI: [../../../.github/workflows/ci.yml](../../../.github/workflows/ci.yml)
 
 Backend repo:
 
@@ -36,8 +41,8 @@ Largest source files discovered:
 Existing audit reports:
 
 - [SECURITY_AUDIT.md](SECURITY_AUDIT.md) — 2025-01-15
-- [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md) — 2025-01-15
-- sibling backend repo `BACKEND_TEST_AUDIT.md` — 2025-01-15
+- [../../../CODE_ORGANIZATION.md](../../../CODE_ORGANIZATION.md) — 2025-01-15
+- sibling backend repo `docs/history/audits/BACKEND_TEST_AUDIT.md` — 2025-01-15
 
 ## Step 1 Baseline Quality Run
 
@@ -130,7 +135,7 @@ Backend:
 
 - Runtime dependencies from `requirements.txt` remain the main production surface
 - CI tooling now pins `black>=26.3.1` to avoid the previously reported tooling CVE
-- Secret-like doc example in `BACKEND_TEST_AUDIT.md` was scrubbed to a placeholder dev string
+- Secret-like doc example in `docs/history/audits/BACKEND_TEST_AUDIT.md` was scrubbed to a placeholder dev string
 - `pip_audit -r requirements.txt`: no known vulnerabilities found
 - Ruff: clean after targeted import and test cleanup
 

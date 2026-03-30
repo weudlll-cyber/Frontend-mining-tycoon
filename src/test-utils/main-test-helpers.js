@@ -1,3 +1,4 @@
+// Shared DOM fixture and import helpers for main module tests.
 import { beforeEach, vi } from 'vitest';
 
 function buildDomFixture() {

@@ -16,6 +16,8 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unreachable': 'error',
       'no-console': 'off',
     },
   },

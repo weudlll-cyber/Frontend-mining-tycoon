@@ -8,9 +8,10 @@ All contributions MUST comply with [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 
 Before opening a PR:
 
-- Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+- Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md).
 - Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, or security docs when impacted) and remove stale statements that no longer match implementation.
 - If the change touches API contracts, session flow, security posture, runbooks, or any other full-stack behavior, review the sibling backend repo docs in the same workstream and update them when needed.
+- If the change touches startup flow, testing workflow, workspace orchestration, full-stack handover, or any user-facing process that spans both repos, also review and update the umbrella workspace docs under `C:\Users\weudl\` in the same workstream.
 - Treat documentation impact review as mandatory for every code change, even when the outcome is that no doc update was required.
 - Validate changes against LOCKED_DECISIONS.md.
 - Use the PR checklist in [.github/pull_request_template.md](.github/pull_request_template.md).
@@ -41,13 +42,20 @@ Use this file as the source of truth for local push gates, CI merge requirements
 
 All of the following must pass before merge:
 
-- `npm run lint`
+- `npm run clean:audit`
 - `npm run format:check`
 - `npm run test -- --run`
 - `npm run test:coverage`
 - `Changed lines coverage` (CI PR check)
 - `npm run build`
 - `npm audit --omit=dev --audit-level=high`
+
+Development execution cadence (required):
+
+- During implementation: run targeted checks/tests only for changed modules to keep iteration fast.
+- Before every commit: run full local gate (`npm run check:all`).
+- Before every push and merge: ensure the same full gate is green (hook/script will enforce again).
+- If behavior/contracts changed, complete repo and umbrella doc updates in the same change before commit.
 
 Recommended structural audit before larger merges:
 

@@ -1,3 +1,4 @@
+// Tests stream join setup and persisted player context behavior.
 import { describe, expect, it, vi } from 'vitest';
 import {
   STORAGE_KEYS,

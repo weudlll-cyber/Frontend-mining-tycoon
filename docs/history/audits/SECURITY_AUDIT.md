@@ -4,6 +4,11 @@ Date: 2026-03-19
 Scope: Frontend runtime UI, DOM rendering paths, storage helpers, and stream wiring after event-visibility and main-entry modularization work.
 Status: PASSED with no critical or high-severity findings.
 
+Status note as of 2026-03-30:
+- This is a historical audit snapshot, not a live release checklist.
+- The current authoritative implementation state lives in `PROJECT_BASELINE.md`, `README.md`, `SECURITY.md`, and `DOCS_STATUS.md`.
+- The residual note about formatting drift is no longer current; formatting has since been normalized for the verified push gates.
+
 ## Executive Summary
 
 The frontend runtime is using safe DOM APIs for live state rendering, event annotations, and stop-stream placeholder resets. The remaining concerns are operational rather than exploitability-focused: repository-wide formatting drift and normal development-time localStorage/browser limitations.
@@ -39,12 +44,12 @@ Status: acceptable.
 - `npm audit --omit=dev`: 0 production vulnerabilities.
 - No frontend production dependency remediation was required during this pass.
 
-## Residual Risks
+## Residual Risks At Audit Time
 
 - Prettier drift remains across multiple frontend files until a formatting normalization pass is completed.
 - Console diagnostics still log payload structure in development, which is useful for debugging but should stay structural-only.
 
-## Validation
+## Validation Performed On 2026-03-19
 
 - `npm run lint`
 - `npm run test -- --run`
