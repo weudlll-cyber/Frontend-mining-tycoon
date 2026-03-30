@@ -10,9 +10,9 @@ Read these first in every new chat/session:
 2. `README.md` - operational runbook, setup flow, and current delivery snapshot.
 3. `LOCKED_DECISIONS.md` - non-negotiable product and UX invariants.
 
-## Full Top-Level Document Inventory
+## Current And Historical Document Inventory
 
-Each top-level text document is listed with purpose and why it exists.
+This inventory covers canonical top-level docs plus archived history documents.
 
 ### Canonical Current
 
@@ -31,6 +31,9 @@ Each top-level text document is listed with purpose and why it exists.
 - `CONTRIBUTING.md`
 	- Purpose: contribution standards, process requirements, and expected quality behavior.
 	- Why it exists: consistent team workflow and review expectations.
+- `SECURITY.md`
+	- Purpose: current frontend security posture and safe-rendering expectations.
+	- Why it exists: live security-maintenance reference for current frontend behavior.
 - `COPILOT_INSTRUCTIONS.md`
 	- Purpose: repository-specific AI working contract.
 	- Why it exists: makes future AI-assisted edits consistent with project constraints.
@@ -65,18 +68,18 @@ Each top-level text document is listed with purpose and why it exists.
 
 ### Security/Test/Audit Snapshots (Historical By Design)
 
-- `TEST_AUDIT_REPORT.md`
+- `docs/history/audits/TEST_AUDIT_REPORT.md`
 	- Purpose: point-in-time test quality findings and follow-ups.
 	- Why it exists: audit evidence and historical benchmark.
 	- Current note: historical snapshot, not the latest authoritative test count.
-- `SECURITY_AUDIT.md`
+- `docs/history/audits/SECURITY_AUDIT.md`
 	- Purpose: point-in-time frontend security assessment summary.
 	- Why it exists: recorded security posture and residual-risk history.
 	- Current note: historical snapshot; keep for audit history, not as a live release checklist.
-- `FULL_STACK_AUDIT_SUMMARY.md`
+- `docs/history/audits/FULL_STACK_AUDIT_SUMMARY.md`
 	- Purpose: cross-repo audit snapshot from a specific review window.
 	- Why it exists: historical stack-level checkpoint for traceability.
-	- Current note: incomplete historical snapshot; archive candidate if top-level cleanup is desired later.
+	- Current note: incomplete historical snapshot; now archived to keep the top level focused on live docs.
 
 ### Operational Runbook Snapshots
 

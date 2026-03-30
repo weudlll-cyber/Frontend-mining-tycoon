@@ -184,7 +184,7 @@ Use these files as the current documentation set for the frontend repo:
 - `CONTRIBUTING.md`: contribution rules, commenting expectations, and quality gates
 - `QUALITY_ENFORCEMENT.md`: mandatory local/CI enforcement policy and test-quality strategy
 - `CODE_ORGANIZATION.md`: source-layout and module-responsibility guide
-- `SECURITY_AUDIT.md`: frontend-relevant security and review notes
+- `SECURITY.md`: current frontend security posture and safe-rendering expectations
 - `AUDIT_MATRIX.md`: PR and nightly audit frequencies with blocking thresholds
 - `DEPLOY.md`: frontend-only VPS deployment and full-stack deployment handoff notes
 

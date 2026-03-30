@@ -8,7 +8,7 @@ All contributions MUST comply with [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 
 Before opening a PR:
 
-- Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+- Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md).
 - Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, or security docs when impacted) and remove stale statements that no longer match implementation.
 - If the change touches API contracts, session flow, security posture, runbooks, or any other full-stack behavior, review the sibling backend repo docs in the same workstream and update them when needed.
 - If the change touches startup flow, testing workflow, workspace orchestration, full-stack handover, or any user-facing process that spans both repos, also review and update the umbrella workspace docs under `C:\Users\weudl\` in the same workstream.

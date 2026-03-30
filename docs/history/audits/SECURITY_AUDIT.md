@@ -6,7 +6,7 @@ Status: PASSED with no critical or high-severity findings.
 
 Status note as of 2026-03-30:
 - This is a historical audit snapshot, not a live release checklist.
-- The current authoritative implementation state lives in `PROJECT_BASELINE.md`, `README.md`, and `DOCS_STATUS.md`.
+- The current authoritative implementation state lives in `PROJECT_BASELINE.md`, `README.md`, `SECURITY.md`, and `DOCS_STATUS.md`.
 - The residual note about formatting drift is no longer current; formatting has since been normalized for the verified push gates.
 
 ## Executive Summary
