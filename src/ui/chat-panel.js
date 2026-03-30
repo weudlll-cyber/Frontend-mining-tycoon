@@ -13,6 +13,7 @@ let _statusEl = null;
 let _getBaseUrl = null;
 let _getGameId = null;
 let _getPlayerId = null;
+let _getPlayerName = null;
 let _getPlayerToken = null;
 let _showToast = null;
 let _onMessage = null;
@@ -68,6 +69,31 @@ function normalizeWsBase(baseUrl) {
   const parsed = new URL(baseUrl);
   parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
   return parsed.toString().replace(/\/+$/, '');
+}
+
+function resolveChatUserLabel(message) {
+  const fallback = String(message?.user || 'player').trim() || 'player';
+  const explicitDisplayName = String(message?.display_name || '').trim();
+  if (explicitDisplayName) {
+    return explicitDisplayName;
+  }
+
+  const ownPlayerId = String(_getPlayerId?.() || '').trim();
+  const ownPlayerName = String(_getPlayerName?.() || '').trim();
+  if (!ownPlayerId || !ownPlayerName) {
+    return fallback;
+  }
+
+  const normalizedFallback = fallback.toLowerCase();
+  const normalizedOwnId = ownPlayerId.toLowerCase();
+  if (
+    normalizedFallback === normalizedOwnId ||
+    normalizedFallback === `player-${normalizedOwnId}`
+  ) {
+    return ownPlayerName;
+  }
+
+  return fallback;
 }
 
 function setComposerEnabled(enabled) {
@@ -127,7 +153,7 @@ export function appendChatMessage(messagesEl, message) {
 
   const user = document.createElement('span');
   user.className = 'chat-message-user';
-  user.textContent = String(message.user || 'player');
+  user.textContent = resolveChatUserLabel(message);
 
   const time = document.createElement('span');
   time.className = 'chat-message-time';
@@ -297,6 +323,7 @@ export function initChatPanel(deps) {
   _getBaseUrl = deps.getBaseUrl;
   _getGameId = deps.getGameId;
   _getPlayerId = deps.getPlayerId;
+  _getPlayerName = deps.getPlayerName;
   _getPlayerToken = deps.getPlayerToken;
   _showToast = deps.showToast;
   _onMessage = deps.onMessage;

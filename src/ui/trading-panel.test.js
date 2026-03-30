@@ -239,6 +239,135 @@ describe('trading-panel', () => {
       expect(statusEl.textContent).toContain('Trading:');
     });
 
+    it('uses season labels when token_names is an array and balances use numeric keys', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        balances: { 0: 100, 1: 80 },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      expect(panelEl.textContent).toContain('Balance (Spring):');
+      expect(panelEl.textContent).toContain('Balance (Summer):');
+      expect(panelEl.textContent).not.toContain('Balance (0):');
+      expect(panelEl.textContent).not.toContain('Balance (1):');
+    });
+
+    it('updates stockpile estimate while typing amount without full rebuild', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 500 },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      expect(amountInput).not.toBeNull();
+
+      amountInput.value = '100';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(panelEl.textContent).toContain('Units: -100 -> +98');
+      expect(panelEl.textContent).toContain('-2 tokens');
+    });
+
+    it('prefers backend oracle pair preview rate for stockpile amount estimate', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 500 },
+        conversion_preview: {
+          by_pair: {
+            'spring:summer': {
+              net_to_per_from: 0.5,
+            },
+          },
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      expect(amountInput).not.toBeNull();
+
+      amountInput.value = '100';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(panelEl.textContent).toContain('Units: -100 -> +50');
+      expect(panelEl.textContent).toContain('-50 tokens');
+    });
+
+    it('updates preview in place while amount input stays focused', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 500 },
+        conversion_preview: {
+          by_pair: {
+            'spring:summer': {
+              net_to_per_from: 0.4,
+            },
+          },
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      expect(amountInput).not.toBeNull();
+
+      amountInput.focus();
+      expect(document.activeElement).toBe(amountInput);
+
+      amountInput.value = '150';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const amountInputAfter = panelEl.querySelector(
+        'input[data-field="amount"]'
+      );
+      expect(amountInputAfter).toBe(amountInput);
+      expect(panelEl.textContent).toContain('Units: -150 -> +60');
+      expect(panelEl.textContent).toContain('-90 tokens');
+    });
+
     it('renders trades used / total and full schedule list', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,

@@ -1966,6 +1966,7 @@ function initializeModules() {
     getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
     getGameId: () => gameIdInput.value,
     getPlayerId: () => playerIdInput.value,
+    getPlayerName: () => playerNameInput.value,
     getPlayerToken: (gameId, playerId) =>
       getStorageItem(getPlayerTokenStorageKey(gameId, playerId)),
     showToast,
@@ -1979,7 +1980,8 @@ function initializeModules() {
   });
   renderChatPreviewState();
   tradingPanelApi = initTradingPanel({
-    getGameMeta,
+    // Bind current gameId so the panel resolves the correct meta object.
+    getGameMeta: () => getGameMeta(gameIdInput?.value),
     getLastGameData: () => lastGameData,
     getActiveScoringMode: () => resolveActiveScoringMode(lastGameData),
     tradingPanelRef: tradingPanelEl,
@@ -2360,7 +2362,15 @@ function updateUI(data) {
     pendingUiRenderData = null;
     if (!frameData) return;
 
-    const selectionSnapshot = snapSelection(document.body);
+    const activeEl = document.activeElement;
+    const shouldSkipSelectionPersistence =
+      activeEl instanceof HTMLInputElement ||
+      activeEl instanceof HTMLTextAreaElement ||
+      activeEl instanceof HTMLSelectElement ||
+      activeEl?.isContentEditable === true;
+    const selectionSnapshot = shouldSkipSelectionPersistence
+      ? null
+      : snapSelection(document.body);
     applyUIUpdate(frameData);
     restoreSelectionIfValid(selectionSnapshot);
   });

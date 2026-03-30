@@ -93,6 +93,21 @@ function buildCoveredLineSet(fileCoverage) {
   return covered;
 }
 
+function buildCoverableLineSet(fileCoverage) {
+  const coverable = new Set();
+  for (const span of Object.values(fileCoverage.statementMap || {})) {
+    const startLine = span?.start?.line;
+    const endLine = span?.end?.line;
+    if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) {
+      continue;
+    }
+    for (let line = startLine; line <= endLine; line += 1) {
+      coverable.add(line);
+    }
+  }
+  return coverable;
+}
+
 function resolveCoverageEntry(coverageMap, relFilePath) {
   const normalizedRel = normalizePath(relFilePath);
   for (const [coveragePath, data] of Object.entries(coverageMap)) {
@@ -134,8 +149,14 @@ function main() {
       continue;
     }
 
+    const coverableLines = buildCoverableLineSet(coverageEntry);
+    const enforcedLines = [...addedLines].filter((line) => coverableLines.has(line));
+    if (enforcedLines.length === 0) {
+      continue;
+    }
+
     const coveredLines = buildCoveredLineSet(coverageEntry);
-    const uncovered = [...addedLines].filter((line) => !coveredLines.has(line));
+    const uncovered = enforcedLines.filter((line) => !coveredLines.has(line));
     if (uncovered.length > 0) {
       failures.push({
         filePath,
