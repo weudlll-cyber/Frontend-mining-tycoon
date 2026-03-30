@@ -1419,14 +1419,21 @@ body {
 
 .live-drawer {
   /* Fixed full-screen overlay so the drawer floats over page content
-     instead of rendering inline after the upgrade rows. */
+     instead of rendering inline after the upgrade rows.
+     display:flex is on :not([hidden]) only — display:flex here would
+     override the HTML [hidden] attribute and keep the drawer always visible. */
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: flex;
   flex-direction: column;
   /* Push the surface to the bottom of the viewport */
   justify-content: flex-end;
+}
+
+/* Apply flex layout only when the drawer is actually visible.
+   The JS toggles the [hidden] attribute to show/close the drawer. */
+.live-drawer:not([hidden]) {
+  display: flex;
 }
 
 .live-drawer-backdrop {
