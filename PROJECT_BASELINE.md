@@ -321,7 +321,7 @@ Implementation checkpoint (2026-03-30):
 - Start/autostart path is wrapped in defensive error handling to prevent unhandled flow errors from collapsing player state transitions.
 - Lobby now consumes the provided seasonal start background asset from `public/assets/backgrounds/Seasonal Enterteinment.png`.
 - Temporary fast-test preset `1m` is available in round/session setup control data; this is a local testing convenience and a release blocker for production default cleanup.
-- Trading UI and Farming UI work are not started yet beyond explicit placeholder visibility/status in the layout.
+- Trading UI now supports backend-authoritative execution for configured trade windows; farming UI remains placeholder/status-only.
 - Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
 - Stable rollback tag for this checkpoint: `checkpoint/2026-03-30-stable-01`.
 

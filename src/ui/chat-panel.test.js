@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendChatMessage,
   initChatPanel,
+  resolveChatUserLabel,
   setChatPanelOpen,
   shouldAutoScroll,
 } from './chat-panel.js';
@@ -64,6 +65,15 @@ describe('chat panel rendering', () => {
 
     expect(messages.textContent).toContain('Alice Miner');
     expect(messages.textContent).toContain('hello');
+  });
+
+  it('resolves own player labels for shared preview callers', () => {
+    expect(
+      resolveChatUserLabel(
+        { user: 'player-303', text: 'hello' },
+        { ownPlayerId: '303', ownPlayerName: 'Alice Miner' }
+      )
+    ).toBe('Alice Miner');
   });
 
   it('appends new messages without replacing existing nodes', () => {

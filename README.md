@@ -17,7 +17,7 @@ This app lets you:
 ## Current Implementation Status (2026-03-30)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
-- **Trading now has an initial scaffold**: read-only panel and capability-driven status in the action bar plus the live tools drawer. The panel consumes backend-authoritative conversion preview estimates (oracle prices + fee + spread). Trade execution itself remains unimplemented.
+- **Trading now has live execution support**: the panel and live-tools drawer consume backend-authoritative conversion preview estimates (oracle prices + fee + spread), and the Execute Trade action calls the canonical backend trade endpoint with schedule/slot validation.
 - Farming gameplay implementation has not started yet; the dashboard exposes a drawer placeholder plus status visibility in the action bar.
 - Gameplay-balance validation is still pending through playtests, especially for:
   - mined output pacing over time
@@ -48,7 +48,7 @@ This section is an operational handover snapshot for incoming developers.
   - Phase 2: frontend auth/lobby/game screen split.
   - Phase 3: security hardening and audit polish.
 - Open/missing right now:
-  - Trading execution is still not implemented (status/visibility only).
+  - Trading execution is implemented for host-configured trade windows; broader balance validation is still ongoing.
   - Farming gameplay is still not implemented (status/visibility only).
   - Large-file refactors are tracked as advisory code-health follow-up work.
   - Seasonal artwork integration (spring/summer/autumn/winter images) is planned but not yet implemented.

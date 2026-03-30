@@ -110,6 +110,60 @@ export async function performUpgrade(
   }
 }
 
+export async function performTrade(fromToken, toToken, amount) {
+  if (!_deps) {
+    throw new Error('Game actions module is not initialized.');
+  }
+  const lastGameData = _deps?.getLastGameData?.();
+  if (!lastGameData?.game_id || !lastGameData?.player_id) {
+    throw new Error('No game or player data available for trade');
+  }
+
+  const baseUrl = _deps.getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    throw new Error('Invalid backend URL');
+  }
+
+  const gameId = lastGameData.game_id;
+  const playerId = lastGameData.player_id;
+  const playerToken = _deps.getStorageItem(
+    _deps.getPlayerTokenStorageKey(gameId, playerId)
+  );
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (playerToken) {
+    headers['X-Player-Token'] = playerToken;
+  }
+
+  const response = await fetch(
+    `${baseUrl}/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/trade`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        from_token: fromToken,
+        to_token: toToken,
+        amount,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const { detail } = await getErrorMessageFromResponse(
+      response,
+      `Trade failed: ${response.status} ${response.statusText}`
+    );
+    throw new Error(detail);
+  }
+
+  const payload = await response.json();
+  _deps.showToast('Trade executed successfully.', 'success');
+  if (typeof _deps.onTradeExecuted === 'function') {
+    _deps.onTradeExecuted(payload);
+  }
+  return payload;
+}
+
 export async function startRoundSession(roundId, playerId) {
   const baseUrl = _deps.getNormalizedBaseUrlOrNull();
   if (!baseUrl) {

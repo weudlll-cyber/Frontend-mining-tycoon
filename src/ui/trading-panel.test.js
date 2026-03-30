@@ -237,6 +237,62 @@ describe('trading-panel', () => {
       expect(panelEl.innerHTML).toContain('trading-card');
       expect(panelEl.innerHTML).toContain('Trades used:');
       expect(statusEl.textContent).toContain('Trading:');
+      expect(panelEl.textContent).toContain('Execute Trade');
+      expect(panelEl.querySelector('.trading-execute-btn')?.disabled).toBe(
+        true
+      );
+    });
+
+    it('enables execute button and forwards selected trade intent', async () => {
+      const executeTrade = vi.fn().mockResolvedValue({});
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        game_duration_seconds: 600,
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        player_state: {
+          balances: { spring: 1000, summer: 500, autumn: 250, winter: 125 },
+        },
+        seconds_remaining: 520,
+        trades_used: 0,
+        trading_rules: {
+          trade_count: 2,
+          unlock_offsets_seconds: [60, 180],
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        executeTrade,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      const executeBtn = panelEl.querySelector('.trading-execute-btn');
+      expect(amountInput).not.toBeNull();
+      expect(executeBtn).not.toBeNull();
+
+      amountInput.value = '75';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      const executeBtnAfterInput = panelEl.querySelector(
+        '.trading-execute-btn'
+      );
+      expect(executeBtnAfterInput.disabled).toBe(false);
+
+      executeBtnAfterInput.click();
+
+      await Promise.resolve();
+      expect(executeTrade).toHaveBeenCalledWith({
+        fromToken: 'spring',
+        toToken: 'summer',
+        amount: 75,
+      });
     });
 
     it('uses season labels when token_names is an array and balances use numeric keys', () => {
@@ -326,6 +382,77 @@ describe('trading-panel', () => {
       expect(panelEl.textContent).toContain('-50 tokens');
     });
 
+    it('uses nested player_state balances and backend pair preview from real game-state shape', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        player_state: {
+          balances: { spring: 1000, summer: 500, autumn: 250, winter: 125 },
+        },
+        conversion_preview: {
+          by_pair: {
+            'spring:summer': {
+              net_to_per_from: 1.55,
+            },
+          },
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      expect(amountInput).not.toBeNull();
+
+      amountInput.value = '1000';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(panelEl.textContent).toContain('Balance (Spring):');
+      expect(panelEl.textContent).toContain('Balance (Summer):');
+      expect(panelEl.textContent).toContain('1');
+      expect(panelEl.textContent).toContain('500');
+      expect(panelEl.textContent).toContain('Units: -1');
+      expect(panelEl.textContent).toContain('-> +1');
+      expect(panelEl.textContent).toContain('+550 tokens');
+    });
+
+    it('does not duplicate season labels when canonical balance keys and token_names are both present', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        player_state: {
+          balances: { spring: 1000, summer: 500, autumn: 250, winter: 125 },
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const fromOptions = Array.from(
+        panelEl.querySelectorAll('select[data-field="from-token"] option')
+      ).map((option) => option.textContent);
+
+      expect(fromOptions).toEqual(['Spring', 'Summer', 'Autumn', 'Winter']);
+    });
+
     it('updates preview in place while amount input stays focused', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
@@ -366,6 +493,111 @@ describe('trading-panel', () => {
       expect(amountInputAfter).toBe(amountInput);
       expect(panelEl.textContent).toContain('Units: -150 -> +60');
       expect(panelEl.textContent).toContain('-90 tokens');
+    });
+
+    it('keeps token dropdown mounted while focused during rerender', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        balances: { spring: 1000, summer: 500, autumn: 250 },
+        conversion_preview: {
+          by_pair: {
+            'spring:summer': { net_to_per_from: 0.5 },
+            'summer:spring': { net_to_per_from: 1.9 },
+            'spring:autumn': { net_to_per_from: 0.3 },
+            'autumn:spring': { net_to_per_from: 3.2 },
+          },
+        },
+      });
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const fromSelect = panelEl.querySelector(
+        'select[data-field="from-token"]'
+      );
+      const toSelect = panelEl.querySelector('select[data-field="to-token"]');
+
+      expect(fromSelect).not.toBeNull();
+      expect(toSelect).not.toBeNull();
+
+      fromSelect.focus();
+      expect(document.activeElement).toBe(fromSelect);
+
+      fromSelect.value = 'summer';
+      fromSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const fromSelectAfter = panelEl.querySelector(
+        'select[data-field="from-token"]'
+      );
+      const toSelectAfter = panelEl.querySelector(
+        'select[data-field="to-token"]'
+      );
+
+      expect(fromSelectAfter).toBe(fromSelect);
+      expect(toSelectAfter).toBe(toSelect);
+      expect(document.activeElement).toBe(fromSelect);
+      expect(fromSelectAfter.value).toBe('summer');
+      expect(toSelectAfter.value).toBe('spring');
+      expect(panelEl.textContent).toContain('Balance (Summer):');
+      expect(panelEl.textContent).toContain('Balance (Spring):');
+    });
+
+    it('keeps schedule countdown updating while token dropdown stays focused', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        game_duration_seconds: 600,
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      let lastGameData = {
+        player_state: {
+          balances: { spring: 1000, summer: 500, autumn: 250, winter: 125 },
+        },
+        seconds_remaining: 600,
+        trades_used: 0,
+        trading_rules: {
+          trade_count: 3,
+          unlock_offsets_seconds: [60, 140, 220],
+        },
+      };
+      const getLastGameData = () => lastGameData;
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+      const fromSelect = panelEl.querySelector(
+        'select[data-field="from-token"]'
+      );
+      expect(fromSelect).not.toBeNull();
+
+      fromSelect.focus();
+      expect(document.activeElement).toBe(fromSelect);
+      expect(panelEl.textContent).toContain('Available in 1m 0s');
+
+      lastGameData = {
+        ...lastGameData,
+        seconds_remaining: 547,
+      };
+
+      api.renderTradingStatus();
+
+      expect(document.activeElement).toBe(fromSelect);
+      expect(panelEl.textContent).toContain('Available in 0m 7s');
+      expect(panelEl.textContent).toContain('Trade 2 at 2m 20s');
     });
 
     it('renders trades used / total and full schedule list', () => {

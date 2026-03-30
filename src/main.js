@@ -206,6 +206,7 @@ import {
   initChatPanel,
   connectChat,
   disconnectChat,
+  resolveChatUserLabel,
   setChatPanelOpen,
 } from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
@@ -222,7 +223,11 @@ import {
   closeEventSourceIfOpen,
   hasOpenStream,
 } from './services/stream-controller.js';
-import { initGameActions, performUpgrade } from './services/game-actions.js';
+import {
+  initGameActions,
+  performTrade,
+  performUpgrade,
+} from './services/game-actions.js';
 import {
   initSessionActions,
   createAsyncSession,
@@ -467,7 +472,10 @@ function markChatAsRead() {
 }
 
 function handleChatMessagePreview(message) {
-  const user = String(message?.user || 'player').trim() || 'player';
+  const user = resolveChatUserLabel(message, {
+    ownPlayerId: playerIdInput?.value,
+    ownPlayerName: playerNameInput?.value,
+  });
   const text = String(message?.text || '').trim();
   lastChatPreview = text ? `${user}: ${text}` : `${user}: (empty message)`;
 
@@ -1984,6 +1992,9 @@ function initializeModules() {
     getGameMeta: () => getGameMeta(gameIdInput?.value),
     getLastGameData: () => lastGameData,
     getActiveScoringMode: () => resolveActiveScoringMode(lastGameData),
+    executeTrade: async ({ fromToken, toToken, amount }) =>
+      performTrade(fromToken, toToken, amount),
+    showToast,
     tradingPanelRef: tradingPanelEl,
     tradingStatusRef: tradingStatusEl,
   });
@@ -2070,6 +2081,29 @@ function initializeModules() {
     onSetupBusyChange(next) {
       isSetupBusy = next;
       updateSetupActionsState();
+    },
+    onTradeExecuted(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      const updatedState = payload.updated_state;
+      if (!updatedState || typeof updatedState !== 'object') return;
+
+      const tradeResult = payload.trade_result || {};
+      lastGameData = {
+        ...(lastGameData || {}),
+        player_state: updatedState,
+        trades_used: Number.isFinite(Number(tradeResult.trades_used))
+          ? Number(tradeResult.trades_used)
+          : Number(
+              updatedState.trades_used || updatedState.trade_count_used || 0
+            ),
+      };
+
+      renderPlayerState(lastGameData);
+      renderQuickStats(lastGameData);
+      renderPortfolioValue(lastGameData);
+      if (tradingPanelApi?.renderTradingStatus) {
+        tradingPanelApi.renderTradingStatus();
+      }
     },
     getPlayerName: () => playerNameInput.value.trim() || 'Player',
   });
@@ -2794,6 +2828,7 @@ export {
   formatActiveGameOptionLabel,
   normalizeJoinableActiveGames,
   renderActiveGameOptions,
+  handleChatMessagePreview,
   resolveRequestedGameId,
   renderSeasonData,
   computePortfolioValue,
