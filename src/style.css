@@ -579,6 +579,7 @@ body {
   min-height: 0;
   overflow: hidden;
   scroll-margin-top: 1rem;
+  position: relative;
 }
 
 /* Status Bar (top of dashboard) */
@@ -631,6 +632,30 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 0.25rem;
+}
+
+.season-focus-strip {
+  display: none;
+  align-items: center;
+  gap: 0.42rem;
+  margin-bottom: 0.5rem;
+}
+
+.season-focus-btn {
+  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.season-focus-btn.season-focus-btn-active {
+  border-color: #38bdf8;
+  color: #0f172a;
+  box-shadow: 0 1px 5px rgba(56, 189, 248, 0.28);
 }
 
 .seasons-scroll::-webkit-scrollbar {
@@ -1263,11 +1288,27 @@ body {
   flex-wrap: wrap;
 }
 
+.action-bar {
+  gap: 0.6rem;
+  justify-content: flex-start;
+}
+
 .bottom-bar-item {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font-size: 0.9rem;
+}
+
+.drawer-open-btn {
+  min-width: 6.2rem;
+}
+
+.status-pill {
+  padding: 0.32rem 0.56rem;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: #f8fafc;
 }
 
 .bottom-bar-item .label {
@@ -1289,9 +1330,12 @@ body {
 .chat-toggle-btn {
   background-color: var(--status-blue);
   color: white;
-  padding: 0.55rem 1rem;
+  padding: 0.5rem 0.85rem;
   font-size: 0.9rem;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .chat-toggle-btn:hover {
@@ -1300,12 +1344,70 @@ body {
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
-/* Chat Panel (docked inline; toggleable) */
+.chat-unread-badge {
+  display: inline-flex;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 0 0.24rem;
+}
+
+.chat-dock-btn {
+  position: absolute;
+  right: 1.15rem;
+  bottom: 5.4rem;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid #bae6fd;
+  background: rgba(240, 249, 255, 0.96);
+  color: #0f172a;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+  max-width: min(420px, 58vw);
+}
+
+.chat-dock-icon {
+  font-size: 0.95rem;
+}
+
+.chat-dock-preview {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1f2937;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-dock-unread {
+  display: inline-flex;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.67rem;
+  padding: 0 0.2rem;
+}
+
+/* Chat Panel (inside drawer) */
 .chat-card {
   width: 100%;
   min-height: 260px;
-  max-height: 320px;
-  display: none;
+  max-height: none;
+  display: flex;
   flex-direction: column;
   gap: 0.75rem;
   overflow: hidden;
@@ -1313,6 +1415,87 @@ body {
 
 .chat-card.chat-panel-open {
   display: flex;
+}
+
+.live-drawer {
+  position: relative;
+  z-index: 10;
+}
+
+.live-drawer-backdrop {
+  display: none;
+}
+
+.live-drawer-surface {
+  position: relative;
+  max-height: min(52vh, 520px);
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  border: 1px solid #dbe8f4;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.live-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #dbe8f4;
+}
+
+.live-drawer-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.live-drawer-tab {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.34rem 0.66rem;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.live-drawer-tab.live-drawer-tab-active {
+  border-color: #38bdf8;
+  color: #0f172a;
+  background: #f0f9ff;
+}
+
+.live-drawer-close-btn {
+  padding: 0.32rem 0.64rem;
+  width: auto;
+}
+
+.live-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.8rem;
+}
+
+.live-drawer-panel {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.farming-placeholder-card {
+  padding: 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.farming-placeholder-card h2 {
+  margin-bottom: 0.5rem;
 }
 
 .chat-card-header {
@@ -1941,7 +2124,7 @@ button {
 /* Trading Panel */
 .trading-panel {
   width: 100%;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 
 .trading-card {
@@ -2402,6 +2585,30 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .season-focus-strip {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    padding: 0.25rem;
+    overflow-x: auto;
+  }
+
+  .season-focus-btn {
+    flex: 0 0 auto;
+  }
+
+  .seasons-grid .season-card {
+    display: none;
+  }
+
+  .seasons-grid .season-card.season-card-focus-active {
+    display: flex;
+  }
+
   .seasons-scroll {
     overflow: visible;
     padding-right: 0;
@@ -2425,6 +2632,17 @@ button {
     min-height: 220px;
   }
 
+  .chat-dock-btn {
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
+    bottom: 8.6rem;
+  }
+
+  .live-drawer-surface {
+    max-height: min(64vh, 680px);
+  }
+
   .panel-inline-actions {
     flex-direction: column;
     align-items: stretch;
@@ -2435,9 +2653,16 @@ button {
   }
 
   .bottom-bar {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 0.5rem;
+    justify-content: flex-start;
+    padding: 0.55rem;
+  }
+
+  .status-pill {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .chat-form {
@@ -2459,6 +2684,18 @@ button {
 
   button {
     width: 100%;
+  }
+
+  .season-focus-btn,
+  .drawer-open-btn,
+  .chat-toggle-btn,
+  .live-drawer-tab,
+  .chat-dock-btn {
+    width: auto;
+  }
+
+  .live-drawer-close-btn {
+    width: auto;
   }
 
   .upgrade-controls {

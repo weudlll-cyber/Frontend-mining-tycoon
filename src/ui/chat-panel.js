@@ -15,6 +15,9 @@ let _getGameId = null;
 let _getPlayerId = null;
 let _getPlayerToken = null;
 let _showToast = null;
+let _onMessage = null;
+let _onPanelVisibilityChanged = null;
+let _manageToggleInternally = true;
 
 let _chatSocket = null;
 let _reconnectTimer = null;
@@ -41,6 +44,17 @@ function applyPanelOpenState(isOpen) {
   if (!_panelEl || !_toggleBtnEl) return;
   _panelEl.classList.toggle('chat-panel-open', isOpen);
   _toggleBtnEl.setAttribute('aria-expanded', String(isOpen));
+  if (typeof _onPanelVisibilityChanged === 'function') {
+    _onPanelVisibilityChanged(Boolean(isOpen));
+  }
+}
+
+export function setChatPanelOpen(isOpen) {
+  applyPanelOpenState(Boolean(isOpen));
+}
+
+export function isChatPanelOpen() {
+  return Boolean(_panelEl?.classList.contains('chat-panel-open'));
 }
 
 function clearReconnectTimer() {
@@ -218,6 +232,7 @@ export async function connectChat() {
 
     if (payload?.type === 'chat_message') {
       appendChatMessage(_messagesEl, payload);
+      _onMessage?.(payload);
       return;
     }
 
@@ -284,6 +299,9 @@ export function initChatPanel(deps) {
   _getPlayerId = deps.getPlayerId;
   _getPlayerToken = deps.getPlayerToken;
   _showToast = deps.showToast;
+  _onMessage = deps.onMessage;
+  _onPanelVisibilityChanged = deps.onPanelVisibilityChanged;
+  _manageToggleInternally = deps.manageToggleInternally !== false;
 
   if (!_panelEl || !_toggleBtnEl || !_messagesEl || !_formEl || !_inputEl) {
     return;
@@ -293,10 +311,12 @@ export function initChatPanel(deps) {
   setComposerEnabled(false);
   setStatus('Offline', 'idle');
 
-  _toggleBtnEl.addEventListener('click', () => {
-    const isOpen = !_panelEl.classList.contains('chat-panel-open');
-    applyPanelOpenState(isOpen);
-  });
+  if (_manageToggleInternally) {
+    _toggleBtnEl.addEventListener('click', () => {
+      const isOpen = !_panelEl.classList.contains('chat-panel-open');
+      applyPanelOpenState(isOpen);
+    });
+  }
 
   _formEl.addEventListener('submit', (event) => {
     event.preventDefault();

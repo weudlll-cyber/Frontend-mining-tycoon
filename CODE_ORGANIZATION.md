@@ -16,6 +16,8 @@ Completed extractions now in place:
 - `src/ui/live-summary.js` for score and portfolio summary rendering
 - `src/ui/leaderboard.js` for leaderboard rendering
 - `src/ui/season-cards.js` for season-card balance/output/halving updates
+- `src/ui/season-focus.js` for compact mobile season-card focus switching
+- `src/ui/live-drawer.js` for non-core tool panel orchestration (trade/farm/chat)
 - `src/ui/player-view-layout.js` for player analytics matrix/layout construction
 - `src/ui/player-view-score.js` for player analytics score resolution/formatting
 

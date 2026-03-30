@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendChatMessage,
   initChatPanel,
+  setChatPanelOpen,
   shouldAutoScroll,
 } from './chat-panel.js';
 
@@ -107,6 +108,48 @@ describe('chat panel rendering', () => {
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
 
     toggleBtn.click();
+    expect(panel.classList.contains('chat-panel-open')).toBe(false);
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('supports externally managed open state updates', () => {
+    const panel = document.createElement('aside');
+    panel.id = 'chat-panel';
+    panel.className = 'chat-card';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'chat-toggle-btn';
+
+    const messages = document.createElement('ul');
+    const form = document.createElement('form');
+    const input = document.createElement('input');
+    const status = document.createElement('span');
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    form.append(input, submit);
+
+    document.body.append(panel, toggleBtn, messages, form, status);
+
+    initChatPanel({
+      panelEl: panel,
+      toggleBtnEl: toggleBtn,
+      messagesEl: messages,
+      formEl: form,
+      inputEl: input,
+      statusEl: status,
+      getBaseUrl: () => 'http://127.0.0.1:8000',
+      getGameId: () => '1',
+      getPlayerId: () => '1',
+      getPlayerToken: () => null,
+      showToast: () => {},
+      manageToggleInternally: false,
+    });
+
+    setChatPanelOpen(true);
+    expect(panel.classList.contains('chat-panel-open')).toBe(true);
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+    setChatPanelOpen(false);
     expect(panel.classList.contains('chat-panel-open')).toBe(false);
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
   });

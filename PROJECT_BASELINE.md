@@ -27,8 +27,8 @@ Implementation-factual contract:
 - Deterministic behavior (oracle, halving, events, snapshot-locked settings) is a hard project constraint.
 - Admin configuration is separate from gameplay: settings are snapshot-locked at round creation and only admin can create rounds (via admin.html, not index.html).
 - Main gameplay UI is inline: seasonal cards with visible three-lane upgrades and read-only analytics.
-- Chat is optional, social-only, docked inline, and non-gameplay.
-- Trading and farming visibility is maintained in UI even when disabled (status remains explicit).
+- Chat is optional, social-only, always reachable from the action bar/chat dock, and non-gameplay.
+- Trading and farming visibility is maintained in UI via status pills and on-demand drawer panels even when disabled.
 - Test posture is mandatory: backend and frontend suites remain green; behavior changes require test updates.
 - Security posture is mandatory: preserve XSS-safe rendering patterns and avoid untrusted innerHTML paths.
 
@@ -154,6 +154,8 @@ Frontend structure is modular:
 - Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and a live score-context metric display.
 - Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table.
 - Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
+- Season focus module (`ui/season-focus.js`): keeps mobile layout compact by focusing one season card at a time.
+- Live drawer module (`ui/live-drawer.js`): manages non-core panel access (trade/farm/chat) without crowding the core board.
 - Player state analytics render module (`player-view.js`): orchestrates per-token output, balances, cumulative mined, oracle prices, and conversion parameter display.
 - Player analytics layout helper (`ui/player-view-layout.js`): owns analytics matrix construction and tooltip trigger/bubble anchors.
 - Player analytics score helper (`ui/player-view-score.js`): owns `This session` / `Best this round` display resolution and score formatting.
@@ -178,6 +180,8 @@ Frontend session-mode readiness:
 - In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
 - Async best-of attempts are backend-reset per session start: player state is reset to deterministic baseline (balances/tracks/upgrades/cumulative mined) before each new async session, so attempts are directly comparable.
 - Best-of visibility is surfaced in Player State panel during async rounds only: shows `This session` and `Best this round` (read-only backend values from backend payload). Hidden in sync mode.
+- Live tools behavior is split intentionally: core mining/analytics remain always visible, while trade/farm/chat are reachable via an inline non-blocking bottom drawer.
+- Chat presence remains visible everywhere through an always-available chat button plus compact preview/unread indicator.
 - Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
 - Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
 - Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
