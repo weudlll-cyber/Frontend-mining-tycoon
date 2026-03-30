@@ -17,7 +17,7 @@ This app lets you:
 ## Current Implementation Status (2026-03-30)
 
 - Mining is the only gameplay pillar currently implemented and validated end-to-end (backend + frontend).
-- **Trading now has an initial scaffold**: read-only panel and capability-driven status in the action bar plus the live tools drawer. Trade execution and fee calculation remain unimplemented.
+- **Trading now has an initial scaffold**: read-only panel and capability-driven status in the action bar plus the live tools drawer. The panel consumes backend-authoritative conversion preview estimates (oracle prices + fee + spread). Trade execution itself remains unimplemented.
 - Farming gameplay implementation has not started yet; the dashboard exposes a drawer placeholder plus status visibility in the action bar.
 - Gameplay-balance validation is still pending through playtests, especially for:
   - mined output pacing over time

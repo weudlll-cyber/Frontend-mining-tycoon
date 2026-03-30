@@ -33,7 +33,11 @@ function resolveTokenList(meta, state) {
   if (state?.balances && typeof state.balances === 'object') {
     candidates.push(...Object.keys(state.balances));
   }
-  if (meta?.token_names && typeof meta.token_names === 'object') {
+  if (Array.isArray(meta?.token_names)) {
+    candidates.push(
+      ...meta.token_names.map((_, index) => String(index))
+    );
+  } else if (meta?.token_names && typeof meta.token_names === 'object') {
     candidates.push(...Object.keys(meta.token_names));
   }
   if (!candidates.length) {
@@ -48,6 +52,85 @@ function resolveTokenList(meta, state) {
     deduped.push(normalized);
   });
   return deduped.length ? deduped : [...FALLBACK_TOKENS];
+}
+
+function resolveTokenLabel(token, meta) {
+  const rawToken = String(token || '').trim();
+  if (!rawToken) return 'Unknown';
+
+  const tokenNames = meta?.token_names;
+  if (Array.isArray(tokenNames)) {
+    const index = Number(rawToken);
+    if (Number.isInteger(index) && index >= 0 && index < tokenNames.length) {
+      return formatTokenName(tokenNames[index]);
+    }
+  } else if (tokenNames && typeof tokenNames === 'object') {
+    const mapped = tokenNames[rawToken];
+    if (typeof mapped === 'string' && mapped.trim()) {
+      return formatTokenName(mapped);
+    }
+  }
+
+  return formatTokenName(rawToken);
+}
+
+function buildInformationalStockpilePreview(amountInputValue, feeRate) {
+  const amount = asNumber(amountInputValue);
+  if (amount === null || amount <= 0) {
+    return null;
+  }
+
+  const safeFeeRate = Math.max(0, asNumber(feeRate) ?? 0);
+  const unitsGiven = amount;
+  const unitsReceived = amount * (1 - safeFeeRate);
+  const feeUnits = unitsGiven - unitsReceived;
+
+  return {
+    units_given: unitsGiven,
+    units_received: unitsReceived,
+    total_tokens_change: -feeUnits,
+  };
+}
+
+function buildStockpilePreviewFromPairRate(previewData, amountInputValue) {
+  const amount = asNumber(amountInputValue);
+  if (amount === null || amount <= 0) {
+    return null;
+  }
+
+  const netToPerFrom = asNumber(previewData?.net_to_per_from);
+  if (netToPerFrom === null || netToPerFrom < 0) {
+    return null;
+  }
+
+  const unitsGiven = amount;
+  const unitsReceived = amount * netToPerFrom;
+  return {
+    units_given: unitsGiven,
+    units_received: unitsReceived,
+    total_tokens_change: unitsReceived - unitsGiven,
+  };
+}
+
+function resolveResultPreview(mode, previewData, amountInputValue, feeRate) {
+  if (normalizeScoringMode(mode) !== 'stockpile_total_tokens') {
+    return previewData;
+  }
+  const backendAmountPreview = buildStockpilePreviewFromPairRate(
+    previewData,
+    amountInputValue
+  );
+  if (backendAmountPreview) {
+    return backendAmountPreview;
+  }
+  const hasConcreteUnits =
+    asNumber(previewData?.units_given) !== null ||
+    asNumber(previewData?.units_received) !== null;
+  if (hasConcreteUnits) {
+    return previewData;
+  }
+  // In stockpile mode, keep preview responsive to the typed amount.
+  return buildInformationalStockpilePreview(amountInputValue, feeRate) || previewData;
 }
 
 function resolvePreviewRoot(meta, state, trading) {
@@ -275,7 +358,7 @@ function appendControlsSection(card, model) {
   model.tokens.forEach((token) => {
     const option = document.createElement('option');
     option.value = token;
-    option.textContent = formatTokenName(token);
+    option.textContent = resolveTokenLabel(token, model.meta);
     option.selected = token === model.selectedFromToken;
     fromSelect.appendChild(option);
   });
@@ -294,7 +377,7 @@ function appendControlsSection(card, model) {
   model.tokens.forEach((token) => {
     const option = document.createElement('option');
     option.value = token;
-    option.textContent = formatTokenName(token);
+    option.textContent = resolveTokenLabel(token, model.meta);
     option.selected = token === model.selectedToToken;
     toSelect.appendChild(option);
   });
@@ -322,12 +405,12 @@ function appendControlsSection(card, model) {
   const balanceRow = document.createElement('div');
   balanceRow.className = 'trading-balance-row';
   const balanceFrom = document.createElement('span');
-  balanceFrom.textContent = `Balance (${formatTokenName(model.selectedFromToken)}): `;
+  balanceFrom.textContent = `Balance (${resolveTokenLabel(model.selectedFromToken, model.meta)}): `;
   const balanceFromStrong = document.createElement('strong');
   balanceFromStrong.textContent = model.balanceFrom;
   balanceFrom.appendChild(balanceFromStrong);
   const balanceTo = document.createElement('span');
-  balanceTo.textContent = `Balance (${formatTokenName(model.selectedToToken)}): `;
+  balanceTo.textContent = `Balance (${resolveTokenLabel(model.selectedToToken, model.meta)}): `;
   const balanceToStrong = document.createElement('strong');
   balanceToStrong.textContent = model.balanceTo;
   balanceTo.appendChild(balanceToStrong);
@@ -622,7 +705,10 @@ export function initTradingPanel(deps) {
       selectedFromToken,
       selectedToToken
     );
-    const result = buildResultSection(mode, previewData);
+    const result = buildResultSection(
+      mode,
+      resolveResultPreview(mode, previewData, amountInputValue, trading.value_fee_rate)
+    );
 
     const rules = resolveTradingRules(meta, state);
     const tradesUsed = Math.max(
@@ -640,6 +726,7 @@ export function initTradingPanel(deps) {
 
     const card = createBaseCard(trading, modeName);
     appendControlsSection(card, {
+      meta,
       tokens,
       selectedFromToken,
       selectedToToken,
@@ -657,6 +744,29 @@ export function initTradingPanel(deps) {
     disposeTooltips = initMicroTooltips(tradingPanelRef);
   }
 
+  function updateEditingAmountPreviewInPlace(trading) {
+    if (!tradingPanelRef) return;
+
+    const meta = getGameMeta() || {};
+    const state = getCurrentState() || {};
+    const mode = resolveActiveScoringMode(meta, state, getActiveScoringMode);
+    const previewRoot = resolvePreviewRoot(meta, state, trading);
+    const previewData = resolvePreviewForSelection(
+      previewRoot,
+      selectedFromToken,
+      selectedToToken
+    );
+    const result = buildResultSection(
+      mode,
+      resolveResultPreview(mode, previewData, amountInputValue, trading.value_fee_rate)
+    );
+
+    const valueEl = tradingPanelRef.querySelector('.primary-result-value');
+    const secondaryEl = tradingPanelRef.querySelector('.primary-result-secondary');
+    if (valueEl) valueEl.textContent = result.primaryValue;
+    if (secondaryEl) secondaryEl.textContent = result.secondary;
+  }
+
   function renderBottomStatus(trading) {
     if (!tradingStatusRef) return;
 
@@ -671,6 +781,25 @@ export function initTradingPanel(deps) {
 
   function renderTradingStatus() {
     const trading = getTrading();
+
+    const activeEl = document.activeElement;
+    const isEditingAmountField =
+      Boolean(activeEl) &&
+      Boolean(tradingPanelRef) &&
+      tradingPanelRef.contains(activeEl) &&
+      (activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        activeEl?.isContentEditable === true);
+
+    // Keep the current editor control mounted while the user types/selects.
+    // Rebuilding the panel replaces the amount/select DOM node and drops focus.
+    if (isEditingAmountField) {
+      // Keep the active input mounted while still refreshing computed preview text.
+      updateEditingAmountPreviewInPlace(trading);
+      renderBottomStatus(trading);
+      return;
+    }
+
     renderPanelCard(trading);
     renderBottomStatus(trading);
   }

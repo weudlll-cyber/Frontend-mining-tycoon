@@ -1980,7 +1980,8 @@ function initializeModules() {
   });
   renderChatPreviewState();
   tradingPanelApi = initTradingPanel({
-    getGameMeta,
+    // Bind current gameId so the panel resolves the correct meta object.
+    getGameMeta: () => getGameMeta(gameIdInput?.value),
     getLastGameData: () => lastGameData,
     getActiveScoringMode: () => resolveActiveScoringMode(lastGameData),
     tradingPanelRef: tradingPanelEl,
