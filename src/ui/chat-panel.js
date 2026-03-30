@@ -28,6 +28,34 @@ let _chatAuthenticated = false;
 
 const MAX_RENDERED_MESSAGES = 200;
 
+export function resolveChatUserLabel(
+  message,
+  { ownPlayerId = '', ownPlayerName = '' } = {}
+) {
+  const fallback = String(message?.user || 'player').trim() || 'player';
+  const explicitDisplayName = String(message?.display_name || '').trim();
+  if (explicitDisplayName) {
+    return explicitDisplayName;
+  }
+
+  const normalizedOwnPlayerId = String(ownPlayerId || '').trim();
+  const normalizedOwnPlayerName = String(ownPlayerName || '').trim();
+  if (!normalizedOwnPlayerId || !normalizedOwnPlayerName) {
+    return fallback;
+  }
+
+  const normalizedFallback = fallback.toLowerCase();
+  const normalizedOwnId = normalizedOwnPlayerId.toLowerCase();
+  if (
+    normalizedFallback === normalizedOwnId ||
+    normalizedFallback === `player-${normalizedOwnId}`
+  ) {
+    return normalizedOwnPlayerName;
+  }
+
+  return fallback;
+}
+
 export function shouldAutoScroll(containerEl, thresholdPx = 8) {
   if (!containerEl) return false;
   const distanceFromBottom =
@@ -69,31 +97,6 @@ function normalizeWsBase(baseUrl) {
   const parsed = new URL(baseUrl);
   parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
   return parsed.toString().replace(/\/+$/, '');
-}
-
-function resolveChatUserLabel(message) {
-  const fallback = String(message?.user || 'player').trim() || 'player';
-  const explicitDisplayName = String(message?.display_name || '').trim();
-  if (explicitDisplayName) {
-    return explicitDisplayName;
-  }
-
-  const ownPlayerId = String(_getPlayerId?.() || '').trim();
-  const ownPlayerName = String(_getPlayerName?.() || '').trim();
-  if (!ownPlayerId || !ownPlayerName) {
-    return fallback;
-  }
-
-  const normalizedFallback = fallback.toLowerCase();
-  const normalizedOwnId = ownPlayerId.toLowerCase();
-  if (
-    normalizedFallback === normalizedOwnId ||
-    normalizedFallback === `player-${normalizedOwnId}`
-  ) {
-    return ownPlayerName;
-  }
-
-  return fallback;
 }
 
 function setComposerEnabled(enabled) {
@@ -153,7 +156,10 @@ export function appendChatMessage(messagesEl, message) {
 
   const user = document.createElement('span');
   user.className = 'chat-message-user';
-  user.textContent = resolveChatUserLabel(message);
+  user.textContent = resolveChatUserLabel(message, {
+    ownPlayerId: _getPlayerId?.(),
+    ownPlayerName: _getPlayerName?.(),
+  });
 
   const time = document.createElement('span');
   time.className = 'chat-message-time';

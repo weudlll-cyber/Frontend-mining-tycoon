@@ -65,6 +65,16 @@ function buildDomFixture() {
       <div id="countdown-label"></div>
       <div id="new-game-status"></div>
       <div id="meta-debug"></div>
+      <aside id="chat-panel" class="chat-card"></aside>
+      <button id="chat-toggle-btn" type="button"></button>
+      <ul id="chat-messages"></ul>
+      <form id="chat-form"><input id="chat-input" /><button type="submit">Send</button></form>
+      <span id="chat-status"></span>
+      <span id="chat-unread-badge"></span>
+      <button id="chat-dock-btn" type="button">
+        <span id="chat-dock-preview"></span>
+        <span id="chat-dock-unread"></span>
+      </button>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
       <div id="upgrades"></div>

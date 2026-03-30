@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createNewGameAndJoin,
   initGameActions,
+  performTrade,
   performUpgrade,
 } from './game-actions.js';
 
@@ -257,5 +258,42 @@ describe('performUpgrade pay-token wiring', () => {
     expect(requestBody.upgrade_type).toBe('hashrate');
     expect(requestBody.target_token).toBe('summer');
     expect(requestBody.pay_token).toBe('winter');
+  });
+});
+
+describe('performTrade wiring', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('posts canonical trade payload and invokes onTradeExecuted callback', async () => {
+    const onTradeExecuted = vi.fn();
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+      onTradeExecuted,
+    });
+    initGameActions(deps);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        updated_state: { balances: { spring: 900, summer: 1090 } },
+        trade_result: { trades_used: 1 },
+      }),
+    });
+    globalThis.fetch = fetchMock;
+
+    await performTrade('spring', 'summer', 100);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/games/g-1/players/p-1/trade');
+    expect(JSON.parse(options.body)).toEqual({
+      from_token: 'spring',
+      to_token: 'summer',
+      amount: 100,
+    });
+    expect(onTradeExecuted).toHaveBeenCalledTimes(1);
   });
 });

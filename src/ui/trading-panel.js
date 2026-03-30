@@ -21,6 +21,36 @@ const FALLBACK_TOKENS = ['spring', 'summer', 'autumn', 'winter'];
 
 let tooltipSerial = 0;
 
+function syncSelectOptions(
+  selectEl,
+  values,
+  getLabel = (value) => String(value)
+) {
+  if (!selectEl) return;
+  const previousValue = selectEl.value;
+
+  // WHY: Reusing option nodes keeps native dropdowns open across live refreshes.
+  values.forEach((value, index) => {
+    let option = selectEl.options[index];
+    if (!option) {
+      option = document.createElement('option');
+      selectEl.appendChild(option);
+    }
+    if (option.value !== value) {
+      option.value = value;
+    }
+    option.textContent = getLabel(value);
+  });
+
+  while (selectEl.options.length > values.length) {
+    selectEl.remove(selectEl.options.length - 1);
+  }
+
+  selectEl.value = values.includes(previousValue)
+    ? previousValue
+    : values[0] || '';
+}
+
 function resolveActiveScoringMode(meta, state, getActiveScoringMode) {
   if (typeof getActiveScoringMode === 'function') {
     return normalizeScoringMode(getActiveScoringMode());
@@ -28,11 +58,39 @@ function resolveActiveScoringMode(meta, state, getActiveScoringMode) {
   return normalizeScoringMode(state?.scoring_mode || meta?.scoring_mode);
 }
 
-function resolveTokenList(meta, state) {
-  const candidates = [];
-  if (state?.balances && typeof state.balances === 'object') {
-    candidates.push(...Object.keys(state.balances));
+function resolveBalances(state) {
+  if (
+    state?.player_state?.balances &&
+    typeof state.player_state.balances === 'object'
+  ) {
+    return state.player_state.balances;
   }
+  if (state?.balances && typeof state.balances === 'object') {
+    return state.balances;
+  }
+  return null;
+}
+
+function resolveTokenList(meta, state) {
+  const balances = resolveBalances(state);
+  const balanceKeys = balances
+    ? Object.keys(balances)
+        .map((token) =>
+          String(token || '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    : [];
+  const hasCanonicalBalanceKeys =
+    balanceKeys.length > 0 &&
+    balanceKeys.every((token) => FALLBACK_TOKENS.includes(token));
+
+  if (hasCanonicalBalanceKeys) {
+    return balanceKeys;
+  }
+
+  const candidates = [...balanceKeys];
   if (Array.isArray(meta?.token_names)) {
     candidates.push(...meta.token_names.map((_, index) => String(index)));
   } else if (meta?.token_names && typeof meta.token_names === 'object') {
@@ -405,13 +463,17 @@ function appendControlsSection(card, model) {
   const balanceRow = document.createElement('div');
   balanceRow.className = 'trading-balance-row';
   const balanceFrom = document.createElement('span');
+  balanceFrom.className = 'trading-balance-from';
   balanceFrom.textContent = `Balance (${resolveTokenLabel(model.selectedFromToken, model.meta)}): `;
   const balanceFromStrong = document.createElement('strong');
+  balanceFromStrong.className = 'trading-balance-from-value';
   balanceFromStrong.textContent = model.balanceFrom;
   balanceFrom.appendChild(balanceFromStrong);
   const balanceTo = document.createElement('span');
+  balanceTo.className = 'trading-balance-to';
   balanceTo.textContent = `Balance (${resolveTokenLabel(model.selectedToToken, model.meta)}): `;
   const balanceToStrong = document.createElement('strong');
+  balanceToStrong.className = 'trading-balance-to-value';
   balanceToStrong.textContent = model.balanceTo;
   balanceTo.appendChild(balanceToStrong);
   balanceRow.appendChild(balanceFrom);
@@ -480,6 +542,7 @@ function appendScheduleSection(card, rules, tradesUsed, elapsedSeconds) {
   usedLabel.textContent = 'Trades used:';
   const usedValue = document.createElement('span');
   usedValue.className = 'detail-value';
+  usedValue.classList.add('trading-trades-used-value');
   usedValue.textContent = `${tradesUsed} / ${rules.trade_count}`;
   usedRow.appendChild(usedLabel);
   usedRow.appendChild(usedValue);
@@ -493,6 +556,7 @@ function appendScheduleSection(card, rules, tradesUsed, elapsedSeconds) {
   nextLabel.textContent = 'Next trade:';
   const nextValue = document.createElement('span');
   nextValue.className = 'detail-value';
+  nextValue.classList.add('trading-next-trade-value');
 
   const nextOffset = rules.unlock_offsets_seconds[tradesUsed] ?? null;
   if (nextOffset === null) {
@@ -526,10 +590,14 @@ function appendScheduleSection(card, rules, tradesUsed, elapsedSeconds) {
       item.className = 'trading-schedule-item';
 
       const left = document.createElement('span');
+      left.className = 'trading-schedule-item-label';
       left.textContent = `Trade ${idx + 1} at ${formatDurationAbsolute(offset)}`;
+      left.setAttribute('data-schedule-index', String(idx));
 
       const right = document.createElement('span');
       right.className = 'detail-value';
+      right.classList.add('trading-schedule-item-status');
+      right.setAttribute('data-schedule-index', String(idx));
       right.textContent = getScheduleStatus(
         idx,
         offset,
@@ -547,23 +615,92 @@ function appendScheduleSection(card, rules, tradesUsed, elapsedSeconds) {
   card.appendChild(wrapper);
 }
 
-function appendActionsSection(panelEl, card, trading) {
+function resolveExecutionState(model, trading, isSubmitting) {
+  const amount = asNumber(model.amountInputValue);
+  const availableFrom =
+    asNumber(model.balances?.[model.selectedFromToken]) ?? 0;
+  const nextOffset =
+    model.rules.unlock_offsets_seconds[model.tradesUsed] ?? null;
+
+  if (isSubmitting) {
+    return {
+      enabled: false,
+      buttonText: 'Executing...',
+      reason: 'Trade is being submitted.',
+    };
+  }
+  if (!trading.enabled) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'Trading is not enabled for this round.',
+    };
+  }
+  if (!model.rules.trade_count) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'No trade slots are configured for this round.',
+    };
+  }
+  if (model.tradesUsed >= model.rules.trade_count) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'No remaining trade slots in this round.',
+    };
+  }
+  if (nextOffset !== null && model.elapsedSeconds < nextOffset) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: `Next trade unlocks in ${formatDurationAbsolute(nextOffset - model.elapsedSeconds)}.`,
+    };
+  }
+  if (model.selectedFromToken === model.selectedToToken) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'Choose two different tokens for conversion.',
+    };
+  }
+  if (amount === null || amount <= 0) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'Enter an amount greater than 0.',
+    };
+  }
+  if (amount > availableFrom) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: 'Amount exceeds your available balance.',
+    };
+  }
+
+  return {
+    enabled: true,
+    buttonText: 'Execute Trade',
+    reason: 'Submit trade at backend-authoritative conversion rates.',
+  };
+}
+
+function appendActionsSection(panelEl, card, execution) {
   const actions = document.createElement('div');
   actions.className = 'trading-actions';
 
   const executeBtn = document.createElement('button');
   executeBtn.type = 'button';
   executeBtn.className = 'btn-primary trading-execute-btn';
-  executeBtn.textContent = 'Execute Conversion';
-  executeBtn.disabled = !trading.enabled;
+  executeBtn.setAttribute('data-action', 'execute-trade');
+  executeBtn.textContent = execution.buttonText;
+  executeBtn.disabled = !execution.enabled;
+  executeBtn.title = execution.reason;
 
   actions.appendChild(executeBtn);
   actions.appendChild(
-    createInlineTooltipTrigger(
-      panelEl,
-      'Irreversible',
-      'This action cannot be undone after confirmation by the backend.'
-    )
+    createInlineTooltipTrigger(panelEl, 'Execution rules', execution.reason)
   );
 
   card.appendChild(actions);
@@ -624,6 +761,8 @@ export function initTradingPanel(deps) {
     getGameMeta,
     getLastGameData,
     getActiveScoringMode,
+    executeTrade,
+    showToast,
     tradingPanelRef,
     tradingStatusRef,
   } = deps || {};
@@ -644,6 +783,7 @@ export function initTradingPanel(deps) {
   let selectedFromToken = FALLBACK_TOKENS[0];
   let selectedToToken = FALLBACK_TOKENS[1];
   let amountInputValue = '';
+  let isTradeSubmitting = false;
 
   function getTrading() {
     try {
@@ -694,10 +834,11 @@ export function initTradingPanel(deps) {
     const mode = resolveActiveScoringMode(meta, state, getActiveScoringMode);
     const modeName = formatScoringModeName(mode);
     const tokens = resolveTokenList(meta, state);
+    const balances = resolveBalances(state);
     keepTokenSelectionValid(tokens);
 
-    const balanceFrom = formatTokenUnits(state?.balances?.[selectedFromToken]);
-    const balanceTo = formatTokenUnits(state?.balances?.[selectedToToken]);
+    const balanceFrom = formatTokenUnits(balances?.[selectedFromToken]);
+    const balanceTo = formatTokenUnits(balances?.[selectedToToken]);
 
     const previewRoot = resolvePreviewRoot(meta, state, trading);
     const previewData = resolvePreviewForSelection(
@@ -721,6 +862,19 @@ export function initTradingPanel(deps) {
       Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
     );
     const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
+    const execution = resolveExecutionState(
+      {
+        amountInputValue,
+        balances,
+        selectedFromToken,
+        selectedToToken,
+        rules,
+        tradesUsed,
+        elapsedSeconds,
+      },
+      trading,
+      isTradeSubmitting
+    );
 
     removeManagedTooltips(tradingPanelRef);
     disposeTooltips();
@@ -741,7 +895,7 @@ export function initTradingPanel(deps) {
       feePercentage: (trading.value_fee_rate * 100).toFixed(2),
     });
     appendPrimaryResultSection(tradingPanelRef, card, result);
-    appendActionsSection(tradingPanelRef, card, trading);
+    appendActionsSection(tradingPanelRef, card, execution);
     appendStatusSummary(card, trading);
     appendScheduleSection(card, rules, tradesUsed, elapsedSeconds);
 
@@ -749,12 +903,15 @@ export function initTradingPanel(deps) {
     disposeTooltips = initMicroTooltips(tradingPanelRef);
   }
 
-  function updateEditingAmountPreviewInPlace(trading) {
+  function updateEditingPanelInPlace(trading) {
     if (!tradingPanelRef) return;
 
     const meta = getGameMeta() || {};
     const state = getCurrentState() || {};
     const mode = resolveActiveScoringMode(meta, state, getActiveScoringMode);
+    const tokens = resolveTokenList(meta, state);
+    const balances = resolveBalances(state);
+    keepTokenSelectionValid(tokens);
     const previewRoot = resolvePreviewRoot(meta, state, trading);
     const previewData = resolvePreviewForSelection(
       previewRoot,
@@ -770,13 +927,131 @@ export function initTradingPanel(deps) {
         trading.value_fee_rate
       )
     );
+    const rules = resolveTradingRules(meta, state);
+    const tradesUsed = Math.max(
+      0,
+      Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
+    );
+    const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
 
+    const fromSelect = tradingPanelRef.querySelector(
+      'select[data-field="from-token"]'
+    );
+    const toSelect = tradingPanelRef.querySelector(
+      'select[data-field="to-token"]'
+    );
+    const amountInput = tradingPanelRef.querySelector(
+      'input[data-field="amount"]'
+    );
+    syncSelectOptions(fromSelect, tokens, (token) =>
+      resolveTokenLabel(token, meta)
+    );
+    syncSelectOptions(toSelect, tokens, (token) =>
+      resolveTokenLabel(token, meta)
+    );
+    if (fromSelect) fromSelect.value = selectedFromToken;
+    if (toSelect) toSelect.value = selectedToToken;
+    if (amountInput && amountInput.value !== amountInputValue) {
+      amountInput.value = amountInputValue;
+    }
+
+    const balanceFromEl = tradingPanelRef.querySelector(
+      '.trading-balance-from'
+    );
+    const balanceToEl = tradingPanelRef.querySelector('.trading-balance-to');
+    const balanceFromValueEl = tradingPanelRef.querySelector(
+      '.trading-balance-from-value'
+    );
+    const balanceToValueEl = tradingPanelRef.querySelector(
+      '.trading-balance-to-value'
+    );
+    if (balanceFromEl?.firstChild) {
+      balanceFromEl.firstChild.textContent = `Balance (${resolveTokenLabel(selectedFromToken, meta)}): `;
+    }
+    if (balanceToEl?.firstChild) {
+      balanceToEl.firstChild.textContent = `Balance (${resolveTokenLabel(selectedToToken, meta)}): `;
+    }
+    if (balanceFromValueEl) {
+      balanceFromValueEl.textContent = formatTokenUnits(
+        balances?.[selectedFromToken]
+      );
+    }
+    if (balanceToValueEl) {
+      balanceToValueEl.textContent = formatTokenUnits(
+        balances?.[selectedToToken]
+      );
+    }
+
+    const metricLabelEl = tradingPanelRef.querySelector(
+      '.primary-result-metric-label'
+    );
     const valueEl = tradingPanelRef.querySelector('.primary-result-value');
     const secondaryEl = tradingPanelRef.querySelector(
       '.primary-result-secondary'
     );
+    if (metricLabelEl) metricLabelEl.textContent = result.primaryLabel;
     if (valueEl) valueEl.textContent = result.primaryValue;
     if (secondaryEl) secondaryEl.textContent = result.secondary;
+
+    const tradesUsedEl = tradingPanelRef.querySelector(
+      '.trading-trades-used-value'
+    );
+    const nextTradeEl = tradingPanelRef.querySelector(
+      '.trading-next-trade-value'
+    );
+    const executeBtn = tradingPanelRef.querySelector('.trading-execute-btn');
+    const execution = resolveExecutionState(
+      {
+        amountInputValue,
+        balances,
+        selectedFromToken,
+        selectedToToken,
+        rules,
+        tradesUsed,
+        elapsedSeconds,
+      },
+      trading,
+      isTradeSubmitting
+    );
+    if (tradesUsedEl) {
+      tradesUsedEl.textContent = `${tradesUsed} / ${rules.trade_count}`;
+    }
+    if (nextTradeEl) {
+      const nextOffset = rules.unlock_offsets_seconds[tradesUsed] ?? null;
+      if (nextOffset === null) {
+        nextTradeEl.textContent = 'No remaining trades';
+      } else if (elapsedSeconds >= nextOffset) {
+        nextTradeEl.textContent = 'Available now';
+      } else {
+        nextTradeEl.textContent = `Available in ${formatDurationAbsolute(nextOffset - elapsedSeconds)}`;
+      }
+    }
+
+    rules.unlock_offsets_seconds.forEach((offset, idx) => {
+      const labelEl = tradingPanelRef.querySelector(
+        `.trading-schedule-item-label[data-schedule-index="${idx}"]`
+      );
+      const statusEl = tradingPanelRef.querySelector(
+        `.trading-schedule-item-status[data-schedule-index="${idx}"]`
+      );
+      if (labelEl) {
+        labelEl.textContent = `Trade ${idx + 1} at ${formatDurationAbsolute(offset)}`;
+      }
+      if (statusEl) {
+        statusEl.textContent = getScheduleStatus(
+          idx,
+          offset,
+          tradesUsed,
+          elapsedSeconds
+        );
+      }
+    });
+
+    if (executeBtn) {
+      executeBtn.textContent = execution.buttonText;
+      executeBtn.disabled = !execution.enabled;
+      executeBtn.title = execution.reason;
+    }
   }
 
   function renderBottomStatus(trading) {
@@ -795,19 +1070,20 @@ export function initTradingPanel(deps) {
     const trading = getTrading();
 
     const activeEl = document.activeElement;
-    const isEditingAmountField =
+    const isEditingField =
       Boolean(activeEl) &&
       Boolean(tradingPanelRef) &&
       tradingPanelRef.contains(activeEl) &&
       (activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLSelectElement ||
         activeEl instanceof HTMLTextAreaElement ||
         activeEl?.isContentEditable === true);
 
     // Keep the current editor control mounted while the user types/selects.
     // Rebuilding the panel replaces the amount/select DOM node and drops focus.
-    if (isEditingAmountField) {
-      // Keep the active input mounted while still refreshing computed preview text.
-      updateEditingAmountPreviewInPlace(trading);
+    if (isEditingField) {
+      // Keep the active control mounted while still refreshing computed preview text.
+      updateEditingPanelInPlace(trading);
       renderBottomStatus(trading);
       return;
     }
@@ -831,12 +1107,87 @@ export function initTradingPanel(deps) {
       amountInputValue = String(target.value || '');
     }
 
+    const meta = getGameMeta() || {};
+    const state = getCurrentState() || {};
+    keepTokenSelectionValid(resolveTokenList(meta, state));
+
     renderTradingStatus();
+  }
+
+  async function handleExecuteTrade() {
+    const trading = getTrading();
+    const meta = getGameMeta() || {};
+    const state = getCurrentState() || {};
+    const balances = resolveBalances(state);
+    const rules = resolveTradingRules(meta, state);
+    const tradesUsed = Math.max(
+      0,
+      Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
+    );
+    const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
+    const execution = resolveExecutionState(
+      {
+        amountInputValue,
+        balances,
+        selectedFromToken,
+        selectedToToken,
+        rules,
+        tradesUsed,
+        elapsedSeconds,
+      },
+      trading,
+      isTradeSubmitting
+    );
+
+    if (!execution.enabled) {
+      if (typeof showToast === 'function') {
+        showToast(execution.reason, 'info');
+      }
+      return;
+    }
+    if (typeof executeTrade !== 'function') {
+      if (typeof showToast === 'function') {
+        showToast('Trade execution handler is unavailable.', 'error');
+      }
+      return;
+    }
+
+    const amount = asNumber(amountInputValue);
+    isTradeSubmitting = true;
+    renderTradingStatus();
+
+    try {
+      await executeTrade({
+        fromToken: selectedFromToken,
+        toToken: selectedToToken,
+        amount,
+      });
+      amountInputValue = '';
+    } catch (error) {
+      if (typeof showToast === 'function') {
+        showToast(
+          `Trade failed: ${error?.message || 'Unknown error'}`,
+          'error'
+        );
+      }
+    } finally {
+      isTradeSubmitting = false;
+      renderTradingStatus();
+    }
+  }
+
+  function handlePanelClick(event) {
+    const button = event?.target?.closest?.(
+      'button[data-action="execute-trade"]'
+    );
+    if (!button || !tradingPanelRef?.contains(button)) return;
+    void handleExecuteTrade();
   }
 
   if (tradingPanelRef) {
     tradingPanelRef.addEventListener('input', handlePanelInput);
     tradingPanelRef.addEventListener('change', handlePanelInput);
+    tradingPanelRef.addEventListener('click', handlePanelClick);
   }
 
   return {
