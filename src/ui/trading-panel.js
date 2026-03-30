@@ -34,9 +34,7 @@ function resolveTokenList(meta, state) {
     candidates.push(...Object.keys(state.balances));
   }
   if (Array.isArray(meta?.token_names)) {
-    candidates.push(
-      ...meta.token_names.map((_, index) => String(index))
-    );
+    candidates.push(...meta.token_names.map((_, index) => String(index)));
   } else if (meta?.token_names && typeof meta.token_names === 'object') {
     candidates.push(...Object.keys(meta.token_names));
   }
@@ -130,7 +128,9 @@ function resolveResultPreview(mode, previewData, amountInputValue, feeRate) {
     return previewData;
   }
   // In stockpile mode, keep preview responsive to the typed amount.
-  return buildInformationalStockpilePreview(amountInputValue, feeRate) || previewData;
+  return (
+    buildInformationalStockpilePreview(amountInputValue, feeRate) || previewData
+  );
 }
 
 function resolvePreviewRoot(meta, state, trading) {
@@ -707,7 +707,12 @@ export function initTradingPanel(deps) {
     );
     const result = buildResultSection(
       mode,
-      resolveResultPreview(mode, previewData, amountInputValue, trading.value_fee_rate)
+      resolveResultPreview(
+        mode,
+        previewData,
+        amountInputValue,
+        trading.value_fee_rate
+      )
     );
 
     const rules = resolveTradingRules(meta, state);
@@ -758,11 +763,18 @@ export function initTradingPanel(deps) {
     );
     const result = buildResultSection(
       mode,
-      resolveResultPreview(mode, previewData, amountInputValue, trading.value_fee_rate)
+      resolveResultPreview(
+        mode,
+        previewData,
+        amountInputValue,
+        trading.value_fee_rate
+      )
     );
 
     const valueEl = tradingPanelRef.querySelector('.primary-result-value');
-    const secondaryEl = tradingPanelRef.querySelector('.primary-result-secondary');
+    const secondaryEl = tradingPanelRef.querySelector(
+      '.primary-result-secondary'
+    );
     if (valueEl) valueEl.textContent = result.primaryValue;
     if (secondaryEl) secondaryEl.textContent = result.secondary;
   }

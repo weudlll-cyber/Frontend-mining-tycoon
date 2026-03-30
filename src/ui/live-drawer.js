@@ -150,7 +150,7 @@ function _initDrag(windowEl, handleEl) {
       handleEl.addEventListener('touchend', onTouchEnd);
       e.preventDefault();
     },
-    { passive: false },
+    { passive: false }
   );
 }
 
