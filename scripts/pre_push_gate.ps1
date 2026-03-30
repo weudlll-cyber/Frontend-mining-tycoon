@@ -10,10 +10,77 @@ security checks that must pass before pushing the frontend branch.
 & .\scripts\pre_push_gate.ps1
 #>
 
+param(
+    [switch]$Force
+)
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
+$gitDir = (& git rev-parse --git-dir).Trim()
+$gateCacheDir = Join-Path $gitDir "gate-cache"
+$gateCachePath = Join-Path $gateCacheDir "frontend-pre-push.json"
+
+function Get-CurrentGateFingerprint {
+    $head = (& git rev-parse HEAD).Trim()
+    $tree = (& git rev-parse "HEAD^{tree}").Trim()
+    return [pscustomobject]@{
+        Head = $head
+        Tree = $tree
+    }
+}
+
+function Test-CleanWorkingTree {
+    $status = & git status --porcelain
+    return [string]::IsNullOrWhiteSpace(($status -join "`n"))
+}
+
+function Get-GateCache {
+    if (-not (Test-Path $gateCachePath)) {
+        return $null
+    }
+
+    try {
+        return Get-Content $gateCachePath -Raw | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Save-GateCache {
+    if (-not (Test-CleanWorkingTree)) {
+        return
+    }
+
+    $fingerprint = Get-CurrentGateFingerprint
+    $cachePayload = [pscustomobject]@{
+        head = $fingerprint.Head
+        tree = $fingerprint.Tree
+        passedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+    }
+
+    if (-not (Test-Path $gateCacheDir)) {
+        New-Item -ItemType Directory -Path $gateCacheDir | Out-Null
+    }
+
+    $cachePayload | ConvertTo-Json | Set-Content $gateCachePath
+}
+
+function Test-CanSkipGate {
+    if ($Force -or -not (Test-CleanWorkingTree)) {
+        return $false
+    }
+
+    $cache = Get-GateCache
+    if ($null -eq $cache) {
+        return $false
+    }
+
+    $fingerprint = Get-CurrentGateFingerprint
+    return $cache.head -eq $fingerprint.Head -and $cache.tree -eq $fingerprint.Tree
+}
 
 function Invoke-Step {
     param(
@@ -36,6 +103,12 @@ function Invoke-Step {
     }
 
     Write-Host "PASS: $Name"
+}
+
+if (Test-CanSkipGate) {
+    $cache = Get-GateCache
+    Write-Host "Frontend pre-push gate already passed for this clean HEAD at $($cache.passedAtUtc). Skipping rerun."
+    return
 }
 
 $requiredDocs = @(
@@ -71,6 +144,8 @@ Invoke-Step -Name "npm audit (prod, high+)" -Action {
 Invoke-Step -Name "Code health audit (advisory)" -Action {
     & (Join-Path $PSScriptRoot "code_health_audit.ps1")
 } -WarningOnly
+
+Save-GateCache
 
 Write-Host "`nFrontend pre-push gate completed successfully."
 

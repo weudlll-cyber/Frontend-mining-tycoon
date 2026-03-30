@@ -306,6 +306,10 @@ Daily usage:
 & .\scripts\push_with_audit.ps1
 ```
 
+If the exact same clean HEAD already passed the local gate, the helper and the
+tracked pre-push hook now reuse that successful result and skip rerunning the
+full gate. Use `& .\scripts\push_with_audit.ps1 -ForceAudit` to force a fresh rerun.
+
 What happens before push:
 
 - required frontend docs presence check

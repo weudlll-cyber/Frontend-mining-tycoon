@@ -71,6 +71,7 @@ Local push discipline:
 - enable the tracked git hooks once with `& .\scripts\enable_git_hooks.ps1`
 - use `& .\scripts\push_with_audit.ps1` for normal pushes when possible
 - the tracked pre-push hook runs the same local gate automatically and blocks pushes on failure
+- if the same clean HEAD already passed locally, the helper/hook now skip the duplicate rerun; use `-ForceAudit` when you intentionally want a fresh pass
 
 Repository merge policy:
 

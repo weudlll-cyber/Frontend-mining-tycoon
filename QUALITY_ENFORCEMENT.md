@@ -23,6 +23,11 @@ Recommended push workflow:
 & .\scripts\push_with_audit.ps1
 ```
 
+Duplicate local reruns are intentionally avoided for the same clean HEAD.
+If `pre_push_gate.ps1` already passed and no files changed afterward, the
+helper or tracked hook reuse that result instead of rerunning the full gate.
+Use `-ForceAudit` when a fresh rerun is required.
+
 Mandatory local gate command (run directly or via hook):
 
 ```powershell

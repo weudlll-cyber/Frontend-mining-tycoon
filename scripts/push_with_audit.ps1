@@ -10,6 +10,7 @@ param(
     [string]$Remote = "origin",
     [string]$Branch,
     [switch]$SkipAudit,
+    [switch]$ForceAudit,
     [switch]$AllowDirty
 )
 
@@ -32,7 +33,7 @@ if (-not $AllowDirty) {
 }
 
 if (-not $SkipAudit) {
-    & (Join-Path $PSScriptRoot "pre_push_gate.ps1")
+    & (Join-Path $PSScriptRoot "pre_push_gate.ps1") -Force:$ForceAudit
 }
 
 $upstream = & git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>$null
