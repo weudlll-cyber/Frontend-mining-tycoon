@@ -1966,6 +1966,7 @@ function initializeModules() {
     getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
     getGameId: () => gameIdInput.value,
     getPlayerId: () => playerIdInput.value,
+    getPlayerName: () => playerNameInput.value,
     getPlayerToken: (gameId, playerId) =>
       getStorageItem(getPlayerTokenStorageKey(gameId, playerId)),
     showToast,
@@ -2360,7 +2361,15 @@ function updateUI(data) {
     pendingUiRenderData = null;
     if (!frameData) return;
 
-    const selectionSnapshot = snapSelection(document.body);
+    const activeEl = document.activeElement;
+    const shouldSkipSelectionPersistence =
+      activeEl instanceof HTMLInputElement ||
+      activeEl instanceof HTMLTextAreaElement ||
+      activeEl instanceof HTMLSelectElement ||
+      activeEl?.isContentEditable === true;
+    const selectionSnapshot = shouldSkipSelectionPersistence
+      ? null
+      : snapSelection(document.body);
     applyUIUpdate(frameData);
     restoreSelectionIfValid(selectionSnapshot);
   });

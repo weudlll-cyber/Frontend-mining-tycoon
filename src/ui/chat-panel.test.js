@@ -28,6 +28,44 @@ describe('chat panel rendering', () => {
     expect(messages.textContent).toContain('<img src=x onerror=alert(1)>');
   });
 
+  it('maps own player-id label to current player display name', () => {
+    const panel = document.createElement('aside');
+    const toggleBtn = document.createElement('button');
+    const messages = document.createElement('ul');
+    const form = document.createElement('form');
+    const input = document.createElement('input');
+    const status = document.createElement('span');
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    form.append(input, submit);
+
+    document.body.append(panel, toggleBtn, messages, form, status);
+
+    initChatPanel({
+      panelEl: panel,
+      toggleBtnEl: toggleBtn,
+      messagesEl: messages,
+      formEl: form,
+      inputEl: input,
+      statusEl: status,
+      getBaseUrl: () => 'http://127.0.0.1:8000',
+      getGameId: () => '1',
+      getPlayerId: () => '303',
+      getPlayerName: () => 'Alice Miner',
+      getPlayerToken: () => null,
+      showToast: () => {},
+    });
+
+    appendChatMessage(messages, {
+      user: 'player-303',
+      text: 'hello',
+      ts: 1_700_000_000,
+    });
+
+    expect(messages.textContent).toContain('Alice Miner');
+    expect(messages.textContent).toContain('hello');
+  });
+
   it('appends new messages without replacing existing nodes', () => {
     const messages = document.createElement('ul');
 
