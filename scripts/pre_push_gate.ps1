@@ -12,7 +12,7 @@ security checks that must pass before pushing the frontend branch.
 
 param(
     [switch]$Force,
-    [ValidateSet("fast", "full")][string]$Profile = "fast"
+    [Alias("Profile")][ValidateSet("fast", "full")][string]$GateProfile = "fast"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,7 +21,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 $gitDir = (& git rev-parse --git-dir).Trim()
 $gateCacheDir = Join-Path $gitDir "gate-cache"
-$gateCachePath = Join-Path $gateCacheDir "frontend-pre-push-$Profile.json"
+$gateCachePath = Join-Path $gateCacheDir "frontend-pre-push-$GateProfile.json"
 
 function Get-CurrentGateFingerprint {
     $head = (& git rev-parse HEAD).Trim()
@@ -108,11 +108,11 @@ function Invoke-Step {
 
 if (Test-CanSkipGate) {
     $cache = Get-GateCache
-    Write-Host "Frontend pre-push gate ($Profile) already passed for this clean HEAD at $($cache.passedAtUtc). Skipping rerun."
+    Write-Host "Frontend pre-push gate ($GateProfile) already passed for this clean HEAD at $($cache.passedAtUtc). Skipping rerun."
     return
 }
 
-Write-Host "Running frontend pre-push gate profile: $Profile"
+Write-Host "Running frontend pre-push gate profile: $GateProfile"
 
 $requiredDocs = @(
     "README.md",
@@ -141,7 +141,7 @@ Invoke-Step -Name "Prettier format check" -Action { & npm run format:check }
 Invoke-Step -Name "Vitest unit tests" -Action { & npm run test -- --run }
 Invoke-Step -Name "Production build" -Action { & npm run build }
 
-if ($Profile -eq "full") {
+if ($GateProfile -eq "full") {
     Invoke-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
     Invoke-Step -Name "npm audit (prod, high+)" -Action {
         & npm audit --omit=dev --audit-level=high
@@ -153,5 +153,5 @@ if ($Profile -eq "full") {
 
 Save-GateCache
 
-Write-Host "`nFrontend pre-push gate ($Profile) completed successfully."
+Write-Host "`nFrontend pre-push gate ($GateProfile) completed successfully."
 
