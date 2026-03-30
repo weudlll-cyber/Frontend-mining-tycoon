@@ -1418,16 +1418,30 @@ body {
 }
 
 .live-drawer {
-  position: relative;
-  z-index: 10;
+  /* Fixed full-screen overlay so the drawer floats over page content
+     instead of rendering inline after the upgrade rows. */
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  /* Push the surface to the bottom of the viewport */
+  justify-content: flex-end;
 }
 
 .live-drawer-backdrop {
-  display: none;
+  /* Dim layer behind the surface; positioned to fill the full overlay
+     container. Click handler (registered in live-drawer.js) closes the drawer. */
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
 }
 
 .live-drawer-surface {
+  /* Stacks above the absolute-positioned backdrop due to DOM order.
+     position: relative within a fixed flex container is intentional. */
   position: relative;
+  z-index: 1;
   max-height: min(52vh, 520px);
   background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
   border-top-left-radius: 14px;
