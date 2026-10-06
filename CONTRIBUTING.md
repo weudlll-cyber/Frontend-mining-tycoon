@@ -48,7 +48,7 @@ All of the following must pass before merge:
 - `npm run test:coverage`
 - `Changed lines coverage` (CI PR check)
 - `npm run build`
-- `npm audit --omit=dev --audit-level=high`
+- `npm audit --audit-level=high`
 
 Development execution cadence (required):
 

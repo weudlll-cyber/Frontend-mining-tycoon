@@ -331,7 +331,7 @@ What happens before push (`-Profile fast`, default):
 Additional checks in `-Profile full`:
 
 - `npm run test:coverage`
-- `npm audit --omit=dev --audit-level=high`
+- `npm audit --audit-level=high`
 - advisory code-health audit (file-size hotspots, comment-header coverage, TODO/FIXME markers, debug-console scan)
 
 The push helper also prints a concise summary of commits and changed files since the last push so the outgoing change set is easy to review.

@@ -153,7 +153,7 @@ For every source file touched or created:
   - `npm run test -- --run`
   - `npm run test:coverage`
   - `npm run build`
-  - `npm audit --omit=dev --audit-level=high`
+  - `npm audit --audit-level=high`
 
 - Prefer the audited push helper when pushing this repo:
   - `& .\scripts\push_with_audit.ps1`
