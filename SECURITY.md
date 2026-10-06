@@ -34,7 +34,7 @@ Historical frontend security snapshots live under `docs/history/audits/`.
 - `npm run test -- --run`
 - `npm run test:coverage`
 - `npm run build`
-- `npm audit --omit=dev --audit-level=high`
+- `npm audit --audit-level=high`
 
 ## Current Known Constraints
 

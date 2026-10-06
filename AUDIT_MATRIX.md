@@ -6,7 +6,7 @@ This matrix defines mandatory audit gates and frequency for the frontend reposit
 
 | Audit category | Check | Threshold / Gate | Enforcement |
 |---|---|---|---|
-| Security basis | `npm audit --omit=dev --audit-level=high` | `0` high/critical vulnerabilities | Blocking |
+| Security basis | `npm audit --audit-level=high` | `0` high/critical vulnerabilities | Blocking |
 | Secret scanning | `gitleaks` | `0` verified secrets in repo history or diff | Blocking |
 | Source cleanliness | `npm run clean:audit` | `0` blocking findings (eslint + unused/dependency scan) | Blocking |
 | Tests | `npm run test -- --run` | All tests pass | Blocking |

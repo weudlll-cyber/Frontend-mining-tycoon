@@ -103,7 +103,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -126,7 +126,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -149,7 +149,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -172,7 +172,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -198,7 +198,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -227,7 +227,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -250,7 +250,7 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
@@ -273,14 +273,14 @@ jobs:
         if: needs['detect-changes'].outputs.frontend == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: Install dependencies
         if: needs['detect-changes'].outputs.frontend == 'true'
         run: npm ci
       - name: Run security audit
         if: needs['detect-changes'].outputs.frontend == 'true'
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
       - name: No frontend changes
         if: needs['detect-changes'].outputs.frontend != 'true'
         run: echo "No frontend changes; security audit check passes by policy."
