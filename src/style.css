@@ -1269,10 +1269,37 @@ body {
   line-height: 1;
 }
 
-.game-over-card p:last-child {
+#game-over-message {
   margin-top: 0.85rem;
   font-size: 1rem;
   color: rgba(241, 245, 249, 0.88);
+}
+
+.game-over-results-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(241, 245, 249, 0.7);
+}
+
+/* Post-game only: opens the lobby's full results view for this round. */
+.game-over-results-link {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.6);
+  color: #bfdbfe;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.game-over-results-link[hidden] {
+  display: none;
+}
+
+.game-over-results-link:hover,
+.game-over-results-link:focus-visible {
+  background: rgba(147, 197, 253, 0.16);
 }
 
 /* Bottom Bar */

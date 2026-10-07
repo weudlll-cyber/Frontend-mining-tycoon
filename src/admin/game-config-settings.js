@@ -4,8 +4,9 @@
  *          GET /admin/game-config, renders editors for the round-setup
  *          tunables (duration presets, presets offered per round type,
  *          create-form defaults, limits, default trade counts by round length,
- *          trade unlock fractions) and saves edits via PATCH /admin/game-config
- *          sending only the changed top-level keys (`defaults` as a partial).
+ *          trade unlock fractions, account policy "Require sign-in to join")
+ *          and saves edits via PATCH /admin/game-config sending only the
+ *          changed top-level keys (`defaults` as a partial).
  * Role in system: Standalone admin module initialised from admin-setup.js.
  *          After a save the returned document is handed to
  *          src/config/game-config.js and the create form re-renders.
@@ -258,6 +259,15 @@ export function buildGameConfigPatch(draft, baseline) {
     if (value !== baseline?.defaults?.[key]) changedDefaults[key] = value;
   });
   if (Object.keys(changedDefaults).length) patch.defaults = changedDefaults;
+  // WHY: compared as a boolean so an older backend without `account_policy`
+  // (read as false) never receives the key unless the admin ticks the box.
+  const requireAccount = Boolean(draft.account_policy?.require_account_to_join);
+  if (
+    requireAccount !==
+    Boolean(baseline?.account_policy?.require_account_to_join)
+  ) {
+    patch.account_policy = { require_account_to_join: requireAccount };
+  }
   return patch;
 }
 
@@ -404,6 +414,8 @@ function renderDocument(doc) {
   FRACTION_FIELDS.forEach(({ key, id }) => {
     el(id).value = String(config.trade_unlock[key]);
   });
+  el(`${PREFIX}-require-account`).checked =
+    config.account_policy.require_account_to_join;
 
   const hash = String(doc?.config_hash || '').slice(0, 12);
   const updated = doc?.updated_at ? ` · updated ${doc.updated_at}` : '';
@@ -505,6 +517,10 @@ export function readGameConfigDraft() {
       integer: false,
     });
   });
+
+  config.account_policy = {
+    require_account_to_join: el(`${PREFIX}-require-account`).checked,
+  };
 
   return { config, errors };
 }

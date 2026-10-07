@@ -59,6 +59,14 @@
               >
                 Change password
               </button>
+              <button
+                id="open-results-dialog"
+                class="logout-btn"
+                type="button"
+                disabled
+              >
+                My results
+              </button>
               <a class="link-button" href="/admin.html">Admin setup</a>
             </div>
           </form>
@@ -191,6 +199,45 @@
           <button type="submit" class="auth-button">Change password</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="results-dialog" aria-label="My results">
+      <div class="dialog-form results-dialog">
+        <section id="history-view" aria-label="My finished rounds">
+          <h3>My results</h3>
+          <ul id="history-list" class="history-list"></ul>
+          <p
+            id="history-message"
+            class="message"
+            data-kind="info"
+            aria-live="polite"
+          ></p>
+          <div class="dialog-actions">
+            <button id="history-load-more" type="button" hidden>
+              Load more
+            </button>
+          </div>
+        </section>
+        <section id="game-results-view" aria-label="Full results" hidden>
+          <h3 id="game-results-title">Full results</h3>
+          <p id="game-results-summary" class="results-summary"></p>
+          <div id="game-results-list"></div>
+          <p
+            id="game-results-message"
+            class="message"
+            data-kind="info"
+            aria-live="polite"
+          ></p>
+          <div class="dialog-actions">
+            <button id="game-results-back" type="button" hidden>
+              Back to my results
+            </button>
+          </div>
+        </section>
+        <div class="dialog-actions">
+          <button id="close-results-dialog" type="button">Close</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="register-dialog" aria-label="Register account form">

@@ -1037,6 +1037,18 @@ Security notes:
         </fieldset>
 
         <fieldset class="gc-fieldset">
+          <legend>Accounts</legend>
+          <label for="admin-gameconfig-require-account">
+            <input id="admin-gameconfig-require-account" type="checkbox" />
+            Require sign-in to join
+          </label>
+          <p class="derived-note">
+            When ticked, the backend only lets signed-in accounts join a round
+            (it answers ACCOUNT_REQUIRED otherwise).
+          </p>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
           <legend>Trade unlock schedule</legend>
           <div class="form-grid">
             <div class="form-group">

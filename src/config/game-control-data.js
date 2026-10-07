@@ -86,6 +86,13 @@ export const ASYNC_SESSION_DEFAULT_PRESET = '5m';
 export const ENROLLMENT_WINDOW_LIMITS = { min: 5, max: 3600 }; // seconds
 export const ENROLLMENT_WINDOW_DEFAULT_SECONDS = 10;
 
+// ── Account policy ──────────────────────────────────────────────────────────
+// Fallback for `account_policy`: an older backend without the key lets
+// everyone join (the lobby still sends the account token when signed in).
+export const ACCOUNT_POLICY_DEFAULTS = Object.freeze({
+  require_account_to_join: false,
+});
+
 // ── Scoring modes ───────────────────────────────────────────────────────────
 // DEFAULT_MODE is the full canonical mode used throughout the app.
 // ALLOWED_MODES are the short aliases accepted by the backend scoring_mode field.

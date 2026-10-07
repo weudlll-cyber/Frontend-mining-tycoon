@@ -17,6 +17,8 @@
  *  - Backend stays authoritative: these values only drive form options,
  *    defaults and previews; POST /games is validated by the backend and each
  *    created round keeps a snapshot of the config it was created with.
+ *  - `account_policy.require_account_to_join` is enforced by the backend on
+ *    join (401 ACCOUNT_REQUIRED); the frontend only edits/displays it.
  *  - Malformed backend sections fall back per top-level key, so one bad
  *    field never breaks the whole admin form.
  * Security notes: pure data handling, no DOM or network access.
@@ -35,6 +37,7 @@ import {
   ENROLLMENT_WINDOW_LIMITS,
   ENROLLMENT_WINDOW_DEFAULT_SECONDS,
   SCORING_CONTROL,
+  ACCOUNT_POLICY_DEFAULTS,
 } from './game-control-data.js';
 import {
   TRADE_COUNT_LIMITS,
@@ -92,6 +95,7 @@ export function buildFallbackGameConfig() {
       first_unlock_fraction: FIRST_TRADE_UNLOCK_FRACTION,
       remaining_window_fraction: REMAINING_WINDOW_FRACTION,
     },
+    account_policy: { ...ACCOUNT_POLICY_DEFAULTS },
   };
 }
 
@@ -172,6 +176,14 @@ function normalizeTradeUnlock(raw, fallback) {
     };
   }
   return fallback;
+}
+
+function normalizeAccountPolicy(raw, fallback) {
+  const value = isPlainObject(raw) ? raw.require_account_to_join : undefined;
+  return {
+    require_account_to_join:
+      typeof value === 'boolean' ? value : fallback.require_account_to_join,
+  };
 }
 
 function normalizeDefaults(raw, fallback, config) {
@@ -261,6 +273,10 @@ export function normalizeGameConfig(raw) {
     trade_unlock: normalizeTradeUnlock(
       source.trade_unlock,
       fallback.trade_unlock
+    ),
+    account_policy: normalizeAccountPolicy(
+      source.account_policy,
+      fallback.account_policy
     ),
   };
   config.defaults = normalizeDefaults(

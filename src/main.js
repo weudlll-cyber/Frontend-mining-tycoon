@@ -267,6 +267,8 @@ const playerIdInput = document.getElementById('player-id');
 const gameOverOverlayEl = document.getElementById('game-over-overlay');
 const gameOverTitleEl = document.getElementById('game-over-title');
 const gameOverMessageEl = document.getElementById('game-over-message');
+const gameOverResultsLinkEl = document.getElementById('game-over-results-link');
+const gameOverResultsNoteEl = document.getElementById('game-over-results-note');
 
 function setActiveMeta(meta) {
   initializeModules();
@@ -1273,8 +1275,27 @@ function showGameOverOverlay(gameId = '', options = {}) {
         ? `Round ${normalizedGameId} finished. Click anywhere to return to the login lobby.`
         : 'Round finished. Click anywhere to return to the login lobby.');
   }
+  updateGameOverResultsLink(normalizedGameId, title === 'Session Finished');
 
   gameOverOverlayEl.hidden = false;
+}
+
+/**
+ * "View full results" deep link into the lobby results view
+ * (index.html?results=<gameId>&player=<playerId>, the player id lets the lobby
+ * highlight the own row). An ended async session usually finishes before the
+ * round does, so the note explains when the final results exist.
+ */
+function updateGameOverResultsLink(gameId, isSessionEnd) {
+  if (gameOverResultsNoteEl) {
+    gameOverResultsNoteEl.hidden = !(gameId && isSessionEnd);
+  }
+  if (!gameOverResultsLinkEl) return;
+  gameOverResultsLinkEl.hidden = !gameId;
+  const query = new URLSearchParams({ results: gameId });
+  const playerId = String(playerIdInput?.value || '').trim();
+  if (playerId) query.set('player', playerId);
+  gameOverResultsLinkEl.href = gameId ? `/index.html?${query}` : '/index.html';
 }
 
 function isGameOverOverlayEligible({
@@ -1362,7 +1383,7 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
   updateSetupActionsState();
 }
 
-function acknowledgeGameOverOverlay() {
+function acknowledgeGameOverOverlay(targetUrl = '/index.html') {
   try {
     hideGameOverOverlay();
     resetLiveBoardState({ clearPlayerContext: true });
@@ -1377,11 +1398,11 @@ function acknowledgeGameOverOverlay() {
   }
   // Always attempt navigation, even if reset failed
   try {
-    window.location.assign('/index.html');
+    window.location.assign(targetUrl);
   } catch (error) {
     console.error('[Game Over] Navigation failed:', error);
     // Last resort: use href
-    window.location.href = '/index.html';
+    window.location.href = targetUrl;
   }
 }
 
@@ -2137,11 +2158,18 @@ async function ensurePlayerJoinedForStream({ baseUrl, gameId, playerId }) {
   }
 
   const playerName = String(playerNameInput?.value || '').trim() || 'Player';
+  // WHY: with the account token the backend links the player to the account
+  // and returns the account's existing player (rejoin) instead of a new one.
+  const joinHeaders = { 'Content-Type': 'application/json' };
+  const accountToken = String(
+    getStorageItem(STORAGE_KEYS.authToken) || ''
+  ).trim();
+  if (accountToken) joinHeaders.Authorization = `Bearer ${accountToken}`;
   const joinResponse = await fetch(
     `${baseUrl}/games/${encodeURIComponent(normalizedGameId)}/join`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: joinHeaders,
       body: JSON.stringify({ name: playerName }),
     }
   );
@@ -2377,7 +2405,17 @@ gameOverOverlayEl?.addEventListener('click', () => {
   acknowledgeGameOverOverlay();
 });
 
+// The results link resets the board like any acknowledgement, then opens the
+// lobby results view instead of the plain lobby.
+gameOverResultsLinkEl?.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  acknowledgeGameOverOverlay(gameOverResultsLinkEl.getAttribute('href'));
+});
+
 gameOverOverlayEl?.addEventListener('keydown', (event) => {
+  // Enter on the focused results link is handled by the link's own click.
+  if (event.target === gameOverResultsLinkEl) return;
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
     acknowledgeGameOverOverlay();

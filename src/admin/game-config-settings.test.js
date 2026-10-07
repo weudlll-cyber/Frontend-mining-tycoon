@@ -48,6 +48,7 @@ const CONFIG = {
     { max_duration_seconds: null, trade_count: 6 },
   ],
   trade_unlock: { first_unlock_fraction: 0.2, remaining_window_fraction: 0.8 },
+  account_policy: { require_account_to_join: false },
 };
 
 function documentFor(config = CONFIG, version = 1) {
@@ -273,6 +274,41 @@ describe('editing and saving', () => {
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(getActiveGameConfigDocument()).toEqual(savedDoc);
     expect($('version').textContent).toContain('Version 2');
+  });
+
+  it('saves "Require sign-in to join" as account_policy only when changed', async () => {
+    const fetchMock = await loadWith();
+    expect($('require-account').checked).toBe(false);
+
+    $('require-account').checked = true;
+    fetchMock.mockResolvedValueOnce(
+      okResponse(
+        documentFor(
+          { ...CONFIG, account_policy: { require_account_to_join: true } },
+          2
+        )
+      )
+    );
+    $('save-btn').click();
+    await flush();
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      account_policy: { require_account_to_join: true },
+    });
+    expect($('require-account').checked).toBe(true);
+    expect(resultText()).toContain('Saved account_policy.');
+  });
+
+  it('treats a backend without account_policy as "not required"', async () => {
+    const legacyConfig = structuredClone(CONFIG);
+    delete legacyConfig.account_policy;
+    const fetchMock = await loadWith(documentFor(legacyConfig));
+    expect($('require-account').checked).toBe(false);
+
+    await saveGameConfigSettings();
+
+    expect(resultText()).toBe('No changes to save.');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('removes presets from the checklists and default dropdowns', async () => {

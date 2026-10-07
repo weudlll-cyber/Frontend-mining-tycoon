@@ -49,6 +49,7 @@ const BACKEND_CONFIG = {
     { max_duration_seconds: null, trade_count: 3 },
   ],
   trade_unlock: { first_unlock_fraction: 0.5, remaining_window_fraction: 0.5 },
+  account_policy: { require_account_to_join: true },
 };
 
 function doc(config, version = 3) {
@@ -144,8 +145,10 @@ describe('normalizeGameConfig', () => {
         first_unlock_fraction: 2,
         remaining_window_fraction: 0.5,
       },
+      account_policy: { require_account_to_join: 'yes' },
     });
     expect(config).toEqual(fallback);
+    expect(fallback.account_policy).toEqual({ require_account_to_join: false });
     expect(normalizeGameConfig(null)).toEqual(fallback);
     expect(
       normalizeGameConfig({ duration_presets: [] }).duration_presets

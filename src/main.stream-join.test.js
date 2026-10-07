@@ -38,6 +38,28 @@ describe('stream start join behavior', () => {
     );
   });
 
+  it('sends the stored account token so the backend rejoins the linked player', async () => {
+    localStorage.setItem(STORAGE_KEYS.authToken, 'account-jwt');
+    const module = await loadMainModule();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ player_id: 5, player_token: 't', rejoined: true }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await module.ensurePlayerJoinedForStream({
+      baseUrl: 'http://127.0.0.1:8000',
+      gameId: 'game-7',
+      playerId: '',
+    });
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer account-jwt',
+    });
+    localStorage.removeItem(STORAGE_KEYS.authToken);
+  });
+
   it('does not call join endpoint when player id is already present', async () => {
     const module = await loadMainModule();
     const fetchMock = vi.fn().mockResolvedValue({

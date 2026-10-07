@@ -153,7 +153,7 @@ Players cannot directly influence:
 
 Entry points (Vite multi-page build):
 
-- `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus), join ("Enter game"), and "Last Game Highscores" from the last finished round. Joining stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
+- `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus; requested with the account token, own games marked via `my_player_id`), join ("Enter game", or "Rejoin" for a game the account already plays), "My results" dialog (`GET /auth/me/history` with Load more, full final leaderboard via `GET /games/{id}/results` with the own row highlighted, deep link `index.html?results=<gameId>&player=<playerId>`), and "Last Game Highscores" (server history when signed in, otherwise the local snapshot). Joining sends the account bearer token, stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
 - `admin.html` + `src/admin/`: admin console with 11 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
 
@@ -174,7 +174,7 @@ Session-mode behavior:
 - Async rounds never fall back to the game stream.
 - Every new async session starts from the same backend baseline (balances, tracks, upgrades, cumulative mined), so attempts are comparable; the backend keeps the best finalized score.
 - In async rounds the Player State panel shows `This session` and `Best this round`; the header shows `Async: Session Active` and a session countdown. Both are hidden in sync rounds.
-- Known limitation: each "Enter game" in the lobby creates a new player entry (accounts are not linked to players yet), so a second attempt from the lobby appears as a separate leaderboard row.
+- Accounts are linked to players: the lobby (and the board's fallback join) send the account token on `POST /games/{id}/join`, and a repeated join returns the same player (`rejoined: true`), so async best-of continues across lobby re-entries instead of creating a second leaderboard row. With an older backend that ignores the token, each join still creates a new player.
 - Session-start denials (`403`/`409`, for example `SESSION_ASYNC_INSUFFICIENT_TIME`) are shown inline in the setup panel, without modals.
 
 Player board layout (desktop target 1440x900, no page scroll):
@@ -185,7 +185,7 @@ Player board layout (desktop target 1440x900, no page scroll):
 - **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values.
 - **Action bar:** score context value, Trading and Farming status pills (always visible), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
 - **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (placeholder), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
-- **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the stored last-game highscores.
+- **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the last-game highscores. The overlay's "View full results" link resets the board too and opens the lobby's full results view for that round (`index.html?results=<gameId>&player=<playerId>`); after an async session it notes that final results exist only once the round ends (the backend answers `409 GAME_NOT_FINISHED` until then).
 
 Responsive behavior:
 
@@ -211,7 +211,7 @@ Authoritative boundaries:
 
 Player auth and stream controls:
 
-- Account auth (register/login/logout/`/auth/me`/change-password) with bearer session tokens; the lobby re-validates a stored token on load.
+- Account auth (register/login/logout/`/auth/me`/change-password) with bearer session tokens; the lobby re-validates a stored token on load. Joins send the token (links the player to the account); `401 ACCOUNT_AUTH_INVALID` clears the local session, `401 ACCOUNT_REQUIRED` (admin Game Settings "Require sign-in to join", `account_policy.require_account_to_join`) shows the backend message.
 - Per-player (per-game) `player_token` model is implemented; the lobby stores it for the player board.
 - Optional strict player auth mode (`REQUIRE_PLAYER_AUTH`) enforces token validation.
 - SSE ticket flow provides short-lived stream authorization; the frontend requests a fresh ticket for every (re)connect.
@@ -305,6 +305,8 @@ Recently completed (frontend PRs #16-#19 and backend PRs #8, #10):
 - Backend: all four scoring modes are evaluated (`mining_time` and `efficiency` definitions confirmed by the owner on 2026-10-07, see `SCORING_MODES.md`); upgrades/trades only while the round runs or the async session is active; async rounds use the session clock; 3h preset.
 - Dead code removed: player-side game creation, the in-board open-games/return panel, the legacy upgrade panel, the Vite counter sample.
 
+Accounts linked to players (frontend side): lobby join/rejoin with the account token, "My results" history and full results, server-backed "Last Game Highscores", "View full results" on the Game Over overlay, admin "Require sign-in to join" (needs the matching backend: `user_id`/`rejoined` on join, `my_player_id` on `/games/active`, `/auth/me/history`, `/games/{id}/results`, `account_policy`).
+
 Earlier milestones still valid: lobby/board split (`index.html` / `player.html`), admin-only round creation, async sessions with best-of, trading execution, floating live tools window, last-game highscores in the lobby.
 
 In progress elsewhere:
@@ -314,7 +316,7 @@ In progress elsewhere:
 Open work (summary):
 
 - Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
-- Gameplay features: Farming Stage 1 and Stage 2; result history; linking accounts to players (one player per account and game, so async best-of works across lobby re-entries); secure email-based password reset; scheduled sync live rounds; per-round fee override; full leaderboard view; chat moderation, emoji and per-round opt-out; season artwork (`public/assets/seasons/` images exist but are unused).
+- Gameplay features: Farming Stage 1 and Stage 2; secure email-based password reset; scheduled sync live rounds; per-round fee override; chat moderation, emoji and per-round opt-out; season artwork (`public/assets/seasons/` images exist but are unused).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
 - Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
 
@@ -385,7 +387,7 @@ Source-of-truth rule:
 
 - Default trade allocation by game length: implemented; the implemented table was confirmed by the owner on 2026-10-07 and is admin-configurable in Game Settings (see `SEASONAL_TYCOON_CONCEPT.md`). Hosts can override the count, not individual unlock times.
 - Trading cost: deterministic conversion fee and spread exist; a per-round host fee override does not.
-- Leaderboards: live Top 5 only; no full view, no provisional/final marker, no result history.
+- Leaderboards: live Top 5 during play; full final leaderboard and per-account result history in the lobby ("My results") after a round finishes. No provisional/final marker on the live Top 5.
 
 ### 3) Concept Areas Not Yet Implemented
 
@@ -401,7 +403,7 @@ Source-of-truth rule:
 
 #### C) Accounts & Results
 
-- Linking accounts to game players; result history per account.
+- Profile page (avatars, cross-round statistics beyond the history list).
 
 #### D) Frontend / UX
 
