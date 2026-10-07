@@ -199,6 +199,7 @@ import {
   setChatPanelOpen,
 } from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
+import { resolvePlayerActionAvailability } from './ui/action-availability.js';
 import {
   initLiveDrawer,
   getLiveDrawerTab,
@@ -410,6 +411,9 @@ let lastChatPreview = 'Chat is ready';
 let sessionStartSupported = true;
 let setupRoundModeOverride = null;
 let activeSession = null;
+// Whether the backend currently runs a session for this player (async rounds).
+// Drives the play-window gate for upgrade/trade buttons.
+let playerHasActiveSession = false;
 let sessionElapsedInterval = null;
 let sessionElapsedAnchorUnix = null;
 let sessionElapsedSeedSeconds = 0;
@@ -849,6 +853,9 @@ function handleActiveSessionExpired() {
 
   isStreamActive = false;
   setLiveSessionActive(false);
+  // The stream is closed, so no further payload would re-render the action
+  // buttons: re-apply the play-window gate now.
+  refreshPlayerActionControls();
   setBadgeStatus(connStatusEl, 'idle');
   setStartSessionStatus(
     'Session duration reached. Start Async Session to continue.',
@@ -1380,7 +1387,28 @@ function acknowledgeGameOverOverlay() {
 }
 
 function setLiveSessionActive(isActive) {
+  playerHasActiveSession = Boolean(isActive);
   document.body.classList.toggle('live-session', Boolean(isActive));
+}
+
+/** Re-render upgrade lanes and the trade panel against the current gate. */
+function refreshPlayerActionControls() {
+  if (lastGameData) {
+    renderAllSeasonUpgrades(lastGameData, getGameMeta);
+  }
+  tradingPanelApi?.renderTradingStatus?.();
+}
+
+/**
+ * Play-window gate for upgrade/trade buttons, derived from state the board
+ * already tracks. Backend stays authoritative (409 toast remains the fallback).
+ */
+function getPlayerActionAvailability() {
+  return resolvePlayerActionAvailability({
+    gameStatus: latestGameStatus,
+    roundMode: getCurrentRoundContext().roundMode,
+    hasActiveSession: playerHasActiveSession,
+  });
 }
 
 function renderDebugContext() {
@@ -1586,6 +1614,7 @@ function initializeModules() {
     isActiveContractSupported,
     getActiveUpgradeDefinitions,
     performUpgrade,
+    getActionAvailability: getPlayerActionAvailability,
   });
   initSeasonFocus({
     stripEl: seasonFocusStripEl,
@@ -1650,6 +1679,7 @@ function initializeModules() {
     executeTrade: async ({ fromToken, toToken, amount }) =>
       performTrade(fromToken, toToken, amount),
     showToast,
+    getActionAvailability: getPlayerActionAvailability,
     tradingPanelRef: tradingPanelEl,
     tradingStatusRef: tradingStatusEl,
   });
@@ -1917,6 +1947,10 @@ function applyUIUpdate(data) {
   }
 
   setLiveSessionActive(hasActiveSession);
+  // WHY: the stream is player-scoped, so a running session in the payload is
+  // backend truth even before the local session record catches up.
+  playerHasActiveSession =
+    hasActiveSession || sessionRenderState.streamSessionRunning;
   handleLastHalvingStateUpdate(data);
 
   if (data.game_status) {

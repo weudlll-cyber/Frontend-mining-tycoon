@@ -451,3 +451,59 @@ describe('inline upgrade grid alignment', () => {
     expect(costCell?.getAttribute('title')).toContain('12,500');
   });
 });
+
+describe('inline upgrade lanes play-window gate', () => {
+  function initWithAvailability(getActionAvailability) {
+    initInlineUpgrades({
+      getActiveGameMeta: () => createMeta(),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: { base_cost: 50 },
+        efficiency: { base_cost: 60 },
+        cooling: { base_cost: 70 },
+      }),
+      performUpgrade: vi.fn(),
+      getActionAvailability,
+    });
+  }
+
+  it('disables upgrade buttons with the reason as tooltip when actions are blocked', () => {
+    initWithAvailability(() => ({
+      allowed: false,
+      reason: 'Upgrades and trades unlock when the round starts.',
+    }));
+    const container = document.querySelector('.season-upgrades');
+    renderInlineSeasonUpgrades(container, 'spring', createData());
+
+    const buttons = container.querySelectorAll('.btn-upgrade-inline');
+    expect(buttons.length).toBe(3);
+    buttons.forEach((button) => {
+      expect(button.disabled).toBe(true);
+      expect(button.title).toBe(
+        'Upgrades and trades unlock when the round starts.'
+      );
+    });
+  });
+
+  it('re-enables upgrade buttons once actions are allowed again', () => {
+    let availability = { allowed: false, reason: 'Start a session.' };
+    initWithAvailability(() => availability);
+    const container = document.querySelector('.season-upgrades');
+    renderInlineSeasonUpgrades(container, 'spring', createData());
+
+    availability = { allowed: true, reason: '' };
+    renderInlineSeasonUpgrades(container, 'spring', createData());
+
+    const button = container.querySelector('.btn-upgrade-inline');
+    expect(button.disabled).toBe(false);
+    expect(button.title).toBe('');
+  });
+
+  it('keeps upgrades enabled when no availability provider is wired', () => {
+    initWithAvailability(undefined);
+    const container = document.querySelector('.season-upgrades');
+    renderInlineSeasonUpgrades(container, 'spring', createData());
+
+    expect(container.querySelector('.btn-upgrade-inline').disabled).toBe(false);
+  });
+});

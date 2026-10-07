@@ -22,6 +22,7 @@ let _getActiveGameMeta = null;
 let _isActiveContractSupported = null;
 let _getActiveUpgradeDefinitions = null;
 let _performUpgrade = null;
+let _getActionAvailability = null;
 const _inlineStateByContainer = new WeakMap();
 
 const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
@@ -275,6 +276,7 @@ function ensureLaneRow(type, seasonToken, state) {
  *   isActiveContractSupported: () => boolean,
  *   getActiveUpgradeDefinitions: () => object|null,
  *   performUpgrade: (type: string, nextLevel: number, targetToken: string) => void,
+ *   getActionAvailability?: () => { allowed: boolean, reason: string },
  * }} deps
  */
 export function initInlineUpgrades(deps) {
@@ -282,6 +284,7 @@ export function initInlineUpgrades(deps) {
   _isActiveContractSupported = deps.isActiveContractSupported;
   _getActiveUpgradeDefinitions = deps.getActiveUpgradeDefinitions;
   _performUpgrade = deps.performUpgrade;
+  _getActionAvailability = deps.getActionAvailability || null;
 }
 
 /**
@@ -311,6 +314,9 @@ export function renderInlineSeasonUpgrades(
 
   const activeUpgradeDefinitions = _getActiveUpgradeDefinitions?.();
   const contractSupported = _isActiveContractSupported?.() ?? true;
+  // Play-window gate (enrolling/finished round, async without session); the
+  // backend still rejects with 409 if the client view is stale.
+  const actionAvailability = _getActionAvailability?.() ?? { allowed: true };
 
   const activeGameMeta =
     _getActiveGameMeta?.(String(data?.game_id || '')) || null;
@@ -390,6 +396,9 @@ export function renderInlineSeasonUpgrades(
       rowRefs.button.disabled = true;
       rowRefs.button.title =
         'Unsupported API contract version. Upgrades disabled.';
+    } else if (!actionAvailability.allowed) {
+      rowRefs.button.disabled = true;
+      rowRefs.button.title = actionAvailability.reason;
     } else {
       rowRefs.button.disabled = false;
       rowRefs.button.title = '';
