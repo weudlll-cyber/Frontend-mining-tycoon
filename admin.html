@@ -41,7 +41,10 @@ Security notes:
         --error-border: #ef4444;
         --radius: 8px;
         --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
       }
 
       body {
@@ -304,7 +307,9 @@ Security notes:
   <body class="page-admin">
     <div class="page-banner">
       <span class="page-banner-icon">⚙️</span>
-      <span>Admin Setup — round configuration is snapshot-locked at creation</span>
+      <span
+        >Admin Setup — round configuration is snapshot-locked at creation</span
+      >
     </div>
 
     <div class="page-header">
@@ -393,7 +398,9 @@ Security notes:
             min="5"
             max="3600"
           />
-          <p class="derived-note">How long players can join before the round starts (5 – 3 600 s).</p>
+          <p class="derived-note">
+            How long players can join before the round starts (5 – 3 600 s).
+          </p>
         </div>
         <div class="form-group">
           <label for="admin-duration-preset">Round Duration</label>
@@ -401,7 +408,11 @@ Security notes:
             <!-- Populated by admin-setup.js from ROUND_DURATION_PRESETS -->
           </select>
         </div>
-        <div id="admin-duration-custom-row" class="form-group" style="display: none">
+        <div
+          id="admin-duration-custom-row"
+          class="form-group"
+          style="display: none"
+        >
           <label for="admin-duration-custom-value">Custom Duration Value</label>
           <div style="display: flex; gap: 0.5rem">
             <input
@@ -526,7 +537,9 @@ Security notes:
             step="1"
             min="1"
           />
-          <p class="derived-note">1 cycle = 4 halvings. Leave blank for server default.</p>
+          <p class="derived-note">
+            1 cycle = 4 halvings. Leave blank for server default.
+          </p>
         </div>
       </div>
     </section>
@@ -555,10 +568,11 @@ Security notes:
     <section class="card" aria-labelledby="section-games-title">
       <h2 id="section-games-title">8 — Game Management</h2>
       <p class="section-note" style="margin-bottom: 1rem">
-        View and control all games. Sync games show player enrollment; async games accept new players during their session window.
-        Delete a game to stop it and free up resources.
+        View and control all games. Sync games show player enrollment; async
+        games accept new players during their session window. Delete a game to
+        stop it and free up resources.
       </p>
-      
+
       <div style="margin-bottom: 1rem">
         <button
           id="admin-refresh-games-btn"
@@ -578,29 +592,53 @@ Security notes:
         </button>
       </div>
 
-      <div id="admin-games-loading" style="display: none; padding: 1rem; color: var(--text-muted)">
+      <div
+        id="admin-games-loading"
+        style="display: none; padding: 1rem; color: var(--text-muted)"
+      >
         Loading games...
       </div>
 
-      <div id="admin-games-error" class="result-box error" style="display: none"></div>
+      <div
+        id="admin-games-error"
+        class="result-box error"
+        style="display: none"
+      ></div>
 
-      <div id="admin-games-list-container" style="
-        display: none;
-        overflow-x: auto;
-      ">
-        <table style="
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 0.875rem;
-        ">
+      <div
+        id="admin-games-list-container"
+        style="display: none; overflow-x: auto"
+      >
+        <table
+          style="width: 100%; border-collapse: collapse; font-size: 0.875rem"
+        >
           <thead>
-            <tr style="border-bottom: 2px solid var(--border); background: #f9f9f9">
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Game ID</th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Status</th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Type</th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Time Remaining</th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">Players</th>
-              <th style="text-align: center; padding: 0.75rem; font-weight: 600">Action</th>
+            <tr
+              style="
+                border-bottom: 2px solid var(--border);
+                background: #f9f9f9;
+              "
+            >
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
+                Game ID
+              </th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
+                Status
+              </th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
+                Type
+              </th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
+                Time Remaining
+              </th>
+              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
+                Players
+              </th>
+              <th
+                style="text-align: center; padding: 0.75rem; font-weight: 600"
+              >
+                Action
+              </th>
             </tr>
           </thead>
           <tbody id="admin-games-tbody">
@@ -609,19 +647,26 @@ Security notes:
         </table>
       </div>
 
-      <div id="admin-games-empty" style="
-        display: none;
-        padding: 1.5rem;
-        text-align: center;
-        color: var(--text-muted);
-        background: #f9f9f9;
-        border-radius: var(--radius);
-        border: 1px dashed var(--border);
-      ">
+      <div
+        id="admin-games-empty"
+        style="
+          display: none;
+          padding: 1.5rem;
+          text-align: center;
+          color: var(--text-muted);
+          background: #f9f9f9;
+          border-radius: var(--radius);
+          border: 1px dashed var(--border);
+        "
+      >
         No games found. Create one to get started!
       </div>
 
-      <div id="admin-delete-result" class="result-box" style="display: none; margin-top: 1rem"></div>
+      <div
+        id="admin-delete-result"
+        class="result-box"
+        style="display: none; margin-top: 1rem"
+      ></div>
     </section>
 
     <script type="module" src="/src/admin/admin-setup.js"></script>

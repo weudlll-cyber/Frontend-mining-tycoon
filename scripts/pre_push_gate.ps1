@@ -143,8 +143,8 @@ Invoke-Step -Name "Production build" -Action { & npm run build }
 
 if ($GateProfile -eq "full") {
     Invoke-Step -Name "Vitest coverage" -Action { & npm run test:coverage }
-    Invoke-Step -Name "npm audit (prod, high+)" -Action {
-        & npm audit --omit=dev --audit-level=high
+    Invoke-Step -Name "npm audit (high+)" -Action {
+        & npm audit --audit-level=high
     }
     Invoke-Step -Name "Code health audit (advisory)" -Action {
         & (Join-Path $PSScriptRoot "code_health_audit.ps1")

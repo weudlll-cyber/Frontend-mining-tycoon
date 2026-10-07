@@ -731,7 +731,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
           </div>
 
           <!-- Action Bar: score context and quick access for optional panels -->
-          <div class="bottom-bar action-bar" aria-label="Live board quick actions">
+          <div
+            class="bottom-bar action-bar"
+            aria-label="Live board quick actions"
+          >
             <div class="bottom-bar-item">
               <span id="score-context-label" class="label">Score</span>
               <span id="portfolio-value" class="bottom-bar-value">—</span>
@@ -774,11 +777,15 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             </div>
             <div class="bottom-bar-item trading-status status-pill">
               <span class="label">Trading</span>
-              <span id="trading-status" class="bottom-bar-value">Not enabled</span>
+              <span id="trading-status" class="bottom-bar-value"
+                >Not enabled</span
+              >
             </div>
             <div class="bottom-bar-item farming-status status-pill">
               <span class="label">Farming</span>
-              <span id="farming-status" class="bottom-bar-value">Not enabled</span>
+              <span id="farming-status" class="bottom-bar-value"
+                >Not enabled</span
+              >
             </div>
           </div>
 
@@ -892,7 +899,10 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   >
                     <div class="chat-card-header">
                       <h2>Chat</h2>
-                      <span id="chat-status" class="chat-status" data-level="idle"
+                      <span
+                        id="chat-status"
+                        class="chat-status"
+                        data-level="idle"
                         >Offline</span
                       >
                     </div>
@@ -931,7 +941,8 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
         <p class="game-over-eyebrow">Round Complete</p>
         <h2 id="game-over-title">Game Over</h2>
         <p id="game-over-message">
-          Click anywhere to return to the player panel and choose another open game.
+          Click anywhere to return to the player panel and choose another open
+          game.
         </p>
       </div>
     </div>
