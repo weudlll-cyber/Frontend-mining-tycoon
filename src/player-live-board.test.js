@@ -8,7 +8,7 @@ Covers:
 - No stray console.log calls in the main entry point.
 */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -40,6 +40,10 @@ async function bootMainWithCapturedStream() {
 }
 
 beforeEach(() => {
+  // Booting main.js can show toasts whose 3 s hide timers outlive the test;
+  // fake timers (advancing with real time) let afterEach drop them so they
+  // never run after the jsdom environment is torn down.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetModules();
   vi.doUnmock('./services/stream-controller.js');
   localStorage.clear();
@@ -55,6 +59,11 @@ beforeEach(() => {
     return 1;
   };
   globalThis.cancelAnimationFrame = () => {};
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
 describe('player live board wiring', () => {

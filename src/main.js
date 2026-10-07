@@ -1148,7 +1148,7 @@ function renderMetaDebugLine() {
     const gameMeta = getGameMeta(gameId);
     if (gameMeta && gameMeta.game_duration_seconds) {
       const durationSec = gameMeta.game_duration_seconds;
-      let durationLabel = '';
+      let durationLabel;
       if (durationSec < 60) durationLabel = `${durationSec}s`;
       else if (durationSec < 3600)
         durationLabel = `${Math.round(durationSec / 60)}m`;

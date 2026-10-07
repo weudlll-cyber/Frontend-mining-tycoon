@@ -114,7 +114,6 @@ export function ensurePlayerStateViewLayout({
 
   if (disposeTooltips) {
     disposeTooltips();
-    disposeTooltips = null;
   }
 
   clearNode(playerStateEl);

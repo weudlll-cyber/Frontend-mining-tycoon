@@ -148,7 +148,7 @@ export async function createAsyncSession({ gameId, playerId }) {
     _deps.getPlayerTokenStorageKey(gameId, playerId)
   );
 
-  let requirePlayerAuth = false;
+  let requirePlayerAuth;
   try {
     const authProbe = await probeRequirePlayerAuth({ gameId, playerId });
     if (authProbe.value === true || authProbe.value === false) {

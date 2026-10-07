@@ -65,7 +65,8 @@ export async function register(baseUrl, payload) {
     });
   } catch (error) {
     throw new Error(
-      mapRegisterErrorMessage(error?.message || 'Registration failed')
+      mapRegisterErrorMessage(error?.message || 'Registration failed'),
+      { cause: error }
     );
   }
 }
