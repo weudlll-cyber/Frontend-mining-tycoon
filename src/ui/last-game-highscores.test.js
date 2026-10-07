@@ -58,3 +58,17 @@ describe('last game highscores', () => {
     expect(items[1].textContent).toContain('99');
   });
 });
+
+describe('last game snapshot score formatting', () => {
+  it('keeps efficiency ratios in the stored snapshot', () => {
+    const snapshot = buildLastGameSnapshot({
+      gameId: 'g-eff',
+      scoringModeLabel: 'Efficiency Mode',
+      data: {
+        scoring_mode: 'efficiency',
+        leaderboard_top_5: [{ player_id: 1, name: 'A', score: 1.5 }],
+      },
+    });
+    expect(snapshot.leaderboard[0].score).toBe('1.5000×');
+  });
+});

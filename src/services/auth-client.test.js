@@ -342,4 +342,19 @@ describe('auth-client contract errors', () => {
       joinGame('http://127.0.0.1:8000', { gameId: 'g', playerName: 'A' })
     ).rejects.toMatchObject({ status: 409, message: 'Game already finished' });
   });
+
+  it('surfaces backend detail when the open-games list fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ detail: 'Maintenance' }),
+      })
+    );
+
+    await expect(fetchOpenGames('http://127.0.0.1:8000')).rejects.toMatchObject(
+      { status: 503, message: 'Maintenance' }
+    );
+  });
 });

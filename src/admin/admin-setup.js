@@ -66,9 +66,8 @@ function buildOption(value, label, isDefault) {
 
 function populateDurationPreset() {
   const select = el('admin-duration-preset');
+  // All presets (including '3h') are valid for sync rounds in the backend.
   for (const [key] of Object.entries(ROUND_DURATION_PRESETS)) {
-    // Skip async-only preset '3h' from sync dropdown
-    if (key === '3h') continue;
     select.appendChild(
       buildOption(key, _presetLabel(key), key === SYNC_DEFAULT_PRESET)
     );
@@ -158,10 +157,22 @@ function resolveAsyncSessionSeconds() {
   return ROUND_DURATION_PRESETS[preset] ?? 0;
 }
 
+/**
+ * Time window that trade defaults and unlock offsets are based on.
+ * Async rounds: offsets count from each player's session start and the backend
+ * rejects offsets >= session duration, so the session length is the window.
+ * Sync rounds: the round duration.
+ */
+export function resolveTradeWindowSeconds() {
+  return _getSelectedRoundType() === 'async'
+    ? resolveAsyncSessionSeconds()
+    : resolveCurrentDurationSeconds();
+}
+
 // ── Trade schedule preview ───────────────────────────────────────────────────
 
 function updateTradePreview() {
-  const durationSeconds = resolveCurrentDurationSeconds();
+  const durationSeconds = resolveTradeWindowSeconds();
   const rawCount = Number(el('admin-trade-count').value);
   const tradeCount = Math.max(
     TRADE_COUNT_LIMITS.min,
@@ -185,7 +196,8 @@ function updateTradePreview() {
     return;
   }
 
-  noteEl.textContent = `${tradeCount} trade${tradeCount !== 1 ? 's' : ''} scheduled.`;
+  const perSession = _getSelectedRoundType() === 'async' ? ' per session' : '';
+  noteEl.textContent = `${tradeCount} trade${tradeCount !== 1 ? 's' : ''} scheduled${perSession}.`;
   const lines = offsets.map((offset, i) => {
     const mins = Math.floor(offset / 60);
     const secs = offset % 60;
@@ -198,7 +210,7 @@ function updateTradePreview() {
 // ── Default trade count auto-sync ────────────────────────────────────────────
 
 function syncDefaultTradeCount() {
-  const durationSeconds = resolveCurrentDurationSeconds();
+  const durationSeconds = resolveTradeWindowSeconds();
   const defaultCount = getDefaultTradeCount(durationSeconds);
   const input = el('admin-trade-count');
   input.value = String(defaultCount);
@@ -313,7 +325,7 @@ function _formatSeconds(s) {
   return `${s / 86400}d`;
 }
 
-function updateReview() {
+export function updateReview() {
   const dl = el('admin-review-dl');
   dl.replaceChildren();
   const rows = buildReviewSummary();
@@ -339,7 +351,7 @@ export function buildGamePayload() {
     Math.min(TRADE_COUNT_LIMITS.max, Math.round(rawCount) || 0)
   );
   const tradeUnlockOffsets = computeTradeUnlockOffsetsSeconds(
-    durationSeconds,
+    resolveTradeWindowSeconds(),
     tradeCount
   );
   const scoringMode = toBackendScoringMode(_getSelectedScoringMode());
@@ -425,7 +437,7 @@ export function renderCreateSuccess(resultBox, { gameId, joinUrl }) {
   resultBox.replaceChildren(okLine, idLine, shareLine, link);
 }
 
-function initBackendUrlField() {
+export function initBackendUrlField() {
   const input = el('admin-backend-url');
   if (!input) return;
   const stored = String(getStorageItem(STORAGE_KEYS.baseUrl) || '').trim();
@@ -440,7 +452,7 @@ function initBackendUrlField() {
   });
 }
 
-async function createRound() {
+export async function createRound() {
   const resultBox = el('admin-result-box');
   const createBtn = el('admin-create-btn');
 

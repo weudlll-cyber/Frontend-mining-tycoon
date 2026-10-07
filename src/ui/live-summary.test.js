@@ -102,6 +102,21 @@ describe('live-summary async badge', () => {
     expect(document.getElementById('top-score')?.textContent).toBe('6,343');
   });
 
+  it('formats efficiency scores as ratios in the header', () => {
+    renderQuickStats({
+      player_id: '42',
+      scoring_mode: 'efficiency',
+      leaderboard_top_5: [
+        { player_id: '7', score: 1.5 },
+        { player_id: '42', score: 1.2345 },
+      ],
+      player_state: {},
+    });
+
+    expect(document.getElementById('my-score')?.textContent).toBe('1.2345×');
+    expect(document.getElementById('top-score')?.textContent).toBe('1.5000×');
+  });
+
   it('shows live async score while session is running even before finalized leaderboard score exists', () => {
     initLiveSummary({
       myScoreEl: document.getElementById('my-score'),

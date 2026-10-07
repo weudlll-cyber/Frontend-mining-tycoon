@@ -55,3 +55,28 @@ describe('leaderboard renderer', () => {
     );
   });
 });
+
+describe('leaderboard score formatting per scoring mode', () => {
+  it('shows efficiency scores as 4-decimal ratios', () => {
+    renderLeaderboard({
+      scoring_mode: 'efficiency',
+      leaderboard_top_5: [
+        { player_id: 1, name: 'A', score: 1.2345 },
+        { player_id: 2, name: 'B', score: 0.9876 },
+      ],
+    });
+    const scores = Array.from(
+      document.querySelectorAll('.leaderboard-score')
+    ).map((node) => node.textContent);
+    expect(scores).toEqual(['1.2345×', '0.9876×']);
+  });
+
+  it('shows integers when scoring_mode is missing (stockpile)', () => {
+    renderLeaderboard({
+      leaderboard_top_5: [{ player_id: 1, name: 'A', score: 12000 }],
+    });
+    expect(document.querySelector('.leaderboard-score').textContent).toBe(
+      '12000'
+    );
+  });
+});

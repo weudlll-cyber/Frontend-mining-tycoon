@@ -12,6 +12,7 @@ Session model relation:
 - Renders the visible async session badge in the header summary line.
 */
 
+import { formatBackendScore } from '../utils/score-format.js';
 import {
   normalizeTokenNames,
   formatCompactNumber,
@@ -42,9 +43,17 @@ export function initLiveSummary(deps) {
     .forEach((element) => element.classList.add('selectable'));
 }
 
-function formatScore(value) {
+function formatScore(value, scoringMode) {
   if (!Number.isFinite(value)) return '—';
-  return Math.floor(value).toLocaleString('en-US');
+  return formatBackendScore(value, scoringMode);
+}
+
+function resolveScoringMode(data) {
+  return (
+    data?.scoring_mode ||
+    _getGameMeta?.(String(data?.game_id || ''))?.scoring_mode ||
+    null
+  );
 }
 
 function formatPortfolioValue(value) {
@@ -218,9 +227,10 @@ export function renderQuickStats(data) {
     topScore = ownScore;
   }
 
-  setElementTextValue(_refs.myScoreEl, formatScore(ownScore));
+  const scoringMode = resolveScoringMode(data);
+  setElementTextValue(_refs.myScoreEl, formatScore(ownScore, scoringMode));
   setElementTextValue(_refs.myRankEl, ownRank ? `#${ownRank}` : '—');
-  setElementTextValue(_refs.topScoreEl, formatScore(topScore));
+  setElementTextValue(_refs.topScoreEl, formatScore(topScore, scoringMode));
 }
 
 export function renderPortfolioValue(data) {

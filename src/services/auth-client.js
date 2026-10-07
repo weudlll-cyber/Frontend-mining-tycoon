@@ -19,11 +19,6 @@ function mapRegisterErrorMessage(message) {
   return message;
 }
 
-async function parseError(response, fallback) {
-  const { message } = await readApiError(response, fallback);
-  return message;
-}
-
 async function requestJson(baseUrl, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method || 'GET',
@@ -114,7 +109,9 @@ export async function fetchOpenGames(baseUrl) {
     method: 'GET',
   });
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not load open games.'));
+    throw createApiError(
+      await readApiError(response, 'Could not load open games.')
+    );
   }
   const payload = await response.json();
   return Array.isArray(payload) ? payload : [];

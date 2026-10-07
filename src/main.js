@@ -605,7 +605,10 @@ function formatOffsetLabel(seconds) {
 
 function getSelectedRoundDurationSecondsForTradingDefaults() {
   if (getSelectedRoundType() === 'async') {
+    // Async trade offsets count from session start and must fit inside the
+    // session (backend validation), so the session length is the window.
     return (
+      presetToSeconds(asyncSessionDurationPresetInput?.value) ||
       presetToSeconds(getAsyncDurationPreset(asyncHostDurationPresetInput)) ||
       600
     );

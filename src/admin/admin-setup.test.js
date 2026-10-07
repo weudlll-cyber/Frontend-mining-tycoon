@@ -9,7 +9,7 @@
  *    correctly after init
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import {
   ROUND_DURATION_PRESETS,
@@ -109,7 +109,11 @@ function buildDom({
 import {
   buildReviewSummary,
   buildGamePayload,
+  createRound,
+  initBackendUrlField,
   renderCreateSuccess,
+  resolveTradeWindowSeconds,
+  updateReview,
 } from './admin-setup.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -370,5 +374,120 @@ describe('control-data wiring — ROUND_DURATION_PRESETS', () => {
 
   it('ASYNC_SESSION_DEFAULT_PRESET exists in ROUND_DURATION_PRESETS', () => {
     expect(ROUND_DURATION_PRESETS[ASYNC_SESSION_DEFAULT_PRESET]).toBeDefined();
+  });
+});
+
+describe('trade window — async rounds use the session duration', () => {
+  it('derives offsets from the session length so they fit inside the session', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 2 });
+    // 30m round, 24h session is clamped elsewhere; pick the 5m session preset.
+    dom.window.document.getElementById('admin-async-session-preset').value =
+      '5m';
+    const payload = buildGamePayload();
+    expect(resolveTradeWindowSeconds()).toBe(300);
+    expect(payload.trade_unlock_offsets_seconds).toHaveLength(2);
+    payload.trade_unlock_offsets_seconds.forEach((offset) => {
+      expect(offset).toBeLessThan(300);
+    });
+  });
+
+  it('uses the round duration for sync rounds', () => {
+    buildDom({ roundType: 'sync', tradeCount: 0 });
+    expect(resolveTradeWindowSeconds()).toBe(ROUND_DURATION_PRESETS['5m']);
+  });
+});
+
+describe('review panel and backend URL field', () => {
+  it('rebuilds the review list without innerHTML', () => {
+    buildDom({ roundType: 'sync' });
+    const dl = document.getElementById('admin-review-dl');
+    dl.appendChild(document.createElement('dt'));
+    updateReview();
+    const terms = Array.from(dl.querySelectorAll('dt')).map(
+      (node) => node.textContent
+    );
+    expect(terms[0]).toBe('Round type');
+    expect(terms).not.toContain('');
+  });
+
+  it('seeds an empty URL field from storage or the shared default and persists edits', () => {
+    const dom = buildDom({ roundType: 'sync' });
+    const input = dom.window.document.getElementById('admin-backend-url');
+    input.value = '';
+    localStorage.removeItem('mining-tycoon:baseUrl');
+    initBackendUrlField();
+    expect(input.value).toBe('http://127.0.0.1:8000');
+
+    input.value = 'https://api.example.test/';
+    input.dispatchEvent(new dom.window.Event('change'));
+    expect(localStorage.getItem('mining-tycoon:baseUrl')).toBe(
+      'https://api.example.test'
+    );
+
+    input.value = 'not a url';
+    input.dispatchEvent(new dom.window.Event('change'));
+    expect(localStorage.getItem('mining-tycoon:baseUrl')).toBe(
+      'https://api.example.test'
+    );
+
+    const dom2 = buildDom({ roundType: 'sync' });
+    const input2 = dom2.window.document.getElementById('admin-backend-url');
+    input2.value = '';
+    initBackendUrlField();
+    expect(input2.value).toBe('https://api.example.test');
+    localStorage.removeItem('mining-tycoon:baseUrl');
+  });
+});
+
+describe('createRound', () => {
+  it('renders the created game id safely on success', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ game_id: '<i>12</i>' }),
+    });
+
+    await createRound();
+
+    const box = document.getElementById('admin-result-box');
+    expect(box.className).toBe('result-box success');
+    expect(box.querySelector('i')).toBeNull();
+    expect(box.textContent).toContain('Game ID: <i>12</i>');
+    expect(document.getElementById('admin-create-btn').disabled).toBe(false);
+  });
+
+  it('shows backend validation detail on failure', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: async () => ({
+        detail: [{ loc: ['body', 'trade_count'], msg: 'too many' }],
+      }),
+    });
+
+    await createRound();
+
+    const box = document.getElementById('admin-result-box');
+    expect(box.className).toBe('result-box error');
+    expect(box.textContent).toContain('body.trade_count: too many');
+  });
+
+  it('explains missing admin permission on 403', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => ({ detail: 'Admin token required' }),
+    });
+
+    await createRound();
+
+    expect(document.getElementById('admin-result-box').textContent).toContain(
+      'Admin permission required to create rounds. Admin token required'
+    );
   });
 });

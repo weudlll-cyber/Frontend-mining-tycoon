@@ -616,6 +616,12 @@ Auth-aware behavior:
 - before every stream connect and reconnect the frontend fetches a fresh ticket (`GET /games/{id}/sse-ticket`, 60 s TTL) and appends it as `ticket=` to the game or session stream URL; on stream errors it closes the EventSource and reconnects itself with backoff instead of replaying an expired ticket
 - async session support is assumed for async rounds (from game meta `round_type`); there is no capability probe request
 
+Score and trade-window display:
+
+- Scores from the backend are integers, except in Efficiency mode (4-decimal ratio, 1.0 = baseline) where they are shown as `1.2345×` (`src/utils/score-format.js`). A missing `scoring_mode` means Stockpile.
+- Upgrades/trades outside the play window return `409` with a `code` and `detail`; the frontend shows `detail` in the existing toast.
+- For async rounds the admin trade defaults and unlock offsets are computed from the session duration (offsets count from session start and must be shorter than the session).
+
 ## Chat (Minimal, Optional, Non-persistent)
 
 Chat is implemented as a side feature only:
