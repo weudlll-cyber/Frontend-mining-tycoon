@@ -269,23 +269,19 @@ Sync/Async model (backend-aligned):
 
 ## VPS Deployment
 
-Frontend-only deploy to a VPS:
+Frontend-only deploy to a VPS (builds with `VITE_API_BASE_URL` and uploads only `dist/`):
 
 ```powershell
-& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game"
+& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiBaseUrl "https://api.your-vps.com" -LetsEncryptEmail "ops@your-vps.com"
 ```
 
-Preview without uploading:
-
-```powershell
-& .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/mining-game" -DryRun
-```
+Build and pack without uploading: add `-DryRun`.
 
 If you want frontend + backend on the same VPS, run the full-stack deploy from the sibling backend repo:
 
 ```powershell
 Set-Location "..\Mining tycoon"
-& .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com"
+& .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com" -LetsEncryptEmail "ops@your-vps.com"
 ```
 
 Further deployment details live in [DEPLOY.md](DEPLOY.md).

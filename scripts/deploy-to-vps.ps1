@@ -1,138 +1,196 @@
 <#
 .SYNOPSIS
-Deploy Mining Tycoon frontend to VPS (production artifacts only).
+Builds the Mining Tycoon frontend and deploys ONLY the built dist/ to a VPS.
 
 .DESCRIPTION
-Builds the app and creates a minimal deployment package with only
-production files - no tests, no dev dependencies, no git history.
+1. Validates the parameters (the API base URL must be https unless
+   -AllowInsecureHttp is given).
+2. Runs `npm run build` with VITE_API_BASE_URL set, so the bundle talks to the
+   production backend, and checks that the URL really ended up in the bundle.
+3. Packs dist/ plus deploy/ (nginx template and server-side installer) with
+   the Windows tar.exe, uploads it with scp and runs
+   deploy/remote/install-frontend.sh on the server via `sudo -n`.
+   The installer publishes dist/ to /var/www/mining-tycoon (root-owned),
+   installs nginx/rsync if missing, writes the nginx site on first deploy,
+   optionally obtains a Let's Encrypt certificate and smoke-tests the pages.
 
-Requires:
-  - SSH credentials configured for your VPS
-  - rsync installed on target VPS
+Requirements:
+  - Local: Node.js/npm, OpenSSH client (ssh, scp) and tar.exe (Windows 10+).
+  - Server: Debian/Ubuntu with systemd; the SSH user needs passwordless sudo.
 
-Usage:
-  .\scripts\deploy-to-vps.ps1 -VpsUser "myuser" -VpsHost "123.45.67.89" -VpsPath "/var/www/mining-tycoon"
+.PARAMETER ApiBaseUrl
+Public backend URL baked into the build, e.g. https://api.example.com.
+
+.PARAMETER FrontendDomain
+Host name the game is served under, e.g. game.example.com (nginx server_name).
+
+.PARAMETER LetsEncryptEmail
+If given, certbot obtains/installs a certificate for FrontendDomain.
+DNS must already point to the server.
 
 .EXAMPLE
-  .\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "my-vps.com" -VpsPath "/var/www/app"
+.\scripts\deploy-to-vps.ps1 -VpsUser deploy -VpsHost 203.0.113.10 `
+    -FrontendDomain game.example.com -ApiBaseUrl https://api.example.com `
+    -LetsEncryptEmail ops@example.com
+
+.EXAMPLE
+.\scripts\deploy-to-vps.ps1 -VpsUser deploy -VpsHost 203.0.113.10 `
+    -FrontendDomain game.example.com -ApiBaseUrl https://api.example.com -DryRun
 #>
 
+[CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$VpsUser,
-    
-    [Parameter(Mandatory=$true)]
+
+    [Parameter(Mandatory = $true)]
     [string]$VpsHost,
-    
-    [Parameter(Mandatory=$true)]
-    [string]$VpsPath,
-    
-    [string]$SshKey = $null,
-    [switch]$DryRun = $false
+
+    [Parameter(Mandatory = $true)]
+    [string]$FrontendDomain,
+
+    [Parameter(Mandatory = $true)]
+    [AllowEmptyString()]
+    [string]$ApiBaseUrl,
+
+    [string]$LetsEncryptEmail = "",
+    [string]$SshKey = "",
+    [int]$SshPort = 22,
+    [switch]$ResetNginxConfig,
+    [switch]$AllowInsecureHttp,
+    [switch]$DryRun
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-Set-Location $projectRoot
+$stagingDir = "mining-frontend-staging"
+$archiveName = "mining-frontend-upload.tgz"
+$domainPattern = '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$'
+$emailPattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$'
 
-Write-Host "==> Mining Tycoon VPS Deployment" -ForegroundColor Green
-Write-Host ""
-
-# Step 1: Clean and build
-Write-Host "Building production bundle..." -ForegroundColor Cyan
-if (Test-Path "dist") {
-    Remove-Item -Recurse -Force "dist"
+function Invoke-Native {
+    param([string]$FilePath, [string[]]$Arguments)
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "'$FilePath' failed with exit code $LASTEXITCODE"
+    }
 }
 
-npm run build 2>&1 | Out-Null
-
-if (-not (Test-Path "dist")) {
-    throw "Build failed - dist/ not created"
+# ------------------------------------------------------------------ validation
+$ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd('/')
+if ([string]::IsNullOrWhiteSpace($ApiBaseUrl)) {
+    throw "-ApiBaseUrl is empty. Pass the public backend URL, e.g. https://api.example.com"
+}
+$urlPattern = if ($AllowInsecureHttp) { '^https?://[^\s/?#]+(/[^\s?#]*)?$' } else { '^https://[^\s/?#]+(/[^\s?#]*)?$' }
+if ($ApiBaseUrl -notmatch $urlPattern) {
+    throw "-ApiBaseUrl '$ApiBaseUrl' must be an https:// URL (use -AllowInsecureHttp only for testing)."
+}
+if ($ApiBaseUrl -match '^https?://(localhost|127\.|\[::1\])') {
+    throw "-ApiBaseUrl points to localhost; players' browsers could not reach it."
+}
+if ($FrontendDomain -notmatch $domainPattern) {
+    throw "-FrontendDomain must be a host name such as game.example.com"
+}
+if ($LetsEncryptEmail -and $LetsEncryptEmail -notmatch $emailPattern) {
+    throw "-LetsEncryptEmail is not a valid e-mail address"
+}
+if ($AllowInsecureHttp) {
+    Write-Warning "-AllowInsecureHttp: the build may talk to the backend over plain HTTP. Testing only."
 }
 
-Write-Host "✓ Build complete" -ForegroundColor Green
+# Use the Windows bsdtar explicitly: a GNU tar from Git/MSYS would treat
+# "C:\..." archive paths as remote host names.
+$tarExe = Join-Path $env:SystemRoot "System32\tar.exe"
+if (-not (Test-Path $tarExe)) { $tarExe = "tar" }
 
-# Step 2: Create deployment manifest
-Write-Host "Creating deployment package..." -ForegroundColor Cyan
+Write-Host "==> Mining Tycoon frontend deployment" -ForegroundColor Green
+Write-Host "    Target:   ${VpsUser}@${VpsHost}:$SshPort"
+Write-Host "    Domain:   $FrontendDomain"
+Write-Host "    API base: $ApiBaseUrl"
 
-$excludePatterns = @(
-    "src/",
-    "scripts/",
-    "node_modules/",
-    ".git/",
-    ".venv/",
-    "coverage/",
-    "*.test.js",
-    "*.config.js",
-    "*.config.mjs",
-    "*.md",
-    ".github/",
-    ".githooks/",
-    ".vscode/",
-    ".env*",
-    "*.lock",
-    ".prettierrc.json"
-)
+Push-Location $projectRoot
+$archivePath = Join-Path ([System.IO.Path]::GetTempPath()) ("mining-frontend-" + [guid]::NewGuid().ToString("N") + ".tgz")
+$previousApiBase = $env:VITE_API_BASE_URL
+try {
+    # -------------------------------------------------------------- build
+    if (-not (Test-Path "node_modules")) {
+        Write-Host "==> Installing dependencies (npm ci)" -ForegroundColor Cyan
+        Invoke-Native "npm" @("ci")
+    }
+    if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 
-$rsyncExcludes = ($excludePatterns | ForEach-Object { "--exclude='$_'" }) -join " "
+    Write-Host "==> Building with VITE_API_BASE_URL=$ApiBaseUrl" -ForegroundColor Cyan
+    $env:VITE_API_BASE_URL = $ApiBaseUrl
+    Invoke-Native "npm" @("run", "build")
 
-# Step 3: Build rsync command
-$sshOpt = ""
-if ($SshKey) {
-    $sshOpt = "-e 'ssh -i $SshKey'"
-}
+    foreach ($page in @("index.html", "player.html", "admin.html")) {
+        if (-not (Test-Path (Join-Path "dist" $page))) {
+            throw "Build output is missing dist/$page"
+        }
+    }
+    $bundleHit = Get-ChildItem -Path "dist/assets" -Filter "*.js" -File |
+        Select-String -SimpleMatch -Pattern $ApiBaseUrl -List |
+        Select-Object -First 1
+    if (-not $bundleHit) {
+        throw ("The built bundle does not contain '$ApiBaseUrl'. This frontend version " +
+            "probably does not read VITE_API_BASE_URL yet; refusing to deploy a build " +
+            "that would call http://127.0.0.1:8000.")
+    }
+    Write-Host "OK: build contains the API base URL" -ForegroundColor Green
 
-$rsyncCmd = "rsync -avz --delete $sshOpt $rsyncExcludes `"$projectRoot/`" `"${VpsUser}@${VpsHost}:${VpsPath}/`""
+    # -------------------------------------------------------------- package
+    Invoke-Native $tarExe @("-czf", $archivePath, "-C", $projectRoot, "dist", "deploy")
 
-Write-Host "Files to sync:" -ForegroundColor Cyan
-@(
-    "dist/ (compiled app)",
-    "public/ (assets)",
-    "index.html (entry point)"
-) | ForEach-Object { Write-Host "  - $_" }
+    $installerArgs = @("--frontend-domain", $FrontendDomain)
+    if ($LetsEncryptEmail) { $installerArgs += @("--letsencrypt-email", $LetsEncryptEmail) }
+    if ($ResetNginxConfig) { $installerArgs += "--reset-nginx" }
 
-Write-Host ""
-Write-Host "Excluded (not synced):" -ForegroundColor Yellow
-$excludePatterns | ForEach-Object { Write-Host "  - $_" }
+    # All values in this command were validated above, so plain quoting is safe.
+    $remoteCommand = (
+        "set -e; " +
+        "rm -rf ~/$stagingDir; mkdir -p ~/$stagingDir; " +
+        "tar -xzf ~/$archiveName -C ~/$stagingDir; rm -f ~/$archiveName; " +
+        "sudo -n bash ~/$stagingDir/deploy/remote/install-frontend.sh " +
+        (($installerArgs | ForEach-Object { "'$_'" }) -join " ") + "; " +
+        "rm -rf ~/$stagingDir"
+    )
 
-if ($DryRun) {
+    $sshArgs = @("-p", "$SshPort")
+    $scpArgs = @("-P", "$SshPort")
+    if ($SshKey) {
+        $sshArgs += @("-i", $SshKey)
+        $scpArgs += @("-i", $SshKey)
+    }
+    $target = "${VpsUser}@${VpsHost}"
+
+    if ($DryRun) {
+        Write-Host ""
+        Write-Host "DRY RUN - nothing was uploaded. Package contents:" -ForegroundColor Yellow
+        Invoke-Native $tarExe @("-tzf", $archivePath)
+        Write-Host ""
+        Write-Host "Would run: scp $($scpArgs -join ' ') <package> ${target}:$archiveName"
+        Write-Host "Would run: ssh $($sshArgs -join ' ') $target `"$remoteCommand`""
+        return
+    }
+
+    # -------------------------------------------------------------- upload + install
+    Write-Host "==> Uploading package" -ForegroundColor Cyan
+    Invoke-Native "scp" ($scpArgs + @($archivePath, "${target}:$archiveName"))
+
+    Write-Host "==> Running server-side installer" -ForegroundColor Cyan
+    Invoke-Native "ssh" ($sshArgs + @($target, $remoteCommand))
+
+    $scheme = if ($LetsEncryptEmail) { "https" } else { "http" }
     Write-Host ""
-    Write-Host "DRY RUN - Command preview:" -ForegroundColor Yellow
-    Write-Host $rsyncCmd
-    return
-}
-
-Write-Host ""
-Write-Host "Syncing to VPS..." -ForegroundColor Cyan
-Write-Host "Target: ${VpsUser}@${VpsHost}:${VpsPath}/" -ForegroundColor Cyan
-Write-Host ""
-
-Invoke-Expression $rsyncCmd
-
-Write-Host ""
-Write-Host "✓ Deployment complete!" -ForegroundColor Green
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. SSH into VPS: ssh ${VpsUser}@${VpsHost}"
-Write-Host "2. Configure web server (nginx/apache) to serve ${VpsPath}/"
-Write-Host "3. Set your backend URL in the app settings"
-Write-Host ""
-Write-Host "Quick nginx config:" -ForegroundColor Cyan
-Write-Host @"
-server {
-    listen 80;
-    server_name your-domain.com;
-    root $VpsPath;
-    index index.html;
-    
-    location / {
-        try_files \$uri /index.html;
-    }
-    
-    location ~* \.(js|css|svg|png|jpg|gif)$ {
-        expires 7d;
-        add_header Cache-Control "public, immutable";
+    Write-Host "OK: frontend deployed: ${scheme}://$FrontendDomain/" -ForegroundColor Green
+    if (-not $LetsEncryptEmail) {
+        Write-Host "    No -LetsEncryptEmail given: make sure TLS is configured (see DEPLOY.md)." -ForegroundColor Yellow
     }
 }
-"@
+finally {
+    $env:VITE_API_BASE_URL = $previousApiBase
+    if (Test-Path $archivePath) { Remove-Item -Force $archivePath }
+    Pop-Location
+}
