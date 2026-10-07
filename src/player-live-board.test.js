@@ -120,6 +120,52 @@ describe('player live board wiring', () => {
     expect(banner.textContent).toContain('Spread +3.0% (all tokens)');
   });
 
+  it('shows "Chat is disabled for this round." and opens no socket when game meta disables chat', async () => {
+    const sockets = [];
+    vi.stubGlobal(
+      'WebSocket',
+      vi.fn(function FakeSocket(url) {
+        sockets.push(url);
+      })
+    );
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () =>
+        String(url).includes('/games/7/meta')
+          ? { meta_hash: 'game-7', chat_enabled: false }
+          : { meta_hash: 'global' },
+    }));
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    document.getElementById('game-id').value = '7';
+    document.getElementById('player-id').value = '3';
+    await deps.fetchMetaSnapshot('http://127.0.0.1:8000', '7');
+
+    await deps.connectChat();
+
+    expect(sockets).toEqual([]);
+    const note = document.getElementById('chat-disabled-note');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toBe('Chat is disabled for this round.');
+    expect(document.getElementById('chat-dock-preview').textContent).toBe(
+      'Chat is disabled for this round.'
+    );
+    // The Chat tab itself stays in the live tools window.
+    expect(document.getElementById('live-tab-chat')).not.toBeNull();
+
+    // A round without chat_enabled (older backend) chats as before.
+    document.getElementById('game-id').value = '8';
+    await deps.connectChat();
+    expect(sockets).toHaveLength(1);
+    expect(note.hidden).toBe(true);
+    expect(document.getElementById('chat-dock-preview').textContent).toBe(
+      'Chat is ready'
+    );
+    vi.unstubAllGlobals();
+  });
+
   it('seeds the backend URL field from the shared config module', async () => {
     expect(document.getElementById('base-url').value).toBe('');
     const { DEFAULT_BACKEND_URL } = await import('./config/backend-url.js');

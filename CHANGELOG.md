@@ -10,6 +10,17 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Per-round options in the admin create form: optional "Conversion fee
+  override (%)" and "Oracle spread override (%)" in section 5 (empty = global
+  economy, current values as placeholders; sent as `conversion_fee_rate` /
+  `oracle_spread` rates) and a "Chat enabled" checkbox in section 2 (default
+  from the new Game Settings option "Chat enabled by default",
+  `defaults.chat_enabled`). Section 7 lists all three.
+- Player board: a round with `chat_enabled: false` keeps the Chat tab but shows
+  "Chat is disabled for this round." and opens no WebSocket; a server
+  `CHAT_DISABLED` chat error is handled the same way without reconnecting. The
+  trading cost note shows the round's fee and oracle spread.
+
 - "How to play" guide (`how-to-play.html`): a static page covering the goal
   and tokens, mining, upgrades, halvings, oracle prices, trading, sync/async
   rounds, scoring modes, events, the live tools window, accounts and farming
@@ -52,6 +63,8 @@ No versions have been released yet; `package.json` is still `0.0.0`.
   `QUALITY_ENFORCEMENT.md` (#27, #30).
 
 ### Fixed
+
+- The trading panel no longer replaces a 0 % round fee with the 2 % fallback.
 
 - Admin "Advanced overrides" were silently ignored (wrong field names) (#19).
 - Admin page rendered backend values with `innerHTML` (#19).

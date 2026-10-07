@@ -156,6 +156,7 @@ Entry points (Vite multi-page build):
 - `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus; requested with the account token, own games marked via `my_player_id`), join ("Enter game", or "Rejoin" for a game the account already plays), "My results" dialog (`GET /auth/me/history` with Load more, full final leaderboard via `GET /games/{id}/results` with the own row highlighted, deep link `index.html?results=<gameId>&player=<playerId>`), and "Last Game Highscores" (server history when signed in, otherwise the local snapshot). Joining sends the account bearer token, stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
 - `admin.html` + `src/admin/`: admin console with 11 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
+- Round options (snapshot-locked per round, backend-validated): optional conversion fee / oracle spread overrides in percent (section 5; empty = global economy, sent as `conversion_fee_rate` / `oracle_spread` rates) and "Chat enabled" (section 2; default from `defaults.chat_enabled`, fallback on; `chat_enabled` sent only when changed). `/games/{id}/meta` exposes the effective `conversion_fee_rate`, `oracle_spread` and `chat_enabled`; the player board shows the round fee/spread in the trading panel and, with chat disabled, a "Chat is disabled for this round." Chat tab without opening a WebSocket (also on a `CHAT_DISABLED` socket error, no reconnect). Missing fields = today's behavior (chat on, economy snapshot fee).
 
 The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 
@@ -316,7 +317,7 @@ In progress elsewhere:
 Open work (summary):
 
 - Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
-- Gameplay features: Farming Stage 1 and Stage 2; secure email-based password reset; scheduled sync live rounds; per-round fee override; chat moderation, emoji and per-round opt-out; season artwork (`public/assets/seasons/` images exist but are unused).
+- Gameplay features: Farming Stage 1 and Stage 2; secure email-based password reset; scheduled sync live rounds; chat moderation and emoji; season artwork (`public/assets/seasons/` images exist but are unused).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
 - Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
 
@@ -386,7 +387,7 @@ Source-of-truth rule:
 ### 2) Concept Areas Partially Covered
 
 - Default trade allocation by game length: implemented; the implemented table was confirmed by the owner on 2026-10-07 and is admin-configurable in Game Settings (see `SEASONAL_TYCOON_CONCEPT.md`). Hosts can override the count, not individual unlock times.
-- Trading cost: deterministic conversion fee and spread exist; a per-round host fee override does not.
+- Trading cost: deterministic conversion fee and spread exist; the admin can override both per round (round options in the admin console).
 - Leaderboards: live Top 5 during play; full final leaderboard and per-account result history in the lobby ("My results") after a round finishes. No provisional/final marker on the live Top 5.
 
 ### 3) Concept Areas Not Yet Implemented
@@ -399,7 +400,7 @@ Source-of-truth rule:
 
 - Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).
 - Farming Stage 2 (rotating farming), the final planned farming layer.
-- Per-round trading fee override.
+- ~~Per-round trading fee override.~~ Implemented (admin round options).
 
 #### C) Accounts & Results
 
