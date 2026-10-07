@@ -93,6 +93,11 @@ export const ACCOUNT_POLICY_DEFAULTS = Object.freeze({
   require_account_to_join: false,
 });
 
+// ── Chat ────────────────────────────────────────────────────────────────────
+// Fallback for `defaults.chat_enabled`: an older backend without the key keeps
+// chat on for every round (today's behavior).
+export const CHAT_ENABLED_DEFAULT = true;
+
 // ── Scoring modes ───────────────────────────────────────────────────────────
 // DEFAULT_MODE is the full canonical mode used throughout the app.
 // ALLOWED_MODES are the short aliases accepted by the backend scoring_mode field.

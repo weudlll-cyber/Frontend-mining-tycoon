@@ -196,6 +196,8 @@ import {
   disconnectChat,
   resolveChatUserLabel,
   setChatPanelOpen,
+  isChatEnabledForRound,
+  CHAT_DISABLED_TEXT,
 } from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
 import { resolvePlayerActionAvailability } from './ui/action-availability.js';
@@ -330,6 +332,7 @@ const chatMessagesEl = document.getElementById('chat-messages');
 const chatFormEl = document.getElementById('chat-form');
 const chatInputEl = document.getElementById('chat-input');
 const chatStatusEl = document.getElementById('chat-status');
+const chatDisabledNoteEl = document.getElementById('chat-disabled-note');
 const chatUnreadBadgeEl = document.getElementById('chat-unread-badge');
 const chatDockBtnEl = document.getElementById('chat-dock-btn');
 const chatDockPreviewEl = document.getElementById('chat-dock-preview');
@@ -408,7 +411,8 @@ let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
 let chatUnreadCount = 0;
-let lastChatPreview = 'Chat is ready';
+const CHAT_READY_PREVIEW = 'Chat is ready';
+let lastChatPreview = CHAT_READY_PREVIEW;
 let sessionStartSupported = true;
 let setupRoundModeOverride = null;
 let activeSession = null;
@@ -469,6 +473,18 @@ function handleChatMessagePreview(message) {
     chatUnreadCount += 1;
   }
 
+  renderChatPreviewState();
+}
+
+// Round option: keep the chat preview dock in sync with "chat disabled".
+// Re-enabling only resets the preview when it still shows the disabled text,
+// so a real last message is never overwritten.
+function handleChatAvailabilityChange(enabled) {
+  if (!enabled) {
+    lastChatPreview = CHAT_DISABLED_TEXT;
+  } else if (lastChatPreview === CHAT_DISABLED_TEXT) {
+    lastChatPreview = CHAT_READY_PREVIEW;
+  }
   renderChatPreviewState();
 }
 
@@ -1677,6 +1693,11 @@ function initializeModules() {
     formEl: chatFormEl,
     inputEl: chatInputEl,
     statusEl: chatStatusEl,
+    disabledNoteEl: chatDisabledNoteEl,
+    // `chat_enabled` from the round's game meta (fetched before the stream
+    // starts); missing = enabled, as with older backends.
+    isChatEnabled: () => isChatEnabledForRound(getGameMeta(gameIdInput?.value)),
+    onAvailabilityChange: handleChatAvailabilityChange,
     getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
     getGameId: () => gameIdInput.value,
     getPlayerId: () => playerIdInput.value,

@@ -85,6 +85,12 @@ function buildDom({
     <p id="admin-trade-count-note"></p>
     <div id="admin-trade-schedule-preview"></div>
 
+    <input id="admin-chat-enabled" type="checkbox" checked />
+    <input id="admin-fee-override" type="number" value="" />
+    <p id="admin-fee-override-note"></p>
+    <input id="admin-spread-override" type="number" value="" />
+    <p id="admin-spread-override-note"></p>
+
     <select id="admin-anchor-token"><option value="">—</option></select>
     <input id="admin-anchor-rate" type="number" value="" />
     <input id="admin-season-cycles" type="number" value="" />
@@ -672,6 +678,92 @@ describe('create form from the effective game config', () => {
       '5m',
       'custom',
     ]);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('per-round options (fee/spread overrides, chat)', () => {
+  beforeEach(() => setGameConfigDocument(null));
+
+  it('sends overrides as rates, chat only when changed, and lists them in review', () => {
+    const doc = buildDom().window.document;
+    applyGameConfigToForm();
+    expect(buildGamePayload()).not.toHaveProperty('conversion_fee_rate');
+    expect(buildGamePayload()).not.toHaveProperty('chat_enabled');
+
+    doc.getElementById('admin-fee-override').value = '1.5';
+    doc.getElementById('admin-spread-override').value = '0.5';
+    doc.getElementById('admin-chat-enabled').checked = false;
+    const payload = buildGamePayload();
+    expect(payload.conversion_fee_rate).toBe(0.015);
+    expect(payload.oracle_spread).toBe(0.005);
+    expect(payload.chat_enabled).toBe(false);
+
+    const review = Object.fromEntries(buildReviewSummary());
+    expect(review['Conversion fee']).toBe('1.5% (override)');
+    expect(review['Oracle spread']).toBe('0.5% (override)');
+    expect(review.Chat).toBe('Disabled');
+  });
+
+  it('pre-ticks chat from defaults.chat_enabled of the game config', () => {
+    const doc = buildDom().window.document;
+    // Newer version than any /meta document cached by earlier tests.
+    setGameConfigDocument({
+      ...GAME_CONFIG_DOC,
+      version: 99,
+      config: {
+        ...GAME_CONFIG_DOC.config,
+        defaults: { ...GAME_CONFIG_DOC.config.defaults, chat_enabled: false },
+      },
+    });
+    applyGameConfigToForm();
+    expect(doc.getElementById('admin-chat-enabled').checked).toBe(false);
+    expect(buildGamePayload()).not.toHaveProperty('chat_enabled');
+  });
+
+  it('refuses to create a round with an invalid override', async () => {
+    const doc = buildDom().window.document;
+    applyGameConfigToForm();
+    doc.getElementById('admin-fee-override').value = '-3';
+    globalThis.fetch = vi.fn();
+
+    await createRound();
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(doc.getElementById('admin-result-box').textContent).toBe(
+      '❌ Conversion fee override must be at least 0% and below 100%.'
+    );
+  });
+
+  it('shows the global /meta fee and spread as placeholders and updates the review on input', async () => {
+    const doc = buildDom().window.document;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          meta_hash: 'm-fee',
+          conversion_fee_rate: 0.025,
+          oracle_spread: 0.01,
+        }),
+      })
+    );
+    init();
+    await refreshGameConfigFromMeta();
+    expect(doc.getElementById('admin-fee-override').placeholder).toBe('2.5');
+    expect(doc.getElementById('admin-spread-override').placeholder).toBe('1');
+
+    const fee = doc.getElementById('admin-fee-override');
+    fee.value = '4';
+    fee.dispatchEvent(new doc.defaultView.Event('input'));
+    const chat = doc.getElementById('admin-chat-enabled');
+    chat.checked = false;
+    chat.dispatchEvent(new doc.defaultView.Event('change'));
+    const text = doc.getElementById('admin-review-dl').textContent;
+    expect(text).toContain('4% (override)');
+    expect(text).toContain('Global economy (1%)');
+    expect(text).toContain('Disabled');
     vi.unstubAllGlobals();
   });
 });

@@ -5,7 +5,8 @@
  *          back to the src/config constants), handles live previews, and
  *          submits POST /games with an optional X-Admin-Token header.
  *          Re-renders the form when /meta loads or the admin saves new
- *          Game Settings (section 11).
+ *          Game Settings (section 11). Per-round options (fee/spread
+ *          overrides, chat) live in round-options.js.
  *
  * No runtime dependencies on main.js or setup-shell.js; standalone module.
  * Security notes: backend values (game_id) and derived URLs are rendered via
@@ -28,6 +29,12 @@ import { initGameManagement } from './game-management.js';
 import { initEconomySettings } from './economy-settings.js';
 import { initAdminMetrics } from './admin-metrics.js';
 import { initGameConfigSettings } from './game-config-settings.js';
+import {
+  applyChatDefault,
+  buildRoundOptionsReviewRows,
+  collectRoundOptionsPayload,
+  refreshRateOverrideHints,
+} from './round-options.js';
 import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
 import { fillPresetSelect } from '../ui/async-duration.js';
 import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
@@ -107,6 +114,10 @@ export function applyGameConfigToForm() {
 
   el('admin-trade-count').min = String(config.trade_count_limits.min);
   el('admin-trade-count').max = String(config.trade_count_limits.max);
+
+  applyChatDefault(config);
+  // /meta also carries the global fee/spread used as override placeholders.
+  refreshRateOverrideHints();
 
   renderConfigSource();
   applyRoundTypeVisibility();
@@ -328,6 +339,7 @@ export function buildReviewSummary() {
   }
 
   rows.push(['Trade count', String(tradeCount)]);
+  rows.push(...buildRoundOptionsReviewRows());
 
   return rows;
 }
@@ -410,6 +422,10 @@ export function buildGamePayload() {
       seasonCyclesInput: el('admin-season-cycles'),
     })
   );
+
+  // Optional per-round options (fee/spread overrides, chat); throws on
+  // invalid overrides, which createRound shows as the error message.
+  Object.assign(payload, collectRoundOptionsPayload());
 
   return payload;
 }
@@ -578,13 +594,23 @@ export function init() {
     updateReview();
   });
 
+  ['admin-fee-override', 'admin-spread-override'].forEach((id) =>
+    el(id).addEventListener('input', updateReview)
+  );
+  el('admin-chat-enabled').addEventListener('change', updateReview);
+
   el('admin-create-btn').addEventListener('click', createRound);
 
   // Initial state: fallback config first, then the backend game_config from
   // /meta (re-fetched when the backend URL changes).
   applyGameConfigToForm();
   initGameManagement();
-  initEconomySettings();
+  initEconomySettings({
+    onLoaded() {
+      refreshRateOverrideHints();
+      updateReview();
+    },
+  });
   initAdminMetrics();
   initGameConfigSettings({ onSaved: applyGameConfigToForm });
   el('admin-backend-url').addEventListener('change', () => {

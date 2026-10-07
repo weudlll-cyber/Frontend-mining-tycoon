@@ -244,9 +244,10 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
         <ul>
           <li>
             A trade converts part of one token balance into another token at the
-            oracle prices, minus the conversion fee and spread (by default 2%
-            fee + 1% spread; the current values are shown in Player State). You
-            trade with the game, not with other players.
+            oracle prices, minus the conversion fee and spread. Both are set per
+            round by the admin (by default the global economy values, 2% fee +
+            1% spread); the round's values are shown in Player State and in the
+            Trade tab. You trade with the game, not with other players.
           </li>
           <li>
             Each round has a <strong>limited number of trades</strong>. The
@@ -407,7 +408,9 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           <li>
             <strong>Chat:</strong> talk to the other players in the round. Chat
             is social only, has no effect on the game and is not saved. A small
-            preview with an unread counter stays visible on the board.
+            preview with an unread counter stays visible on the board. The admin
+            can disable chat for a round; the Chat tab then says "Chat is
+            disabled for this round."
           </li>
           <li><strong>Top 5:</strong> the current leaderboard.</li>
         </ul>

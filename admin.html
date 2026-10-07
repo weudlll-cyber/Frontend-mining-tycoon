@@ -483,6 +483,16 @@ Security notes:
           </label>
         </div>
       </div>
+      <div class="form-group">
+        <label for="admin-chat-enabled">
+          <input id="admin-chat-enabled" type="checkbox" checked />
+          Chat enabled
+        </label>
+        <p id="admin-chat-enabled-note" class="derived-note">
+          Players can chat in the live tools window. Untick to disable chat for
+          this round.
+        </p>
+      </div>
       <p
         id="admin-game-config-source"
         class="derived-note"
@@ -605,6 +615,34 @@ Security notes:
           <div id="admin-trade-schedule-preview" class="schedule-preview">
             No trades configured.
           </div>
+        </div>
+        <div class="form-group">
+          <label for="admin-fee-override">Conversion fee override (%)</label>
+          <input
+            id="admin-fee-override"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="Global economy value"
+          />
+          <p id="admin-fee-override-note" class="derived-note">
+            Empty = use the global economy value (section 9).
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="admin-spread-override">Oracle spread override (%)</label>
+          <input
+            id="admin-spread-override"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="Global economy value"
+          />
+          <p id="admin-spread-override-note" class="derived-note">
+            Empty = use the global economy value (section 9).
+          </p>
         </div>
       </div>
     </section>
@@ -955,6 +993,14 @@ Security notes:
               />
             </div>
           </div>
+          <label for="admin-gameconfig-default-chat-enabled">
+            <input id="admin-gameconfig-default-chat-enabled" type="checkbox" />
+            Chat enabled by default
+          </label>
+          <p class="derived-note">
+            Pre-ticks "Chat enabled" in the create form. Each round keeps the
+            choice it was created with.
+          </p>
         </fieldset>
 
         <fieldset class="gc-fieldset">

@@ -62,6 +62,15 @@ export const ECONOMY_FIELDS = Object.freeze([
 ]);
 
 let loadedConfig = null;
+let onLoadedCallback = null;
+
+/**
+ * The economy config last loaded or saved in this page session (a copy), or
+ * null before "Load". The create form uses it for the fee/spread placeholders.
+ */
+export function getLoadedEconomyConfig() {
+  return loadedConfig ? { ...loadedConfig } : null;
+}
 
 function el(id) {
   return document.getElementById(id);
@@ -151,6 +160,7 @@ function renderSettings(settings) {
   }
   el('admin-economy-fields').hidden = false;
   el('admin-economy-save-btn').disabled = false;
+  onLoadedCallback?.(getLoadedEconomyConfig());
 }
 
 function readRawValues() {
@@ -208,10 +218,15 @@ export async function saveEconomySettings() {
   }
 }
 
-export function initEconomySettings() {
+/**
+ * Wire the section. `onLoaded` runs with the config after every load/save
+ * (admin-setup.js refreshes the create form's fee/spread placeholders).
+ */
+export function initEconomySettings({ onLoaded } = {}) {
   const container = el('admin-economy-fields');
   if (!container) return;
   loadedConfig = null;
+  onLoadedCallback = onLoaded || null;
   container.replaceChildren();
   renderFields(container);
   container.hidden = true;

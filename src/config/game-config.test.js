@@ -40,6 +40,7 @@ const BACKEND_CONFIG = {
     async_session_preset: '5m',
     enrollment_window_seconds: 20,
     scoring_mode: 'power',
+    chat_enabled: false,
   },
   duration_limits: { min_seconds: 30, max_seconds: 7200 },
   enrollment_window_limits: { min_seconds: 15, max_seconds: 60 },
@@ -83,6 +84,7 @@ describe('effective config resolution', () => {
       async_session_preset: '5m',
       enrollment_window_seconds: 10,
       scoring_mode: 'stockpile',
+      chat_enabled: true,
     });
   });
 
@@ -150,6 +152,11 @@ describe('normalizeGameConfig', () => {
     expect(config).toEqual(fallback);
     expect(fallback.account_policy).toEqual({ require_account_to_join: false });
     expect(normalizeGameConfig(null)).toEqual(fallback);
+    // A non-boolean chat default falls back to "chat on" (today's behavior).
+    expect(
+      normalizeGameConfig({ defaults: { chat_enabled: 'no' } }).defaults
+        .chat_enabled
+    ).toBe(true);
     expect(
       normalizeGameConfig({ duration_presets: [] }).duration_presets
     ).toEqual(fallback.duration_presets);

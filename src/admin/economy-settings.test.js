@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ECONOMY_FIELDS,
   buildEconomyPatch,
+  getLoadedEconomyConfig,
   initEconomySettings,
   loadEconomySettings,
   saveEconomySettings,
@@ -265,6 +266,21 @@ describe('economy settings section', () => {
 });
 
 describe('initEconomySettings', () => {
+  it('reports the loaded config to onLoaded and exposes a copy', async () => {
+    const onLoaded = vi.fn();
+    buildDom();
+    initEconomySettings({ onLoaded });
+    expect(getLoadedEconomyConfig()).toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse(settings())));
+
+    await loadEconomySettings();
+
+    expect(onLoaded).toHaveBeenCalledWith(CONFIG);
+    const copy = getLoadedEconomyConfig();
+    copy.conversion_fee_rate = 9;
+    expect(getLoadedEconomyConfig().conversion_fee_rate).toBe(0.02);
+  });
+
   it('is a no-op when the section is absent', () => {
     document.body.innerHTML = '';
     expect(() => initEconomySettings()).not.toThrow();

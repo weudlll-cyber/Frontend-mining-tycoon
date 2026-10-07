@@ -810,6 +810,50 @@ describe('trading-panel', () => {
       expect(trading.value_fee_rate).toBe(0.02);
     });
 
+    it('keeps a 0% per-round fee override instead of the 2% fallback', () => {
+      const api = initTradingPanel({
+        getGameMeta: () => ({ conversion_fee_rate: 0, trading: null }),
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      expect(api.getTrading().value_fee_rate).toBe(0);
+      api.renderTradingStatus();
+      expect(statusEl.textContent).toBe('Trading: Not Enabled (0.0% fee)');
+    });
+
+    it('shows the round fee and oracle spread from game meta in the cost note', () => {
+      const api = initTradingPanel({
+        getGameMeta: () => ({
+          conversion_fee_rate: 0.015,
+          oracle_spread: 0.005,
+          trading: null,
+        }),
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+
+      expect(panelEl.querySelector('.trading-cost-note').textContent).toBe(
+        'Conversion cost: 1.50% fee + 0.50% spread for this round (informational)'
+      );
+    });
+
+    it('keeps the fee-only cost note when game meta has no oracle_spread', () => {
+      const api = initTradingPanel({
+        getGameMeta: () => ({ conversion_fee_rate: 0.02, trading: null }),
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+
+      api.renderTradingStatus();
+
+      expect(panelEl.querySelector('.trading-cost-note').textContent).toBe(
+        'Conversion cost: 2.00% (informational)'
+      );
+    });
+
     it('handles getGameMeta errors gracefully', () => {
       const getMeta = () => {
         throw new Error('Meta fetch failed');

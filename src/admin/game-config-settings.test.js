@@ -311,6 +311,45 @@ describe('editing and saving', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('saves "Chat enabled by default" as defaults.chat_enabled only when changed', async () => {
+    // CONFIG has no defaults.chat_enabled (older backend): read as enabled.
+    const fetchMock = await loadWith();
+    expect($('default-chat-enabled').checked).toBe(true);
+
+    await saveGameConfigSettings();
+    expect(resultText()).toBe('No changes to save.');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    $('default-chat-enabled').checked = false;
+    fetchMock.mockResolvedValueOnce(
+      okResponse(
+        documentFor(
+          { ...CONFIG, defaults: { ...CONFIG.defaults, chat_enabled: false } },
+          2
+        )
+      )
+    );
+    $('save-btn').click();
+    await flush();
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      defaults: { chat_enabled: false },
+    });
+    expect($('default-chat-enabled').checked).toBe(false);
+    expect(resultText()).toContain('Saved defaults.');
+  });
+
+  it('compares chat_enabled against an explicit backend value', () => {
+    const baseline = structuredClone(CONFIG);
+    baseline.defaults.chat_enabled = false;
+    const draft = structuredClone(baseline);
+    expect(buildGameConfigPatch(draft, baseline)).toEqual({});
+    draft.defaults.chat_enabled = true;
+    expect(buildGameConfigPatch(draft, baseline)).toEqual({
+      defaults: { chat_enabled: true },
+    });
+  });
+
   it('removes presets from the checklists and default dropdowns', async () => {
     await loadWith();
     const row = presetRows().find(
@@ -399,7 +438,11 @@ describe('editing and saving', () => {
     await loadWith();
     const { config, errors } = readGameConfigDraft();
     expect(errors).toEqual([]);
-    expect(config).toEqual(CONFIG);
+    // The legacy CONFIG has no chat default; the editor reads it as enabled.
+    expect(config).toEqual({
+      ...CONFIG,
+      defaults: { ...CONFIG.defaults, chat_enabled: true },
+    });
   });
 });
 
