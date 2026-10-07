@@ -257,7 +257,7 @@ PowerShell scripts (`scripts/`):
 | `push_with_audit.ps1` | summarize outgoing changes, run the gate, push |
 | `code_health_audit.ps1` | advisory code-health audit |
 | `deploy-to-vps.ps1` | build and deploy `dist/` to a VPS |
-| `apply-branch-protection.ps1` | apply branch protection to `main` (needs `GITHUB_TOKEN`) |
+| `apply-branch-protection.ps1` | create/update the "Protect main" ruleset (needs `GITHUB_TOKEN`) |
 | `tag-stable-snapshot.ps1` | create a stable rollback tag |
 
 Node helpers: `scripts/check_changed_lines_coverage.mjs`,

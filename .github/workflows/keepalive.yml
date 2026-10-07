@@ -68,6 +68,8 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # main is protected by the "Protect main" ruleset (PR + green CI), so the
+          # keepalive commit goes to its own branch; any push counts as activity.
           git commit --allow-empty -m 'chore(ci): keepalive to preserve scheduled workflows [skip ci]'
-          git push origin HEAD:main
+          git push --force origin HEAD:refs/heads/keepalive
           echo "- Keepalive commit: pushed (${IDLE_DAYS}d idle)" >> "$GITHUB_STEP_SUMMARY"
