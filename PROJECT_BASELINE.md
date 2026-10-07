@@ -155,7 +155,7 @@ Entry points (Vite multi-page build):
 
 - `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus), join ("Enter game"), and "Last Game Highscores" from the last finished round. Joining stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
-- `admin.html` + `src/admin/`: admin console with 8 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management).
+- `admin.html` + `src/admin/`: admin console with 10 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics).
 
 The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 

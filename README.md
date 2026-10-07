@@ -92,6 +92,7 @@ console all use this default; the Backend URL fields on `player.html` and
 
 - Sign in, **Create account** (username, display name, email, Discord handle, optional Telegram handle, password with at least 12 characters incl. upper/lower case, digit and special character) and **Logout**.
 - A stored login is re-validated with `GET /auth/me` on load; an invalid token signs you out.
+- **Change password** (signed in only) opens a dialog for current/new password. The backend ends all sessions after a change, so the lobby signs you out and asks you to sign in again.
 - **Forgot password?** opens a dialog. Password reset is disabled by default in the backend; the dialog then shows "Password reset is not available. Please contact an administrator." (or the server message).
 - **Open Games** lists enrolling games and running async games (only while the session still fits into the remaining round time). The list refreshes every 10 seconds and when the tab becomes visible.
 - **Enter game** (requires sign-in and a selected game) joins, stores the game ID, player ID and `player_token`, and opens `player.html?autostart=1`.
@@ -115,12 +116,14 @@ tablets stack the grid; phones show one season card at a time. See
 
 ### Admin console (`admin.html`, `src/admin/`)
 
-Eight sections: 1 Connection (backend URL, optional admin token),
+Ten sections: 1 Connection (backend URL, optional admin token),
 2 Round Type (Sync / Async), 3 Time Configuration, 4 Scoring Mode,
 5 Trading Rules (count and unlock preview), 6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
-(active games with sync/async label, status-aware time remaining, player count,
-delete).
+(active games with sync/async label, status-aware time remaining, player count;
+per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
+(`GET`/`PATCH /admin/economy`; changes apply to newly created games only),
+10 Metrics (`GET /admin/metrics` summary).
 
 Presets and defaults (from `src/config/`):
 
@@ -145,7 +148,7 @@ the admin token.
 - **Async:** the round runs immediately (`enrollment_window_seconds=0`). Each player plays fixed-length sessions inside the round window; every session starts from the same baseline, and the backend keeps the best score. Stream: `/sessions/{session_id}/stream` only.
 - Async call chain: `POST /games/{id}/join` (lobby) -> `POST /games/{id}/sessions` (automatic on entering the board) -> `GET /sessions/{session_id}/stream?player_id=...&ticket=...`.
 - In async rounds the Player State panel shows `This session` and `Best this round`, and trade unlock times count from the session start.
-- Upgrades and trades are only accepted while the round runs (sync) or your session is active (async); otherwise the backend returns `409` and the board shows its `detail`.
+- Upgrades and trades are only accepted while the round runs (sync) or your session is active (async). The board disables the upgrade buttons and "Execute Trade" with a short reason outside that window; if a request still reaches the backend, its `409` `detail` is shown as a toast.
 
 Auth and streaming:
 
