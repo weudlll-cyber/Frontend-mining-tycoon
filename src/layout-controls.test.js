@@ -3,7 +3,7 @@ File: src/layout-controls.test.js
 Purpose: Guard setup action visibility/state rules across sync and async round flows.
 */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function buildDomFixture() {
   document.body.innerHTML = `
@@ -92,6 +92,17 @@ async function loadMainModule() {
 beforeEach(() => {
   vi.resetModules();
   buildDomFixture();
+  // DOMContentLoaded startup fetches meta/active games and then starts an
+  // auto-refresh interval. A never-settling fetch parks that async chain so
+  // it cannot log or schedule work after the test environment tears down.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise(() => {}))
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('layout controls', () => {
