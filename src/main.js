@@ -853,6 +853,9 @@ function handleActiveSessionExpired() {
 
   isStreamActive = false;
   setLiveSessionActive(false);
+  // The stream is closed, so no further payload would re-render the action
+  // buttons: re-apply the play-window gate now.
+  refreshPlayerActionControls();
   setBadgeStatus(connStatusEl, 'idle');
   setStartSessionStatus(
     'Session duration reached. Start Async Session to continue.',
@@ -1386,6 +1389,14 @@ function acknowledgeGameOverOverlay() {
 function setLiveSessionActive(isActive) {
   playerHasActiveSession = Boolean(isActive);
   document.body.classList.toggle('live-session', Boolean(isActive));
+}
+
+/** Re-render upgrade lanes and the trade panel against the current gate. */
+function refreshPlayerActionControls() {
+  if (lastGameData) {
+    renderAllSeasonUpgrades(lastGameData, getGameMeta);
+  }
+  tradingPanelApi?.renderTradingStatus?.();
 }
 
 /**
