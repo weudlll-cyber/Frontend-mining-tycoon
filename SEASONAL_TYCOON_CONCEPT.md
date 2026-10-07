@@ -215,18 +215,20 @@ Implementation note: the admin console pre-fills a default trade count from the 
 
 ### Default Trading Values by Game Length
 
-> **Open product decision.** The concept table and the implemented defaults
-> differ. Until the owner decides which one is right, the implemented table is
-> what players get.
+> **Decided by the project owner (2026-10-07):** the implemented table below
+> is the confirmed default. It is admin-configurable at runtime in the admin
+> console, section "11 — Game Settings" (backend `trade_defaults`), so it can
+> be tuned without a code change. The earlier concept list is kept for history
+> only.
 
-Concept (agreed earlier):
+Earlier concept (superseded):
 
 - five-minute games: zero trades
 - ten- to fifteen-minute games: one trade, typically in the middle portion
 - twenty- to forty-minute games: two trades, typically in middle and later portions
 - sixty-minute-and-longer games: three trades, typically across early, middle, and later portions
 
-Implemented (`getDefaultTradeCount()` in `src/config/trading-control-data.js`; the admin can change the count, 0-10):
+Confirmed default (`getDefaultTradeCount()` in `src/config/game-config.js`; the admin can still change the count per round within the configured trade-count limits, default 0-10):
 
 | Round length (sync) or session length (async) | Default trades |
 |---|---|
@@ -238,9 +240,15 @@ Implemented (`getDefaultTradeCount()` in `src/config/trading-control-data.js`; t
 | 24 h and longer | 6 |
 | lengths between these ranges | nearest bucket |
 
-Unlock times (`computeTradeUnlockOffsetsSeconds()`): the first trade unlocks
-after 20 % of the duration, the others are spread evenly over the remaining
-80 %. Example: 30 minutes with 3 trades unlocks at 6, 14 and 22 minutes. In
+The backend stores the table as ascending buckets (`max_duration_seconds` ->
+`trade_count`, the first bucket whose max is >= the duration wins, `null` =
+longer than all). Admins edit those buckets in Game Settings. When the backend
+sends no game config, the frontend uses built-in buckets that reproduce the
+table above including the nearest-bucket gaps.
+
+Unlock times (`computeTradeUnlockOffsetsSeconds()`): by default the first
+trade unlocks after 20 % of the duration, the others are spread evenly over
+the remaining 80 % (both fractions are part of Game Settings). Example: 30 minutes with 3 trades unlocks at 6, 14 and 22 minutes. In
 async rounds the offsets count from the start of each player's session.
 
 Hosts may override the trade count before round start. Overriding individual unlock times is not implemented.
@@ -326,6 +334,6 @@ Farming does not introduce player-to-player markets, real-world liquidity pools,
 - Mining (season cards, three upgrade lanes, halvings, events, oracle prices) is implemented end to end.
 - Trading is implemented: host-configured trade count and unlock schedule, backend-authoritative conversion with fee and spread, executed from the Trade tab of the live tools window. A per-round fee override by the host is not implemented.
 - Farming is not started; the UI shows a placeholder tab and a status pill.
-- All four scoring modes are evaluated by the backend; the `mining_time` and `efficiency` formulas still need product confirmation (see [SCORING_MODES.md](SCORING_MODES.md)).
+- All four scoring modes are evaluated by the backend; the `mining_time` and `efficiency` formulas were confirmed by the owner on 2026-10-07 (see [SCORING_MODES.md](SCORING_MODES.md)).
 - Sync and async rounds, async sessions and best-of scoring are implemented.
 - Structured playtests for mining pace, upgrade economy and halving behavior are still pending (checklist in [MANUAL_TEST_RUNBOOK.md](MANUAL_TEST_RUNBOOK.md)).

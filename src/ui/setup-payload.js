@@ -1,9 +1,11 @@
 /**
 File: src/ui/setup-payload.js
 Purpose: Build setup payload fragments for game creation inputs.
+Notes: custom-duration limits come from the effective game config (backend
+/meta `game_config`, fallback src/config constants); the backend re-validates.
 */
 
-import { ROUND_DURATION_LIMITS } from '../config/game-control-data.js';
+import { getEffectiveGameConfig } from '../config/game-config.js';
 
 export function resolveDurationSecondsFromInputs({
   durationPresetInput,
@@ -23,13 +25,10 @@ export function resolveDurationSecondsFromInputs({
     else if (unit === 'hours') seconds = customValue * 3600;
     else if (unit === 'days') seconds = customValue * 86400;
 
-    if (
-      seconds < ROUND_DURATION_LIMITS.min ||
-      seconds > ROUND_DURATION_LIMITS.max
-    ) {
-      throw new Error(
-        `Duration must be between ${ROUND_DURATION_LIMITS.min}s and ${ROUND_DURATION_LIMITS.max}s`
-      );
+    const { min_seconds: min, max_seconds: max } =
+      getEffectiveGameConfig().duration_limits;
+    if (seconds < min || seconds > max) {
+      throw new Error(`Duration must be between ${min}s and ${max}s`);
     }
     return { mode: 'custom', customSeconds: seconds };
   }

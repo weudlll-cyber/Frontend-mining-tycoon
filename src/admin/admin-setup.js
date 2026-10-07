@@ -1,8 +1,11 @@
 /**
  * File: src/admin/admin-setup.js
- * Purpose: Admin-only round creation UI. Populates form controls from
- *          control-data constants, handles live previews, and submits
- *          POST /games with an optional X-Admin-Token header.
+ * Purpose: Admin-only round creation UI. Populates form controls from the
+ *          effective game config (backend GET /meta `game_config`, falling
+ *          back to the src/config constants), handles live previews, and
+ *          submits POST /games with an optional X-Admin-Token header.
+ *          Re-renders the form when /meta loads or the admin saves new
+ *          Game Settings (section 11).
  *
  * No runtime dependencies on main.js or setup-shell.js; standalone module.
  * Security notes: backend values (game_id) and derived URLs are rendered via
@@ -10,22 +13,23 @@
  */
 
 import {
-  ROUND_DURATION_PRESETS,
-  ASYNC_ROUND_PRESET_IDS,
-  ASYNC_ROUND_DEFAULT_PRESET,
-  ASYNC_SESSION_PRESET_IDS,
-  ASYNC_SESSION_DEFAULT_PRESET,
-  ENROLLMENT_WINDOW_LIMITS,
-  ENROLLMENT_WINDOW_DEFAULT_SECONDS,
   SCORING_CONTROL,
-  TRADE_COUNT_LIMITS,
+  getEffectiveGameConfig,
+  getActiveGameConfigDocument,
+  getPresetSeconds,
+  isAsyncRoundType,
+  clampTradeCount,
+  clampEnrollmentWindowSeconds,
   getDefaultTradeCount,
   computeTradeUnlockOffsetsSeconds,
 } from '../config/index.js';
+import { fetchMetaSnapshot } from '../meta/meta-manager.js';
 import { initGameManagement } from './game-management.js';
 import { initEconomySettings } from './economy-settings.js';
 import { initAdminMetrics } from './admin-metrics.js';
+import { initGameConfigSettings } from './game-config-settings.js';
 import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
+import { fillPresetSelect } from '../ui/async-duration.js';
 import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
 import {
   STORAGE_KEYS,
@@ -47,52 +51,86 @@ const SCORING_LABELS = {
 // Short-alias → canonical mode value accepted by backend
 const SCORING_ALIAS_MAP = SCORING_CONTROL.CANONICAL_MODES;
 
-// Default sync preset for manual testing
-const SYNC_DEFAULT_PRESET = '5m';
-
 // ── DOM helpers ──────────────────────────────────────────────────────────────
 
 function el(id) {
   return document.getElementById(id);
 }
 
-function buildOption(value, label, isDefault) {
-  const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = label;
-  if (isDefault) opt.selected = true;
-  return opt;
+// ── Populate the form from the effective game config ───────────────────────
+
+/**
+ * (Re)build the create-form options, limits and defaults from the effective
+ * game config. Defaults (round type, presets, scoring mode, enrollment window)
+ * are applied every time: this runs on page load, after /meta arrives and
+ * after the admin saves new Game Settings, i.e. whenever the defaults change.
+ */
+export function applyGameConfigToForm() {
+  const config = getEffectiveGameConfig();
+  const { defaults } = config;
+  const keep = { keepCurrent: false };
+
+  fillPresetSelect(
+    el('admin-duration-preset'),
+    config.sync_round_preset_ids,
+    defaults.sync_round_preset,
+    { ...keep, customOption: true }
+  );
+  fillPresetSelect(
+    el('admin-async-duration-preset'),
+    config.async_round_preset_ids,
+    defaults.async_round_preset,
+    keep
+  );
+  fillPresetSelect(
+    el('admin-async-session-preset'),
+    config.async_session_preset_ids,
+    defaults.async_session_preset,
+    keep
+  );
+
+  const isAsync = isAsyncRoundType(defaults.round_type);
+  el('admin-round-type-sync').checked = !isAsync;
+  el('admin-round-type-async').checked = isAsync;
+
+  const scoringRadio = el(`admin-scoring-${defaults.scoring_mode}`);
+  if (scoringRadio) scoringRadio.checked = true;
+
+  const enrollment = el('admin-enrollment-window');
+  enrollment.min = String(config.enrollment_window_limits.min_seconds);
+  enrollment.max = String(config.enrollment_window_limits.max_seconds);
+  enrollment.value = String(clampEnrollmentWindowSeconds(0, config));
+
+  const customValue = el('admin-duration-custom-value');
+  customValue.min = String(config.duration_limits.min_seconds);
+  customValue.max = String(config.duration_limits.max_seconds);
+
+  el('admin-trade-count').min = String(config.trade_count_limits.min);
+  el('admin-trade-count').max = String(config.trade_count_limits.max);
+
+  renderConfigSource();
+  applyRoundTypeVisibility();
 }
 
-// ── Populate selects from control data ──────────────────────────────────────
-
-function populateDurationPreset() {
-  const select = el('admin-duration-preset');
-  // All presets (including '3h') are valid for sync rounds in the backend.
-  for (const [key] of Object.entries(ROUND_DURATION_PRESETS)) {
-    select.appendChild(
-      buildOption(key, _presetLabel(key), key === SYNC_DEFAULT_PRESET)
-    );
-  }
-  select.appendChild(buildOption('custom', 'Custom…', false));
+function renderConfigSource() {
+  const sourceEl = el('admin-game-config-source');
+  if (!sourceEl) return;
+  const doc = getActiveGameConfigDocument();
+  const hash = String(doc?.config_hash || '').slice(0, 12);
+  sourceEl.textContent = doc
+    ? `Options and defaults: backend Game Settings v${doc.version ?? '?'} (${hash || 'no hash'}).`
+    : 'Options and defaults: built-in fallback (backend sent no game config).';
 }
 
-function populateAsyncDurationPreset() {
-  const select = el('admin-async-duration-preset');
-  for (const key of ASYNC_ROUND_PRESET_IDS) {
-    select.appendChild(
-      buildOption(key, _presetLabel(key), key === ASYNC_ROUND_DEFAULT_PRESET)
-    );
-  }
-}
-
-function populateAsyncSessionPreset() {
-  const select = el('admin-async-session-preset');
-  for (const key of ASYNC_SESSION_PRESET_IDS) {
-    select.appendChild(
-      buildOption(key, _presetLabel(key), key === ASYNC_SESSION_DEFAULT_PRESET)
-    );
-  }
+/**
+ * Fetch GET /meta (public) and re-render the form with its game_config.
+ * Failures keep the current (fallback) form; meta-manager logs them.
+ */
+export async function refreshGameConfigFromMeta() {
+  const baseUrl = String(el('admin-backend-url').value || '').trim();
+  if (!/^https?:\/\/.+/.test(baseUrl)) return;
+  await fetchMetaSnapshot(baseUrl, null, { force: true });
+  applyGameConfigToForm();
 }
 
 function populateScoringModes() {
@@ -125,23 +163,13 @@ function populateScoringModes() {
   }
 }
 
-// ── Preset label helper ──────────────────────────────────────────────────────
-
-function _presetLabel(key) {
-  const seconds = ROUND_DURATION_PRESETS[key];
-  if (seconds < 3600) return `${seconds / 60}m`;
-  if (seconds < 86400) return `${seconds / 3600}h`;
-  if (seconds < 604800) return `${seconds / 86400}d`;
-  return `${seconds / 86400}d`;
-}
-
 // ── Duration resolution ──────────────────────────────────────────────────────
 
 function resolveCurrentDurationSeconds() {
   const roundType = _getSelectedRoundType();
   if (roundType === 'async') {
     const preset = el('admin-async-duration-preset').value;
-    return ROUND_DURATION_PRESETS[preset] ?? 0;
+    return getPresetSeconds(preset) ?? 0;
   }
 
   const preset = el('admin-duration-preset').value;
@@ -151,12 +179,12 @@ function resolveCurrentDurationSeconds() {
     const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
     return Math.round(rawValue * (multipliers[unit] ?? 1));
   }
-  return ROUND_DURATION_PRESETS[preset] ?? 0;
+  return getPresetSeconds(preset) ?? 0;
 }
 
 function resolveAsyncSessionSeconds() {
   const preset = el('admin-async-session-preset').value;
-  return ROUND_DURATION_PRESETS[preset] ?? 0;
+  return getPresetSeconds(preset) ?? 0;
 }
 
 /**
@@ -175,11 +203,7 @@ export function resolveTradeWindowSeconds() {
 
 function updateTradePreview() {
   const durationSeconds = resolveTradeWindowSeconds();
-  const rawCount = Number(el('admin-trade-count').value);
-  const tradeCount = Math.max(
-    TRADE_COUNT_LIMITS.min,
-    Math.min(TRADE_COUNT_LIMITS.max, Math.round(rawCount) || 0)
-  );
+  const tradeCount = clampTradeCount(el('admin-trade-count').value);
 
   const noteEl = el('admin-trade-count-note');
   const previewEl = el('admin-trade-schedule-preview');
@@ -272,14 +296,7 @@ function formatApiDetail(detail) {
 // ── Enrollment window helper ─────────────────────────────────────────────────
 
 function _getEnrollmentWindow() {
-  const raw = Number(el('admin-enrollment-window').value);
-  return Math.max(
-    ENROLLMENT_WINDOW_LIMITS.min,
-    Math.min(
-      ENROLLMENT_WINDOW_LIMITS.max,
-      Math.round(raw) || ENROLLMENT_WINDOW_DEFAULT_SECONDS
-    )
-  );
+  return clampEnrollmentWindowSeconds(el('admin-enrollment-window').value);
 }
 
 // ── Review panel ─────────────────────────────────────────────────────────────
@@ -295,11 +312,7 @@ function _scoringLabel(canonical) {
 export function buildReviewSummary() {
   const roundType = _getSelectedRoundType();
   const durationSeconds = resolveCurrentDurationSeconds();
-  const rawCount = Number(el('admin-trade-count').value);
-  const tradeCount = Math.max(
-    TRADE_COUNT_LIMITS.min,
-    Math.min(TRADE_COUNT_LIMITS.max, Math.round(rawCount) || 0)
-  );
+  const tradeCount = clampTradeCount(el('admin-trade-count').value);
 
   const rows = [];
 
@@ -347,11 +360,7 @@ export function updateReview() {
 export function buildGamePayload() {
   const roundType = _getSelectedRoundType();
   const durationSeconds = resolveCurrentDurationSeconds();
-  const rawCount = Number(el('admin-trade-count').value);
-  const tradeCount = Math.max(
-    TRADE_COUNT_LIMITS.min,
-    Math.min(TRADE_COUNT_LIMITS.max, Math.round(rawCount) || 0)
-  );
+  const tradeCount = clampTradeCount(el('admin-trade-count').value);
   const tradeUnlockOffsets = computeTradeUnlockOffsetsSeconds(
     resolveTradeWindowSeconds(),
     tradeCount
@@ -523,21 +532,7 @@ export async function createRound() {
 
 export function init() {
   initBackendUrlField();
-  populateDurationPreset();
-  populateAsyncDurationPreset();
-  populateAsyncSessionPreset();
   populateScoringModes();
-
-  // Enrollment window defaults
-  el('admin-enrollment-window').min = String(ENROLLMENT_WINDOW_LIMITS.min);
-  el('admin-enrollment-window').max = String(ENROLLMENT_WINDOW_LIMITS.max);
-  el('admin-enrollment-window').value = String(
-    ENROLLMENT_WINDOW_DEFAULT_SECONDS
-  );
-
-  // Trade count limits from control data
-  el('admin-trade-count').min = String(TRADE_COUNT_LIMITS.min);
-  el('admin-trade-count').max = String(TRADE_COUNT_LIMITS.max);
 
   // Event listeners
   el('admin-round-type-sync').addEventListener(
@@ -565,8 +560,7 @@ export function init() {
       const sessionSelect = el('admin-async-session-preset');
       // Pick largest session preset that fits
       for (let i = sessionSelect.options.length - 1; i >= 0; i--) {
-        const optSecs =
-          ROUND_DURATION_PRESETS[sessionSelect.options[i].value] ?? 0;
+        const optSecs = getPresetSeconds(sessionSelect.options[i].value) ?? 0;
         if (optSecs <= roundSecs) {
           sessionSelect.selectedIndex = i;
           break;
@@ -586,12 +580,17 @@ export function init() {
 
   el('admin-create-btn').addEventListener('click', createRound);
 
-  // Initial state
-  syncDefaultTradeCount();
-  updateReview();
+  // Initial state: fallback config first, then the backend game_config from
+  // /meta (re-fetched when the backend URL changes).
+  applyGameConfigToForm();
   initGameManagement();
   initEconomySettings();
   initAdminMetrics();
+  initGameConfigSettings({ onSaved: applyGameConfigToForm });
+  el('admin-backend-url').addEventListener('change', () => {
+    void refreshGameConfigFromMeta();
+  });
+  void refreshGameConfigFromMeta();
 }
 
 document.addEventListener('DOMContentLoaded', init);

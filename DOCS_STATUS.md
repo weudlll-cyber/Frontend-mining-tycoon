@@ -22,7 +22,7 @@ Read these first in every new chat/session:
 | `DOCS_STATUS.md` | This index. |
 | `PROJECT_BASELINE.md` | What is implemented and tested right now; status checkpoint and open work. Source of truth if docs disagree. |
 | `README.md` | Entry point: quick start, pages, UI overview, backend URL, deploy, scripts, CI overview, project structure. |
-| `LOCKED_DECISIONS.md` | Invariants and change control, including the 2026-10-07 REDESIGN DECISION for the floating live tools window (pending owner confirmation). |
+| `LOCKED_DECISIONS.md` | Invariants and change control, including the 2026-10-07 REDESIGN DECISION for the floating live tools window (confirmed by the owner on 2026-10-07). |
 | `CONTRIBUTING.md` | Contribution process, commenting rules, doc-update duty. |
 | `QUALITY_ENFORCEMENT.md` | Single source of truth for local gates, required CI checks, scheduled audits, merge policy and test-quality policy. |
 | `CODE_ORGANIZATION.md` | Current module map and dependency rules. |
@@ -40,7 +40,7 @@ Read these first in every new chat/session:
 | Doc | Purpose |
 |---|---|
 | `SEASONAL_TYCOON_CONCEPT.md` | Game vision, agreed design decisions, farming roadmap; marks where the implementation differs (trade defaults, default round type). |
-| `SCORING_MODES.md` | The four scoring modes, plus the backend formulas (two pending product confirmation). |
+| `SCORING_MODES.md` | The four scoring modes, plus the backend formulas (confirmed by the owner on 2026-10-07). |
 | `PRODUCT_INFRASTRUCTURE.md` | Non-gameplay systems (accounts, admin, leaderboards, history, chat) with implemented / partial / not-started markers. |
 
 ### Historical (do not use as current reference)

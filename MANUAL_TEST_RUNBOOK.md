@@ -42,9 +42,9 @@ window to play with two accounts.
 ## 1. Admin Console (`admin.html`)
 
 1. Open `/admin.html`. The amber banner reads "Admin Setup - round configuration is snapshot-locked at creation".
-2. Verify **10 sections**: 1 Connection, 2 Round Type, 3 Time Configuration, 4 Scoring Mode, 5 Trading Rules, 6 Advanced Overrides (optional), 7 Review & Create, 8 Game Management, 9 Global Economy, 10 Metrics.
-3. Defaults (from `src/config/` and `src/admin/admin-setup.js`): Backend URL = stored URL or `VITE_API_BASE_URL` default; round type Sync; enrollment window 10 s; sync round 5m; async round 30m; async session 5m; scoring Stockpile.
-4. Sync presets include `1m` (temporary test preset), `3h` and `Custom...`. Async round presets: 1m, 5m, 10m, 15m, 30m, 1h, 3h, 6h, 12h, 1d, 3d, 7d. Session presets: 1m, 5m, 10m, 30m, 1h, 6h, 12h, 1d; a session longer than the round is clamped.
+2. Verify **11 sections**: 1 Connection, 2 Round Type, 3 Time Configuration, 4 Scoring Mode, 5 Trading Rules, 6 Advanced Overrides (optional), 7 Review & Create, 8 Game Management, 9 Global Economy, 10 Metrics, 11 Game Settings.
+3. Defaults come from the backend game config (`GET /meta` -> `game_config`). Section 2 shows the source: "backend Game Settings vN (hash)" or, with an older backend, "built-in fallback". Built-in fallback / shipped backend defaults: Backend URL = stored URL or `VITE_API_BASE_URL` default; round type Sync; enrollment window 10 s; sync round 5m; async round 30m; async session 5m; scoring Stockpile.
+4. Sync presets include `1m` (short test preset), `3h` and `Custom...`. Async round presets: 1m, 5m, 10m, 15m, 30m, 1h, 3h, 6h, 12h, 1d, 3d, 7d. Session presets: 1m, 5m, 10m, 30m, 1h, 6h, 12h, 1d; a session longer than the round is clamped. (These lists change when an admin edits Game Settings.)
 5. **Trade schedule:** set Sync, round 30m, trade count 3. The preview shows `Trade 1: unlocks at 6m`, `Trade 2: ... 14m`, `Trade 3: ... 22m` (first unlock at 20 %, then evenly over the remaining 80 %). Changing the duration (or round type) resets the count to that duration's default (30m -> 2), so set the count last. In Async mode the preview is computed from the **session** duration and says "per session".
 6. **Create a sync round:** keep the defaults, click "Create Round". The result box shows "Round created successfully.", the Game ID and the lobby URL. No HTML from the server is rendered.
 7. **Create an async round:** Async, round 30m, session 5m, scoring Power. Review & Create shows these values; create succeeds.
@@ -53,6 +53,7 @@ window to play with two accounts.
 10. **Game Management:** "Refresh Game List" shows only enrolling/running games with ID, status, Sync/Async, time remaining (enrolling: enrollment time left; running: run time left) and player count. "Delete" asks for confirmation, deletes the game and refreshes the list. "📊 Metrics" shows that game's counters. "♻ Reset" asks for confirmation, clones the game (same settings) and shows the new Game ID.
 11. **Global Economy:** "Load" shows the current values, version and snapshot hash. Change one value and save: only the changed field is sent, the version increases, and a newly created game uses the new value while existing games keep their snapshot. Invalid input shows the backend message inline.
 12. **Metrics:** the summary shows total games and games per status.
+13. **Game Settings:** "Load game settings" shows version, hash and update time plus all editors. Add a preset `2m` = 120 s, tick it for "Sync round duration", choose it as default sync round duration and save: the result names the changed keys (`duration_presets`, `sync_round_preset_ids`, `defaults`), the version increases, and sections 2-5 re-render (Round Duration now offers and preselects 2m). Create a 2m sync round; it runs 2 minutes. Existing rounds are unchanged. Unticking every preset of a list, an empty preset id or a non-number shows an inline error without a request; a value the backend rejects (for example trade count max 99) shows the backend message inline. Reload the page: section 2 still shows the new version (from `/meta`).
 
 ---
 
@@ -176,7 +177,7 @@ Use this to validate mining balance (moved here from `README.md`).
 
 ## 9. Summary Checklist
 
-- [ ] Admin console: 10 sections, defaults, trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, game list + metrics/reset/delete, global economy edit, metrics summary
+- [ ] Admin console: 11 sections, defaults (backend game config), trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, game list + metrics/reset/delete, global economy edit, metrics summary, game settings edit (2m test preset)
 - [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join
 - [ ] Player board: autostart, no host controls, season cards + upgrades, analytics, halving, events banner
 - [ ] Live tools window: Trade / Farm / Chat / Top 5, drag, Escape and outside-click close, board stays usable

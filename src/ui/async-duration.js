@@ -8,26 +8,81 @@ Key responsibilities:
 Invariants:
 - Session duration must never exceed selected async round duration.
 - Unknown presets degrade gracefully to safe defaults.
+- Presets, offered preset lists and defaults come from the effective game
+  config (backend /meta `game_config`, fallback src/config constants).
 Security notes:
-- Pure client-side UI helpers; no network or token handling.
+- Pure client-side UI helpers; no network or token handling. Options are
+  built with createElement/textContent only.
 */
 
 import {
-  ROUND_DURATION_PRESETS,
-  ASYNC_ROUND_PRESET_IDS,
-  ASYNC_ROUND_DEFAULT_PRESET,
-  ASYNC_SESSION_PRESET_IDS,
-  ASYNC_SESSION_DEFAULT_PRESET,
-} from '../config/game-control-data.js';
+  getEffectiveGameConfig,
+  getPresetSeconds,
+  formatPresetLabel,
+} from '../config/game-config.js';
 
 /**
  * Converts a preset label (e.g. "5m", "3h", "7d") to seconds.
  * Returns null for unknown labels so callers can handle unsupported presets safely.
  */
 export function presetToSeconds(preset) {
-  return Object.prototype.hasOwnProperty.call(ROUND_DURATION_PRESETS, preset)
-    ? ROUND_DURATION_PRESETS[preset]
-    : null;
+  return getPresetSeconds(preset);
+}
+
+/**
+ * Rebuild a <select> with the given preset ids (labels derived from the
+ * preset seconds). Keeps the current value when it is still offered,
+ * otherwise selects `defaultId`. `customOption` appends the "Custom..." entry
+ * used by sync duration dropdowns.
+ */
+export function fillPresetSelect(
+  select,
+  presetIds,
+  defaultId,
+  { customOption = false, keepCurrent = true } = {}
+) {
+  if (!select) return;
+  const config = getEffectiveGameConfig();
+  const current = select.value;
+  const values = customOption ? [...presetIds, 'custom'] : [...presetIds];
+  select.replaceChildren(
+    ...values.map((id) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent =
+        id === 'custom' ? 'Custom…' : formatPresetLabel(id, config);
+      return option;
+    })
+  );
+  select.value = keepCurrent && values.includes(current) ? current : defaultId;
+}
+
+/**
+ * Fill the legacy (always hidden) host duration dropdowns on player.html from
+ * the effective game config so they never offer presets the backend dropped.
+ */
+export function populateHostPresetSelects({
+  durationPresetInput,
+  asyncDurationPresetInput,
+  asyncSessionPresetInput,
+}) {
+  const config = getEffectiveGameConfig();
+  fillPresetSelect(
+    durationPresetInput,
+    config.sync_round_preset_ids,
+    config.defaults.sync_round_preset,
+    { customOption: true }
+  );
+  fillPresetSelect(
+    asyncDurationPresetInput,
+    config.async_round_preset_ids,
+    config.defaults.async_round_preset
+  );
+  fillPresetSelect(
+    asyncSessionPresetInput,
+    config.async_session_preset_ids,
+    config.defaults.async_session_preset
+  );
 }
 
 /**
@@ -84,23 +139,22 @@ export function syncSessionDurationOptions({
 }
 
 export function getAsyncDurationPreset(roundDurationInput) {
-  const selectedPreset = String(
-    roundDurationInput?.value || ASYNC_ROUND_DEFAULT_PRESET
-  );
-  const allowed = new Set(ASYNC_ROUND_PRESET_IDS);
-  return allowed.has(selectedPreset)
+  const config = getEffectiveGameConfig();
+  const fallbackPreset = config.defaults.async_round_preset;
+  const selectedPreset = String(roundDurationInput?.value || fallbackPreset);
+  return config.async_round_preset_ids.includes(selectedPreset)
     ? selectedPreset
-    : ASYNC_ROUND_DEFAULT_PRESET;
+    : fallbackPreset;
 }
 
 export function getAsyncSessionDurationSeconds(sessionDurationInput) {
-  const selected = String(
-    sessionDurationInput?.value || ASYNC_SESSION_DEFAULT_PRESET
-  );
-  const isValidSession = ASYNC_SESSION_PRESET_IDS.includes(selected);
-  const seconds = ROUND_DURATION_PRESETS[selected];
-  if (isValidSession && seconds !== undefined) {
+  const config = getEffectiveGameConfig();
+  const fallbackPreset = config.defaults.async_session_preset;
+  const selected = String(sessionDurationInput?.value || fallbackPreset);
+  const isValidSession = config.async_session_preset_ids.includes(selected);
+  const seconds = getPresetSeconds(selected, config);
+  if (isValidSession && seconds !== null) {
     return seconds;
   }
-  return ROUND_DURATION_PRESETS[ASYNC_SESSION_DEFAULT_PRESET];
+  return getPresetSeconds(fallbackPreset, config);
 }
