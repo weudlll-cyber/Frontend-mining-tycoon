@@ -186,8 +186,8 @@ Additional output policy for this repository:
 
 ## 10) Control Data / Tuning Values
 
-- All game setup tunables — duration presets, session/enrollment limits, scoring mode defaults, async defaults — must live in `src/config/game-control-data.js`.
-- Trade-scheduling tunables must live in `src/config/trading-control-data.js`.
+- Round-setup tunables (duration presets, offered presets, defaults, limits, trade-count defaults, unlock fractions) are admin-editable in the backend (`/admin/game-config`, exposed as `game_config` in `GET /meta`). `src/config/game-config.js` is the single resolver: read them via `getEffectiveGameConfig()` and its helpers.
+- The built-in fallback values (used when the backend sends no `game_config`) live in `src/config/game-control-data.js` (setup) and `src/config/trading-control-data.js` (trade scheduling).
 - `src/config/index.js` is the barrel export; external modules may import from either the barrel or the individual files.
 - Never hardcode tunable values inline in UI modules, service modules, or `main.js`. Import from `src/config` instead.
 - Equivalent backend policy constants must live in `app/policy/control_data.py`. Do not duplicate them in `game_service.py` or `schemas.py`.

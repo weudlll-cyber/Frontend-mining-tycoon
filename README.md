@@ -116,25 +116,36 @@ tablets stack the grid; phones show one season card at a time. See
 
 ### Admin console (`admin.html`, `src/admin/`)
 
-Ten sections: 1 Connection (backend URL, optional admin token),
+Eleven sections: 1 Connection (backend URL, optional admin token),
 2 Round Type (Sync / Async), 3 Time Configuration, 4 Scoring Mode,
 5 Trading Rules (count and unlock preview), 6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
 per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
 (`GET`/`PATCH /admin/economy`; changes apply to newly created games only),
-10 Metrics (`GET /admin/metrics` summary).
+10 Metrics (`GET /admin/metrics` summary), 11 Game Settings
+(`GET`/`PATCH /admin/game-config`: duration presets, which presets are offered
+for sync rounds / async rounds / async sessions, create-form defaults,
+duration / enrollment / trade-count limits, default trade count by round
+length, trade unlock fractions; applies to newly created rounds only, existing
+rounds keep their settings).
 
-Presets and defaults (from `src/config/`):
+Presets and defaults come from the backend: `GET /meta` carries the current
+game config as `game_config`, and `src/config/game-config.js`
+(`getEffectiveGameConfig()`) resolves it. The admin page fetches `/meta` on
+load (and when the backend URL changes) and re-renders sections 2-5 after a
+Game Settings save. Only when the backend sends no `game_config` (older
+backend) the built-in fallback from `src/config/game-control-data.js` and
+`src/config/trading-control-data.js` is used; section 2 shows which source is
+active. Built-in fallback values:
 
-- Sync round: all presets from `1m` (temporary test preset) to `7d`, including `3h`, plus custom; default `5m`; enrollment window default 10 s.
+- Sync round: all presets from `1m` (short test preset) to `7d`, including `3h`, plus custom; default `5m`; enrollment window default 10 s.
 - Async round: 1m, 5m, 10m, 15m, 30m, 1h, 3h, 6h, 12h, 1d, 3d, 7d (default 30m).
 - Async session: 1m, 5m, 10m, 30m, 1h, 6h, 12h, 1d (default 5m); it must be shorter than the round.
 - Trades: 0-10. The default count depends on the round length (session length for async rounds); unlocks start at 20 % of the duration and spread evenly over the rest (30 minutes with 3 trades: 6, 14 and 22 minutes).
 
-All tunables live in `src/config/game-control-data.js` and
-`src/config/trading-control-data.js`; never hard-code them in UI code. The
-`1m` preset must be removed before production
+Never hard-code tunables in UI code; read them through `src/config/`.
+Production defaults and test presets are set by admins in Game Settings
 ([PRODUCTION_DEFAULTS_CHECKLIST.md](PRODUCTION_DEFAULTS_CHECKLIST.md)).
 
 Permission enforcement is done by the backend: with

@@ -59,9 +59,8 @@ implementation definitions".
 | `mining_time` | `sum(balance[t] / base_rate[t])`, i.e. seconds of baseline mining (`base_rate` = snapshot-locked level-0 emission rate) | integer |
 | `efficiency` | `cumulative_mined / baseline_mined`, where `baseline_mined` is what a no-upgrade player would have mined over the same elapsed time (1.0 = baseline) | float, 4 decimals |
 
-> **Pending product confirmation:** the `mining_time` and `efficiency` formulas
-> are an implementation interpretation of the intent described above. The
-> project owner still has to confirm them.
+> **Confirmed by the project owner (2026-10-07):** the `mining_time` and
+> `efficiency` formulas above are the approved definitions of these modes.
 
 Frontend display (`src/utils/score-format.js`): integers for `stockpile`,
 `power` and `mining_time`; efficiency scores are shown as a ratio with four

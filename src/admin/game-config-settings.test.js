@@ -186,6 +186,19 @@ describe('init and load', () => {
     expect($('version').textContent).toBe('Version ? · hash n/a');
   });
 
+  it('renders preset ids from the backend as text, never as markup', async () => {
+    const config = structuredClone(CONFIG);
+    config.duration_presets = { '<img src=x onerror=alert(1)>': 60 };
+    config.sync_round_preset_ids = ['<img src=x onerror=alert(1)>'];
+    await loadWith(documentFor(config));
+    const section = $('editor');
+    expect(section.querySelector('img')).toBeNull();
+    expect(checklistValues('offer-sync')).toEqual([
+      '<img src=x onerror=alert(1)>',
+    ]);
+    expect($('offer-sync').textContent).toBe('<img src=x onerror=alert(1)>');
+  });
+
   it('shows the backend message when loading fails', async () => {
     vi.stubGlobal(
       'fetch',

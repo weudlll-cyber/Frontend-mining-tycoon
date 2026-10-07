@@ -60,11 +60,10 @@ This file defines architecture, UI, gameplay-boundary, and delivery constraints 
 
 REDESIGN DECISION (2026-10-07) - floating live tools window:
 
-> **Owner confirmation required.** This note documents the implementation that
-> already exists (introduced with commit `e5deacc` and extended since, most
-> recently with the Top 5 tab in PR #19). It was written during the 2026-10-07
-> documentation refresh to bring this file in line with the code. The project
-> owner should confirm it, or decide to revert the UI to an inline dock.
+> **Confirmed by the project owner (2026-10-07).** This note documents the
+> implementation introduced with commit `e5deacc` and extended since (most
+> recently with the Top 5 tab in PR #19). The floating window is the approved
+> chat/live-tools UI; the inline dock is not coming back.
 
 - Chat, Trade, Farm and the Top 5 leaderboard are tabs of one **floating live
   tools window** on `player.html` (`#live-drawer`, `src/ui/live-drawer.js`).

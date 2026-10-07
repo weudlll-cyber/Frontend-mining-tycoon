@@ -155,7 +155,7 @@ Entry points (Vite multi-page build):
 
 - `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus), join ("Enter game"), and "Last Game Highscores" from the last finished round. Joining stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
-- `admin.html` + `src/admin/`: admin console with 10 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics).
+- `admin.html` + `src/admin/`: admin console with 11 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
 
 The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 
@@ -184,7 +184,7 @@ Player board layout (desktop target 1440x900, no page scroll):
 - **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
 - **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values.
 - **Action bar:** score context value, Trading and Farming status pills (always visible), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
-- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (placeholder), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, pending owner confirmation.
+- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (placeholder), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
 - **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the stored last-game highscores.
 
 Responsive behavior:
@@ -199,7 +199,7 @@ UX/behavior principles implemented:
 - Incremental DOM updates (text/attribute diffs) for live values; tooltip anchors and pay-token selections survive SSE ticks.
 - Mining, trading and farming are always visible as sections or status pills, even when disabled.
 - One shared micro-tooltip contract (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`) with hover/focus/tap open and leave/Escape close, no timeout auto-hide.
-- Tunables come only from `src/config/` (`game-control-data.js`, `trading-control-data.js`).
+- Tunables come only from `src/config/`: `game-config.js` resolves the effective round-setup config (backend `/meta` `game_config`, admin-editable), with `game-control-data.js` / `trading-control-data.js` as the built-in fallback for backends that send none.
 - Safe DOM rendering only (see `SECURITY.md`).
 
 ## 6) Security & Anti-Cheat Invariants
@@ -302,7 +302,7 @@ Recently completed (frontend PRs #16-#19 and backend PRs #8, #10):
 - Admin advanced overrides (anchor token, anchor rate, season cycles) reach the backend; the admin create result uses safe DOM.
 - Lobby stores the `player_token`, re-validates stored logins via `/auth/me`, and shows the backend message when password reset is disabled.
 - SSE reconnects always use a fresh ticket.
-- Backend: all four scoring modes are evaluated (`mining_time` and `efficiency` pending product confirmation, see `SCORING_MODES.md`); upgrades/trades only while the round runs or the async session is active; async rounds use the session clock; 3h preset.
+- Backend: all four scoring modes are evaluated (`mining_time` and `efficiency` definitions confirmed by the owner on 2026-10-07, see `SCORING_MODES.md`); upgrades/trades only while the round runs or the async session is active; async rounds use the session clock; 3h preset.
 - Dead code removed: player-side game creation, the in-board open-games/return panel, the legacy upgrade panel, the Vite counter sample.
 
 Earlier milestones still valid: lobby/board split (`index.html` / `player.html`), admin-only round creation, async sessions with best-of, trading execution, floating live tools window, last-game highscores in the lobby.
@@ -313,7 +313,7 @@ In progress elsewhere:
 
 Open work (summary):
 
-- Owner decisions: confirm the floating live tools window (REDESIGN DECISION in `LOCKED_DECISIONS.md` §D); confirm the `mining_time` and `efficiency` formulas; choose between the concept and the implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults (`PRODUCTION_DEFAULTS_CHECKLIST.md`); branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4).
+- Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
 - Gameplay features: Farming Stage 1 and Stage 2; result history; linking accounts to players (one player per account and game, so async best-of works across lobby re-entries); secure email-based password reset; scheduled sync live rounds; per-round fee override; full leaderboard view; chat moderation, emoji and per-round opt-out; season artwork (`public/assets/seasons/` images exist but are unused).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
 - Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
@@ -383,8 +383,7 @@ Source-of-truth rule:
 
 ### 2) Concept Areas Partially Covered
 
-- Scoring: `mining_time` and `efficiency` formulas are an implementation interpretation pending product confirmation.
-- Default trade allocation by game length: implemented, but the values differ from the concept table (open product decision, see `SEASONAL_TYCOON_CONCEPT.md`). Hosts can override the count, not individual unlock times.
+- Default trade allocation by game length: implemented; the implemented table was confirmed by the owner on 2026-10-07 and is admin-configurable in Game Settings (see `SEASONAL_TYCOON_CONCEPT.md`). Hosts can override the count, not individual unlock times.
 - Trading cost: deterministic conversion fee and spread exist; a per-round host fee override does not.
 - Leaderboards: live Top 5 only; no full view, no provisional/final marker, no result history.
 
