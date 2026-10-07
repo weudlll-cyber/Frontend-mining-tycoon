@@ -33,6 +33,17 @@ describe('lobby-games helpers', () => {
     expect(normalized.tradeCountLabel).toBe('Trades 4');
     expect(normalized.playersCount).toBe(3);
     expect(normalized.remainingLabel).toContain('Starts in');
+    // Older backends (or anonymous calls) send no my_player_id.
+    expect(normalized.myPlayerId).toBe('');
+  });
+
+  it('keeps the linked player id from my_player_id', () => {
+    expect(
+      normalizeGameItem({ game_id: 'g', my_player_id: 12 }).myPlayerId
+    ).toBe('12');
+    expect(
+      normalizeGameItem({ game_id: 'g', my_player_id: null }).myPlayerId
+    ).toBe('');
   });
 
   it('returns robust fallback badge for unknown statuses', () => {

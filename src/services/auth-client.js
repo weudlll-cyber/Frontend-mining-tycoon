@@ -129,9 +129,24 @@ export async function logout(baseUrl, { authToken } = {}) {
   });
 }
 
-export async function fetchOpenGames(baseUrl) {
+function bearerHeaders(authToken) {
+  const headers = {};
+  if (safeTrim(authToken)) {
+    headers.Authorization = `Bearer ${safeTrim(authToken)}`;
+  }
+  return headers;
+}
+
+/**
+ * GET /games/active. When an account token is passed the backend adds
+ * `my_player_id` per item (the caller's linked player, or null) and also lists
+ * running sync games the caller already plays in, so the lobby can offer
+ * "Rejoin". Older backends ignore the header.
+ */
+export async function fetchOpenGames(baseUrl, { authToken } = {}) {
   const response = await fetch(`${baseUrl}/games/active`, {
     method: 'GET',
+    headers: bearerHeaders(authToken),
   });
   if (!response.ok) {
     throw createApiError(
@@ -142,6 +157,13 @@ export async function fetchOpenGames(baseUrl) {
   return Array.isArray(payload) ? payload : [];
 }
 
+/**
+ * POST /games/{id}/join with the account token (when signed in). The backend
+ * links the player to the account; joining again returns the SAME player_id
+ * and player_token with `rejoined: true` (the name is ignored then).
+ * Account errors carry `code`: 401 ACCOUNT_AUTH_INVALID (stale token) and
+ * 401 ACCOUNT_REQUIRED (round requires a signed-in account).
+ */
 export async function joinGame(baseUrl, { gameId, playerName, authToken }) {
   const headers = {
     'Content-Type': 'application/json',
@@ -174,4 +196,39 @@ export async function joinGame(baseUrl, { gameId, playerName, authToken }) {
     throw createApiError(apiError);
   }
   return await response.json();
+}
+
+/**
+ * GET /auth/me/history: the signed-in account's finished rounds, newest first.
+ * @returns {Promise<{ items: object[], total: number }>} malformed bodies
+ *   degrade to an empty page.
+ */
+export async function fetchMyHistory(
+  baseUrl,
+  { authToken, limit = 20, offset = 0 } = {}
+) {
+  const query = new URLSearchParams({
+    limit: String(Math.max(1, Math.floor(Number(limit) || 20))),
+    offset: String(Math.max(0, Math.floor(Number(offset) || 0))),
+  });
+  const payload = await requestJson(baseUrl, `/auth/me/history?${query}`, {
+    headers: bearerHeaders(authToken),
+  });
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const total = Number(payload?.total);
+  return {
+    items,
+    total: Number.isFinite(total) ? total : items.length,
+  };
+}
+
+/**
+ * GET /games/{id}/results (public): the final leaderboard of a finished round.
+ * Throws an Error with `status`/`code` (409 GAME_NOT_FINISHED, 404 unknown).
+ */
+export async function fetchGameResults(baseUrl, gameId) {
+  return await requestJson(
+    baseUrl,
+    `/games/${encodeURIComponent(safeTrim(gameId))}/results`
+  );
 }

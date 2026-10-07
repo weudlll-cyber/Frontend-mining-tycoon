@@ -486,6 +486,94 @@ dialog::backdrop {
   gap: 0.5rem;
 }
 
+/* "My results" dialog: wider than the form dialogs so result rows fit. */
+#results-dialog {
+  width: min(640px, calc(100vw - 2rem));
+}
+
+.history-list,
+.results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  max-height: 55dvh;
+  overflow-y: auto;
+}
+
+.history-item,
+.results-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.history-item:last-child,
+.results-item:last-child {
+  border-bottom: 0;
+}
+
+.history-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-headline {
+  display: flex;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.history-name,
+.results-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-meta,
+.results-summary {
+  margin: 0;
+  color: var(--lobby-text-soft);
+  font-size: 0.82rem;
+}
+
+.history-full-results-btn {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  background: rgba(8, 16, 30, 0.76);
+  color: var(--lobby-text);
+  cursor: pointer;
+}
+
+.results-rank {
+  min-width: 2.5rem;
+  font-weight: 700;
+}
+
+.results-item.is-own {
+  background: rgba(243, 180, 49, 0.18);
+  border-left: 3px solid var(--lobby-accent);
+}
+
+/* Rejoin hint on an open game the signed-in account already plays in. */
+.game-mine-chip {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(43, 193, 147, 0.24);
+  color: #8ce8c9;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 @media (max-width: 960px) {
   .lobby-shell {
     padding: 1rem;

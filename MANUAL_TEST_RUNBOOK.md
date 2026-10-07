@@ -66,8 +66,13 @@ window to play with two accounts.
 5. **Forgot password (default backend):** "Forgot password?" opens a dialog. Submitting shows "Password reset is not available. Please contact an administrator." (or the server's message) **inside the dialog**; the dialog stays open. With `ALLOW_UNVERIFIED_PASSWORD_RESET=true` a valid reset closes the dialog and shows a success message.
 6. **Open games:** the list shows enrolling games and running async games with a status badge and remaining time. Running sync games are not listed, and running async games are hidden when the session is not shorter than the remaining round time. The list refreshes every 10 s and when the tab becomes visible again.
 7. **Join:** "Enter game" is disabled until you are signed in and have selected a game. Clicking it joins and opens `player.html?autostart=1`. The join name is your display name, or a cleaned/shortened version (1-24 letters, digits, spaces, `_ - .`), falling back to your username.
-8. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5.
-9. **How to play:** the "How to play" link opens `how-to-play.html` in the same tab. Check: the table of contents jumps to each section, "Back to the lobby" returns, the page reads well at desktop width and on a phone (no sideways page scroll; tables scroll inside their box), and the rules still match the current game (upgrade increments and costs, halving order, trade schedule, scoring modes, event kinds).
+8. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5. Signed in, it comes from the server (newest entry of "My results"), so it matches on any device; signed out it shows the snapshot stored in this browser.
+9. **Rejoin:** join a running async round (or an enrolling sync round), go back to the lobby. The game is marked "You joined" and selecting it turns the button into **Rejoin**. Rejoining opens the board with the **same** player ID (Debug panel) and the leaderboard has no second row for you. Running sync rounds you already play in are listed too.
+10. **Stale token:** sign in, then invalidate the session on the backend (log out in another tab) and click Enter game/Rejoin: the lobby signs you out ("session has expired") and asks you to sign in again.
+11. **My results:** signed out the button is disabled. Signed in with no finished rounds it shows "No finished rounds yet.". After finished rounds it lists date, round type, scoring mode, rank / participants, score and name (newest first); with more than 20 rounds **Load more** appends the next page and disappears at the end. Efficiency scores show 4 decimals and a `×`.
+12. **Full results:** "Full results" on a history row shows the complete final leaderboard with your row highlighted; "Back to my results" returns to the list. Hostile player names render as plain text.
+13. **Require sign-in (admin section 11):** tick "Require sign-in to join" and save. Joining from `player.html` without a stored account (clear localStorage, enter the Game ID, Start Game) shows the backend `ACCOUNT_REQUIRED` message; signed-in lobby joins still work. Untick and save to restore.
+14. **How to play:** the "How to play" link opens `how-to-play.html` in the same tab. Check: the table of contents jumps to each section, "Back to the lobby" returns, the page reads well at desktop width and on a phone (no sideways page scroll; tables scroll inside their box), and the rules still match the current game (upgrade increments and costs, halving order, trade schedule, scoring modes, event kinds).
 
 ---
 
@@ -102,8 +107,8 @@ Create an async round (round 30m, session 5m) in the admin console.
 3. Trades unlock relative to the **session** start. Example: create the round with trade count 2 (the default for a 5m session is 0); the trades unlock 1m and 3m after the session starts.
 4. When the session ends, the `Session Finished` overlay appears; a click returns to the lobby.
 5. Join the same round again from the lobby while enough round time remains. The new session starts from the same baseline balances and upgrades.
-   - Known limitation: every lobby join creates a **new player entry** (accounts are not linked to players yet), so a second attempt appears as a separate leaderboard row instead of improving `Best this round` of the first one. Record what you see.
-6. Join an async round whose remaining time is shorter than the session: it is not listed in the lobby; forcing it (for example via `player.html` with the Game ID) shows the backend 409 (`SESSION_ASYNC_INSUFFICIENT_TIME`) inline.
+   - The lobby shows **Rejoin** for this round, and the backend returns your existing player (same player ID): the leaderboard keeps one row for you and `Best this round` keeps the best of both sessions. (With an older backend that does not link accounts, a second row appears instead.)
+6. Join an async round whose remaining time is shorter than the session: it is not listed in the lobby (unless you already joined it, then it stays listed for Rejoin); forcing it (for example via `player.html` with the Game ID) shows the backend 409 (`SESSION_ASYNC_INSUFFICIENT_TIME`) inline.
 
 ---
 
@@ -111,7 +116,9 @@ Create an async round (round 30m, session 5m) in the admin console.
 
 1. Let a sync round finish while the board is open. A full-screen `Game Over` overlay says the round finished; it is the only full-screen overlay and appears only after play has ended.
 2. Click it (or press Enter/Space): the board resets and the browser returns to the lobby, which now shows "Last Game Highscores" for that round.
-3. Upgrades sent after the end are rejected by the backend (409).
+3. Finish another round and click **View full results** on the overlay instead: the lobby opens the full results dialog for that round with your row highlighted, and the URL loses its `?results=` query (a reload does not reopen it).
+4. Async: when your session ends while the round still runs, the overlay notes "Final results are available when the round ends."; the link opens the lobby, which shows the same note (backend `409 GAME_NOT_FINISHED`). After the round ends the link/history show the final leaderboard.
+5. Upgrades sent after the end are rejected by the backend (409).
 
 ---
 
@@ -179,10 +186,10 @@ Use this to validate mining balance (moved here from `README.md`).
 ## 9. Summary Checklist
 
 - [ ] Admin console: 11 sections, defaults (backend game config), trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, game list + metrics/reset/delete, global economy edit, metrics summary, game settings edit (2m test preset)
-- [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join
+- [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join, rejoin (same player), My results + Load more, Full results highlight, require sign-in
 - [ ] Player board: autostart, no host controls, season cards + upgrades, analytics, halving, events banner
 - [ ] Live tools window: Trade / Farm / Chat / Top 5, drag, Escape and outside-click close, board stays usable
 - [ ] Async: session start, session countdown, This session / Best this round, Session Finished -> lobby
-- [ ] Game Over overlay -> lobby -> Last Game Highscores
+- [ ] Game Over overlay -> lobby -> Last Game Highscores; View full results -> lobby results dialog
 - [ ] Safe rendering of hostile names/messages
 - [ ] Gates in `QUALITY_ENFORCEMENT.md` green

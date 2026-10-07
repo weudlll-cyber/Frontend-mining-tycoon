@@ -17,7 +17,7 @@ marker (verified against both repos on 2026-10-07): **Implemented**,
 
 ## 1. Player Creation & Player Profiles
 
-> **Status: Partial.** Accounts exist (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/change-password`). Registration in the lobby collects username, display name, email, a **Discord handle (required)**, a **Telegram handle (optional)** and a password (min. 12 characters with upper/lowercase, digit and special character). The Discord/Telegram handles are stored as contact fields only; there is no Discord or Telegram integration (see Section 9). Accounts are **not yet linked** to in-game players: joining creates a per-game player with the account's display name and a per-game `player_token`. No avatars or cosmetic metadata.
+> **Status: Partial.** Accounts exist (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/change-password`). Registration in the lobby collects username, display name, email, a **Discord handle (required)**, a **Telegram handle (optional)** and a password (min. 12 characters with upper/lowercase, digit and special character). The Discord/Telegram handles are stored as contact fields only; there is no Discord or Telegram integration (see Section 9). Accounts are **linked** to in-game players: the lobby joins with the account token, the backend stores the account on the player, and joining the same game again returns the same player and `player_token` ("Rejoin" in the lobby). Admins can require a signed-in account to join (Game Settings, `account_policy.require_account_to_join`). No avatars or cosmetic metadata.
 
 ### What a Player Profile Represents
 
@@ -49,7 +49,7 @@ Player identity is created and maintained server-side. The backend is the author
 
 ## 2. Player Profile Persistence
 
-> **Status: Partial.** Account records persist in the backend database across rounds. Because accounts are not linked to game players yet, per-round results are not attributed to a persistent profile.
+> **Status: Partial.** Account records persist in the backend database across rounds, and players are linked to accounts, so finished-round results are attributed to the account (see Section 7). There is no profile page beyond the lobby's "My results" list.
 
 ### Why Persistence Is Required
 
@@ -187,7 +187,7 @@ Retry count itself is never a scoring factor.
 
 ## 7. Result History & Past Rounds
 
-> **Status: Not started.** There is no backend archive or history endpoint. The only "history" is the last finished game's highscore snapshot, kept in the browser's localStorage and shown in the lobby ("Last Game Highscores").
+> **Status: Implemented (basic).** `GET /auth/me/history` lists the signed-in account's finished rounds (date, round type, scoring mode, rank / participants, score, player name; paginated, newest first) and `GET /games/{id}/results` returns a finished round's full final leaderboard (`409 GAME_NOT_FINISHED` before the end). The lobby shows both in the "My results" dialog, and its "Last Game Highscores" panel uses the newest server result when signed in (the browser-local snapshot remains the signed-out fallback). Not yet: cross-round statistics, archive/retention policy.
 
 ### The Need for Historical Results
 

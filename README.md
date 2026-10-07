@@ -6,7 +6,7 @@ gameplay outcomes; this frontend only displays state and sends player intent.
 
 Four pages:
 
-- **Lobby** (`index.html`): register, log in/out, pick an open game, join it, see the last game's highscores.
+- **Lobby** (`index.html`): register, log in/out, pick an open game, join or rejoin it, see your result history, full final leaderboards and the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
 - **Admin console** (`admin.html`): create rounds with snapshot-locked settings, list and delete active games.
 - **How to play** (`how-to-play.html`): static player guide (rules, upgrades, halvings, trading, round types, scoring modes, events). Linked from the lobby and from the player-board header (opens in a new tab).
@@ -16,8 +16,8 @@ Four pages:
 The current implementation state, recent changes and open work are tracked in
 [PROJECT_BASELINE.md](PROJECT_BASELINE.md) (section 10). In short: mining,
 upgrades, halvings, events, trading, sync and async rounds, best-of scoring,
-chat, accounts and the admin console work end to end. Farming, result history
-and production hardening are open.
+chat, accounts (linked to players, with result history) and the admin console
+work end to end. Farming and production hardening are open.
 
 ## Documentation
 
@@ -95,9 +95,10 @@ console all use this default; the Backend URL fields on `player.html` and
 - A stored login is re-validated with `GET /auth/me` on load; an invalid token signs you out.
 - **Change password** (signed in only) opens a dialog for current/new password. The backend ends all sessions after a change, so the lobby signs you out and asks you to sign in again.
 - **Forgot password?** opens a dialog. Password reset is disabled by default in the backend; the dialog then shows "Password reset is not available. Please contact an administrator." (or the server message).
-- **Open Games** lists enrolling games and running async games (only while the session still fits into the remaining round time). The list refreshes every 10 seconds and when the tab becomes visible.
-- **Enter game** (requires sign-in and a selected game) joins, stores the game ID, player ID and `player_token`, and opens `player.html?autostart=1`.
-- **Last Game Highscores** shows the Top 5 of your last finished round (stored in the browser).
+- **Open Games** lists enrolling games and running async games (only while the session still fits into the remaining round time). Signed in, the list is requested with your account token: games where your account already has a player are marked "You joined" and are always listed (also running sync rounds and async rounds a new session would not fit). The list refreshes every 10 seconds and when the tab becomes visible.
+- **Enter game** (requires sign-in and a selected game) joins with your account token, stores the game ID, player ID and `player_token`, and opens `player.html?autostart=1`. For a game you already joined the button reads **Rejoin**: the backend links players to accounts and returns your existing player (same player ID and token), so you continue instead of creating a second leaderboard row. A stale account token (`ACCOUNT_AUTH_INVALID`) signs you out; a round that requires sign-in (`ACCOUNT_REQUIRED`) shows the backend message.
+- **My results** (signed in only) opens a dialog with your finished rounds, newest first: date, round type, scoring mode, rank / participants, score and the name you played under, 20 per page with **Load more**, or "No finished rounds yet.". **Full results** shows the round's complete final leaderboard with your row highlighted. `index.html?results=<gameId>&player=<playerId>` (linked from the player board's Game Over overlay) opens that view directly, also signed out.
+- **Last Game Highscores** shows the Top 5 of your last finished round. Signed in, it uses the server (your newest history entry and its full results); signed out, or when the backend has no history endpoint, it shows the snapshot stored in this browser.
 - A **How to play** link opens the player guide (`how-to-play.html`) in the same tab; an **Admin setup** link leads to `admin.html`.
 
 ### Player board (`player.html`, `src/main.js`)
@@ -109,7 +110,7 @@ console all use this default; the Backend URL fields on `player.html` and
 - **Event banner:** one line above the season grid listing all active events; ⚡ marks affected values.
 - **Action bar:** score context, Trading and Farming status (always visible), buttons `Trade`, `Farm`, `Chat`, `🏆 Top 5`, and a chat preview dock with unread badge.
 - **Live tools window:** a floating, non-modal window with the tabs Trade, Farm (placeholder), Chat and Top 5. Drag it by its header, resize it, close it with the close button, Escape or a click outside. The rest of the board stays usable.
-- **Game Over:** after the round finishes (or the async session ends) a full-screen overlay appears; a click returns to the lobby. This is the only full-screen overlay (see `LOCKED_DECISIONS.md` §C).
+- **Game Over:** after the round finishes (or the async session ends) a full-screen overlay appears; a click returns to the lobby. A **View full results** link opens the lobby's full results view for that round instead; after an async session it notes "Final results are available when the round ends." This is the only full-screen overlay (see `LOCKED_DECISIONS.md` §C).
 
 Layout rules: desktop (1440x900) has no page scroll, only internal scroll areas;
 tablets stack the grid; phones show one season card at a time. See
@@ -137,7 +138,9 @@ per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
 (`GET`/`PATCH /admin/game-config`: duration presets, which presets are offered
 for sync rounds / async rounds / async sessions, create-form defaults,
 duration / enrollment / trade-count limits, default trade count by round
-length, trade unlock fractions; applies to newly created rounds only, existing
+length, trade unlock fractions, and the account policy "Require sign-in to
+join" (`account_policy.require_account_to_join`, fallback off, sent only when
+changed); round-setup values apply to newly created rounds only, existing
 rounds keep their settings).
 
 Presets and defaults come from the backend: `GET /meta` carries the current

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   changePassword,
   fetchCurrentUser,
+  fetchGameResults,
+  fetchMyHistory,
   fetchOpenGames,
   joinGame,
   login,
@@ -430,6 +432,85 @@ describe('auth-client changePassword', () => {
     ).rejects.toMatchObject({
       status: 422,
       message: 'Password must be at least 12 characters',
+    });
+  });
+});
+
+describe('auth-client accounts, history and results', () => {
+  function stubJson(body, { ok = true, status = 200 } = {}) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok,
+      status,
+      json: async () => body,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('sends the account token when listing open games', async () => {
+    const fetchMock = stubJson([{ game_id: '1', my_player_id: 4 }]);
+
+    const games = await fetchOpenGames('http://h', { authToken: ' jwt ' });
+
+    expect(games[0].my_player_id).toBe(4);
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      Authorization: 'Bearer jwt',
+    });
+  });
+
+  it('lists open games anonymously without a token', async () => {
+    const fetchMock = stubJson({ not: 'a list' });
+
+    expect(await fetchOpenGames('http://h')).toEqual([]);
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({});
+  });
+
+  it('fetches a history page with bearer header and paging query', async () => {
+    const item = { game_id: 5, rank: 1, participants: 3, score: 10 };
+    const fetchMock = stubJson({ items: [item], total: 7 });
+
+    const page = await fetchMyHistory('http://h', {
+      authToken: 'jwt',
+      limit: 20,
+      offset: 40,
+    });
+
+    expect(page).toEqual({ items: [item], total: 7 });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://h/auth/me/history?limit=20&offset=40');
+    expect(options.headers.Authorization).toBe('Bearer jwt');
+  });
+
+  it('degrades a malformed history body to an empty page and sane paging', async () => {
+    const fetchMock = stubJson({ items: 'nope', total: 'x' });
+
+    expect(
+      await fetchMyHistory('http://h', { limit: 'x', offset: -3 })
+    ).toEqual({ items: [], total: 0 });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'http://h/auth/me/history?limit=20&offset=0'
+    );
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+
+    stubJson({ items: [{ game_id: 1 }] });
+    expect((await fetchMyHistory('http://h')).total).toBe(1);
+  });
+
+  it('fetches public results and surfaces 409 GAME_NOT_FINISHED', async () => {
+    const fetchMock = stubJson({ game_id: 9, results: [] });
+    expect(await fetchGameResults('http://h', ' 9 ')).toEqual({
+      game_id: 9,
+      results: [],
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('http://h/games/9/results');
+
+    stubJson(
+      { code: 'GAME_NOT_FINISHED', detail: 'Game is not finished' },
+      { ok: false, status: 409 }
+    );
+    await expect(fetchGameResults('http://h', '9')).rejects.toMatchObject({
+      status: 409,
+      code: 'GAME_NOT_FINISHED',
     });
   });
 });

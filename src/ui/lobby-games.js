@@ -1,6 +1,9 @@
 /**
 File: src/ui/lobby-games.js
 Purpose: Shared helpers for formatting and normalizing open game records in the lobby.
+Backend contract: GET /games/active items; with an account token each item may
+carry `my_player_id` (the caller's linked player in that game, or null). Older
+backends omit it, which reads as "not joined yet".
 */
 
 function normalizeStatus(rawStatus) {
@@ -57,6 +60,10 @@ export function normalizeGameItem(rawGame = {}) {
   const tradeCount = Math.max(0, Number(rawGame?.trade_count || 0));
   const tradeCountLabel = `Trades ${tradeCount}`;
   const playersCount = Math.max(0, Number(rawGame?.players_count || 0));
+  const myPlayerId =
+    rawGame?.my_player_id === null || rawGame?.my_player_id === undefined
+      ? ''
+      : String(rawGame.my_player_id).trim();
 
   let remainingSeconds = 0;
   let remainingLabel = 'n/a';
@@ -80,6 +87,7 @@ export function normalizeGameItem(rawGame = {}) {
     tradeCount,
     tradeCountLabel,
     playersCount,
+    myPlayerId,
     remainingSeconds,
     remainingLabel,
   };

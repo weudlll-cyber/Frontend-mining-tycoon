@@ -115,4 +115,52 @@ describe('post-game flow', () => {
     expect(playerIdInput.value).toBe('');
     expect(setupShell.classList.contains('setup-collapsed')).toBe(false);
   });
+
+  it('offers a "View full results" deep link into the lobby results view', async () => {
+    const main = await import('./main.js');
+    const link = document.getElementById('game-over-results-link');
+    const note = document.getElementById('game-over-results-note');
+    document.getElementById('player-id').value = '9';
+
+    main.showGameOverOverlay('game 42');
+    expect(link.hidden).toBe(false);
+    expect(link.getAttribute('href')).toBe(
+      '/index.html?results=game+42&player=9'
+    );
+    // Sync round over: results are final, no note.
+    expect(note.hidden).toBe(true);
+
+    document.getElementById('player-id').value = '';
+    main.showGameOverOverlay('7', { title: 'Session Finished' });
+    expect(link.getAttribute('href')).toBe('/index.html?results=7');
+    // Async session over: the round may still run, results come later.
+    expect(note.hidden).toBe(false);
+
+    main.showGameOverOverlay('');
+    expect(link.hidden).toBe(true);
+    expect(note.hidden).toBe(true);
+    expect(link.getAttribute('href')).toBe('/index.html');
+  });
+
+  it('resets the board when the results link is used, without the overlay handler', async () => {
+    const main = await import('./main.js');
+    const overlay = document.getElementById('game-over-overlay');
+    const link = document.getElementById('game-over-results-link');
+    const gameIdInput = document.getElementById('game-id');
+    gameIdInput.value = 'game-42';
+    main.showGameOverOverlay('game-42');
+
+    // Enter on the focused link is left to the link's own click.
+    link.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
+    expect(overlay.hidden).toBe(false);
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(overlay.hidden).toBe(true);
+    expect(gameIdInput.value).toBe('');
+  });
 });

@@ -1,3 +1,20 @@
+/**
+File: src/lobby.js
+Purpose: Lobby page (index.html): register / login / logout / change password,
+  the open-games list with join and rejoin, "My results" (account history and
+  full final leaderboards) and the "Last Game Highscores" panel.
+Role in system: entry point before the player board. Stores the backend URL,
+  account session and per-game player credentials for player.html.
+Backend contract notes:
+- Join sends the account token; the backend links the player to the account
+  and answers a repeated join with the same player_id/player_token
+  (`rejoined: true`). 401 ACCOUNT_AUTH_INVALID = stale account token (treated
+  like an expired session), 401 ACCOUNT_REQUIRED = round needs a sign-in.
+- /games/active with the token marks the caller's games via `my_player_id`.
+- Older backends omit these fields; the lobby then behaves as before.
+Security notes: tokens are never rendered; all backend text uses textContent.
+*/
+
 import './lobby.css';
 import {
   STORAGE_KEYS,
@@ -11,6 +28,8 @@ import { toPlayerName } from './utils/player-name.js';
 import {
   changePassword,
   fetchCurrentUser,
+  fetchGameResults,
+  fetchMyHistory,
   fetchOpenGames,
   joinGame,
   login,
@@ -23,8 +42,16 @@ import {
   initLastGameHighscores,
   renderLastGameHighscores,
 } from './ui/last-game-highscores.js';
+import { buildServerLastGameSnapshot } from './ui/lobby-results.js';
+import {
+  initLobbyResults,
+  openGameResults,
+  openMyResults,
+  resetLobbyResults,
+} from './ui/lobby-results-dialog.js';
 
 const LOBBY_REFRESH_MS = 10000;
+const ACCOUNT_REQUIRED_MESSAGE = 'Sign in to join this game.';
 
 const authMessageEl = document.getElementById('auth-message');
 const lobbyMessageEl = document.getElementById('lobby-message');
@@ -56,11 +83,15 @@ const changePasswordForm = document.getElementById('change-password-form');
 const changePasswordMessageEl = document.getElementById(
   'change-password-message'
 );
+const openResultsBtn = document.getElementById('open-results-dialog');
 const lastGameSummaryEl = document.getElementById('last-game-summary');
 const lastGameHighscoresEl = document.getElementById('last-game-highscores');
 
 let lobbyRefreshTimer = null;
 let selectedGameId = '';
+// True when the selected open game already has this account's player
+// (`my_player_id`), so joining it is a rejoin of the same player.
+let selectedGameIsMine = false;
 let displayNameUserEdited = false;
 let authState = {
   isAuthenticated: false,
@@ -136,6 +167,12 @@ function updateJoinButtonState() {
   if (!joinSelectedBtn) return;
   const canJoin = authState.isAuthenticated && Boolean(selectedGameId);
   joinSelectedBtn.disabled = !canJoin;
+  joinSelectedBtn.textContent =
+    canJoin && selectedGameIsMine ? 'Rejoin' : 'Enter game';
+
+  if (openResultsBtn) {
+    openResultsBtn.disabled = !authState.isAuthenticated;
+  }
 
   if (logoutBtn) {
     logoutBtn.disabled = !authState.isAuthenticated;
@@ -197,6 +234,7 @@ function renderOpenGames(games = []) {
 
   if (!games.length) {
     selectedGameId = '';
+    selectedGameIsMine = false;
     updateJoinButtonState();
     const emptyItem = document.createElement('li');
     emptyItem.className = 'game-list-empty';
@@ -214,9 +252,13 @@ function renderOpenGames(games = []) {
     const row = document.createElement('li');
     row.className = 'game-list-item';
     row.dataset.gameId = game.gameId;
+    if (game.myPlayerId) {
+      row.dataset.myPlayerId = game.myPlayerId;
+    }
     if (game.gameId === previouslySelectedGameId) {
       row.classList.add('selected');
       selectedStillAvailable = true;
+      selectedGameIsMine = Boolean(game.myPlayerId);
     }
 
     const left = document.createElement('div');
@@ -225,6 +267,12 @@ function renderOpenGames(games = []) {
     const title = document.createElement('div');
     title.className = 'game-id';
     title.textContent = `${game.roundTypeLabel} • ${game.scoringModeLabel}`;
+    if (game.myPlayerId) {
+      const chip = document.createElement('span');
+      chip.className = 'game-mine-chip';
+      chip.textContent = 'You joined';
+      title.appendChild(chip);
+    }
 
     const subtitle = document.createElement('div');
     subtitle.className = 'game-subtitle';
@@ -243,13 +291,16 @@ function renderOpenGames(games = []) {
 
     row.addEventListener('click', () => {
       selectedGameId = game.gameId;
+      selectedGameIsMine = Boolean(game.myPlayerId);
       Array.from(openGamesListEl.querySelectorAll('.game-list-item')).forEach(
         (item) => {
           item.classList.toggle('selected', item === row);
         }
       );
       setLobbyMessage(
-        `Selected ${game.gameId}. You can now enter the game.`,
+        game.myPlayerId
+          ? `Selected ${game.gameId}. Rejoin to continue with your player.`
+          : `Selected ${game.gameId}. You can now enter the game.`,
         'success'
       );
       updateJoinButtonState();
@@ -260,6 +311,7 @@ function renderOpenGames(games = []) {
 
   if (!selectedStillAvailable) {
     selectedGameId = '';
+    selectedGameIsMine = false;
   }
   updateJoinButtonState();
 }
@@ -274,8 +326,9 @@ async function refreshOpenGames({ showSuccess = false } = {}) {
     return;
   }
 
+  const authToken = authState.token;
   try {
-    const rawGames = await fetchOpenGames(baseUrl);
+    const rawGames = await fetchOpenGames(baseUrl, { authToken });
     const joinableGames = rawGames.filter((game) => canJoinFromLobby(game));
     renderOpenGames(joinableGames);
     if (showSuccess || authState.isAuthenticated) {
@@ -285,6 +338,12 @@ async function refreshOpenGames({ showSuccess = false } = {}) {
       );
     }
   } catch (error) {
+    // A stale account token: drop the session and list the games anonymously.
+    if (error?.status === 401 && authToken && authState.token === authToken) {
+      expireStoredSession();
+      await refreshOpenGames({ showSuccess });
+      return;
+    }
     clearOpenGames();
     setLobbyMessage(error.message, 'error');
   }
@@ -301,6 +360,12 @@ function canJoinFromLobby(rawGame) {
   const status = String(rawGame?.game_status || '').toLowerCase();
   if (status !== 'enrolling' && status !== 'running') {
     return false;
+  }
+
+  // The caller already plays here: always offer the rejoin, even when a new
+  // async session would no longer fit the remaining round time.
+  if (rawGame?.my_player_id !== null && rawGame?.my_player_id !== undefined) {
+    return true;
   }
 
   const roundType = String(rawGame?.round_type || '').toLowerCase();
@@ -343,7 +408,12 @@ async function handleJoinSelectedGame() {
   }
 
   joinSelectedBtn.disabled = true;
-  setLobbyMessage('Joining selected game...', 'info');
+  setLobbyMessage(
+    selectedGameIsMine
+      ? 'Rejoining your player...'
+      : 'Joining selected game...',
+    'info'
+  );
 
   // WHY: the backend only accepts 1-24 chars of letters/digits/space/_-. while
   // account display names allow 80 arbitrary chars, so map to a valid name.
@@ -378,10 +448,27 @@ async function handleJoinSelectedGame() {
 
     window.location.href = '/player.html?autostart=1';
   } catch (error) {
-    setLobbyMessage(error.message, 'error');
-    joinSelectedBtn.disabled = false;
-    updateJoinButtonState();
+    handleJoinError(error);
   }
+}
+
+/**
+ * Join failures: account-auth errors get dedicated handling, everything else
+ * shows the backend message (e.g. 422 player-name validation).
+ */
+function handleJoinError(error) {
+  if (error?.code === 'ACCOUNT_AUTH_INVALID') {
+    expireStoredSession();
+    setLobbyMessage('Please sign in again to join this game.', 'error');
+    return;
+  }
+  const message =
+    error?.code === 'ACCOUNT_REQUIRED'
+      ? error?.message || ACCOUNT_REQUIRED_MESSAGE
+      : error?.message;
+  setLobbyMessage(message, 'error');
+  joinSelectedBtn.disabled = false;
+  updateJoinButtonState();
 }
 
 async function handleLoginSubmit(event) {
@@ -409,6 +496,9 @@ async function handleLoginSubmit(event) {
       'Login successful. Please select a game from the open list.',
       'success'
     );
+    // Re-list games with the token so the account's games show "Rejoin".
+    void refreshOpenGames();
+    void preferServerLastGame(authState.token);
   } catch (error) {
     setAuthMessage(error.message, 'error');
   }
@@ -592,6 +682,9 @@ function resolvePasswordResetDisabledMessage(error) {
 }
 
 function clearAuthSessionData() {
+  // Account-bound views fall back to the local, device-only data.
+  resetLobbyResults();
+  renderLobbyLastGameHighscores(readStoredLastPlayedGameSnapshot());
   setStorageItem(STORAGE_KEYS.authToken, '');
   setStorageItem(STORAGE_KEYS.authUsername, '');
   setStorageItem(STORAGE_KEYS.authDisplayName, '');
@@ -725,11 +818,54 @@ async function validateStoredSession(token) {
       username,
       display_name: displayName,
     });
+    void preferServerLastGame(token);
   } catch (error) {
     if (error?.status === 401 && authState.token === token) {
       expireStoredSession();
     }
   }
+}
+
+/**
+ * "Last Game Highscores" prefers the server: when signed in, show the top 5 of
+ * the account's most recent finished round (history + full results). Any
+ * failure (older backend without history, no rounds yet) keeps the local
+ * device snapshot written by player.html.
+ */
+async function preferServerLastGame(token) {
+  try {
+    const baseUrl = getBackendUrlOrThrow();
+    const page = await fetchMyHistory(baseUrl, {
+      authToken: token,
+      limit: 1,
+      offset: 0,
+    });
+    const latest = page.items[0];
+    if (!latest || authState.token !== token) return;
+    const snapshot = buildServerLastGameSnapshot(
+      await fetchGameResults(baseUrl, latest.game_id)
+    );
+    if (snapshot && authState.token === token) {
+      renderLobbyLastGameHighscores(snapshot);
+    }
+  } catch {
+    // Keep the local snapshot.
+  }
+}
+
+/**
+ * Deep link from the player board's Game Over overlay:
+ * index.html?results=<gameId>[&player=<playerId>] opens the full results.
+ * The query is removed afterwards so a reload does not reopen the dialog.
+ */
+function openResultsFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const gameId = String(params.get('results') || '').trim();
+  if (!gameId) return;
+  window.history.replaceState(null, '', window.location.pathname);
+  void openGameResults(gameId, {
+    highlight: { playerId: params.get('player') || '' },
+  });
 }
 
 function bindEvents() {
@@ -785,6 +921,9 @@ function bindEvents() {
   forgotForm?.addEventListener('submit', (event) => {
     void handleForgotPasswordSubmit(event);
   });
+  openResultsBtn?.addEventListener('click', () => {
+    void openMyResults();
+  });
   openChangePasswordBtn?.addEventListener('click', () => {
     changePasswordForm?.reset();
     setChangePasswordMessage('', 'info');
@@ -810,8 +949,17 @@ function bootstrap() {
   });
   renderLobbyLastGameHighscores(readStoredLastPlayedGameSnapshot());
 
+  initLobbyResults({
+    getContext: () => ({
+      baseUrl: getBackendUrlOrThrow(),
+      authToken: authState.token,
+    }),
+    onAuthInvalid: expireStoredSession,
+  });
+
   hydrateFromStorage();
   bindEvents();
+  openResultsFromQuery();
   void refreshOpenGames({ showSuccess: true });
   startLobbyRefreshLoop();
   updateJoinButtonState();

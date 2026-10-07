@@ -198,7 +198,7 @@ Additional output policy for this repository:
 
 Game configuration is strictly **admin-only** and is managed via a separate entrypoint:
 
-- **Lobby** (`index.html`, `src/lobby.js`): register / login / logout, open-games list, join, last-game highscores.
+- **Lobby** (`index.html`, `src/lobby.js`): register / login / logout, open-games list, join / rejoin (account-linked players), "My results" history and full results, last-game highscores.
 - **Player board** (`player.html`, `src/main.js`): the live game for one joined round (season cards, upgrades, analytics, live tools window).
 - **Admin console** (`admin.html`, `src/admin/`): creates and configures new rounds with snapshot-locked settings and manages/deletes active games.
 

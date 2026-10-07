@@ -5,6 +5,8 @@ import process from 'node:process';
 
 vi.mock('./services/auth-client.js', () => ({
   fetchCurrentUser: vi.fn().mockResolvedValue({ username: 'weudl' }),
+  fetchGameResults: vi.fn(),
+  fetchMyHistory: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   fetchOpenGames: vi.fn().mockResolvedValue([]),
   joinGame: vi.fn(),
   login: vi.fn(),
@@ -544,5 +546,334 @@ describe('lobby change-password dialog', () => {
       'Password changed. Please sign in again with your new password.'
     );
     expect(document.getElementById('open-change-password').disabled).toBe(true);
+  });
+});
+
+async function flushDeep() {
+  for (let i = 0; i < 30; i += 1) {
+    await Promise.resolve();
+  }
+}
+
+describe('lobby account-linked players', () => {
+  beforeEach(async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.joinGame).mockReset();
+    vi.mocked(authClient.fetchCurrentUser).mockResolvedValue({
+      username: 'weudl',
+    });
+    vi.mocked(authClient.fetchMyHistory).mockReset();
+    vi.mocked(authClient.fetchMyHistory).mockResolvedValue({
+      items: [],
+      total: 0,
+    });
+    vi.mocked(authClient.fetchGameResults).mockReset();
+  });
+
+  const MY_SYNC_GAME = {
+    ...OPEN_SYNC_GAME,
+    game_status: 'running',
+    my_player_id: 9,
+  };
+
+  it('lists games with the account token and offers "Rejoin" for own games', async () => {
+    const authClient = await bootLobbySignedIn({
+      games: [MY_SYNC_GAME, { ...OPEN_SYNC_GAME, game_id: '78' }],
+    });
+
+    expect(authClient.fetchOpenGames).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      { authToken: 'token' }
+    );
+    const mine = document.querySelector('.game-list-item[data-game-id="77"]');
+    expect(mine.dataset.myPlayerId).toBe('9');
+    expect(mine.querySelector('.game-mine-chip').textContent).toBe(
+      'You joined'
+    );
+    const joinBtn = document.getElementById('join-selected-btn');
+
+    mine.click();
+    expect(joinBtn.textContent).toBe('Rejoin');
+    expect(document.getElementById('lobby-message').textContent).toContain(
+      'Rejoin to continue with your player'
+    );
+
+    document.querySelector('.game-list-item[data-game-id="78"]').click();
+    expect(joinBtn.textContent).toBe('Enter game');
+  });
+
+  it('keeps the rejoin selection across refreshes and stores the same player', async () => {
+    const authClient = await bootLobbySignedIn({ games: [MY_SYNC_GAME] });
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+
+    // Auto-refresh re-renders the list; the selection stays a rejoin.
+    vi.advanceTimersByTime(10000);
+    await flushPromises();
+    expect(document.getElementById('join-selected-btn').textContent).toBe(
+      'Rejoin'
+    );
+
+    vi.mocked(authClient.joinGame).mockResolvedValue({
+      player_id: 9,
+      player_token: 'same-token',
+      user_id: 3,
+      rejoined: true,
+    });
+    document.getElementById('join-selected-btn').click();
+    expect(document.getElementById('lobby-message').textContent).toBe(
+      'Rejoining your player...'
+    );
+    await flushPromises();
+
+    expect(authClient.joinGame).toHaveBeenCalledWith('http://127.0.0.1:8000', {
+      gameId: '77',
+      playerName: 'Weudl',
+      authToken: 'token',
+    });
+    expect(localStorage.getItem('mining-tycoon:playerId')).toBe('9');
+    expect(localStorage.getItem('mining-tycoon:playerToken:77:9')).toBe(
+      'same-token'
+    );
+  });
+
+  it('shows own async games even when a new session would not fit', async () => {
+    await bootLobbySignedIn({
+      games: [
+        {
+          game_id: 'async-mine',
+          game_status: 'running',
+          round_type: 'asynchronous',
+          run_remaining_seconds: 100,
+          session_duration_seconds: 600,
+          my_player_id: 4,
+        },
+      ],
+    });
+    expect(document.querySelectorAll('.game-list-item')).toHaveLength(1);
+  });
+
+  it('treats ACCOUNT_AUTH_INVALID on join like an expired session', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.joinGame).mockRejectedValue(
+      Object.assign(new Error('Invalid account token'), {
+        status: 401,
+        code: 'ACCOUNT_AUTH_INVALID',
+      })
+    );
+
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+    document.getElementById('join-selected-btn').click();
+    await flushPromises();
+
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
+    expect(document.getElementById('auth-message').textContent).toContain(
+      'session has expired'
+    );
+    expect(document.getElementById('lobby-message').textContent).toBe(
+      'Please sign in again to join this game.'
+    );
+    expect(document.getElementById('join-selected-btn').disabled).toBe(true);
+  });
+
+  it('shows the ACCOUNT_REQUIRED message (with a fallback)', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.joinGame)
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Sign in to join this game, please.'), {
+          status: 401,
+          code: 'ACCOUNT_REQUIRED',
+        })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(''), { status: 401, code: 'ACCOUNT_REQUIRED' })
+      );
+
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+    document.getElementById('join-selected-btn').click();
+    await flushPromises();
+    const message = document.getElementById('lobby-message');
+    expect(message.textContent).toBe('Sign in to join this game, please.');
+    expect(document.getElementById('join-selected-btn').disabled).toBe(false);
+
+    document.getElementById('join-selected-btn').click();
+    await flushPromises();
+    expect(message.textContent).toBe('Sign in to join this game.');
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('token');
+  });
+
+  it('drops a stale token when the open-games call answers 401', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchOpenGames).mockImplementation(
+      async (_url, { authToken } = {}) => {
+        if (authToken) {
+          throw Object.assign(new Error('Invalid account token'), {
+            status: 401,
+            code: 'ACCOUNT_AUTH_INVALID',
+          });
+        }
+        return [OPEN_SYNC_GAME];
+      }
+    );
+    localStorage.setItem('mining-tycoon:authToken', 'token');
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushDeep();
+
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
+    expect(document.querySelectorAll('.game-list-item')).toHaveLength(1);
+    vi.mocked(authClient.fetchOpenGames).mockReset();
+    vi.mocked(authClient.fetchOpenGames).mockResolvedValue([]);
+  });
+});
+
+describe('lobby results and history', () => {
+  const RESULTS = {
+    game_id: 5,
+    finished_at: 1760000000,
+    scoring_mode: 'stockpile',
+    round_type: 'synchronous',
+    participants: 2,
+    results: [
+      { rank: 1, player_id: 1, player_name: 'Alice', score: 300 },
+      { rank: 2, player_id: 2, player_name: 'Weudl', score: 100 },
+    ],
+  };
+
+  beforeEach(async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchCurrentUser).mockResolvedValue({
+      username: 'weudl',
+    });
+    vi.mocked(authClient.fetchOpenGames).mockResolvedValue([]);
+    vi.mocked(authClient.fetchMyHistory).mockReset();
+    vi.mocked(authClient.fetchMyHistory).mockResolvedValue({
+      items: [],
+      total: 0,
+    });
+    vi.mocked(authClient.fetchGameResults).mockReset();
+    vi.mocked(authClient.fetchGameResults).mockResolvedValue(RESULTS);
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('enables "My results" only when signed in and opens the history', async () => {
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+    expect(document.getElementById('open-results-dialog').disabled).toBe(true);
+
+    vi.resetModules();
+    loadLobbyFixture();
+    const authClient = await bootLobbySignedIn({ games: [] });
+    const button = document.getElementById('open-results-dialog');
+    expect(button.disabled).toBe(false);
+
+    button.click();
+    await flushDeep();
+    expect(authClient.fetchMyHistory).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:8000',
+      { authToken: 'token', limit: 20, offset: 0 }
+    );
+    expect(document.getElementById('history-message').textContent).toBe(
+      'No finished rounds yet.'
+    );
+  });
+
+  it('prefers the latest server result for "Last Game Highscores" when signed in', async () => {
+    localStorage.setItem(
+      'mining-tycoon:lastPlayedGameSnapshot',
+      JSON.stringify({
+        gameId: 'local-1',
+        scoringModeLabel: 'X',
+        leaderboard: [],
+      })
+    );
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchMyHistory).mockResolvedValue({
+      items: [{ game_id: 5, rank: 2, player_name: 'Weudl' }],
+      total: 1,
+    });
+
+    await bootLobbySignedIn({ games: [] });
+    await flushDeep();
+
+    expect(authClient.fetchMyHistory).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      { authToken: 'token', limit: 1, offset: 0 }
+    );
+    expect(document.getElementById('last-game-summary').textContent).toBe(
+      '5 • Stockpile Mode • Last finished game'
+    );
+    expect(document.querySelectorAll('.last-game-score-item')).toHaveLength(2);
+
+    // Logging out falls back to the local device snapshot.
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(authClient.logout).mockResolvedValue(null);
+    document.getElementById('logout-btn').click();
+    await flushDeep();
+    expect(document.getElementById('last-game-summary').textContent).toContain(
+      'local-1'
+    );
+  });
+
+  it('keeps the local snapshot when the server has no history', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchMyHistory).mockRejectedValue(
+      Object.assign(new Error('Not Found'), { status: 404 })
+    );
+    await bootLobbySignedIn({ games: [] });
+    await flushDeep();
+    expect(document.getElementById('last-game-summary').textContent).toBe(
+      'No finished game recorded yet.'
+    );
+    expect(authClient.fetchGameResults).not.toHaveBeenCalled();
+  });
+
+  it('re-lists games and loads the server result after a login', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.login).mockResolvedValue({
+      access_token: 'fresh',
+      username: 'weudl',
+    });
+    vi.mocked(authClient.fetchMyHistory).mockResolvedValue({
+      items: [{ game_id: 5 }],
+      total: 1,
+    });
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+    vi.mocked(authClient.fetchOpenGames).mockClear();
+
+    const form = document.getElementById('login-form');
+    form.querySelector('#login-username').value = 'weudl';
+    form.querySelector('#login-password').value = 'pw';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushDeep();
+
+    expect(authClient.fetchOpenGames).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      { authToken: 'fresh' }
+    );
+    expect(document.getElementById('last-game-summary').textContent).toContain(
+      '5 •'
+    );
+  });
+
+  it('opens the full results from the ?results= deep link and cleans the URL', async () => {
+    const authClient = await import('./services/auth-client.js');
+    window.history.replaceState(null, '', '/index.html?results=5&player=2');
+
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushDeep();
+
+    expect(authClient.fetchGameResults).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      '5'
+    );
+    expect(document.getElementById('game-results-view').hidden).toBe(false);
+    expect(
+      document.querySelector('.results-item.is-own .results-name').textContent
+    ).toBe('Weudl');
+    expect(window.location.search).toBe('');
   });
 });
