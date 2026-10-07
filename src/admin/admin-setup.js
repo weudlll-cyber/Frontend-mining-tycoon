@@ -5,6 +5,8 @@
  *          POST /games with an optional X-Admin-Token header.
  *
  * No runtime dependencies on main.js or setup-shell.js; standalone module.
+ * Security notes: backend values (game_id) and derived URLs are rendered via
+ * textContent/createElement only — never innerHTML.
  */
 
 import {
@@ -21,6 +23,13 @@ import {
   computeTradeUnlockOffsetsSeconds,
 } from '../config/index.js';
 import { initGameManagement } from './game-management.js';
+import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
+import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
+import {
+  STORAGE_KEYS,
+  getStorageItem,
+  setStorageItem,
+} from '../utils/storage-utils.js';
 
 // ── Label maps ───────────────────────────────────────────────────────────────
 
@@ -306,7 +315,7 @@ function _formatSeconds(s) {
 
 function updateReview() {
   const dl = el('admin-review-dl');
-  dl.innerHTML = '';
+  dl.replaceChildren();
   const rows = buildReviewSummary();
   for (const [key, val] of rows) {
     const dt = document.createElement('dt');
@@ -365,27 +374,78 @@ export function buildGamePayload() {
     }
   }
 
-  // Advanced overrides — only include non-blank fields
-  const anchorToken = el('admin-anchor-token').value;
-  const anchorRate = el('admin-anchor-rate').value;
-  const seasonCycles = el('admin-season-cycles').value;
-  if (anchorToken) payload.anchor_token = anchorToken;
-  if (anchorRate && Number(anchorRate) > 0)
-    payload.anchor_rate = Number(anchorRate);
-  if (seasonCycles && Number(seasonCycles) >= 1)
-    payload.season_cycles = Number(seasonCycles);
+  // Advanced overrides — only non-blank fields, using the backend contract
+  // names (emission_anchor_token, emission_anchor_tokens_per_second,
+  // season_cycles_per_game). The admin section is always visible, so the
+  // shared helper is called with an always-checked toggle.
+  Object.assign(
+    payload,
+    collectAdvancedOverridesFromInputs({
+      showAdvancedCheckbox: { checked: true },
+      anchorTokenInput: el('admin-anchor-token'),
+      anchorRateInput: el('admin-anchor-rate'),
+      seasonCyclesInput: el('admin-season-cycles'),
+    })
+  );
 
   return payload;
 }
 
 // ── Create round ─────────────────────────────────────────────────────────────
 
+/**
+ * Render the "round created" result with safe DOM APIs only.
+ * gameId comes from the backend response and joinUrl from window.location,
+ * so neither may be interpolated into HTML.
+ */
+export function renderCreateSuccess(resultBox, { gameId, joinUrl }) {
+  resultBox.className = 'result-box success';
+
+  const okLine = document.createElement('div');
+  okLine.textContent = '✅ Round created successfully.';
+
+  const idLine = document.createElement('div');
+  idLine.className = 'game-id-display';
+  idLine.id = 'new-game-id-display';
+  idLine.textContent = `Game ID: ${String(gameId)}`;
+
+  const shareLine = document.createElement('div');
+  shareLine.textContent = 'Share the Game ID with players. They join at:';
+
+  const link = document.createElement('a');
+  link.className = 'join-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = joinUrl;
+  // Only allow http(s) links; anything else stays as plain text.
+  if (/^https?:\/\//i.test(String(joinUrl))) {
+    link.href = joinUrl;
+  }
+
+  resultBox.replaceChildren(okLine, idLine, shareLine, link);
+}
+
+function initBackendUrlField() {
+  const input = el('admin-backend-url');
+  if (!input) return;
+  const stored = String(getStorageItem(STORAGE_KEYS.baseUrl) || '').trim();
+  if (!String(input.value || '').trim()) {
+    input.value = stored || DEFAULT_BACKEND_URL;
+  }
+  input.addEventListener('change', () => {
+    const value = String(input.value || '').trim();
+    if (/^https?:\/\/.+/.test(value)) {
+      setStorageItem(STORAGE_KEYS.baseUrl, value.replace(/\/+$/, ''));
+    }
+  });
+}
+
 async function createRound() {
   const resultBox = el('admin-result-box');
   const createBtn = el('admin-create-btn');
 
   resultBox.className = 'result-box';
-  resultBox.innerHTML = '';
+  resultBox.replaceChildren();
   createBtn.disabled = true;
   createBtn.textContent = 'Creating…';
 
@@ -435,13 +495,7 @@ async function createRound() {
     if (!gameId) throw new Error('Server did not return a game_id.');
 
     const joinUrl = `${window.location.origin}${window.location.pathname.replace('admin.html', 'index.html')}`;
-    resultBox.className = 'result-box success';
-    resultBox.innerHTML = `
-      <div>✅ Round created successfully.</div>
-      <div class="game-id-display" id="new-game-id-display">Game ID: ${gameId}</div>
-      <div>Share the Game ID with players. They join at:</div>
-      <a class="join-link" href="${joinUrl}" target="_blank">${joinUrl}</a>
-    `;
+    renderCreateSuccess(resultBox, { gameId, joinUrl });
   } catch (err) {
     resultBox.className = 'result-box error';
     resultBox.textContent = `❌ ${err.message}`;
@@ -454,6 +508,7 @@ async function createRound() {
 // ── Initialisation ────────────────────────────────────────────────────────────
 
 function init() {
+  initBackendUrlField();
   populateDurationPreset();
   populateAsyncDurationPreset();
   populateAsyncSessionPreset();

@@ -37,7 +37,6 @@ import {
   formatCompactNumber,
   normalizeTokenNames,
 } from './utils/token-utils.js';
-import { clearNode } from './utils/dom-utils.js';
 import {
   STORAGE_KEYS,
   getPlayerTokenStorageKey,
@@ -120,11 +119,7 @@ import {
   initLeaderboard,
   renderLeaderboard as renderTopLeaderboard,
 } from './ui/leaderboard.js';
-import {
-  initLastGameHighscores,
-  buildLastGameSnapshot,
-  renderLastGameHighscores,
-} from './ui/last-game-highscores.js';
+import { buildLastGameSnapshot } from './ui/last-game-highscores.js';
 import {
   snapSelection,
   restoreSelectionIfValid,
@@ -139,11 +134,6 @@ import {
   stopSeasonHalvingTimers,
   renderSeasonData as renderSeasonCardData,
 } from './ui/season-cards.js';
-import {
-  initUpgradePanel,
-  renderUpgradeMetrics as renderUpgradePanelMetrics,
-  getSelectedTokens,
-} from './ui/upgrade-panel.js';
 import {
   syncSessionDurationOptions,
   getAsyncDurationPreset,
@@ -173,7 +163,6 @@ import {
   shouldResetAsyncDiagnostics,
   createAsyncDiagnosticsProbeKey,
   shouldSkipAsyncDiagnosticsProbe,
-  resolveSessionSupportProbeValue,
   resolveRequirePlayerAuthValue,
 } from './ui/async-diagnostics.js';
 import {
@@ -221,7 +210,6 @@ import {
   startStream,
   stopLiveTimersAndHalving,
   closeEventSourceIfOpen,
-  hasOpenStream,
 } from './services/stream-controller.js';
 import {
   initGameActions,
@@ -231,13 +219,12 @@ import {
 import {
   initSessionActions,
   createAsyncSession,
-  getSessionStreamTicket,
+  getStreamTicket,
   probeRequirePlayerAuth,
-  probeSessionSupport,
 } from './services/session-actions.js';
 import { debugLog } from './utils/debug-log.js';
-
-const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
+import { readApiError } from './utils/api-error.js';
+import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
 
 // DOM elements - inputs
 const baseUrlInput = document.getElementById('base-url');
@@ -277,22 +264,9 @@ const tradeSchedulePreviewEl = document.getElementById(
 );
 const gameIdInput = document.getElementById('game-id');
 const playerIdInput = document.getElementById('player-id');
-const activeGameSelectInput = document.getElementById('active-game-select');
-const refreshActiveGamesBtn = document.getElementById(
-  'refresh-active-games-btn'
-);
-const activeGameStatusEl = document.getElementById('active-game-status');
-const playerReturnPanelEl = document.getElementById('player-return-panel');
-const lastGameSummaryEl = document.getElementById('last-game-summary');
-const lastGameHighscoresEl = document.getElementById('last-game-highscores');
 const gameOverOverlayEl = document.getElementById('game-over-overlay');
 const gameOverTitleEl = document.getElementById('game-over-title');
 const gameOverMessageEl = document.getElementById('game-over-message');
-
-initLastGameHighscores({
-  summaryEl: lastGameSummaryEl,
-  listEl: lastGameHighscoresEl,
-});
 
 function setActiveMeta(meta) {
   initializeModules();
@@ -370,15 +344,23 @@ const liveDrawerCloseBtnEl = document.getElementById('live-drawer-close-btn');
 const liveDrawerTabTradeEl = document.getElementById('live-tab-trade');
 const liveDrawerTabFarmEl = document.getElementById('live-tab-farm');
 const liveDrawerTabChatEl = document.getElementById('live-tab-chat');
+const liveDrawerTabLeaderboardEl = document.getElementById(
+  'live-tab-leaderboard'
+);
+const leaderboardDrawerBtnEl = document.getElementById(
+  'leaderboard-drawer-btn'
+);
 const liveDrawerPanelTradeEl = document.getElementById('live-panel-trade');
 const liveDrawerPanelFarmEl = document.getElementById('live-panel-farm');
 const liveDrawerPanelChatEl = document.getElementById('live-panel-chat');
+const liveDrawerPanelLeaderboardEl = document.getElementById(
+  'live-panel-leaderboard'
+);
 
 // DOM elements - player and leaderboard
 const playerStateEl = document.getElementById('player-state');
+// Compact top-5 leaderboard lives in the live tools window ("Top 5" tab).
 const leaderboardEl = document.getElementById('leaderboard');
-const upgradesEl =
-  document.getElementById('upgrades') || document.createElement('div'); // Fallback for safety
 const seasonScrollEl = document.querySelector('.seasons-scroll');
 const seasonFocusStripEl = document.getElementById('season-focus-strip');
 const seasonFocusButtons = Array.from(
@@ -410,7 +392,6 @@ const editableInputs = [
   asyncHostDurationPresetInput,
   asyncSessionDurationPresetInput,
   asyncHostAutoStartCheckbox,
-  activeGameSelectInput,
   gameIdInput,
   playerIdInput,
   anchorTokenInput,
@@ -495,9 +476,6 @@ function handleLiveDrawerStateChange(nextState) {
     markChatAsRead();
   }
 }
-let activeGamesById = new Map();
-let activeGamesRefreshInterval = null;
-let lastFinishedGameSnapshot = null;
 let lastFinishedGameId = null;
 let currentViewedGameId = '';
 let _hasSeenPlayableStateForCurrentView = false;
@@ -776,6 +754,12 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
     return;
   }
 
+  // WHY: the backend meta exposes no explicit session capability and the old
+  // OPTIONS / X-Dry-Run probe was rejected by CORS (and a dry-run POST would
+  // create a real session). Async rounds always support POST /games/{id}/sessions,
+  // so the round type from meta is the capability signal.
+  asyncSessionSupportProbe = true;
+
   const probeKey = createAsyncDiagnosticsProbeKey({
     baseUrl,
     gameId,
@@ -796,15 +780,10 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
 
   asyncDiagnosticsProbeKey = probeKey;
   asyncDiagnosticsProbeInFlight = (async () => {
-    const [sessionSupportResult, authResult] = await Promise.all([
-      probeSessionSupport({ gameId, playerId }),
-      playerId
-        ? probeRequirePlayerAuth({ gameId, playerId })
-        : Promise.resolve({ value: 'unknown', reason: 'missing-player-id' }),
-    ]);
+    const authResult = playerId
+      ? await probeRequirePlayerAuth({ gameId, playerId })
+      : { value: 'unknown', reason: 'missing-player-id' };
 
-    asyncSessionSupportProbe =
-      resolveSessionSupportProbeValue(sessionSupportResult);
     asyncRequirePlayerAuth = resolveRequirePlayerAuthValue(authResult);
 
     debugLog('async-diagnostics', 'probe results', {
@@ -813,12 +792,10 @@ async function refreshAsyncDiagnostics({ force = false } = {}) {
       windowOpen: asyncWindowOpen,
       sessionApiSupported: asyncSessionSupportProbe,
       requirePlayerAuth: asyncRequirePlayerAuth,
-      sessionProbeCode: sessionSupportResult?.code ?? null,
       authProbeCode: authResult?.code ?? null,
     });
   })()
     .catch(() => {
-      asyncSessionSupportProbe = null;
       asyncRequirePlayerAuth = 'unknown';
     })
     .finally(() => {
@@ -1241,24 +1218,6 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
-function readStoredLastPlayedGameSnapshot() {
-  const raw = getStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
 function storeLastPlayedGameSnapshot(snapshot) {
   if (!snapshot) {
     setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, '');
@@ -1266,11 +1225,6 @@ function storeLastPlayedGameSnapshot(snapshot) {
   }
 
   setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, JSON.stringify(snapshot));
-}
-
-function renderLastFinishedGameSnapshot(snapshot) {
-  lastFinishedGameSnapshot = snapshot || null;
-  renderLastGameHighscores(lastFinishedGameSnapshot);
 }
 
 function captureLastPlayedGameSnapshot(data) {
@@ -1285,7 +1239,7 @@ function captureLastPlayedGameSnapshot(data) {
   }
 
   lastFinishedGameId = snapshot.gameId;
-  renderLastFinishedGameSnapshot(snapshot);
+  // The lobby (index.html) renders this snapshot as "last game highscores".
   storeLastPlayedGameSnapshot(snapshot);
   return snapshot;
 }
@@ -1300,13 +1254,6 @@ function showGameOverOverlay(gameId = '', options = {}) {
   const title = String(options?.title || 'Game Over').trim() || 'Game Over';
   const message = String(options?.message || '').trim();
 
-  console.log(
-    '[Game Over] Showing overlay for game:',
-    normalizedGameId,
-    'Title:',
-    title
-  );
-
   if (gameOverTitleEl) {
     gameOverTitleEl.textContent = title;
   }
@@ -1319,7 +1266,6 @@ function showGameOverOverlay(gameId = '', options = {}) {
   }
 
   gameOverOverlayEl.hidden = false;
-  console.log('[Game Over] Overlay is now visible');
 }
 
 function isGameOverOverlayEligible({
@@ -1389,11 +1335,10 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
   stopCountdownTimer();
   lastGameData = null;
   resetPlayerStateView();
-  resetSectionPlaceholder(leaderboardEl, 'Waiting for game data...');
+  renderLeaderboard(null);
   if (myScoreEl) myScoreEl.textContent = '—';
   if (myRankEl) myRankEl.textContent = '—';
   if (topScoreEl) topScoreEl.textContent = '—';
-  resetSectionPlaceholder(upgradesEl, 'Waiting for upgrade data...');
   ensureInputsEditable();
   setLiveSessionActive(false);
   setStartSessionStatus('', 'info');
@@ -1403,32 +1348,9 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
     if (playerIdInput) playerIdInput.value = '';
     setStorageItem(STORAGE_KEYS.gameId, '');
     setStorageItem(STORAGE_KEYS.playerId, '');
-    syncActiveGameSelectFromInput();
   }
 
   updateSetupActionsState();
-}
-
-function _returnToPlayerPanel({
-  clearPlayerContext = true,
-  statusMessage = '',
-} = {}) {
-  resetLiveBoardState({ clearPlayerContext });
-  setSetupCollapsed(false);
-
-  if (statusMessage) {
-    setActiveGamesStatus(statusMessage);
-  }
-
-  const returnTarget = activeGameSelectInput || playerReturnPanelEl;
-  if (returnTarget?.scrollIntoView) {
-    returnTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-  if (returnTarget?.focus) {
-    returnTarget.focus();
-  }
-
-  void refreshActiveGames({ notifyOnError: false });
 }
 
 function acknowledgeGameOverOverlay() {
@@ -1503,271 +1425,10 @@ function renderLeaderboard(data) {
   renderTopLeaderboard(data);
 }
 
-function formatActiveGameOptionLabel(game = {}) {
-  const gameId = String(game?.game_id || '').trim();
-  if (!gameId) {
-    return 'Unknown game';
-  }
-
-  const status = String(game?.game_status || '')
-    .trim()
-    .toLowerCase();
-  const playersCount = Number(game?.players_count || 0);
-  const playersText = `${playersCount} player${playersCount === 1 ? '' : 's'}`;
-
-  if (status === 'enrolling') {
-    const remaining = Number(game?.enrollment_remaining_seconds || 0);
-    return `${gameId} • enrolling • starts in ${formatDurationCompact(Math.max(0, remaining))} • ${playersText}`;
-  }
-
-  if (status === 'running') {
-    const remaining = Number(game?.run_remaining_seconds || 0);
-    return `${gameId} • running • ${formatDurationCompact(Math.max(0, remaining))} left • ${playersText}`;
-  }
-
-  return `${gameId} • ${status || 'unknown'} • ${playersText}`;
-}
-
-function setActiveGamesStatus(message) {
-  if (!activeGameStatusEl) return;
-  activeGameStatusEl.textContent = message;
-}
-
-function normalizeJoinableActiveGames(games = []) {
-  return games.filter((game) => {
-    const gameId = String(game?.game_id || '').trim();
-    const status = String(game?.game_status || '')
-      .trim()
-      .toLowerCase();
-
-    if (!gameId) {
-      return false;
-    }
-
-    return status === 'enrolling' || status === 'running';
-  });
-}
-
-function syncActiveGameSelectFromInput(games = []) {
-  if (!activeGameSelectInput) return;
-  const currentGameId = String(gameIdInput?.value || '').trim();
-  const availableIdsFromGames = games
-    .map((game) => String(game?.game_id || '').trim())
-    .filter(Boolean);
-  const availableIdsFromSelect = Array.from(activeGameSelectInput.options)
-    .map((option) => String(option?.value || '').trim())
-    .filter(Boolean);
-  const availableGameIds = availableIdsFromGames.length
-    ? availableIdsFromGames
-    : availableIdsFromSelect;
-
-  if (!currentGameId) {
-    const [firstAvailableGameId] = availableGameIds;
-    const normalizedFirstAvailableGameId = String(
-      firstAvailableGameId || ''
-    ).trim();
-
-    if (normalizedFirstAvailableGameId) {
-      activeGameSelectInput.value = normalizedFirstAvailableGameId;
-      applySelectedActiveGame(normalizedFirstAvailableGameId, {
-        notifyOnPlayerReset: false,
-      });
-      return;
-    }
-
-    activeGameSelectInput.value = '';
-    return;
-  }
-
-  if (
-    activeGamesById.has(currentGameId) ||
-    availableGameIds.includes(currentGameId)
-  ) {
-    activeGameSelectInput.value = currentGameId;
-    return;
-  }
-
-  const [firstActiveGameId] = availableGameIds.length
-    ? availableGameIds
-    : activeGamesById.keys();
-  const normalizedFirstActiveGameId = String(firstActiveGameId || '').trim();
-
-  if (normalizedFirstActiveGameId) {
-    activeGameSelectInput.value = normalizedFirstActiveGameId;
-    applySelectedActiveGame(normalizedFirstActiveGameId, {
-      notifyOnPlayerReset: false,
-    });
-    return;
-  }
-
-  activeGameSelectInput.value = '';
-}
-
-function renderActiveGameOptions(games = []) {
-  if (!activeGameSelectInput) return;
-
-  const joinableGames = normalizeJoinableActiveGames(games);
-
-  clearNode(activeGameSelectInput);
-  const placeholderOption = document.createElement('option');
-  placeholderOption.value = '';
-  placeholderOption.textContent =
-    joinableGames.length > 0
-      ? 'Choose an active game...'
-      : 'No joinable games found';
-  activeGameSelectInput.appendChild(placeholderOption);
-
-  joinableGames.forEach((game) => {
-    const option = document.createElement('option');
-    option.value = String(game.game_id || '').trim();
-    option.textContent = formatActiveGameOptionLabel(game);
-    activeGameSelectInput.appendChild(option);
-  });
-
-  syncActiveGameSelectFromInput(joinableGames);
-}
-
-async function fetchActiveGames(baseUrl) {
-  const response = await fetch(`${baseUrl}/games/active`, {
-    method: 'GET',
-  });
-
-  if (!response.ok) {
-    const detail = await getApiErrorDetail(
-      response,
-      `${response.status} ${response.statusText}`
-    );
-    throw new Error(`Failed to load active games: ${detail}`);
-  }
-
-  const payload = await response.json();
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload;
-}
-
-async function refreshActiveGames({ notifyOnError = true } = {}) {
-  if (!activeGameSelectInput) {
-    return [];
-  }
-
-  const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
-  if (!baseUrl) {
-    activeGamesById = new Map();
-    renderActiveGameOptions([]);
-    setActiveGamesStatus('Enter a valid backend URL to load joinable games.');
-    return [];
-  }
-
-  try {
-    const games = normalizeJoinableActiveGames(await fetchActiveGames(baseUrl));
-    activeGamesById = new Map(
-      games.map((game) => [String(game?.game_id || '').trim(), game])
-    );
-    renderActiveGameOptions(games);
-
-    if (!games.length) {
-      setActiveGamesStatus('There are no joinable games right now.');
-    } else {
-      setActiveGamesStatus(
-        `Loaded ${games.length} active game${games.length === 1 ? '' : 's'}.`
-      );
-    }
-
-    return games;
-  } catch (error) {
-    activeGamesById = new Map();
-    renderActiveGameOptions([]);
-    setActiveGamesStatus('Could not load joinable games.');
-    if (notifyOnError) {
-      showToast(error.message, 'error');
-    }
-    return [];
-  }
-}
-
-function startActiveGamesAutoRefresh() {
-  if (!activeGameSelectInput) {
-    return;
-  }
-  if (activeGamesRefreshInterval) {
-    clearInterval(activeGamesRefreshInterval);
-  }
-  activeGamesRefreshInterval = setInterval(() => {
-    void refreshActiveGames({ notifyOnError: false });
-  }, 10000);
-}
-
-function getRoundModeHintFromActiveGames(gameId) {
-  const normalizedGameId = String(gameId || '').trim();
-  if (!normalizedGameId) return null;
-  const game = activeGamesById.get(normalizedGameId);
-  const roundType = String(game?.round_type || '')
-    .trim()
-    .toLowerCase();
-  if (roundType === 'asynchronous' || roundType === 'async') {
-    return 'async';
-  }
-  if (roundType === 'synchronous' || roundType === 'sync') {
-    return 'sync';
-  }
-  return null;
-}
-
+// The player board joins exactly the game chosen in the lobby (stored game id);
+// game selection lives in index.html, not here.
 function resolveRequestedGameId() {
-  const inputGameId = String(gameIdInput?.value || '').trim();
-  const selectedGameId = String(activeGameSelectInput?.value || '').trim();
-  const inputIsJoinable = inputGameId && activeGamesById.has(inputGameId);
-  const selectedIsJoinable =
-    selectedGameId && activeGamesById.has(selectedGameId);
-
-  if (selectedIsJoinable && (!inputGameId || !inputIsJoinable)) {
-    applySelectedActiveGame(selectedGameId, {
-      notifyOnPlayerReset: false,
-    });
-    return selectedGameId;
-  }
-
-  if (inputGameId) {
-    return inputGameId;
-  }
-
-  if (selectedIsJoinable) {
-    applySelectedActiveGame(selectedGameId, {
-      notifyOnPlayerReset: false,
-    });
-    return selectedGameId;
-  }
-
-  return '';
-}
-
-function applySelectedActiveGame(
-  nextGameId,
-  { notifyOnPlayerReset = true } = {}
-) {
-  const selectedGameId = String(nextGameId || '').trim();
-  if (!selectedGameId) {
-    return;
-  }
-
-  const previousGameId = String(gameIdInput?.value || '').trim();
-  gameIdInput.value = selectedGameId;
-
-  if (previousGameId && previousGameId !== selectedGameId && playerIdInput) {
-    playerIdInput.value = '';
-    setStorageItem(STORAGE_KEYS.playerId, '');
-    if (notifyOnPlayerReset) {
-      showToast(
-        'Selected game changed. Cleared Player ID to avoid mismatch.',
-        'info'
-      );
-    }
-  }
-
-  saveSettings();
+  return String(gameIdInput?.value || '').trim();
 }
 
 function renderSeasonData(data) {
@@ -1815,7 +1476,6 @@ function saveSettings() {
   );
   setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
   setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
-  syncActiveGameSelectFromInput();
 
   renderDebugContext();
   updateScoringModeUi();
@@ -1893,7 +1553,7 @@ function initializeModules() {
   });
   initCountdown({ countdownEl, countdownLabelEl }, { get: () => lastGameData });
   initHalvingDisplay({ getActiveGameMeta: getGameMeta });
-  initEventDisplay({ seasonScrollEl });
+  initEventDisplay({ seasonScrollEl, getActiveGameMeta: getGameMeta });
   initLiveSummary({
     myScoreEl,
     myRankEl,
@@ -1904,10 +1564,6 @@ function initializeModules() {
     defaultTokenNames: PLAYER_STATE_TOKENS,
   });
   initLeaderboard({ leaderboardEl });
-  initLastGameHighscores({
-    summaryEl: lastGameSummaryEl,
-    listEl: lastGameHighscoresEl,
-  });
   initSeasonCards({ getGameMeta });
   initMetaManager({
     onMetaChanged() {
@@ -1922,13 +1578,6 @@ function initializeModules() {
     showToast,
   });
   initPlayerView({ playerStateEl, getActiveGameMeta: getGameMeta });
-  initUpgradePanel({
-    upgradesEl,
-    getActiveGameMeta: getGameMeta,
-    isActiveContractSupported,
-    getActiveUpgradeDefinitions,
-    performUpgrade,
-  });
   initInlineUpgrades({
     getActiveGameMeta: getGameMeta,
     isActiveContractSupported,
@@ -1949,17 +1598,20 @@ function initializeModules() {
       liveDrawerTabTradeEl,
       liveDrawerTabFarmEl,
       liveDrawerTabChatEl,
+      liveDrawerTabLeaderboardEl,
     ],
     panels: [
       liveDrawerPanelTradeEl,
       liveDrawerPanelFarmEl,
       liveDrawerPanelChatEl,
+      liveDrawerPanelLeaderboardEl,
     ],
     openButtons: [
       tradeDrawerBtnEl,
       farmDrawerBtnEl,
       chatToggleBtnEl,
       chatDockBtnEl,
+      leaderboardDrawerBtnEl,
     ],
     defaultTab: 'trade',
     onStateChanged: handleLiveDrawerStateChange,
@@ -2011,7 +1663,7 @@ function initializeModules() {
     connectChat,
     getStorageItem,
     getPlayerTokenStorageKey,
-    getSessionStreamTicket,
+    getStreamTicket,
     setBadgeStatus,
     connStatusEl,
     fetchMetaSnapshot,
@@ -2024,14 +1676,7 @@ function initializeModules() {
       const sessionStatus = String(data?.session?.status || '')
         .trim()
         .toLowerCase();
-      console.log(
-        '[Async Session] Stream finished, sessionStatus:',
-        sessionStatus
-      );
       if (sessionStatus !== 'finished') {
-        console.log(
-          '[Async Session] Session status is not "finished", skipping overlay'
-        );
         return;
       }
 
@@ -2042,10 +1687,6 @@ function initializeModules() {
         captureLastPlayedGameSnapshot(data);
       }
 
-      console.log(
-        '[Async Session] Showing game over overlay for async game:',
-        finishedGameId
-      );
       showGameOverOverlay(finishedGameId, {
         title: 'Session Finished',
         message:
@@ -2068,20 +1709,6 @@ function initializeModules() {
     getNormalizedBaseUrlOrNull,
     getStorageItem,
     getPlayerTokenStorageKey,
-    getSelectedTokens,
-    disconnectChat,
-    hasOpenStream,
-    stopActiveStream() {
-      closeEventSourceIfOpen();
-      stopLiveTimersAndHalving();
-      isStreamActive = false;
-      latestGameStatus = null;
-      updateSetupActionsState();
-    },
-    onSetupBusyChange(next) {
-      isSetupBusy = next;
-      updateSetupActionsState();
-    },
     onTradeExecuted(payload) {
       if (!payload || typeof payload !== 'object') return;
       const updatedState = payload.updated_state;
@@ -2105,7 +1732,6 @@ function initializeModules() {
         tradingPanelApi.renderTradingStatus();
       }
     },
-    getPlayerName: () => playerNameInput.value.trim() || 'Player',
   });
   initSessionActions({
     getNormalizedBaseUrlOrNull,
@@ -2118,26 +1744,12 @@ function initializeModules() {
 
 function renderUpgradeMetrics(data) {
   initializeModules();
-  renderUpgradePanelMetrics(data, getGameMeta);
   renderAllSeasonUpgrades(data, getGameMeta);
-}
-
-function createPlaceholder(message) {
-  const placeholder = document.createElement('p');
-  placeholder.className = 'placeholder';
-  placeholder.textContent = message;
-  return placeholder;
 }
 
 function ensureInputsEditable() {
   initializeModules();
   ensureSetupInputsEditable();
-}
-
-function resetSectionPlaceholder(node, message) {
-  if (!node) return;
-  clearNode(node);
-  node.appendChild(createPlaceholder(message));
 }
 
 function loadSettings() {
@@ -2196,7 +1808,6 @@ function loadSettings() {
   }
   if (savedGameId) gameIdInput.value = savedGameId;
   if (savedPlayerId) playerIdInput.value = savedPlayerId;
-  syncActiveGameSelectFromInput();
   if (savedGameId && savedPlayerId) {
     // Keep setup out of the way once the player already joined a game.
     setSetupCollapsed(true);
@@ -2224,7 +1835,6 @@ function loadSettings() {
   }
 
   renderMetaDebugLine();
-  renderLastFinishedGameSnapshot(readStoredLastPlayedGameSnapshot());
   renderDebugContext();
   renderTradeSchedulePreview();
   updateSetupActionsState();
@@ -2427,22 +2037,6 @@ async function startLiveStream(gameId, playerId, options = {}) {
   });
 }
 
-async function getApiErrorDetail(response, fallback) {
-  try {
-    const payload = await response.json();
-    if (
-      payload &&
-      typeof payload.detail === 'string' &&
-      payload.detail.trim()
-    ) {
-      return payload.detail;
-    }
-  } catch {
-    // Ignore JSON parse errors and keep fallback.
-  }
-  return fallback;
-}
-
 async function canReusePlayerForGame({ baseUrl, gameId, playerId }) {
   const normalizedGameId = String(gameId || '').trim();
   const normalizedPlayerId = String(playerId || '').trim();
@@ -2515,11 +2109,16 @@ async function ensurePlayerJoinedForStream({ baseUrl, gameId, playerId }) {
   );
 
   if (!joinResponse.ok) {
-    const detail = await getApiErrorDetail(
+    const { message, status } = await readApiError(
       joinResponse,
-      `${joinResponse.status} ${joinResponse.statusText}`
+      `${joinResponse.status} ${joinResponse.statusText}`.trim()
     );
-    throw new Error(`Join failed: ${detail}`);
+    // 422: backend rejected the player name (1-24 chars, letters/digits/space/_-.).
+    throw new Error(
+      status === 422
+        ? `Invalid player name: ${message}`
+        : `Join failed: ${message}`
+    );
   }
 
   const joinData = await joinResponse.json();
@@ -2644,9 +2243,7 @@ async function handleStartGameFlow() {
     console.warn('Initial meta fetch failed before stream start:', e);
   }
 
-  const roundMode =
-    getRoundModeHintFromActiveGames(gameId) ||
-    getCurrentRoundContext().roundMode;
+  const roundMode = getCurrentRoundContext().roundMode;
   if (roundMode === 'async' && !activeSession?.sessionId) {
     await startAsyncSessionForGame({ gameId, playerId });
     return;
@@ -2703,10 +2300,7 @@ if (showAdvancedCheckbox) {
   });
 }
 
-baseUrlInput?.addEventListener('change', () => {
-  saveSettings();
-  void refreshActiveGames({ notifyOnError: false });
-});
+baseUrlInput?.addEventListener('change', saveSettings);
 playerNameInput?.addEventListener('change', saveSettings);
 durationCustomValueInput?.addEventListener('change', () => {
   syncTradeCountWithDuration();
@@ -2730,13 +2324,6 @@ tradeCountInput?.addEventListener('change', () => {
   saveSettings();
 });
 gameIdInput?.addEventListener('change', saveSettings);
-activeGameSelectInput?.addEventListener('change', () => {
-  hideGameOverOverlay();
-  applySelectedActiveGame(activeGameSelectInput.value);
-});
-refreshActiveGamesBtn?.addEventListener('click', () => {
-  void refreshActiveGames({ notifyOnError: true });
-});
 
 gameOverOverlayEl?.addEventListener('click', () => {
   acknowledgeGameOverOverlay();
@@ -2786,8 +2373,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
-  await refreshActiveGames({ notifyOnError: false });
-  startActiveGamesAutoRefresh();
   updateScoringModeUi();
   void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
@@ -2825,9 +2410,6 @@ export {
   applyHalvingTextAndSeverity,
   syncSeasonHalvingTicker,
   stopSeasonHalvingTimers,
-  formatActiveGameOptionLabel,
-  normalizeJoinableActiveGames,
-  renderActiveGameOptions,
   handleChatMessagePreview,
   resolveRequestedGameId,
   renderSeasonData,

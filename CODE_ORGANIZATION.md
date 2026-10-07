@@ -98,7 +98,7 @@ Current recommendation:
 | `src/ui/player-view-layout.js` | analytics table/layout creation and tooltip anchors |
 | `src/ui/player-view-score.js` | analytics score display helpers |
 | `src/services/stream-controller.js` | SSE stream lifecycle |
-| `src/services/game-actions.js` | create/join/upgrade API flows |
+| `src/services/game-actions.js` | upgrade/trade API flows |
 | `src/ui/setup-shell.js` | setup panel, top controls, and header navigation |
 
 ---
@@ -107,8 +107,7 @@ Current recommendation:
 
 ```mermaid
 graph TD
-    A[main.js] -->|imports| B[ui/upgrade-panel.js]
-    A -->|imports| C[ui/upgrade-panel-inline.js]
+    A[main.js] -->|imports| C[ui/upgrade-panel-inline.js]
     A -->|imports| D[ui/player-view.js]
     A -->|imports| E[ui/chat-panel.js]
     A -->|imports| F[ui/halving-display.js]
@@ -159,15 +158,8 @@ graph TD
 
 **High complexity areas**:
 
-1. **main.js::createNewGameAndJoin()** - 12+ code paths
-   - Multiple error conditions, async/await handling
-   - Acceptable for complex feature
-
-2. **ui/player-view.js::renderPlayerState()** - Multiple token loops
+1. **ui/player-view.js::renderPlayerState()** - Multiple token loops
   - Still justified by multi-token rendering requirement, now supported by extracted layout/score helpers
-
-3. **ui/upgrade-panel.js::renderUpgradeMetrics()** - Complex form building
-   - Acceptable for modal structure
 
 **Recommendation**: Current complexity is acceptable given feature requirements.
 

@@ -106,7 +106,11 @@ function buildDom({
 
 // ── Import module after DOM is set —
 //   We import buildReviewSummary and buildGamePayload which read the global document.
-import { buildReviewSummary, buildGamePayload } from './admin-setup.js';
+import {
+  buildReviewSummary,
+  buildGamePayload,
+  renderCreateSuccess,
+} from './admin-setup.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -262,19 +266,19 @@ describe('buildGamePayload — advanced overrides excluded when blank', () => {
     buildDom({ roundType: 'sync' });
   });
 
-  it('does not include anchor_token when empty', () => {
+  it('does not include emission_anchor_token when empty', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_token).toBeUndefined();
+    expect(payload.emission_anchor_token).toBeUndefined();
   });
 
-  it('does not include anchor_rate when 0', () => {
+  it('does not include emission_anchor_tokens_per_second when blank', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_rate).toBeUndefined();
+    expect(payload.emission_anchor_tokens_per_second).toBeUndefined();
   });
 
-  it('does not include season_cycles when blank', () => {
+  it('does not include season_cycles_per_game when blank', () => {
     const payload = buildGamePayload();
-    expect(payload.season_cycles).toBeUndefined();
+    expect(payload.season_cycles_per_game).toBeUndefined();
   });
 });
 
@@ -288,19 +292,60 @@ describe('buildGamePayload — advanced overrides included when set', () => {
     dom.window.document.getElementById('admin-season-cycles').value = '2';
   });
 
-  it('includes anchor_token', () => {
+  it('includes emission_anchor_token (backend contract name)', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_token).toBe('spring');
+    expect(payload.emission_anchor_token).toBe('spring');
   });
 
-  it('includes anchor_rate as number', () => {
+  it('includes emission_anchor_tokens_per_second as number', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_rate).toBe(5.0);
+    expect(payload.emission_anchor_tokens_per_second).toBe(5.0);
   });
 
-  it('includes season_cycles as number', () => {
+  it('includes season_cycles_per_game as number', () => {
     const payload = buildGamePayload();
-    expect(payload.season_cycles).toBe(2);
+    expect(payload.season_cycles_per_game).toBe(2);
+  });
+
+  it('never sends the legacy field names the backend ignores', () => {
+    const payload = buildGamePayload();
+    expect(payload).not.toHaveProperty('anchor_token');
+    expect(payload).not.toHaveProperty('anchor_rate');
+    expect(payload).not.toHaveProperty('season_cycles');
+  });
+});
+
+describe('renderCreateSuccess — safe DOM rendering', () => {
+  beforeEach(() => {
+    buildDom({ roundType: 'sync' });
+  });
+
+  it('renders backend game_id as text, never as markup', () => {
+    const box = document.getElementById('admin-result-box');
+    renderCreateSuccess(box, {
+      gameId: '<img src=x onerror="alert(1)">',
+      joinUrl: 'http://localhost:5173/index.html',
+    });
+
+    expect(box.querySelector('img')).toBeNull();
+    expect(box.querySelector('#new-game-id-display')?.textContent).toBe(
+      'Game ID: <img src=x onerror="alert(1)">'
+    );
+    const link = box.querySelector('a.join-link');
+    expect(link?.getAttribute('href')).toBe('http://localhost:5173/index.html');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(box.className).toBe('result-box success');
+  });
+
+  it('does not set an href for non-http join URLs', () => {
+    const box = document.getElementById('admin-result-box');
+    renderCreateSuccess(box, {
+      gameId: 7,
+      joinUrl: 'javascript:alert(1)',
+    });
+    const link = box.querySelector('a.join-link');
+    expect(link?.hasAttribute('href')).toBe(false);
+    expect(link?.textContent).toBe('javascript:alert(1)');
   });
 });
 

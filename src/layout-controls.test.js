@@ -70,7 +70,6 @@ function buildDomFixture() {
       <div id="new-game-status"></div>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
-      <div id="upgrades"></div>
       <div id="my-score"></div>
       <div id="my-rank"></div>
       <div id="top-score"></div>

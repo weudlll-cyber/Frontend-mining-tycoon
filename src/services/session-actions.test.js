@@ -8,7 +8,7 @@ import {
   initSessionActions,
   createAsyncSession,
   probeRequirePlayerAuth,
-  probeSessionSupport,
+  getStreamTicket,
 } from './session-actions.js';
 
 describe('session-actions', () => {
@@ -163,53 +163,107 @@ describe('session-actions', () => {
     expect(result.code).toBe(404);
   });
 
-  it('probeSessionSupport returns null for ambiguous 404 capability response', async () => {
+  it('getStreamTicket requests a fresh ticket with the stored player token', async () => {
     setupDeps();
 
-    globalThis.fetch = vi.fn().mockResolvedValueOnce({
-      status: 404,
-      ok: false,
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ ticket: 'fresh-ticket', expires_in: 60 }),
+    });
+    globalThis.fetch = fetchMock;
+
+    const first = await getStreamTicket({
+      gameId: 'g 1',
+      playerId: '2',
+      requirePlayerAuth: true,
+    });
+    const second = await getStreamTicket({
+      gameId: 'g 1',
+      playerId: '2',
+      requirePlayerAuth: true,
     });
 
-    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
-    expect(result.supported).toBe(null);
-    expect(result.code).toBe(404);
+    expect(first).toEqual({ ok: true, ticket: 'fresh-ticket' });
+    expect(second).toEqual({ ok: true, ticket: 'fresh-ticket' });
+    // One network call per connect attempt — tickets are never cached.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      'http://127.0.0.1:8000/games/g%201/sse-ticket?player_id=2'
+    );
+    expect(options.headers['X-Player-Token']).toBe('token-123');
   });
 
-  it('probeSessionSupport returns true when POST dry-run reaches endpoint', async () => {
-    setupDeps();
+  it('getStreamTicket fails when auth is required but no token is stored', async () => {
+    initSessionActions({
+      getNormalizedBaseUrlOrNull: () => 'http://127.0.0.1:8000',
+      getStorageItem: () => null,
+      getPlayerTokenStorageKey: () => 'player-token-key',
+    });
+    globalThis.fetch = vi.fn();
 
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        status: 405,
-        ok: false,
-      })
-      .mockResolvedValueOnce({
-        status: 422,
-        ok: false,
-      });
-
-    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
-    expect(result.supported).toBe(true);
-    expect(result.code).toBe(422);
+    const result = await getStreamTicket({
+      gameId: '1',
+      playerId: '2',
+      requirePlayerAuth: true,
+    });
+    expect(result.ok).toBe(false);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('probeSessionSupport returns null on network error', async () => {
+  it('getStreamTicket surfaces backend detail when auth is required', async () => {
     setupDeps();
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      status: 403,
+      ok: false,
+      statusText: 'Forbidden',
+      json: async () => ({ detail: 'Invalid player token' }),
+    });
 
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network'));
-
-    const result = await probeSessionSupport({ gameId: '1', playerId: '2' });
-    expect(result.supported).toBe(null);
-    expect(result.reason).toBe('network-error');
+    const result = await getStreamTicket({
+      gameId: '1',
+      playerId: '2',
+      requirePlayerAuth: true,
+    });
+    expect(result).toEqual({ ok: false, message: 'Invalid player token' });
   });
 
-  it('probeSessionSupport returns null when gameId is missing', async () => {
-    setupDeps();
+  it('getStreamTicket is best-effort when auth is not known to be required', async () => {
+    initSessionActions({
+      getNormalizedBaseUrlOrNull: () => 'http://127.0.0.1:8000',
+      getStorageItem: () => null,
+      getPlayerTokenStorageKey: () => 'player-token-key',
+    });
 
-    const result = await probeSessionSupport({ gameId: '', playerId: '2' });
-    expect(result.supported).toBe(null);
-    expect(result.reason).toBe('missing-game-id');
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+      json: async () => ({}),
+    });
+    expect(await getStreamTicket({ gameId: '1', playerId: '2' })).toEqual({
+      ok: true,
+      ticket: null,
+    });
+
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new Error('network'));
+    expect(await getStreamTicket({ gameId: '1', playerId: '2' })).toEqual({
+      ok: true,
+      ticket: null,
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ ticket: 'dev-ticket' }),
+    });
+    const devResult = await getStreamTicket({ gameId: '1', playerId: '2' });
+    expect(devResult).toEqual({ ok: true, ticket: 'dev-ticket' });
+    expect(globalThis.fetch.mock.calls[0][1].headers).toEqual({});
+  });
+
+  it('does not send OPTIONS or X-Dry-Run probes (removed CORS-unsafe capability probe)', async () => {
+    const module = await import('./session-actions.js');
+    expect(module.probeSessionSupport).toBeUndefined();
   });
 });

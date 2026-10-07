@@ -8,9 +8,20 @@ Role in system:
   season-card and player-state tooltip instances, closing any open tooltip after ~1 s.
   Instead: event-banner tooltip scopes to _eventBannerEl only (rebuilt once on mount),
   and each ⚡ indicator is self-bound via bindDirectTooltip() at creation time.
+Backend contract (P2.3 events, app/core/events.py summarize_active_events):
+- `active_events`: LIST of { event_id, event_type, domain, token, magnitude, label,
+  start_sim_month, end_sim_month } on SSE and /state payloads; several may be active.
+- domain ∈ oracle_price | oracle_spread | output | upgrade_cost; token null = all tokens.
+- magnitude is a multiplier for oracle_price/output/upgrade_cost and an additive
+  spread delta (fraction) for oracle_spread.
+- Remaining real time is derived from (end_sim_month - current_sim_month) divided by
+  the game's sim_months_per_real_second (from game meta); without a rate the banner
+  falls back to remaining sim-months.
+- Legacy single-object shapes (active_event / event_context.active_event /
+  events.active with name/effect_description/end_unix) are still tolerated.
 Constraints:
 - LOCKED_DECISIONS.md §C: no overlay/modal behavior; event banner is inline.
-- Frontend is display-only; active event data comes from backend SSE payload.
+- Frontend is display-only; active event data comes from backend payloads.
 Security notes:
 - Tooltip text is assembled from backend strings using textContent — no innerHTML.
 */
@@ -31,13 +42,31 @@ function nextTooltipId(prefix) {
   return `${prefix}-${_tooltipCounter}`;
 }
 
-function getActiveEvent(data) {
-  return (
+const DOMAIN_LABELS = {
+  output: 'Output',
+  upgrade_cost: 'Upgrade cost',
+  oracle_price: 'Oracle price',
+  oracle_spread: 'Spread',
+};
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Return all currently active events as an array.
+ * Prefers the backend list `active_events`; falls back to legacy single-object keys.
+ */
+export function getActiveEvents(data) {
+  if (Array.isArray(data?.active_events)) {
+    return data.active_events.filter(isPlainObject);
+  }
+  const legacy =
     data?.active_event ||
     data?.event_context?.active_event ||
     data?.events?.active ||
-    null
-  );
+    null;
+  return isPlainObject(legacy) ? [legacy] : [];
 }
 
 function getEventDomains(activeEvent) {
@@ -50,26 +79,129 @@ function getEventDomains(activeEvent) {
   return [];
 }
 
-function getRemainingSeconds(activeEvent) {
-  const endUnix = Number(activeEvent?.end_unix ?? activeEvent?.ends_at_unix);
-  if (!Number.isFinite(endUnix)) return null;
-  return Math.max(0, endUnix - Date.now() / 1000);
+function getEventToken(activeEvent) {
+  const token = String(activeEvent?.token || '')
+    .trim()
+    .toLowerCase();
+  return token || null;
 }
 
-function formatRemaining(activeEvent) {
-  const remaining = getRemainingSeconds(activeEvent);
-  return remaining === null ? '—' : formatCountdownClock(remaining);
+function humanizeEventType(eventType) {
+  const raw = String(eventType || '').trim();
+  if (!raw) return '';
+  return raw
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
-function getEventTooltipText(activeEvent) {
-  const eventName = String(activeEvent?.name || 'Event');
-  const effectDesc = String(
-    activeEvent?.effect_description || activeEvent?.effect || 'Effect active'
+function getEventName(activeEvent) {
+  return (
+    String(activeEvent?.label || activeEvent?.name || '').trim() ||
+    humanizeEventType(activeEvent?.event_type) ||
+    'Event'
   );
+}
+
+function formatSignedPercent(fraction, digits = 0) {
+  const pct = fraction * 100;
+  const rounded = Number(pct.toFixed(digits));
+  if (rounded === 0) return '±0%';
+  const sign = rounded > 0 ? '+' : '−';
+  return `${sign}${Math.abs(rounded).toFixed(digits)}%`;
+}
+
+/**
+ * Human-readable effect text, e.g. "Output +25% (spring)" or "Spread +4.0% (all tokens)".
+ * Legacy payloads may carry a ready-made effect_description which wins.
+ */
+function getEffectDescription(activeEvent) {
+  const legacy = activeEvent?.effect_description || activeEvent?.effect;
+  if (typeof legacy === 'string' && legacy.trim()) {
+    return legacy.trim();
+  }
+
+  const domain = String(activeEvent?.domain || '').trim();
+  const magnitude = Number(activeEvent?.magnitude);
+  const domainLabel = DOMAIN_LABELS[domain] || humanizeEventType(domain);
+  if (!domainLabel) {
+    return 'Effect active';
+  }
+
+  let change = '';
+  if (Number.isFinite(magnitude)) {
+    // WHY: oracle_spread magnitude is an additive fraction; all other domains are multipliers.
+    change =
+      domain === 'oracle_spread'
+        ? formatSignedPercent(magnitude, 1)
+        : formatSignedPercent(magnitude - 1);
+  }
+  const token = getEventToken(activeEvent);
+  const scope = token || 'all tokens';
+  return `${domainLabel}${change ? ` ${change}` : ''} (${scope})`;
+}
+
+let _getActiveGameMeta = null;
+
+function getSimMonthsPerRealSecond(data) {
+  const meta = _getActiveGameMeta
+    ? _getActiveGameMeta(String(data?.game_id || ''))
+    : null;
+  const rate = Number(
+    meta?.sim_months_per_real_second ?? data?.sim_months_per_real_second
+  );
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
+/**
+ * Remaining time of an event.
+ * Returns { seconds } when a real-time estimate exists, { simMonths } when only
+ * the sim-month bounds are known, or null when nothing can be derived.
+ */
+function getRemaining(activeEvent, data) {
+  const endUnix = Number(activeEvent?.end_unix ?? activeEvent?.ends_at_unix);
+  if (Number.isFinite(endUnix)) {
+    return { seconds: Math.max(0, endUnix - Date.now() / 1000) };
+  }
+
+  const endMonth = Number(activeEvent?.end_sim_month);
+  const currentMonth = Number(data?.current_sim_month);
+  if (!Number.isFinite(endMonth) || !Number.isFinite(currentMonth)) {
+    return null;
+  }
+  const monthsLeft = Math.max(0, endMonth - currentMonth);
+  const rate = getSimMonthsPerRealSecond(data);
+  if (rate) {
+    return { seconds: monthsLeft / rate };
+  }
+  return { simMonths: monthsLeft };
+}
+
+function formatRemaining(activeEvent, data) {
+  const remaining = getRemaining(activeEvent, data);
+  if (!remaining) return '—';
+  if (Number.isFinite(remaining.seconds)) {
+    return formatCountdownClock(remaining.seconds);
+  }
+  const months = remaining.simMonths;
+  return `${months} sim-month${months === 1 ? '' : 's'}`;
+}
+
+function getEventTooltipText(activeEvent, data) {
+  const eventName = getEventName(activeEvent);
+  const effectDesc = getEffectDescription(activeEvent);
   const domains = getEventDomains(activeEvent);
   const domainsText = domains.length ? domains.join(', ') : 'unknown';
-  const remainingText = formatRemaining(activeEvent);
-  return `${eventName} | Effect: ${effectDesc} | Domains: ${domainsText} | Remaining: ${remainingText}`;
+  const remainingText = formatRemaining(activeEvent, data);
+  const description = String(activeEvent?.description || '').trim();
+  const base = `${eventName} | Effect: ${effectDesc} | Domains: ${domainsText} | Remaining: ${remainingText}`;
+  return description ? `${base} | ${description}` : base;
+}
+
+function getEventsTooltipText(events, data) {
+  return events.map((event) => getEventTooltipText(event, data)).join('\n');
 }
 
 function ensureTooltipLayer() {
@@ -210,6 +342,8 @@ function ensureEventBannerUi() {
     tooltipId,
     tooltipText: '',
   });
+  // One line per concurrent event.
+  _eventBannerBubble.style.whiteSpace = 'pre-line';
   _eventBannerTrigger = createTooltipTrigger({
     tooltipId,
     ariaLabel: 'Event details',
@@ -226,7 +360,10 @@ function ensureEventBannerUi() {
  * @param {object} opts - { seasonScrollEl? }
  */
 export function initEventDisplay(opts = {}) {
-  const { seasonScrollEl } = opts;
+  const { seasonScrollEl, getActiveGameMeta } = opts;
+  if (typeof getActiveGameMeta === 'function') {
+    _getActiveGameMeta = getActiveGameMeta;
+  }
 
   if (_eventBannerEl && !_eventBannerEl.isConnected) {
     _eventBannerEl = null;
@@ -257,16 +394,16 @@ export function initEventDisplay(opts = {}) {
 }
 
 /**
- * Render event banner if event is active.
- * @param {object} data - SSE payload potentially containing active_event
+ * Render the inline event banner for all active events.
+ * @param {object} data - SSE / state payload containing active_events
  */
 export function renderEventBanner(data) {
   if (!_eventBannerEl) return;
   const bannerRebuilt = ensureEventBannerUi();
 
-  const activeEvent = getActiveEvent(data);
+  const events = getActiveEvents(data);
 
-  if (!activeEvent || !activeEvent.name) {
+  if (!events.length) {
     _eventBannerEl.classList.add('event-banner-hidden');
     clearEventTooltipBubbles();
     setElementTextValue(_eventBannerContentEl, '');
@@ -278,11 +415,14 @@ export function renderEventBanner(data) {
     return;
   }
 
-  const countdownText = formatRemaining(activeEvent);
-  const eventName = String(activeEvent.name || 'Event');
-  const effectDesc = String(
-    activeEvent.effect_description || activeEvent.effect || 'Effect active'
+  const segments = events.map(
+    (event) =>
+      `${getEventName(event)} (${getEffectDescription(event)}) — ${formatRemaining(event, data)} remaining`
   );
+  const prefix =
+    events.length === 1 ? '⚡ Event:' : `⚡ ${events.length} events:`;
+  const ariaName =
+    events.length === 1 ? getEventName(events[0]) : `${events.length} active`;
 
   clearEventTooltipBubbles();
   _eventBannerEl.classList.remove('event-banner-hidden');
@@ -290,88 +430,108 @@ export function renderEventBanner(data) {
   setElementTextValue(_eventBannerTrigger, 'ⓘ');
   setElementTextValue(
     _eventBannerContentEl,
-    `⚡ Event: ${eventName} (${effectDesc}) — ${countdownText} remaining`
+    `${prefix} ${segments.join(' · ')}`
   );
-  setElementTextValue(_eventBannerBubble, getEventTooltipText(activeEvent));
-  _eventBannerTrigger.setAttribute('aria-label', `${eventName} event details`);
+  setElementTextValue(_eventBannerBubble, getEventsTooltipText(events, data));
+  _eventBannerTrigger.setAttribute('aria-label', `${ariaName} event details`);
   _eventBannerTrigger.hidden = false;
   // Only rebind the banner tooltip when the DOM structure was freshly created
   if (bannerRebuilt || !_disposeTooltips) refreshTooltips();
 }
 
-/**
- * Annotate DOM elements affected by active event.
- * Add ⚡ indicator next to affected output/upgrade values.
- * @param {object} data - SSE payload with active_event
- */
-export function annotateAffectedValues(data) {
-  const activeEvent = getActiveEvent(data);
-  if (!activeEvent) {
-    clearEventIndicators();
-    return;
+function tokenScopedSelector(selector, token, tokenSelector) {
+  return token ? tokenSelector(token) : selector;
+}
+
+// Map an event to the DOM cells it affects. Token-scoped events only mark the
+// matching token's cells; global events (token null) mark every token.
+function collectAffectedElements(event) {
+  const domains = getEventDomains(event);
+  const token = getEventToken(event);
+  // Token names are simple identifiers (spring/summer/...); anything else is
+  // ignored rather than interpolated into a selector.
+  if (token && !/^[a-z0-9_-]+$/.test(token)) {
+    return [];
   }
-
-  const domains = getEventDomains(activeEvent);
-
-  clearEventIndicators();
+  const safeToken = token;
+  const selectors = [];
 
   if (domains.includes('output')) {
-    document.querySelectorAll('.season-output').forEach((el) => {
-      addEventIndicator(el, activeEvent);
-    });
-
-    document.querySelectorAll('.ps-cell[data-row="output"]').forEach((el) => {
-      addEventIndicator(el, activeEvent);
-    });
+    selectors.push(
+      tokenScopedSelector(
+        '.season-output',
+        safeToken,
+        (t) => `.season-card[data-season="${t}"] .season-output`
+      ),
+      tokenScopedSelector(
+        '.ps-cell[data-row="output"]',
+        safeToken,
+        (t) => `.ps-cell[data-row="output"][data-token="${t}"]`
+      )
+    );
   }
 
   if (domains.includes('upgrade_cost')) {
-    document.querySelectorAll('.upgrade-row-cost').forEach((el) => {
-      addEventIndicator(el, activeEvent);
-    });
-  }
-
-  if (
-    domains.includes('cooling') ||
-    domains.includes('efficiency') ||
-    domains.includes('hashrate')
-  ) {
-    const upgradeTypes = [];
-    if (domains.includes('cooling')) upgradeTypes.push('cooling');
-    if (domains.includes('efficiency')) upgradeTypes.push('efficiency');
-    if (domains.includes('hashrate')) upgradeTypes.push('hashrate');
-
-    upgradeTypes.forEach((type) => {
-      document
-        .querySelectorAll(
-          `.upgrade-row-benefit[data-upgrade-type="${type}"], .upgrade-row-type[data-upgrade-type="${type}"]`
-        )
-        .forEach((el) => {
-          addEventIndicator(el, activeEvent);
-        });
-    });
+    // Backend applies upgrade-cost events to the upgrade's target token,
+    // i.e. the season card the upgrade lane lives in.
+    selectors.push(
+      tokenScopedSelector(
+        '.upgrade-row-cost',
+        safeToken,
+        (t) => `.season-card[data-season="${t}"] .upgrade-row-cost`
+      )
+    );
   }
 
   if (domains.includes('oracle_price')) {
-    document.querySelectorAll('.ps-cell[data-row="price"]').forEach((el) => {
-      addEventIndicator(el, activeEvent);
-    });
+    selectors.push(
+      tokenScopedSelector(
+        '.ps-cell[data-row="price"]',
+        safeToken,
+        (t) => `.ps-cell[data-row="price"][data-token="${t}"]`
+      )
+    );
   }
 
   if (domains.includes('oracle_spread')) {
-    const footerContent = document.querySelector('.ps-footer-content');
-    if (footerContent) {
-      addEventIndicator(footerContent, activeEvent);
-    }
+    selectors.push('.ps-footer-content');
   }
+
+  if (!selectors.length) return [];
+  return Array.from(document.querySelectorAll(selectors.join(', ')));
+}
+
+/**
+ * Annotate DOM elements affected by active events with a ⚡ indicator.
+ * When several events hit the same cell, one indicator lists all of them.
+ * @param {object} data - SSE / state payload with active_events
+ */
+export function annotateAffectedValues(data) {
+  const events = getActiveEvents(data);
+  clearEventIndicators();
+  if (!events.length) {
+    return;
+  }
+
+  const eventsByElement = new Map();
+  events.forEach((event) => {
+    collectAffectedElements(event).forEach((el) => {
+      if (!eventsByElement.has(el)) eventsByElement.set(el, []);
+      eventsByElement.get(el).push(event);
+    });
+  });
+
+  eventsByElement.forEach((elementEvents, el) => {
+    addEventIndicator(el, elementEvents, data);
+  });
   // No refreshTooltips() call here: each indicator is self-bound via bindDirectTooltip.
 }
 
 /**
  * Add a ⚡ indicator to an element.
- * Does NOT modify layout; uses a pseudo-element or inline-block span.
+ * Does NOT modify layout; uses an inline-block trigger button.
  */
-function addEventIndicator(el, activeEvent) {
+function addEventIndicator(el, events, data) {
   if (!el) return;
 
   if (el.querySelector('.event-indicator')) {
@@ -381,11 +541,12 @@ function addEventIndicator(el, activeEvent) {
   const tooltipId = nextTooltipId('event-indicator-tip');
   const bubble = mountTooltipBubble({
     tooltipId,
-    tooltipText: getEventTooltipText(activeEvent),
+    tooltipText: getEventsTooltipText(events, data),
   });
+  bubble.style.whiteSpace = 'pre-line';
   const indicator = createTooltipTrigger({
     tooltipId,
-    ariaLabel: `Affected by ${activeEvent.name || 'event'}`,
+    ariaLabel: `Affected by ${events.map(getEventName).join(', ')}`,
     text: '⚡',
   });
   el.appendChild(indicator);

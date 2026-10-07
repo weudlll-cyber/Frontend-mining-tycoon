@@ -21,9 +21,19 @@ describe('runtime rendering safety guardrails', () => {
     expect(source).not.toMatch(/\.innerHTML\s*=/);
   });
 
-  it('keeps placeholder and counter rendering on safe text APIs', () => {
-    const counterSource = readSource(path.join('src', 'counter.js'));
-    expect(counterSource).toMatch(/\.textContent\s*=/);
-    expect(counterSource).not.toMatch(/\.innerHTML\s*=/);
+  it('keeps lobby and admin console free of innerHTML assignments', () => {
+    for (const relativePath of [
+      path.join('src', 'lobby.js'),
+      path.join('src', 'admin', 'admin-setup.js'),
+      path.join('src', 'ui', 'event-display.js'),
+    ]) {
+      const source = readSource(relativePath);
+      expect(source).not.toMatch(/\.innerHTML\s*=/);
+    }
+  });
+
+  it('never interpolates backend values into HTML template strings', () => {
+    const adminSource = readSource(path.join('src', 'admin', 'admin-setup.js'));
+    expect(adminSource).not.toMatch(/innerHTML\s*=\s*`/);
   });
 });

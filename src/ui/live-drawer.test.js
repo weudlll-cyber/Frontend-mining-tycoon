@@ -83,6 +83,28 @@ describe('live-drawer', () => {
     expect(panels[2].hidden).toBe(false);
   });
 
+  it('supports the Top 5 leaderboard tab', () => {
+    const root = document.createElement('section');
+    const names = ['trade', 'farm', 'chat', 'leaderboard'];
+    const tabs = names.map(makeButton);
+    const panels = names.map(makePanel);
+    const openButton = makeButton('leaderboard');
+
+    initLiveDrawer({
+      rootEl: root,
+      tabButtons: tabs,
+      panels,
+      openButtons: [openButton],
+    });
+
+    openButton.click();
+    expect(isLiveDrawerOpen()).toBe(true);
+    expect(getLiveDrawerTab()).toBe('leaderboard');
+    expect(panels[3].hidden).toBe(false);
+    expect(panels[0].hidden).toBe(true);
+    expect(tabs[3].getAttribute('aria-selected')).toBe('true');
+  });
+
   it('supports header drag with mouse and ignores button clicks in header', () => {
     const root = document.createElement('section');
     const header = document.createElement('div');

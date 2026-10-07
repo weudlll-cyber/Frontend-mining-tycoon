@@ -1512,14 +1512,16 @@ body {
   overflow-y: auto;
 }
 
-.farming-placeholder-card {
+.farming-placeholder-card,
+.leaderboard-card {
   padding: 1rem;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   background: #fff;
 }
 
-.farming-placeholder-card h2 {
+.farming-placeholder-card h2,
+.leaderboard-card h2 {
   margin-bottom: 0.5rem;
 }
 

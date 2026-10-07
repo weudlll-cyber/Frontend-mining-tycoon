@@ -26,12 +26,6 @@ export function shouldSkipAsyncDiagnosticsProbe({
   return false;
 }
 
-export function resolveSessionSupportProbeValue(sessionSupportResult) {
-  return typeof sessionSupportResult?.supported === 'boolean'
-    ? sessionSupportResult.supported
-    : null;
-}
-
 export function resolveRequirePlayerAuthValue(authResult) {
   return authResult?.value === true || authResult?.value === false
     ? authResult.value

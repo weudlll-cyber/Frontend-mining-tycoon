@@ -196,6 +196,10 @@ If a change affects backend contracts, update the sibling backend repo docs in t
 - npm
 - Backend running on `http://127.0.0.1:8000` (default)
 
+### Backend URL configuration
+
+The default backend URL is defined once in `src/config/backend-url.js` and read at build time from `VITE_API_BASE_URL` (copy `.env.example` to `.env.local` and set it, or export it before `npm run build`). When unset or invalid it falls back to `http://127.0.0.1:8000`. The lobby, player board and admin console all use this default; the Backend URL fields on `player.html` and `admin.html` still let users override it, and the override is stored in localStorage.
+
 ## Visual Asset Drop Location
 
 Place image files in:
@@ -242,7 +246,7 @@ Stop the stable detached server with:
 
 4. In the UI:
 
-- keep Backend URL as `http://127.0.0.1:8000`
+- keep Backend URL at its default (`VITE_API_BASE_URL`, falling back to `http://127.0.0.1:8000`)
 - click `+ New Game`
 - click `Start Game`
 
@@ -554,8 +558,6 @@ Current CI pipeline runs:
 - `src/ui/season-cards.js`: per-season balances, output, and halving tickers
 - `src/ui/event-display.js`: active-event banner and affected-value indicators
 - `src/style.css`: styles
-- `src/counter.js`: sample utility module
-- `src/counter.test.js`: sample Vitest test
 
 ## Notes
 
@@ -610,7 +612,9 @@ Frontend call chain for async rounds:
 Auth-aware behavior:
 
 - if player auth is required, frontend sends `X-Player-Token` for session start and ticket calls
-- session stream URL includes `ticket` query only for auth-required backends
+- the lobby stores the `player_token` returned by join under `mining-tycoon:playerToken:{game}:{player}` so player.html can authenticate
+- before every stream connect and reconnect the frontend fetches a fresh ticket (`GET /games/{id}/sse-ticket`, 60 s TTL) and appends it as `ticket=` to the game or session stream URL; on stream errors it closes the EventSource and reconnects itself with backoff instead of replaying an expired ticket
+- async session support is assumed for async rounds (from game meta `round_type`); there is no capability probe request
 
 ## Chat (Minimal, Optional, Non-persistent)
 
@@ -676,18 +680,27 @@ When a deterministic event is active, the frontend shows it inline without chang
 
 ### Data Contract
 
-- The frontend reads event state from SSE payload field `active_event`.
-- Expected structure:
+- The frontend reads the backend list `active_events` from SSE and `/state` payloads (several events can be active at once; the banner lists all of them).
+- Expected structure (backend `summarize_active_events`):
 
 ```json
 {
-  "active_event": {
-    "name": "Heatwave",
-    "effect_description": "−20% Cooling Efficiency",
-    "domains": ["cooling"],
-    "end_unix": 1234567890
-  }
+  "current_sim_month": 5,
+  "active_events": [
+    {
+      "event_id": "…",
+      "event_type": "DEMAND_SURGE",
+      "domain": "oracle_price",
+      "token": "summer",
+      "magnitude": 1.25,
+      "label": "Demand Surge",
+      "start_sim_month": 4,
+      "end_sim_month": 7
+    }
+  ]
 }
 ```
 
-- If `active_event` is missing or null, no banner or indicators are rendered.
+- `token: null` means all tokens; token-scoped events only mark that token's cells.
+- Remaining time = `(end_sim_month - current_sim_month) / sim_months_per_real_second` (from game meta); without a rate the banner shows remaining sim-months.
+- If `active_events` is missing or empty, no banner or indicators are rendered. The legacy single `active_event` object is still tolerated.

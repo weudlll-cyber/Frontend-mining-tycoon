@@ -137,7 +137,7 @@ async function fetchAndDisplayGames() {
       return;
     }
 
-    tbodyEl.innerHTML = '';
+    tbodyEl.replaceChildren();
     activeGames.forEach((game) => {
       const row = document.createElement('tr');
       row.style.borderBottom = '1px solid var(--border)';

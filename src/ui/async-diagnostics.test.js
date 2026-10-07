@@ -8,7 +8,6 @@ import {
   shouldResetAsyncDiagnostics,
   createAsyncDiagnosticsProbeKey,
   shouldSkipAsyncDiagnosticsProbe,
-  resolveSessionSupportProbeValue,
   resolveRequirePlayerAuthValue,
 } from './async-diagnostics.js';
 
@@ -84,10 +83,6 @@ describe('async-diagnostics helpers', () => {
   });
 
   it('normalizes probe result values safely', () => {
-    expect(resolveSessionSupportProbeValue({ supported: true })).toBe(true);
-    expect(resolveSessionSupportProbeValue({ supported: false })).toBe(false);
-    expect(resolveSessionSupportProbeValue({ supported: 'maybe' })).toBeNull();
-
     expect(resolveRequirePlayerAuthValue({ value: true })).toBe(true);
     expect(resolveRequirePlayerAuthValue({ value: false })).toBe(false);
     expect(resolveRequirePlayerAuthValue({ value: 'unknown' })).toBe('unknown');
