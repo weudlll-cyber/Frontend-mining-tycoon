@@ -481,7 +481,15 @@ function appendControlsSection(card, model) {
 
   const costNote = document.createElement('div');
   costNote.className = 'trading-cost-note';
-  costNote.textContent = `Conversion cost: ${model.feePercentage}% (informational)`;
+  // The round's effective oracle spread (game meta `oracle_spread`, set per
+  // round by the admin or taken from the global economy) is shown next to the
+  // fee when the backend sends it; older metas without it keep the fee only.
+  const spread = model.meta?.oracle_spread;
+  const spreadText =
+    typeof spread === 'number' && Number.isFinite(spread)
+      ? ` fee + ${(spread * 100).toFixed(2)}% spread for this round`
+      : '';
+  costNote.textContent = `Conversion cost: ${model.feePercentage}%${spreadText} (informational)`;
 
   controls.appendChild(fromLabel);
   controls.appendChild(toLabel);
@@ -798,7 +806,13 @@ export function initTradingPanel(deps) {
   function getTrading() {
     try {
       const meta = getGameMeta();
-      const fallbackFee = meta?.conversion_fee_rate || 0.02;
+      // WHY: a per-round fee override may be 0, so only a missing/non-numeric
+      // conversion_fee_rate falls back to the 2% default (`||` dropped 0).
+      const metaFee = meta?.conversion_fee_rate;
+      const fallbackFee =
+        typeof metaFee === 'number' && Number.isFinite(metaFee)
+          ? metaFee
+          : 0.02;
       return normalizeTradingCapability(meta?.trading, fallbackFee);
     } catch (err) {
       console.error('[trading-panel] getTrading error:', err);

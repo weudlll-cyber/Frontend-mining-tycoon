@@ -4,7 +4,8 @@
  *          GET /admin/game-config, renders editors for the round-setup
  *          tunables (duration presets, presets offered per round type,
  *          create-form defaults, limits, default trade counts by round length,
- *          trade unlock fractions, account policy "Require sign-in to join")
+ *          trade unlock fractions, account policy "Require sign-in to join",
+ *          "Chat enabled by default")
  *          and saves edits via PATCH /admin/game-config sending only the
  *          changed top-level keys (`defaults` as a partial).
  * Role in system: Standalone admin module initialised from admin-setup.js.
@@ -256,8 +257,19 @@ export function buildGameConfigPatch(draft, baseline) {
   });
   const changedDefaults = {};
   Object.entries(draft.defaults).forEach(([key, value]) => {
+    if (key === 'chat_enabled') return;
     if (value !== baseline?.defaults?.[key]) changedDefaults[key] = value;
   });
+  // WHY: an older backend has no `defaults.chat_enabled` (read as true), so the
+  // key is only sent when the admin actually changes the effective value.
+  if (typeof draft.defaults.chat_enabled === 'boolean') {
+    const baselineChat = baseline?.defaults?.chat_enabled;
+    const effectiveBaselineChat =
+      typeof baselineChat === 'boolean' ? baselineChat : true;
+    if (draft.defaults.chat_enabled !== effectiveBaselineChat) {
+      changedDefaults.chat_enabled = draft.defaults.chat_enabled;
+    }
+  }
   if (Object.keys(changedDefaults).length) patch.defaults = changedDefaults;
   // WHY: compared as a boolean so an older backend without `account_policy`
   // (read as false) never receives the key unless the admin ticks the box.
@@ -403,6 +415,7 @@ function renderDocument(doc) {
   el(`${PREFIX}-default-enrollment`).value = String(
     config.defaults.enrollment_window_seconds
   );
+  el(`${PREFIX}-default-chat-enabled`).checked = config.defaults.chat_enabled;
   LIMIT_FIELDS.forEach(([key, minKey, maxKey, idPart]) => {
     el(`${PREFIX}-${idPart}-min`).value = String(config[key][minKey]);
     el(`${PREFIX}-${idPart}-max`).value = String(config[key][maxKey]);
@@ -473,6 +486,7 @@ export function readGameConfigDraft() {
       'Default enrollment window',
       errors
     ),
+    chat_enabled: el(`${PREFIX}-default-chat-enabled`).checked,
   };
   DEFAULT_PRESET_FIELDS.forEach(({ key, id }) => {
     config.defaults[key] = el(id).value;

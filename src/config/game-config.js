@@ -17,6 +17,8 @@
  *  - Backend stays authoritative: these values only drive form options,
  *    defaults and previews; POST /games is validated by the backend and each
  *    created round keeps a snapshot of the config it was created with.
+ *  - `defaults.chat_enabled` only pre-ticks the create form's "Chat enabled"
+ *    box; the backend decides per round and refuses the chat socket when off.
  *  - `account_policy.require_account_to_join` is enforced by the backend on
  *    join (401 ACCOUNT_REQUIRED); the frontend only edits/displays it.
  *  - Malformed backend sections fall back per top-level key, so one bad
@@ -38,6 +40,7 @@ import {
   ENROLLMENT_WINDOW_DEFAULT_SECONDS,
   SCORING_CONTROL,
   ACCOUNT_POLICY_DEFAULTS,
+  CHAT_ENABLED_DEFAULT,
 } from './game-control-data.js';
 import {
   TRADE_COUNT_LIMITS,
@@ -77,6 +80,7 @@ export function buildFallbackGameConfig() {
       async_session_preset: ASYNC_SESSION_DEFAULT_PRESET,
       enrollment_window_seconds: ENROLLMENT_WINDOW_DEFAULT_SECONDS,
       scoring_mode: 'stockpile',
+      chat_enabled: CHAT_ENABLED_DEFAULT,
     },
     duration_limits: {
       min_seconds: ROUND_DURATION_LIMITS.min,
@@ -216,6 +220,11 @@ function normalizeDefaults(raw, fallback, config) {
     scoring_mode: SCORING_CONTROL.ALLOWED_MODES.includes(source.scoring_mode)
       ? source.scoring_mode
       : fallback.scoring_mode,
+    // Only a real boolean counts; a missing key (older backend) keeps chat on.
+    chat_enabled:
+      typeof source.chat_enabled === 'boolean'
+        ? source.chat_enabled
+        : fallback.chat_enabled,
   };
 }
 

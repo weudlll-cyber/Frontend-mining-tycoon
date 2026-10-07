@@ -130,8 +130,9 @@ rule changes. `src/how-to-play.test.js` guards the anchors and both links.
 ### Admin console (`admin.html`, `src/admin/`)
 
 Eleven sections: 1 Connection (backend URL, optional admin token),
-2 Round Type (Sync / Async), 3 Time Configuration, 4 Scoring Mode,
-5 Trading Rules (count and unlock preview), 6 Advanced Overrides (anchor token,
+2 Round Type (Sync / Async, "Chat enabled"), 3 Time Configuration,
+4 Scoring Mode, 5 Trading Rules (count, unlock preview and optional conversion
+fee / oracle spread overrides), 6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
 per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
@@ -140,10 +141,23 @@ per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
 (`GET`/`PATCH /admin/game-config`: duration presets, which presets are offered
 for sync rounds / async rounds / async sessions, create-form defaults,
 duration / enrollment / trade-count limits, default trade count by round
-length, trade unlock fractions, and the account policy "Require sign-in to
-join" (`account_policy.require_account_to_join`, fallback off, sent only when
-changed); round-setup values apply to newly created rounds only, existing
-rounds keep their settings).
+length, trade unlock fractions, "Chat enabled by default"
+(`defaults.chat_enabled`, fallback on, sent only when changed) and the account
+policy "Require sign-in to join" (`account_policy.require_account_to_join`,
+fallback off, sent only when changed); round-setup values apply to newly
+created rounds only, existing rounds keep their settings).
+
+Round options (per round, snapshot-locked at creation, backend validates):
+
+- **Conversion fee override (%)** and **Oracle spread override (%)** in
+  section 5. Empty = the global economy value (shown as placeholder, from
+  section 9 once loaded, otherwise from `GET /meta`). Entered in percent and
+  sent as rates (`conversion_fee_rate`, `oracle_spread`; 2 % = 0.02). The
+  client only rejects non-numbers and values outside 0 % to below 100 %.
+- **Chat enabled** in section 2, pre-ticked from `defaults.chat_enabled`
+  (fallback on). `chat_enabled` is sent only when the admin changes it.
+- Section 7 lists the effective choice for all three. Omitted fields leave the
+  backend defaults in place, so an older backend behaves as before.
 
 Presets and defaults come from the backend: `GET /meta` carries the current
 game config as `game_config`, and `src/config/game-config.js`
@@ -225,6 +239,17 @@ The frontend reads the backend list `active_events` from SSE and `/state`
 Chat is a non-persistent WebSocket side channel (`/ws/chat`) with
 server-assigned user and timestamp and server-side rate limits. It has no
 effect on gameplay.
+
+Chat can be disabled per round (admin "Chat enabled" round option). When the
+game meta says `chat_enabled: false`, the Chat tab stays in the live tools
+window but shows "Chat is disabled for this round.", the preview dock shows the
+same text and no WebSocket is opened. A server `chat_error` with code
+`CHAT_DISABLED` is handled the same way, without reconnect attempts. A game
+meta without `chat_enabled` (older backend) keeps chat on.
+
+The trading panel's cost note shows the round's effective fee and, when the
+game meta carries it, the oracle spread (`conversion_fee_rate`,
+`oracle_spread` from `/games/{id}/meta`). A 0 % fee override is shown as 0 %.
 
 ## Visual Assets
 

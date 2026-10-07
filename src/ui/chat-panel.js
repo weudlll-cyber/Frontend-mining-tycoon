@@ -1,6 +1,15 @@
 /**
 File: src/ui/chat-panel.js
 Purpose: Minimal non-persistent chat panel (WebSocket side-channel only).
+Role in system: Chat tab of the live tools window on player.html (wired by
+  src/main.js; connected/disconnected by src/services/stream-controller.js).
+Constraints:
+  - Chat is social-only and never affects gameplay (LOCKED_DECISIONS §D).
+  - Chat can be disabled per round: game meta `chat_enabled: false` (or a
+    `chat_error` with code CHAT_DISABLED from the server) shows "Chat is
+    disabled for this round." in the tab, opens no WebSocket and never
+    reconnects for that game. A missing `chat_enabled` means enabled.
+Security notes: messages and server texts are rendered via textContent only.
 */
 
 let _panelEl = null;
@@ -9,6 +18,7 @@ let _messagesEl = null;
 let _formEl = null;
 let _inputEl = null;
 let _statusEl = null;
+let _disabledNoteEl = null;
 
 let _getBaseUrl = null;
 let _getGameId = null;
@@ -19,12 +29,20 @@ let _showToast = null;
 let _onMessage = null;
 let _onPanelVisibilityChanged = null;
 let _manageToggleInternally = true;
+let _isChatEnabled = null;
+let _onAvailabilityChange = null;
 
 let _chatSocket = null;
 let _reconnectTimer = null;
 let _reconnectAttempts = 0;
 let _shouldStayConnected = false;
 let _chatAuthenticated = false;
+// Chat-disabled state for the current round, and the game the server refused
+// chat for (CHAT_DISABLED) so a later connectChat() does not try again.
+let _chatDisabled = false;
+let _serverDisabledGameId = '';
+
+export const CHAT_DISABLED_TEXT = 'Chat is disabled for this round.';
 
 const MAX_RENDERED_MESSAGES = 200;
 
@@ -65,6 +83,14 @@ export function resolveChatUserLabel(
   return fallback;
 }
 
+/**
+ * Whether a round's game meta allows chat. Only an explicit `false` disables
+ * it, so an older backend without the field keeps chat on.
+ */
+export function isChatEnabledForRound(gameMeta) {
+  return gameMeta?.chat_enabled !== false;
+}
+
 export function shouldAutoScroll(containerEl, thresholdPx = 8) {
   if (!containerEl) return false;
   const distanceFromBottom =
@@ -93,6 +119,32 @@ export function setChatPanelOpen(isOpen) {
 
 export function isChatPanelOpen() {
   return Boolean(_panelEl?.classList.contains('chat-panel-open'));
+}
+
+export function isChatDisabled() {
+  return _chatDisabled;
+}
+
+/**
+ * Switch the chat tab between normal and "disabled for this round". The tab
+ * itself stays visible (like the Farming placeholder); only the message list
+ * and composer are hidden behind the explanatory note.
+ */
+function applyChatDisabledState(disabled, message = CHAT_DISABLED_TEXT) {
+  const changed = _chatDisabled !== disabled;
+  _chatDisabled = disabled;
+  _panelEl?.classList.toggle('chat-card-disabled', disabled);
+  if (_disabledNoteEl) {
+    _disabledNoteEl.hidden = !disabled;
+    _disabledNoteEl.textContent = disabled ? message : '';
+  }
+  if (disabled) {
+    setComposerEnabled(false);
+    setStatus('Disabled', 'idle');
+  }
+  if (changed) {
+    _onAvailabilityChange?.(!disabled);
+  }
 }
 
 function clearReconnectTimer() {
@@ -221,11 +273,34 @@ export function disconnectChat() {
   clearReconnectTimer();
   closeSocket();
   setComposerEnabled(false);
-  setStatus('Offline', 'idle');
+  setStatus(_chatDisabled ? 'Disabled' : 'Offline', 'idle');
+}
+
+/**
+ * Stop chat for this round without any reconnect: no socket, no timer.
+ */
+function stopForDisabledRound(message) {
+  _shouldStayConnected = false;
+  _chatAuthenticated = false;
+  clearReconnectTimer();
+  closeSocket();
+  applyChatDisabledState(true, message);
 }
 
 export async function connectChat() {
   if (!_messagesEl) return;
+
+  // Round options: never open a socket for a round with chat disabled.
+  const gameId = String(_getGameId?.() || '').trim();
+  const disabledByServer = Boolean(gameId) && gameId === _serverDisabledGameId;
+  if (_isChatEnabled?.() === false || disabledByServer) {
+    stopForDisabledRound();
+    return;
+  }
+  if (_chatDisabled) {
+    applyChatDisabledState(false);
+  }
+
   if (_chatSocket && _chatSocket.readyState <= 1) return;
 
   const connectionInfo = await buildChatConnectionInfo();
@@ -284,6 +359,15 @@ export async function connectChat() {
       return;
     }
 
+    if (payload?.type === 'chat_error' && payload?.code === 'CHAT_DISABLED') {
+      // The server refuses chat for this round and closes the socket; remember
+      // it so neither onclose nor a later connectChat() reconnects.
+      _serverDisabledGameId = String(_getGameId?.() || '').trim();
+      const detail = String(payload?.detail || '').trim();
+      stopForDisabledRound(detail || CHAT_DISABLED_TEXT);
+      return;
+    }
+
     if (payload?.type === 'chat_error') {
       setStatus('Rate limited', 'warning');
     }
@@ -334,6 +418,7 @@ export function initChatPanel(deps) {
   _formEl = deps.formEl || null;
   _inputEl = deps.inputEl || null;
   _statusEl = deps.statusEl || null;
+  _disabledNoteEl = deps.disabledNoteEl || null;
 
   _getBaseUrl = deps.getBaseUrl;
   _getGameId = deps.getGameId;
@@ -344,6 +429,11 @@ export function initChatPanel(deps) {
   _onMessage = deps.onMessage;
   _onPanelVisibilityChanged = deps.onPanelVisibilityChanged;
   _manageToggleInternally = deps.manageToggleInternally !== false;
+  _isChatEnabled =
+    typeof deps.isChatEnabled === 'function' ? deps.isChatEnabled : null;
+  _onAvailabilityChange = deps.onAvailabilityChange || null;
+  _chatDisabled = false;
+  _serverDisabledGameId = '';
 
   if (!_panelEl || !_toggleBtnEl || !_messagesEl || !_formEl || !_inputEl) {
     return;
