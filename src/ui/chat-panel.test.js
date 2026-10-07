@@ -76,6 +76,16 @@ describe('chat panel rendering', () => {
     ).toBe('Alice Miner');
   });
 
+  it('matches own messages by player_id when the backend sends names', () => {
+    const own = { ownPlayerId: '303', ownPlayerName: 'Alice Miner' };
+    expect(
+      resolveChatUserLabel({ user: 'Alice', player_id: 303, text: 'hi' }, own)
+    ).toBe('Alice Miner');
+    expect(
+      resolveChatUserLabel({ user: 'Bob', player_id: 7, text: 'hi' }, own)
+    ).toBe('Bob');
+  });
+
   it('appends new messages without replacing existing nodes', () => {
     const messages = document.createElement('ul');
 
