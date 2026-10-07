@@ -41,3 +41,31 @@ All modes share the same deterministic systems (simulation timing, token output,
 - Outcome mode is selected before round start by the host/configuration path.
 - The selected mode remains fixed for the round.
 - Runtime switching during an active round is not permitted.
+
+## Implementation (Backend)
+
+All four modes are implemented and evaluated by the backend
+(`app/services/scoring_service.py:compute_player_score` in the sibling backend
+repo). The same function feeds the sync leaderboard, the SSE
+`leaderboard_top_5`, async session final scores and the async best-of. Rounds
+without a stored `scoring_mode` score as `stockpile`. The authoritative
+definitions are in the backend `README.md`, section "Scoring modes -
+implementation definitions".
+
+| Mode (`scoring_mode`) | Formula | Score type |
+|---|---|---|
+| `stockpile` | `sum(balance[t])` over the four tokens | integer |
+| `power` | `sum(balance[t] * oracle_price[t])` at the scoring sim month | integer |
+| `mining_time` | `sum(balance[t] / base_rate[t])`, i.e. seconds of baseline mining (`base_rate` = snapshot-locked level-0 emission rate) | integer |
+| `efficiency` | `cumulative_mined / baseline_mined`, where `baseline_mined` is what a no-upgrade player would have mined over the same elapsed time (1.0 = baseline) | float, 4 decimals |
+
+> **Pending product confirmation:** the `mining_time` and `efficiency` formulas
+> are an implementation interpretation of the intent described above. The
+> project owner still has to confirm them.
+
+Frontend display (`src/utils/score-format.js`): integers for `stockpile`,
+`power` and `mining_time`; efficiency scores are shown as a ratio with four
+decimals and a `×` suffix (for example `1.2345×`). The admin console and the
+setup payload use the long canonical names (`stockpile_total_tokens`,
+`power_oracle_weighted`, `mining_time_equivalent`,
+`efficiency_system_mastery`, see `src/config/game-control-data.js`).

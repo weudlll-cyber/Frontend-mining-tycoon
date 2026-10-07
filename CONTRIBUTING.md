@@ -9,7 +9,7 @@ All contributions MUST comply with [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md).
 Before opening a PR:
 
 - Read and align with [PROJECT_BASELINE.md](PROJECT_BASELINE.md), [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md).
-- Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, or security docs when impacted) and remove stale statements that no longer match implementation.
+- Update any affected docs in the same change (at minimum README and PROJECT_BASELINE; include CONTRIBUTING, CODE_ORGANIZATION, LOCKED_DECISIONS, QUALITY_ENFORCEMENT, MANUAL_TEST_RUNBOOK or SECURITY when impacted) and remove stale statements that no longer match the implementation. [DOCS_STATUS.md](DOCS_STATUS.md) lists every doc and its role.
 - If the change touches API contracts, session flow, security posture, runbooks, or any other full-stack behavior, review the sibling backend repo docs in the same workstream and update them when needed.
 - If the change touches startup flow, testing workflow, workspace orchestration, full-stack handover, or any user-facing process that spans both repos, also review and update the umbrella workspace docs under `C:\Users\weudl\` in the same workstream.
 - Treat documentation impact review as mandatory for every code change, even when the outcome is that no doc update was required.
@@ -37,51 +37,22 @@ PRs that do not satisfy commenting compliance are incomplete.
 
 ## Quality Gates
 
-The authoritative enforcement policy is documented in [QUALITY_ENFORCEMENT.md](QUALITY_ENFORCEMENT.md).
-Use this file as the source of truth for local push gates, CI merge requirements, and test-quality expectations.
+[QUALITY_ENFORCEMENT.md](QUALITY_ENFORCEMENT.md) is the single source of truth
+for the local pre-push gate, the required CI checks, scheduled audits, the merge
+policy and test-quality expectations. Do not copy those lists into other docs;
+link to it.
 
-All of the following must pass before merge:
+Working cadence:
 
-- `npm run clean:audit`
-- `npm run format:check`
-- `npm run test -- --run`
-- `npm run test:coverage`
-- `Changed lines coverage` (CI PR check)
-- `npm run build`
-- `npm audit --audit-level=high`
+- During implementation: run targeted tests for the changed modules (for example `npm run test:fast`, `npm run test:flows` or `npx vitest run <file>`).
+- Before every commit: `npm run check:all`.
+- Push with `& .\scripts\push_with_audit.ps1` (or plain `git push` with the tracked hook enabled via `& .\scripts\enable_git_hooks.ps1`). Never use `--no-verify`.
+- Before larger merges: `npm run audit:health` (advisory structural report).
+- If behavior or contracts changed, finish the repo and umbrella doc updates in the same change before committing.
 
-Development execution cadence (required):
+For UI/layout or tooltip changes, keep the guard tests green (`src/layout-css.test.js`, `src/layout-controls.test.js`, `src/tooltip-parity.test.js`).
 
-- During implementation: run targeted checks/tests only for changed modules to keep iteration fast.
-- Before every commit: run full local gate (`npm run check:all`).
-- Before every push and merge: ensure the same full gate is green (hook/script will enforce again).
-- If behavior/contracts changed, complete repo and umbrella doc updates in the same change before commit.
-
-Recommended structural audit before larger merges:
-
-- `npm run audit:health`
-
-This audit reports oversized files, missing top-of-file comment headers, TODO/FIXME markers, and debug-console usage so refactor work can be planned before a larger merge.
-- GitHub check run: `CodeQL`
-- GitHub check run: `Dependency Review`
-- GitHub check run: `Actionlint`
-
-Local push discipline:
-
-- enable the tracked git hooks once with `& .\scripts\enable_git_hooks.ps1`
-- use `& .\scripts\push_with_audit.ps1` (or `-Profile fast|full`) for normal pushes
-- the tracked pre-push hook runs the same local gate automatically and blocks pushes on failure
-- if the same clean HEAD already passed locally for the selected profile, the helper/hook skip the duplicate rerun; use `-ForceAudit` when you intentionally want a fresh pass
-
-Repository merge policy:
-
-- Final merge approval is manual even when CI is fully green.
-- Auto-merge must remain OFF.
-- Branch protection should require these checks: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Changed lines coverage`, `Build`, `Security audit`, `CodeQL`, `Dependency Review`, `Actionlint`, and `CI Summary (Manual Merge Gate)`.
-- Use squash merge only.
-- PR descriptions must follow [.github/pull_request_template.md](.github/pull_request_template.md), including `merge-safe = YES/NO` and a changed-files summary without full file bodies.
-
-For UI/layout or tooltip changes, ensure repository guard tests remain green (for example layout-css and tooltip parity assertions).
+## Locked Invariant Changes
 
 If your change requires violating a locked invariant:
 

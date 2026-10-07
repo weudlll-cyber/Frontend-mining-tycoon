@@ -71,7 +71,8 @@ Rule:
   - balances
   - oracle prices
   - fee/spread
-- Chat remains social-only, inline/docked, internally scrollable, and non-gameplay.
+- Chat remains social-only, internally scrollable, and non-gameplay. It lives in the floating, draggable, non-modal live tools window on `player.html` (tabs Trade / Farm / Chat / Top 5; see the REDESIGN DECISION in `LOCKED_DECISIONS.md` §D), plus the compact chat preview dock.
+- The only full-screen overlay is the post-game `Game Over` / `Session Finished` overlay, shown after the round or session has ended (`LOCKED_DECISIONS.md` §C).
 
 ## 4) Security Invariants (Must Preserve)
 
@@ -147,24 +148,9 @@ For every source file touched or created:
   - if the change affects backend contracts, runtime behavior, security posture, or operational steps, review and update sibling backend docs in the same workstream
   - if the change affects startup/testing/full-stack workflow or handover guidance, review and update the important umbrella workspace docs in the same workstream
   - if docs are unchanged, explicitly state why
-- Run all quality gates before push:
-  - `npm run lint`
-  - `npm run format:check`
-  - `npm run test -- --run`
-  - `npm run test:coverage`
-  - `npm run build`
-  - `npm audit --audit-level=high`
+- Run the quality gates defined in `QUALITY_ENFORCEMENT.md` (single source of truth): `npm run check:all` before committing, and push through the gate (`& .\scripts\push_with_audit.ps1`, or `git push` with the hook enabled via `& .\scripts\enable_git_hooks.ps1`). Never use `--no-verify`.
 
-- Prefer the audited push helper when pushing this repo:
-  - `& .\scripts\push_with_audit.ps1`
-  - ensure tracked hooks are enabled with `& .\scripts\enable_git_hooks.ps1`
-
-If backend files are touched in the same task, also run backend gates before push:
-
-- `python -m ruff check app tests scripts`
-- `python -m unittest discover -s tests -q`
-- `python -m pytest -q`
-- `python -m pip_audit -r requirements.txt`
+If backend files are touched in the same task, also run the backend gates described in the sibling backend repo (`CONTRIBUTING.md` / `TESTING.md` there) before pushing it.
 
 ## 8) Required Output Format
 
@@ -187,9 +173,9 @@ Additional output policy for this repository:
 
 ## 8.1) Manual Final Approval Workflow
 
-- Required frontend status checks are: `Lint`, `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit`, and `CI Summary (Manual Merge Gate)`.
+- Required checks and the merge policy are listed in `QUALITY_ENFORCEMENT.md` sections 2 and 4.
 - PR bodies must include the required machine-generated sections from `.github/pull_request_template.md`.
-- Branch protection must keep squash merge as the only merge method and keep auto-merge disabled.
+- Keep auto-merge disabled; final merge approval is manual.
 - Stable rollback tagging happens only after a manual merge decision.
 
 ## 9) Scope Discipline
@@ -198,7 +184,7 @@ Additional output policy for this repository:
 - Prefer small focused commits.
 - Do not mix refactors, behavior changes, and formatting unless justified.
 
-## 10) Control Data / Tuning Values (Steuerdaten)
+## 10) Control Data / Tuning Values
 
 - All game setup tunables — duration presets, session/enrollment limits, scoring mode defaults, async defaults — must live in `src/config/game-control-data.js`.
 - Trade-scheduling tunables must live in `src/config/trading-control-data.js`.
@@ -212,28 +198,28 @@ Additional output policy for this repository:
 
 Game configuration is strictly **admin-only** and is managed via a separate entrypoint:
 
-- **Player entrypoint** (`index.html`): Joins existing rounds, plays games, views state, requests upgrades.
-- **Admin entrypoint** (`admin.html`): Creates and configures new rounds with snapshot-locked settings.
+- **Lobby** (`index.html`, `src/lobby.js`): register / login / logout, open-games list, join, last-game highscores.
+- **Player board** (`player.html`, `src/main.js`): the live game for one joined round (season cards, upgrades, analytics, live tools window).
+- **Admin console** (`admin.html`, `src/admin/`): creates and configures new rounds with snapshot-locked settings and manages/deletes active games.
 
 ### Key Rules
 
-- Admin setup must remain in a **separate file/module** (`src/admin/admin-setup.js`), not mixed into the player workflow.
+- Admin setup must remain in **separate modules** (`src/admin/admin-setup.js`, `src/admin/game-management.js`), not mixed into the player workflow.
 - Settings are **snapshot-locked** at round creation: once a round is created, no runtime override is possible (backend-enforced invariant from `LOCKED_DECISIONS.md`).
-- Admin link discoverability: The player page (`index.html`) has a **hidden** admin link that appears **only if `?admin=1` is in the URL query**. This prevents accidental exposure of admin controls.
-- Permission enforcement is **backend-authoritative**: frontend gating is convenience only; backend validates X-Admin-Token header per `REQUIRE_ADMIN_FOR_GAME_CREATE` env flag.
+- Admin link discoverability: the lobby shows a plain "Admin setup" link; on `player.html` the "+ New Game (Admin)" link is hidden unless `?admin=1` is in the URL. Neither is a security boundary.
+- Permission enforcement is **backend-authoritative**: frontend gating is convenience only; the backend validates the `X-Admin-Token` header (game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on, and the `/admin/*` routes).
 - All admin-facing control data must be imported from `src/config/` (no hardcoded defaults in admin UI).
 
 ### Frontend Admin Controls
 
-- Admin-only elements in `index.html` use the `.admin-only` CSS class and are hidden by default (display: none).
+- `player.html` still contains legacy host controls (round type, scoring mode, trade count, durations, advanced overrides). They carry the `.admin-only` CSS class and are always hidden (`display: none !important`); players cannot create games from `player.html`.
 - If a feature must show admin UI conditionally (rare), gate it explicitly in code and document the gate.
 - No admin controls should ever appear in the player UI without explicit gating.
 
 ### Visual Distinction
 
-- Player page uses `body.page-player` styling with player-themed accents (cyan/teal).
-- Admin page uses `body.page-admin` styling with admin-themed accents (amber/warning).
-- Page banners clearly indicate context: "⏱ Player Dashboard" vs "⚙️ Admin Setup — round configuration is snapshot-locked".
+- `player.html` uses `body.page-player` styling with player-themed accents (cyan/teal).
+- `admin.html` uses `body.page-admin` styling with admin-themed accents (amber) and the banner "Admin Setup — round configuration is snapshot-locked at creation".
 
 ### No Admin In-Game Powers
 

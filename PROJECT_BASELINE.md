@@ -4,6 +4,8 @@ This document is the canonical baseline for the current Mining Tycoon project st
 It is intentionally factual and implementation-driven.
 It describes what is currently implemented and validated in code/tests, not ideas or future plans.
 
+Last full review: 2026-10-07 (frontend `main` after PR #19; backend after PRs #8 and #10).
+
 ## 1) Project Overview
 
 Mining Tycoon is a real-time, backend-authoritative multiplayer simulation game with a live frontend dashboard.
@@ -11,8 +13,8 @@ Mining Tycoon is a real-time, backend-authoritative multiplayer simulation game 
 The implemented stack is:
 
 - Backend service handling game lifecycle, simulation, economy, events, validation, and security.
-- Background simulation worker advancing game time and applying mining yields.
-- Frontend dashboard consuming live state via SSE and rendering player state, upgrades, leaderboard, halving/event context, and optional chat.
+- Simulation worker (started inside the backend process) advancing game time and applying mining yields.
+- Frontend with three pages: lobby (`index.html`), live player board (`player.html`, SSE-driven: player state, upgrades, trading, Top 5 leaderboard, halving/event context, chat) and admin console (`admin.html`).
 
 The game is built around deterministic simulation inputs (seeded timelines and snapshot-locked settings) and server-authoritative outcomes.
 
@@ -25,17 +27,17 @@ Implementation-factual contract:
 - Backend is authoritative for lifecycle, simulation, economy, event logic, validation, and security.
 - Frontend is SSE-driven display/intent orchestration and must not become client-authoritative for outcomes.
 - Deterministic behavior (oracle, halving, events, snapshot-locked settings) is a hard project constraint.
-- Admin configuration is separate from gameplay: settings are snapshot-locked at round creation and only admin can create rounds (via admin.html, not index.html).
+- Admin configuration is separate from gameplay: settings are snapshot-locked at round creation and only admins can create rounds (via `admin.html`; the lobby and player board cannot).
 - Main gameplay UI is inline: seasonal cards with visible three-lane upgrades and read-only analytics.
-- Chat is optional, social-only, always reachable from the action bar/chat dock, and non-gameplay.
-- Trading and farming visibility is maintained in UI via status pills and on-demand drawer panels even when disabled.
+- Chat is optional, social-only, always reachable from the action bar/chat dock, and non-gameplay; it lives in the floating, non-modal live tools window.
+- Trading and farming visibility is maintained in UI via status pills and tabs of the live tools window, even when disabled.
 - Test posture is mandatory: backend and frontend suites remain green; behavior changes require test updates.
 - Security posture is mandatory: preserve XSS-safe rendering patterns and avoid untrusted innerHTML paths.
 
 Forward constraints (do not over-claim implementation):
 
 - Farming scope is constrained to Stage 1 Passive and Stage 2 Rotating; Stage 3 is out of scope.
-- Four scoring/outcome modes are part of the project contract and are fixed before round start (Stockpile default; Power, Mining Time Equivalent, and Efficiency optional).
+- Four scoring/outcome modes are part of the project contract, fixed before round start and evaluated by the backend (Stockpile default; Power, Mining Time Equivalent, and Efficiency optional).
 - Round/game definition contract includes a snapshot-locked `scoring_mode` field set at creation time and shared identically by all players in that round.
 
 ## 2) Core Gameplay Systems (stable & authoritative)
@@ -48,26 +50,33 @@ Implemented lifecycle:
 
 Lifecycle behavior:
 
-- Players can join only during enrolling.
-- Running starts after enrollment window completion.
+- Sync rounds: players can join only while the round is enrolling (`409 JOIN_NOT_ALLOWED_STARTED` afterwards). The round starts running automatically when the enrollment window ends.
+- Async rounds: created with `enrollment_window_seconds=0`, so they run immediately. Players can join at any time before the round is finished; the lobby lists a running async round only while its session duration is shorter than the remaining round time.
 - Finished is terminal for gameplay progression.
+- Upgrades and trades are accepted only while the round is running (sync) or while the player has an active session (async). Otherwise the backend answers `409` with `ACTION_NOT_ALLOWED_GAME_NOT_RUNNING` or `ACTION_NOT_ALLOWED_NO_ACTIVE_SESSION`.
+- Async sessions run on the session clock: simulation months, halvings and trade unlock offsets count from the player's session start.
 
 State delivery model:
 
 - Backend exposes game/player state endpoints.
-- SSE stream pushes periodic live state updates.
-- Stream payload includes core state, upgrade metrics, and top leaderboard entries.
+- SSE pushes periodic live state: core state, upgrade metrics, `leaderboard_top_5`, `active_events`, trading state and async session fields.
+- Game streams (`/games/{id}/stream`) serve sync rounds; async rounds use session streams (`/sessions/{session_id}/stream`) only.
 
 Automatic systems:
 
-- Status transitions, simulation-time advancement, mining yield accumulation, and event activation are backend-driven.
+- Status transitions, simulation-time advancement, mining yield accumulation, event activation and score evaluation are backend-driven.
 
 Player-triggered systems:
 
-- Create game.
-- Join game.
-- Request upgrade actions.
-- Open/close stream and optional chat in frontend.
+- Register / log in (lobby).
+- Join a game (lobby, admin-created games only).
+- Start an async session (automatic on entering an async round; manual button as fallback).
+- Request upgrades and trades.
+- Use chat; open the live tools window.
+
+Admin-triggered systems (admin console only):
+
+- Create games with snapshot-locked settings; list and delete active games.
 
 ## 3) Deterministic Economy (mining, halving, events, oracle)
 
@@ -123,9 +132,11 @@ Event model:
 
 Players can:
 
-- Create and join games (within join policy constraints).
+- Join admin-created games (within the join rules in §2). Players cannot create games.
 - Select upgrade type and token/payment choices for upgrades.
-- Observe live game state, leaderboard, oracle values, halving/event context.
+- Execute trades within the round's fixed trade count and unlock schedule.
+- Start async sessions (one at a time) in async rounds.
+- Observe live game state, Top 5 leaderboard, oracle values, halving/event context.
 - Use optional side-channel chat.
 
 Players cannot directly influence:
@@ -134,85 +145,62 @@ Players cannot directly influence:
 - Tick progression.
 - Oracle calculation internals.
 - Event generation/timing.
-- Authoritative cost/yield calculations.
+- Authoritative cost/yield/score calculations.
+- Round settings (scoring mode, durations, trade count/schedule).
 - Server-derived identity/timestamps in chat broadcasts.
 
 ## 5) Frontend Architecture & UX Principles
 
+Entry points (Vite multi-page build):
+
+- `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus), join ("Enter game"), and "Last Game Highscores" from the last finished round. Joining stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
+- `player.html` + `src/main.js`: player board for one joined round.
+- `admin.html` + `src/admin/`: admin console with 8 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management).
+
+The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
+
 Frontend update strategy:
 
-- SSE is the primary live state channel.
-- Meta/capabilities are fetched with ETag-aware cache behavior.
-- UI state reacts to backend contract and game-scoped metadata.
+- SSE is the primary live state channel. Before every connect and reconnect the frontend fetches a fresh `GET /games/{id}/sse-ticket` (with `X-Player-Token` when stored) and appends `ticket=` to the game or session stream URL; reconnects use backoff (1 s to 15 s, up to 20 attempts).
+- Meta/capabilities are fetched with ETag-aware cache behavior; contract versions `1..2` are supported, others disable upgrade actions.
+- The default backend URL comes from `VITE_API_BASE_URL` at build time (`src/config/backend-url.js`, fallback `http://127.0.0.1:8000`); the URL fields on `player.html` and `admin.html` can override it (stored in localStorage).
+- Backend errors are normalized by `src/utils/api-error.js`; 409/422 `detail` texts are shown inline or as toasts.
+- Scores are formatted per scoring mode (`src/utils/score-format.js`): integers, or `1.2345×` in Efficiency mode. A missing `scoring_mode` means Stockpile.
 
-Frontend structure is modular:
+Session-mode behavior:
 
-- Main orchestration module (`main.js`): coordinates SSE lifecycle, data rendering, and user interactions.
-- Session transport module (`services/stream-controller.js`): owns SSE setup, reconnect state, and timer cleanup.
-- Action module (`services/game-actions.js`): owns upgrade and trade submission requests (game creation is admin-only via `admin.html`).
-- Setup shell module (`ui/setup-shell.js`): manages setup panel state, action enablement, and live-board navigation.
-- Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and a live score-context metric display.
-- Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table (SSE `leaderboard_top_5`) in the "Top 5" tab of the live tools window.
-- Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
-- Season focus module (`ui/season-focus.js`): keeps mobile layout compact by focusing one season card at a time.
-- Live drawer module (`ui/live-drawer.js`): manages non-core panel access (trade/farm/chat/top 5) without crowding the core board.
-- Player state analytics render module (`player-view.js`): orchestrates per-token output, balances, cumulative mined, oracle prices, and conversion parameter display.
-- Player analytics layout helper (`ui/player-view-layout.js`): owns analytics matrix construction and tooltip trigger/bubble anchors.
-- Player analytics score helper (`ui/player-view-score.js`): owns `This session` / `Best this round` display resolution and score formatting.
-- Inline upgrade rendering module (`upgrade-panel-inline.js`): renders upgrade lanes (hashrate, efficiency, cooling) within each seasonal card as a compact row-table with headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP` plus inline info tooltip trigger.
-- Countdown module: manages game duration and enrollment countdown timers.
-- Halving display module: calculates and renders halving schedules and countdowns per token.
-- Control-data layer (`src/config/game-control-data.js`): centralises all game setup tunables — duration presets, round/session limits, enrollment window defaults, async defaults, and scoring mode constants. `src/config/trading-control-data.js` holds trade-scheduling tunables. UI modules and `main.js` import from here; constants are not duplicated inline.
+- Round mode (sync/async) comes from game meta (`round_type`). Async rounds are assumed to support sessions; there is no capability probe.
+- Entering an async round from the lobby starts a session automatically (`POST /games/{id}/sessions`) and switches to the session stream. The `Start Session (Async)` button in the setup panel is the manual fallback.
+- Async rounds never fall back to the game stream.
+- Every new async session starts from the same backend baseline (balances, tracks, upgrades, cumulative mined), so attempts are comparable; the backend keeps the best finalized score.
+- In async rounds the Player State panel shows `This session` and `Best this round`; the header shows `Async: Session Active` and a session countdown. Both are hidden in sync rounds.
+- Known limitation: each "Enter game" in the lobby creates a new player entry (accounts are not linked to players yet), so a second attempt from the lobby appears as a separate leaderboard row.
+- Session-start denials (`403`/`409`, for example `SESSION_ASYNC_INSUFFICIENT_TIME`) are shown inline in the setup panel, without modals.
 
-Frontend session-mode readiness:
+Player board layout (desktop target 1440x900, no page scroll):
 
-- Setup shell surfaces round mode (`sync` / `async`) and async session support state without blocking gameplay.
-- Async rounds now use an explicit user-triggered `Start Async Session` action in Setup before session-scoped streaming begins.
-- `Start Async Session` is enabled only when player join context exists, backend session support is available, and no session is active yet.
-- Setup shell exposes explicit host round types:
-  Sync uses enrollment window + round duration controls.
-  Async uses round duration + session duration controls with optional auto-start.
-- Async create payload sends `enrollment_window_seconds=0`, `duration_mode="preset"`, and explicit `session_duration_seconds`.
-- Async enrollment phase is intentionally skipped: because `enrollment_window_seconds=0`, the backend transitions directly from creation to `running` without an `enrolling` phase. The frontend detects async mode via `getRoundModeFromMeta() === 'async'` from the game meta payload and skips the enrollment countdown, showing the round duration countdown immediately instead.
-- Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
-- Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
-- Before every stream connect/reconnect the frontend requests a fresh `GET /games/{id}/sse-ticket` (with `X-Player-Token` when stored) and appends `ticket` to the game or session stream URL; reconnects are driven by the frontend so an expired ticket is never replayed.
-- Async best-of attempts are backend-reset per session start: player state is reset to deterministic baseline (balances/tracks/upgrades/cumulative mined) before each new async session, so attempts are directly comparable.
-- Best-of visibility is surfaced in Player State panel during async rounds only: shows `This session` and `Best this round` (read-only backend values from backend payload). Hidden in sync mode.
-- Live tools behavior is split intentionally: core mining/analytics remain always visible, while trade/farm/chat are reachable via an inline non-blocking bottom drawer.
-- Chat presence remains visible everywhere through an always-available chat button plus compact preview/unread indicator.
-- Event display module: renders the active-event banner and inline affected-value indicators using the shared micro-tooltip layer.
-- Meta manager: handles meta endpoint responses, caching, versioning, and contract-version support validation.
-- Chat panel module: optional side-channel WebSocket communication, non-persistent, isolated from gameplay.
-- Tooltip module (`micro-tooltip.js`): single shared non-blocking tooltip contract (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`) used by player-status and season-header info triggers, with hover-stable behavior across SSE ticks.
-
-Dashboard layout (inline during play, post-game overlay allowed after finish):
-
-- **Status Bar (top)**: connection status, game phase, countdown timer, quick stats.
-- **Main Grid (2 columns)**:
-  - Left (~65%): 2×2 seasonal card grid with inline upgrade lanes (Hashrate, Efficiency, Cooling) and compact row-table headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP`.
-  - Right (~35%): Player-state analytics panel (per-token output, total output, balances, oracle prices, fee/spread), followed by a split player-return panel (`Open Games` + `Last Game Highscores`) and optional docked inline chat below.
-- **Bottom Bar**: score-context metric display, trading status, farming status, chat toggle.
-- **Chat Panel (docked inline, optional)**: toggleable via bottom bar button; expands/collapses inline in the right column with internal message scrolling only.
-- **Post-game return overlay**: when `game_status=finished`, the player sees a full-screen `Game Over` overlay; clicking it clears the ended game/player context and returns focus to the inline Open Games panel.
-- Desktop no-page-scroll remains enforced; setup and seasons use internal scroll containers, and left column overflow is constrained with `min-width: 0`.
+- **Header:** countdown, phase, score, rank, top score, scoring mode, connection badge, async badge; inline Debug disclosure (meta hash, backend URL, IDs).
+- **Setup panel ("Join Round"):** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async only), `Stop Stream`. It collapses after the stream starts. Legacy host controls (round type, scoring, trade count, durations, overrides) remain in the HTML with `.admin-only` and are always hidden.
+- **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
+- **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values.
+- **Action bar:** score context value, Trading and Farming status pills (always visible), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
+- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (placeholder), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, pending owner confirmation.
+- **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the stored last-game highscores.
 
 Responsive behavior:
 
-- Desktop (1440×900+): fixed layout, zero vertical scrolling in dashboard.
-- Tablet (768px–1200px): grid stacks, minimal scrolling.
-- Mobile (<768px): single-column layout with season card tabs or accordion controls.
+- Desktop: no page scroll; setup panel, season list and window contents scroll internally.
+- Tablet (768-1200 px): grid stacks, minimal scrolling.
+- Mobile (<768 px): one season card at a time via the season focus strip.
 
 UX/behavior principles implemented:
 
-- Contract compatibility gating/disabling for upgrade interactions (no UI mutation after disable).
-- Incremental DOM updates for live metric values (balance, output, countdown) using text/attribute diff updates instead of subtree remounting.
-- Inline upgrade controls integrated into season cards (no separate modal/overlay panel).
-- All three economic modes (mining, trading, farming) visible as sections, even when disabled, supporting long-term planning.
-- Optional chat panel is docked inline and non-gameplay (independent lifecycle, no gameplay coupling).
-- Local persistence of UI/session settings and meta hash hints.
-- Deterministic oracle pricing visible per-token to inform player decision-making.
-- Tooltip anchors are kept stable across SSE ticks (no trigger remount while a tooltip is open).
+- Contract compatibility gating for upgrade interactions.
+- Incremental DOM updates (text/attribute diffs) for live values; tooltip anchors and pay-token selections survive SSE ticks.
+- Mining, trading and farming are always visible as sections or status pills, even when disabled.
+- One shared micro-tooltip contract (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`) with hover/focus/tap open and leave/Escape close, no timeout auto-hide.
+- Tunables come only from `src/config/` (`game-control-data.js`, `trading-control-data.js`).
+- Safe DOM rendering only (see `SECURITY.md`).
 
 ## 6) Security & Anti-Cheat Invariants
 
@@ -223,9 +211,12 @@ Authoritative boundaries:
 
 Player auth and stream controls:
 
-- Per-player session token model is implemented.
-- Optional strict player auth mode enforces token validation.
-- SSE ticket flow provides short-lived stream authorization.
+- Account auth (register/login/logout/`/auth/me`/change-password) with bearer session tokens; the lobby re-validates a stored token on load.
+- Per-player (per-game) `player_token` model is implemented; the lobby stores it for the player board.
+- Optional strict player auth mode (`REQUIRE_PLAYER_AUTH`) enforces token validation.
+- SSE ticket flow provides short-lived stream authorization; the frontend requests a fresh ticket for every (re)connect.
+- Password reset: the backend security PR (#9, open on 2026-10-07) disables the unverified reset by default (`403 PASSWORD_RESET_DISABLED`); the lobby shows that message. A secure email-token reset is not implemented.
+- Frontend security details: [SECURITY.md](SECURITY.md).
 
 Chat security posture:
 
@@ -246,7 +237,7 @@ Platform hardening implemented:
 
 ## 7) Test Coverage Guarantees
 
-Backend test coverage includes:
+Backend test coverage (sibling repo) includes:
 
 - Join policy and lifecycle timing behavior.
 - End-to-end create/join/stream/tick/upgrade/leaderboard flow.
@@ -254,24 +245,22 @@ Backend test coverage includes:
 - Oracle and cross-token conversion correctness.
 - Halving and duration/emission mapping behavior.
 - Deterministic global events and active-event effects.
+- Scoring modes, action windows and async session clock.
 - Meta endpoint contract and ETag behavior.
 - Auth/token/ticket enforcement paths.
 - Chat isolation, auth, schema, rate, origin, and backpressure controls.
 - Security headers, rate limiting, and admin access sanity checks.
 - Admin game management and aggregated metrics behavior.
 
-Frontend test coverage includes:
+Frontend test coverage (Vitest + jsdom; 52 files, 460 tests on 2026-10-07):
 
-- Contract support guards.
-- Token normalization and conversion helper coverage.
-- Halving helper behavior and transitions.
-- Orchestration coverage split across `src/main.test.js`, `src/main.halving.test.js`, `src/main.halving-passthrough.test.js`, `src/main.season-upgrades.test.js`, and `src/main.inline-upgrades.test.js`.
-- Direct player analytics rendering tests in `src/ui/player-view.test.js`.
-- Upgrade rendering interaction behavior.
-- Chat rendering/XSS-safety and scroll behavior.
-- Layout guardrails for desktop no-page-scroll, 2×2 season grid, shared upgrade-column alignment, and fixed player panel width.
-- Repo-wide tooltip parity assertions (shared trigger/bubble contract, scoped tooltip init, and no timeout-based auto-hide paths).
-- Large-value compact-number rendering coverage in analytics/upgrade rows (with exact-value tooltip metadata retained).
+- Module tests next to each module in `src/ui/`, `src/services/`, `src/meta/`, `src/utils/`, `src/config/` and `src/admin/`.
+- Player-board orchestration split across `src/main.*.test.js` (halving, halving passthrough, season upgrades, inline upgrades, chat preview, compact numbers, portfolio value, seasonal oracle helpers, stream join).
+- Page-level flows: `src/player-live-board.test.js` (real `player.html` + `main.js` with an SSE payload), `src/lobby.test.js`, `src/async-session-flow.test.js`, `src/post-game-flow.test.js`.
+- Rendering safety: `src/security-rendering.test.js` (lobby, admin, event display) and chat XSS tests.
+- Layout guardrails: `src/layout-css.test.js`, `src/layout-controls.test.js` (no page scroll, 2x2 grid, column alignment, fixed analytics width).
+- Tooltip parity: `src/tooltip-parity.test.js`.
+- Coverage thresholds, changed-lines coverage, contract checks and mutation testing are described in `QUALITY_ENFORCEMENT.md`.
 
 ## 8) Explicit Non-Goals / Out of Scope
 
@@ -299,124 +288,61 @@ Areas intentionally left open by current implementation:
 
 ## 10) Project Status & Next Steps (Non-Binding)
 
-### Current status
+### Current status (checkpoint 2026-10-07)
 
-The current baseline is stable for the implemented mining-focused loop: backend-authoritative simulation, live frontend dashboard, deterministic economy foundations, security boundaries, and test-covered core behaviors are working together for mining gameplay.
+The core loop works end to end: backend-authoritative simulation, lobby, live player board, admin console, sync and async rounds, trading and chat. The project is not release-ready yet (see "Open work" below).
 
-At the same time, the project is still in an iterative phase. Some major areas are intentionally left open so that future decisions can be evaluated against the implemented baseline rather than assumed from design intent alone.
+Recently completed (frontend PRs #16-#19 and backend PRs #8, #10):
 
-Implementation checkpoint (2026-03-30):
+- CI runs on Node 24, audits all dependencies, covers all three HTML entry points in its path filter, and runs a contract suite (`npm run test:contract`) on PRs.
+- Deployment publishes only the built `dist/` with `VITE_API_BASE_URL` set, through `scripts/deploy-to-vps.ps1`, `deploy/remote/install-frontend.sh` and the nginx template in `deploy/nginx/` (see `DEPLOY.md`).
+- Backend URL is configurable at build time (`VITE_API_BASE_URL`).
+- Event banner reads the backend `active_events` list (several events, token-scoped indicators).
+- Live Top 5 leaderboard is shown as a tab of the live tools window.
+- Admin advanced overrides (anchor token, anchor rate, season cycles) reach the backend; the admin create result uses safe DOM.
+- Lobby stores the `player_token`, re-validates stored logins via `/auth/me`, and shows the backend message when password reset is disabled.
+- SSE reconnects always use a fresh ticket.
+- Backend: all four scoring modes are evaluated (`mining_time` and `efficiency` pending product confirmation, see `SCORING_MODES.md`); upgrades/trades only while the round runs or the async session is active; async rounds use the session clock; 3h preset.
+- Dead code removed: player-side game creation, the in-board open-games/return panel, the legacy upgrade panel, the Vite counter sample.
 
-- Mining is the only fully implemented and validated gameplay pillar at this time.
-- Active game discovery and selection flow is implemented for players, including backend filtering rules and frontend auto-refresh.
-- Active game list behavior is constrained to joinable states: enrolling rounds plus asynchronous rounds already running; running synchronous rounds are excluded.
-- Async joinability applies a duration-fit guard: rounds are hidden when `session_duration_seconds >= run_remaining_seconds`.
-- Player setup panel now auto-collapses after successful join to preserve gameplay screen space.
-- Frontend now uses a split entry flow: `index.html` for auth/lobby and `player.html` for the live board.
-- Login no longer auto-enters gameplay. Players must select an open game first, then explicitly enter the live board.
-- Player live board now includes an inline return panel with `Open Games` and `Last Game Highscores` so players can re-enter the join flow without leaving `player.html`.
-- The frontend persists the most recent finished-round highscore snapshot locally and restores it into the player return panel.
-- Game-over handling is aligned for async session expiry from both server-driven finish transitions and client-side elapsed-session fallback paths.
-- Start/autostart path is wrapped in defensive error handling to prevent unhandled flow errors from collapsing player state transitions.
-- Lobby now consumes the provided seasonal start background asset from `public/assets/backgrounds/Seasonal Enterteinment.png`.
-- Temporary fast-test preset `1m` is available in round/session setup control data; this is a local testing convenience and a release blocker for production default cleanup.
-- Trading UI now supports backend-authoritative execution for configured trade windows; farming UI remains placeholder/status-only.
-- Balance/tuning validation is still pending for mined output pace, upgrade value/cost calibration, and halving correctness in live runs.
-- Stable rollback tag for this checkpoint: `checkpoint/2026-03-30-stable-01`.
+Earlier milestones still valid: lobby/board split (`index.html` / `player.html`), admin-only round creation, async sessions with best-of, trading execution, floating live tools window, last-game highscores in the lobby.
 
-### Round Formats & Shared Chat (Non-Binding Status)
+In progress elsewhere:
 
-Round-wide chat is implemented and available as a shared communication layer for players in the same round.
+- Backend security hardening (backend PR #9, open on 2026-10-07): password reset disabled by default (`403 PASSWORD_RESET_DISABLED`, dev opt-in `ALLOW_UNVERIFIED_PASSWORD_RESET`), rate limiting, secrets and input validation. The frontend already handles the 403.
 
-Synchronous live event rounds remain a planned format that builds on the same core deterministic systems already used by challenge-style rounds.
+Open work (summary):
 
-Hosting logic is intended to remain host-controlled and deterministic across round formats so the fairness model stays consistent.
+- Owner decisions: confirm the floating live tools window (REDESIGN DECISION in `LOCKED_DECISIONS.md` §D); confirm the `mining_time` and `efficiency` formulas; choose between the concept and the implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults (`PRODUCTION_DEFAULTS_CHECKLIST.md`); branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4).
+- Gameplay features: Farming Stage 1 and Stage 2; result history; linking accounts to players (one player per account and game, so async best-of works across lobby re-entries); secure email-based password reset; scheduled sync live rounds; per-round fee override; full leaderboard view; chat moderation, emoji and per-round opt-out; season artwork (`public/assets/seasons/` images exist but are unused).
+- Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
+- Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
 
-### Farming (Planned, Staged Introduction)
+Last stable rollback tag: `checkpoint/2026-03-30-stable-01` (no newer stable tag yet).
 
-Farming is treated as a planned third economic pillar alongside mining and trading.
+### Round Formats & Shared Chat
 
-Conceptually, farming represents liquidity provision, demand creation, and long-term stability within the broader seasonal economy. It is not intended to replace mining as the production layer or trading as the allocation layer. Instead, it is understood as a complementary system that adds another way for players to position themselves within the cycle.
+Both round formats are implemented. Sync rounds start automatically when the enrollment window ends; host-scheduled start times are not implemented. Round-wide chat is available to all players of the same round in both formats.
 
-Its introduction is intentionally framed as staged rather than universal.
+### Farming
 
-In an initial stage, some game modes may have no farming at all. In those formats, the game remains focused on mining only, or mining with trading, and farming is intentionally disabled or unavailable.
-
-In a later limited stage, farming can exist as a simple allocation choice. In that form, players commit tokens to farming in exchange for steady, relatively low-risk returns, without requiring active optimization or continual rotation.
-
-In a more strategic stage, farming rewards can rotate across seasonal tokens over time. At that point, players are encouraged to reallocate farming positions as the cycle changes, and farming begins to compete directly with mining upgrades and trading decisions for attention and resources.
-
-In an optional endgame-oriented stage, farming can become one of the primary tools for long-term income and positioning. In that shape of the game, mining continues to matter as infrastructure, while farming and trading take on a larger role in expressing strategic judgment across the full economy.
-
-The relationship to game modes remains intentionally selective rather than uniform:
-
-- short games may exclude farming entirely
-- medium games may treat farming as optional or limited
-- long games may use farming as a core strategic layer
-
-Farming is also explicitly bounded by several non-goals. It is not intended to introduce player-to-player markets, real-world liquidity pools, or any real-money mechanics. It remains an abstracted and deterministic system inside the game’s own economy.
+Not implemented; the UI shows a placeholder tab and a status pill. The staged farming design (Stage 1 passive, Stage 2 rotating, no Stage 3) is described in [SEASONAL_TYCOON_CONCEPT.md](SEASONAL_TYCOON_CONCEPT.md).
 
 ### UI & UX Work (Open)
 
-The current UI is functional and structurally sound, but it is not treated as final.
+The UI is functional but not final. Visual identity, layout refinement per game mode, onboarding/how-to-play and accessibility checks remain open and are deferred until gameplay and mode decisions settle.
 
-A broader UI/UX pass remains intentionally open around:
+### Deployment & Infrastructure
 
-- visual identity and polish
-- layout refinement for different game modes
-- onboarding clarity and information hierarchy
+A deploy path exists for a single VPS (frontend: `DEPLOY.md`; backend and full stack: backend `BACKEND_DEPLOY.md`). Production hardening (secrets, strict mode, backups, monitoring) and real playtest hosting are still open.
 
-This work is intentionally deferred until gameplay structure and mode decisions are more settled, so presentation changes do not force premature revisions to the interface model.
+### Playtesting & Validation (Open)
 
-### Deployment & Infrastructure (Open)
-
-The project is currently operating as a local/development setup.
-
-Deployment to a VPS or similar hosted environment remains an open phase intended to support:
-
-- real playtest sessions
-- longer-running games
-- evaluation of performance and stability under real usage
-
-Related infrastructure work is understood at a high level and includes environment configuration, reverse proxy / HTTPS posture, and basic monitoring and logging.
-
-### Playtesting & Validation Phases (Open)
-
-Structured playtesting is planned as a later validation phase, but it has not yet been executed as part of the current baseline.
-
-The expected role of playtesting is to validate:
-
-- balance between mining and trading-oriented decisions
-- pacing across different game modes
-- UX comprehension for new players
-
-This validation phase is intended to inform tuning and calibration of the implemented systems, not to redefine the project’s core architecture.
-
-Immediate validation backlog (mining-first):
-
-- Validate mined output amounts over full-round timelines.
-- Validate per-upgrade gains against upgrade price progression.
-- Validate halving timing and post-halving output behavior end-to-end.
-
-Immediate delivery backlog (security-first auth):
-
-- Phase 1: backend auth/profile extension (strict unique username, required contact fields persistence, rate limiting, tests).
-- Phase 2: frontend auth/lobby/game split with persistent login/session validation and clean screen routing. (implemented)
-- Phase 3: security hardening and audit polish (headers, stricter validation, audit log coverage, dependency/security audits).
-- Phase 4 (explicitly deferred): forgot-password via email, reset-token flow, email templates, and related end-to-end tests.
+Structured playtests have not been run yet. They should validate mined output pacing, upgrade value vs. cost, halving timing and effect, trading balance and pacing across round lengths. Use `MANUAL_TEST_RUNBOOK.md` §8.
 
 ### Release Preparation (Not Started)
 
-No release process has been initiated at the current stage.
-
-Release preparation is understood only at a high level and includes:
-
-- final balancing
-- UI polish
-- documentation review
-- deployment hardening
-
-Release timing remains intentionally undecided in the current project state.
+No release process exists yet (no versioning, changelog or release tags beyond rollback checkpoints). Release timing is undecided.
 
 ## 11) Operational Tracking Protocol (Mandatory)
 
@@ -426,7 +352,7 @@ Required updates after each meaningful implementation batch:
 
 - Update this file with a factual checkpoint date and completed items.
 - Update next-step and missing-work bullets so a new developer can continue without tribal context.
-- Keep README aligned with the same status and phase ordering.
+- Keep README consistent with it. README no longer carries its own status snapshot; it links here.
 - Reflect test-impact changes explicitly when behavior/contracts change.
 
 Required status content in each checkpoint:
@@ -445,42 +371,45 @@ Source-of-truth rule:
 
 ## Concept Alignment & Remaining Work (Non-Binding)
 
-### 1) Concept Areas Already Covered
+### 1) Concept Areas Covered
 
-- Deterministic, backend-authoritative simulation and fairness boundaries are established.
-- Mining, oracle-relative value behavior, halvings, and global events are already part of the implemented game model.
-- Shared round-level chat is documented as available and separated from gameplay outcomes.
-- The baseline already treats host-controlled deterministic round governance as the intended fairness anchor.
+- Deterministic, backend-authoritative simulation and fairness boundaries.
+- Mining, oracle-relative value, halvings and global events.
+- Round/session model: sync rounds and async rounds in which each player runs an identical, fixed-length session that can start at any time within the round window (session clock, baseline reset per session, best-of).
+- Host-defined trading gates: fixed trade count and unlock schedule per round, identical for all players, enforced by the backend.
+- Four scoring modes (Stockpile default, Power, Mining Time Equivalent, Efficiency), selected before round start and evaluated by the backend.
+- Admin-only, snapshot-locked round setup with presets plus optional overrides.
+- Shared round-level chat, separate from gameplay outcomes.
 
 ### 2) Concept Areas Partially Covered
 
-- Round format framing exists: challenge-style rounds are represented and synchronous live rounds are documented as planned; what is still missing is full alignment to the locked session model where each player runs an identical fixed-duration session within a round window.
-- Host control framing exists in principle through admin and configuration controls; what is still missing is explicit concept-level alignment to preset-plus-override round setup as a stable pre-round contract.
-- Trading cost behavior exists in the economy model through deterministic conversion costs; what is still missing is implementation-level support for the agreed default that every trade carries a round-consistent conversion-ratio-based fee unless the host predefines an override.
-- Farming is already documented as planned; what is still missing is implementation-level support for the locked two-stage scope (Stage 1 passive and Stage 2 rotating only) in the non-binding farming narrative.
+- Scoring: `mining_time` and `efficiency` formulas are an implementation interpretation pending product confirmation.
+- Default trade allocation by game length: implemented, but the values differ from the concept table (open product decision, see `SEASONAL_TYCOON_CONCEPT.md`). Hosts can override the count, not individual unlock times.
+- Trading cost: deterministic conversion fee and spread exist; a per-round host fee override does not.
+- Leaderboards: live Top 5 only; no full view, no provisional/final marker, no result history.
 
 ### 3) Concept Areas Not Yet Implemented
 
-Required future work to realize the agreed concept:
+#### A) Core Game & Simulation
 
-### A) Core Game & Simulation Layer
+- Host-scheduled synchronous live event rounds (fixed start date/time).
 
-- Implement the locked round/session structure where each player runs an identical time-limited session that can start at any point within the round window.
-- Implement host-defined trading gates per round, including fixed trade count and fixed minimum trade-start timing shared equally across all players.
-- Implement full support for the four approved scoring/outcome modes (Stockpile default, plus optional Power, Mining Time Equivalent, and Efficiency), with mode selection fixed before round start and no mid-round switching.
+#### B) Economy & Progression
 
-### B) Economy & Progression Systems
+- Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).
+- Farming Stage 2 (rotating farming), the final planned farming layer.
+- Per-round trading fee override.
 
-- Implement the agreed default trade allocation profile by game length, with host overrides fixed before round start.
-- Implement Farming Stage 1 as a passive lock-duration system with post-duration reward and compounding behavior when positions remain allocated.
-- Implement Farming Stage 2 rotating farming as the next and final planned farming layer, consistent with the explicit no-Stage-3 design limit.
+#### C) Accounts & Results
 
-### C) Host / Round Configuration Layer
+- Linking accounts to game players; result history per account.
 
-- Implement the host-scheduled synchronous live event round format on top of the same deterministic rules used by challenge rounds.
+#### D) Frontend / UX
 
-### D) Frontend / UX Layer
+- Farming panel (currently a placeholder tab).
+- Season artwork from `public/assets/seasons/` in the season cards.
+- Onboarding / how-to-play guidance.
 
-### E) Platform / Operations
+#### E) Platform / Operations
 
-- Integrate approved visual asset pipeline for lobby/background and season artwork from `public/assets/backgrounds` and `public/assets/seasons`.
+- Production defaults, hardening, backups and monitoring (see section 10).

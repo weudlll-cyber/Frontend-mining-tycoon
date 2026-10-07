@@ -1,128 +1,156 @@
 # QUALITY_ENFORCEMENT
 
-This document defines the mandatory quality, test, and security checks for this repository.
-It is the operational policy for local pushes and merge-time CI.
+Single source of truth for the frontend quality gates: local pre-push checks,
+merge-time CI checks, scheduled audits and test-quality policy.
 
-## Scope
+Other docs (`README.md`, `CONTRIBUTING.md`, `COPILOT_INSTRUCTIONS.md`,
+`AUDIT_MATRIX.md`) link here instead of repeating the lists. The automation is
+the ground truth: `scripts/pre_push_gate.ps1`, `package.json` and
+`.github/workflows/*.yml`. If this file and the automation disagree, fix both in
+the same change.
 
-- Applies to every code change in this repository.
-- Documentation-only changes may skip heavy checks only when CI path filters declare no frontend impact.
-- Advisory checks may warn without blocking; required checks must block on failure.
+Last verified against the automation: 2026-10-07.
 
-## Local Enforcement (Before Push)
+## 1) Local Gate (Before Push)
 
-Required one-time setup:
+One-time setup (activates the tracked `.githooks/pre-push` hook):
 
 ```powershell
 & .\scripts\enable_git_hooks.ps1
 ```
 
-Recommended push workflow:
+Push with the helper (prints the outgoing commits/files, runs the gate, pushes):
 
 ```powershell
-& .\scripts\push_with_audit.ps1
+& .\scripts\push_with_audit.ps1                # fast profile (default)
+& .\scripts\push_with_audit.ps1 -Profile full  # fast + coverage + audit + health
+& .\scripts\push_with_audit.ps1 -ForceAudit    # ignore the gate cache
 ```
 
-Duplicate local reruns are intentionally avoided for the same clean HEAD.
-If `pre_push_gate.ps1` already passed and no files changed afterward, the
-helper or tracked hook reuse that result instead of rerunning the full gate.
-Use `-ForceAudit` when a fresh rerun is required.
+A plain `git push` runs the same gate through the hook
+(`scripts/pre_push_gate.ps1`, fast profile). The gate result is cached per clean
+`HEAD` + tree in `.git/gate-cache/`, so an unchanged clean `HEAD` that already
+passed is not checked again. Never bypass the hook with `--no-verify`.
 
-Mandatory local gate command (run directly or via hook):
+| Step (`scripts/pre_push_gate.ps1`) | Command | `fast` | `full` |
+|---|---|---|---|
+| Required docs present and non-empty: `README.md`, `PROJECT_BASELINE.md`, `CONTRIBUTING.md`, `LOCKED_DECISIONS.md`, `SEASONAL_TYCOON_CONCEPT.md`, `CODE_ORGANIZATION.md`, `SECURITY.md` | built in | blocking | blocking |
+| ESLint | `npm run lint` | blocking | blocking |
+| Prettier | `npm run format:check` | blocking | blocking |
+| Unit tests | `npm run test -- --run` | blocking | blocking |
+| Production build | `npm run build` | blocking | blocking |
+| Coverage (thresholds in `vitest.config.js`) | `npm run test:coverage` | - | blocking |
+| Dependency audit (all deps, high+) | `npm audit --audit-level=high` | - | blocking |
+| Code health (large files, missing headers, TODO/FIXME, console use) | `scripts/code_health_audit.ps1` | - | advisory |
 
-```powershell
-& .\scripts\pre_push_gate.ps1
+Recommended before every commit. It is a superset of the fast gate and uses the
+stricter `clean:audit` instead of plain lint:
+
+```bash
+npm run check:all
+# = clean:audit (eslint --max-warnings=0 + knip) + format:check + test + build + npm audit --audit-level=high
 ```
 
-Required blocking checks in local gate:
+Other local checks:
 
-- docs presence + non-empty validation
-- clean source audit (`npm run clean:audit`)
-- prettier format check
-- vitest unit tests
-- vitest coverage run
-- production build
-- npm audit (prod dependencies, high+)
+- `npm run test:contract`: the CI contract suite (`src/meta/meta-manager.test.js` plus the `src/main.*` tests).
+- `npm run check:changed-lines-coverage`: needs `BASE_SHA` and a fresh `npm run test:coverage`.
+- `npm run mutation:check` (Stryker dry run) and `npm run mutation` (full run, config in `stryker.config.mjs`).
+- `npm run audit:health`: the advisory code-health report on its own.
 
-Advisory local checks:
+`format:check` covers `src/**/*.{js,css}` and the three HTML entry points.
+Markdown is not format-checked; keep it tidy by hand.
 
-- code health audit (large files, comment headers, TODO/FIXME markers, debug console usage)
+## 2) Merge-Time CI (Pull Requests)
 
-## Merge-Time CI Enforcement
+### `ci.yml`
 
-The CI workflow in [.github/workflows/ci.yml](.github/workflows/ci.yml) runs required jobs for relevant changes.
+A path filter (`Detect Changed Areas`) decides whether the frontend checks run.
+It matches `src/**`, `public/**`, `*.html`, `scripts/**`, `.github/**`,
+`package*.json`, the eslint/prettier/vite/vitest/knip/stryker configs and five
+docs (`README.md`, `PROJECT_BASELINE.md`, `LOCKED_DECISIONS.md`,
+`CONTRIBUTING.md`, `COPILOT_INSTRUCTIONS.md`). When nothing matches, each job
+passes "by policy" without running.
 
-Required merge checks:
+| Job (check name) | Command | Runs on | Gate |
+|---|---|---|---|
+| `PR Policy` | checks the PR body for the template sections | PRs | warning only |
+| `Lint` | `npm run lint` | push + PR | blocking |
+| `Format check` | `npm run format:check` | push + PR | blocking |
+| `Unit tests` | `npm run test -- --run` | push + PR | blocking |
+| `Test coverage` | `npm run test:coverage` (global thresholds) | push + PR | blocking |
+| `Changed lines coverage` | `npm run check:changed-lines-coverage` | PRs | blocking; every added production JS line must be covered |
+| `Contract checks` | `npm run test:contract` | PRs | blocking |
+| `Build` | `npm run build` | push + PR | blocking |
+| `Security audit` | `npm audit --audit-level=high` | push + PR | blocking; 0 high/critical |
+| `CI Summary (Manual Merge Gate)` | aggregates the jobs above and writes `merge-safe = YES/NO` | push + PR | blocking |
+| `Post PR CI Results Comment` | creates or updates the results comment | PRs | informational |
 
-- Lint
-- Format check
-- Unit tests
-- Test coverage
-- Changed lines coverage (pull requests)
-- Build
-- Security audit
-- CI Summary (Manual Merge Gate)
-- CodeQL
-- Dependency Review
-- Actionlint
+### Other PR workflows
 
-Policy requirements:
+| Workflow | Job (check name) | Gate |
+|---|---|---|
+| `codeql.yml` | `CodeQL` (also on push and weekly) | blocking |
+| `dependency-review.yml` | `Dependency Review` (skips when the dependency graph is unavailable) | blocking |
+| `actionlint.yml` | `Actionlint` (also on push) | blocking |
+| `security-compliance.yml` | `Secret scan` (gitleaks, full history) | blocking |
+| `security-compliance.yml` | `License policy` (`license-checker --production` + `scripts/check_license_policy.mjs`; denies GPL/AGPL/SSPL) | blocking |
+| `security-compliance.yml` | `Compliance summary gate` | blocking |
 
-- auto-merge must remain disabled
-- final merge approval is manual
-- squash merge only
-- branch protection must require all required checks above
+The project has only devDependencies, so `License policy` currently has nothing
+to check.
 
-## Test Quality Policy
+## 3) Scheduled Audits
 
-Coverage percentage alone is not enough. Test quality must combine multiple signals:
+| Workflow | Schedule (UTC) | Checks |
+|---|---|---|
+| `nightly-audits.yml` | daily 01:15 | `Full test suite` (lint, format, test, coverage, build); `Flaky detection (3x)` (full test run three times); `Extended security scanning` (`npm audit --audit-level=moderate`); `Nightly summary gate` |
+| `security-compliance.yml` | daily 01:45 | secret scan, license policy, `Generate SBOM` (CycloneDX artifact; not on PRs) |
+| `codeql.yml` | Mondays 03:20 | CodeQL |
+| `keepalive.yml` | Mondays 04:40 | keeps scheduled workflows from being auto-disabled |
 
-- fast unit tests for deterministic logic
-- integration-style UI tests for critical user flows
-- negative-path tests (422/401/409, malformed payloads, stream failures)
-- contract-sensitive tests for async/sync mode behavior and backend-authoritative outcomes
-- rendering safety tests (XSS-safe rendering patterns)
+Manual workflows: `snapshot.yml` (full gate, then a snapshot tag and optional
+release) and `stable-tag.yml` (tags a commit as a stable rollback point after a
+manual merge).
 
-Required test change discipline:
+## 4) Merge Policy
 
-- behavior change => add or update tests in same change
-- bug fix => add a regression test reproducing old failure first
-- contract change => update tests and docs in same change
+- Merge only when `CI Summary (Manual Merge Gate)` reports `merge-safe = YES`
+  and the other PR workflows above are green.
+- Final merge approval is manual. Auto-merge stays OFF.
+- PR bodies follow `.github/pull_request_template.md`: all sections, including
+  `merge-safe = YES/NO` and a changed-files summary without full file bodies.
+- Intended merge method: squash merge.
+- Branch protection: `scripts/apply-branch-protection.ps1` requires `Lint`,
+  `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit` and
+  `CI Summary (Manual Merge Gate)`. As of 2026-10-07 it has **not** been applied
+  to `main` (the branch is unprotected), and recent PRs were merged with merge
+  commits. **Owner decision pending:** apply the protection and enforce squash
+  merges, or relax this policy.
 
-## Coverage Strategy (High Coverage Without Blind Spots)
+## 5) Test Quality Policy
 
-Use a ratcheting strategy to reach very high coverage safely:
+Coverage percentage alone is not enough. Combine:
 
-- keep global coverage non-decreasing over time
-- prioritize branch coverage on high-risk modules
-- add focused tests for uncovered lines in critical paths first
-- avoid coverage inflation via trivial assertion-only tests
+- fast unit tests for deterministic logic,
+- integration-style tests for critical flows (for example
+  `src/player-live-board.test.js`, `src/async-session-flow.test.js`,
+  `src/post-game-flow.test.js`, `src/lobby.test.js`),
+- negative paths (401/403/409/422, malformed payloads, stream failures),
+- contract tests for sync/async behavior and backend-authoritative outcomes,
+- rendering-safety tests (`src/security-rendering.test.js`) and layout/tooltip
+  guard tests (`src/layout-css.test.js`, `src/tooltip-parity.test.js`).
 
-Recommended next enforcement upgrades:
+Discipline:
 
-- add explicit coverage thresholds in Vitest config (global + per critical area)
-- add mutation testing for core business logic modules
+- behavior change: add or update tests in the same change,
+- bug fix: add a regression test that fails without the fix,
+- contract change: update tests and docs in the same change,
+- keep global coverage from decreasing; focus branch coverage on high-risk
+  modules; do not write assertion-free tests only to raise coverage,
+- quarantine a flaky test only with an owner and an expiry date.
 
-Current support for changed-lines coverage:
-
-- local command: `npm run check:changed-lines-coverage` (requires `BASE_SHA` env var)
-- CI PR enforcement: `Changed lines coverage` job
-
-Current support for mutation testing:
-
-- dry run: `npm run mutation:check`
-- full run: `npm run mutation`
-- config: `stryker.config.mjs`
-
-## Early Defect Detection Enhancements
-
-To detect problems earlier than end-to-end runs:
-
-- keep test execution split by concern (lint/format/unit/coverage/build/security)
-- run affected tests on each push and full suite before merge
-- track flaky tests and quarantine only with owner + expiry
-- fail fast on security and contract breakage
-
-## Ownership
-
-If any rule in this file conflicts with scripts or CI definitions, update both in the same change so policy and automation stay aligned.
+Current enforcement: global coverage thresholds in `vitest.config.js`, 100 %
+changed-lines coverage on PRs, and Stryker mutation testing for
+`meta-manager`, `storage-utils`, `session-actions` and `stream-controller`
+(run manually, not in CI).
