@@ -51,6 +51,14 @@
               <button id="logout-btn" class="logout-btn" type="button" disabled>
                 Logout
               </button>
+              <button
+                id="open-change-password"
+                class="logout-btn"
+                type="button"
+                disabled
+              >
+                Change password
+              </button>
               <a class="link-button" href="/admin.html">Admin setup</a>
             </div>
           </form>
@@ -135,6 +143,52 @@
         <div class="dialog-actions">
           <button id="cancel-forgot-password" type="button">Cancel</button>
           <button type="submit" class="auth-button">Reset</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="change-password-dialog" aria-label="Change password form">
+      <form id="change-password-form" class="dialog-form" method="dialog">
+        <h3>Change password</h3>
+        <label class="auth-form-row" for="change-current-password">
+          <span>Current password</span>
+          <input
+            id="change-current-password"
+            name="currentPassword"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="change-new-password">
+          <span>New password</span>
+          <input
+            id="change-new-password"
+            name="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="change-new-password-confirm">
+          <span>Confirm new password</span>
+          <input
+            id="change-new-password-confirm"
+            name="newPasswordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <p
+          id="change-password-message"
+          class="message"
+          data-kind="info"
+          aria-live="polite"
+        ></p>
+        <div class="dialog-actions">
+          <button id="cancel-change-password" type="button">Cancel</button>
+          <button type="submit" class="auth-button">Change password</button>
         </div>
       </form>
     </dialog>

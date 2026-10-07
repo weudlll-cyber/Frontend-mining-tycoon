@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  changePassword,
   fetchCurrentUser,
   fetchOpenGames,
   joinGame,
@@ -356,5 +357,79 @@ describe('auth-client contract errors', () => {
     await expect(fetchOpenGames('http://127.0.0.1:8000')).rejects.toMatchObject(
       { status: 503, message: 'Maintenance' }
     );
+  });
+});
+
+describe('auth-client changePassword', () => {
+  it('posts current/new password with the bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'Password changed successfully.' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await changePassword('http://127.0.0.1:8000', {
+      authToken: ' tok ',
+      currentPassword: 'OldPassword123!',
+      newPassword: 'NewPassword123!',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/auth/change-password');
+    expect(options.method).toBe('POST');
+    expect(options.headers.Authorization).toBe('Bearer tok');
+    expect(JSON.parse(options.body)).toEqual({
+      current_password: 'OldPassword123!',
+      new_password: 'NewPassword123!',
+    });
+    expect(result.message).toContain('Password changed');
+  });
+
+  it('omits the Authorization header without a token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await changePassword('http://127.0.0.1:8000');
+
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.headers.Authorization).toBeUndefined();
+    expect(JSON.parse(options.body)).toEqual({
+      current_password: '',
+      new_password: '',
+    });
+  });
+
+  it('surfaces backend 422 password-strength messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: [
+            {
+              loc: ['body', 'new_password'],
+              msg: 'Value error, Password must be at least 12 characters',
+            },
+          ],
+        }),
+      })
+    );
+
+    await expect(
+      changePassword('http://127.0.0.1:8000', {
+        authToken: 'tok',
+        currentPassword: 'a',
+        newPassword: 'short',
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      message: 'Password must be at least 12 characters',
+    });
   });
 });
