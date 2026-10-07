@@ -110,9 +110,11 @@ import {
   buildReviewSummary,
   buildGamePayload,
   createRound,
+  init,
   initBackendUrlField,
   renderCreateSuccess,
   resolveTradeWindowSeconds,
+  syncDefaultTradeCount,
   updateReview,
 } from './admin-setup.js';
 
@@ -489,5 +491,50 @@ describe('createRound', () => {
     expect(document.getElementById('admin-result-box').textContent).toContain(
       'Admin permission required to create rounds. Admin token required'
     );
+  });
+});
+
+describe('async trade defaults and init', () => {
+  it('defaults the trade count from the session length (5m session = 0 trades)', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 3 });
+    const doc = dom.window.document;
+    doc.getElementById('admin-async-session-preset').value = '5m';
+    syncDefaultTradeCount();
+    expect(doc.getElementById('admin-trade-count').value).toBe('0');
+    expect(doc.getElementById('admin-trade-count-note').textContent).toBe(
+      'Trading disabled for this round.'
+    );
+  });
+
+  it('labels async trade schedules as per session', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 2 });
+    dom.window.document.getElementById('admin-async-session-preset').value =
+      '24h';
+    updateReview();
+    expect(
+      dom.window.document.getElementById('admin-trade-count-note').textContent
+    ).toBe('2 trades scheduled per session.');
+  });
+
+  it('initializes the console without throwing and seeds the backend URL', async () => {
+    const dom = buildDom({ roundType: 'sync' });
+    dom.window.document.getElementById('admin-backend-url').value = '';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
+    localStorage.removeItem('mining-tycoon:baseUrl');
+
+    expect(() => init()).not.toThrow();
+    await Promise.resolve();
+
+    expect(dom.window.document.getElementById('admin-backend-url').value).toBe(
+      'http://127.0.0.1:8000'
+    );
+    const presetValues = Array.from(
+      dom.window.document.getElementById('admin-duration-preset').options
+    ).map((option) => option.value);
+    expect(presetValues).toContain('3h');
   });
 });

@@ -209,7 +209,7 @@ function updateTradePreview() {
 
 // ── Default trade count auto-sync ────────────────────────────────────────────
 
-function syncDefaultTradeCount() {
+export function syncDefaultTradeCount() {
   const durationSeconds = resolveTradeWindowSeconds();
   const defaultCount = getDefaultTradeCount(durationSeconds);
   const input = el('admin-trade-count');
@@ -519,7 +519,7 @@ export async function createRound() {
 
 // ── Initialisation ────────────────────────────────────────────────────────────
 
-function init() {
+export function init() {
   initBackendUrlField();
   populateDurationPreset();
   populateAsyncDurationPreset();
