@@ -78,7 +78,8 @@ the backend deploy script).
    4. The installer publishes `dist/` to `/var/www/mining-tycoon` with
       `rsync --delete --delay-updates`, writes the nginx site on the first
       deploy, runs certbot when `-LetsEncryptEmail` is given, and fetches the
-      three pages through nginx.
+      four pages (`index.html`, `player.html`, `admin.html`,
+      `how-to-play.html`) through nginx.
 
 4. Open `https://game.example.com/`.
 

@@ -138,7 +138,12 @@ describe('player live board wiring', () => {
 
 describe('static guardrails', () => {
   it('has no hard-coded backend URL in the HTML entry points', () => {
-    for (const file of ['index.html', 'player.html', 'admin.html']) {
+    for (const file of [
+      'index.html',
+      'player.html',
+      'admin.html',
+      'how-to-play.html',
+    ]) {
       expect(readRepoFile(file)).not.toContain('127.0.0.1:8000');
     }
   });

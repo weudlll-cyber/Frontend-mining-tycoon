@@ -193,6 +193,18 @@ body {
   font-size: 0.82rem;
 }
 
+/* The "How to play" link is an <a> styled like the header buttons; it opens
+   the static guide in a new tab so the running game is not left. */
+.header-actions .how-to-play-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius) / 2);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .debug-toggle-btn {
   width: 2rem;
   height: 2rem;
