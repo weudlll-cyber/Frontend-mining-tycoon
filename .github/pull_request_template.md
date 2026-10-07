@@ -33,7 +33,7 @@ Provide a concise generated summary of what changed and why.
 - [ ] `npm run test -- --run`
 - [ ] `npm run test:coverage`
 - [ ] `npm run build`
-- [ ] `npm audit --omit=dev --audit-level=high`
+- [ ] `npm audit --audit-level=high`
 
 ## CI Summary
 

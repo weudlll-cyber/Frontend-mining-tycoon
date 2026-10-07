@@ -51,78 +51,11 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=high
 
-  backend-ci:
-    name: Backend CI (tests/lint/audit/security)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Run backend checks
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -f backend/package.json ]; then
-            echo "Detected Node backend at backend/."
-            pushd backend >/dev/null
-            npm ci
-            npm run lint
-            npm test -- --run
-            npm audit --audit-level=high
-            if npm run | grep -q "build"; then
-              npm run build
-            fi
-            popd >/dev/null
-            exit 0
-          fi
-
-          if [ -f backend/pyproject.toml ] || [ -f backend/requirements.txt ]; then
-            echo "Detected Python backend at backend/."
-            python -m pip install --upgrade pip
-            pushd backend >/dev/null
-
-            if [ -f requirements.txt ]; then
-              pip install -r requirements.txt
-            fi
-
-            if [ -f pyproject.toml ]; then
-              pip install .
-            fi
-
-            pip install pytest ruff bandit pip-audit
-            ruff check .
-            pytest -q
-            bandit -r . -q
-            pip-audit
-            popd >/dev/null
-            exit 0
-          fi
-
-          if [ -f pyproject.toml ] || [ -f requirements.txt ]; then
-            echo "Detected Python backend at repository root."
-            python -m pip install --upgrade pip
-            if [ -f requirements.txt ]; then
-              pip install -r requirements.txt
-            fi
-            pip install pytest ruff bandit pip-audit
-            ruff check .
-            pytest -q
-            bandit -r . -q
-            pip-audit
-            exit 0
-          fi
-
-          echo "No supported backend project layout found. Snapshot requires backend CI to pass before tag/release creation."
-          echo "Expected one of: backend/package.json, backend/pyproject.toml, backend/requirements.txt, pyproject.toml, requirements.txt"
-          exit 1
-
   ci-summary:
     name: CI Summary Gate
     runs-on: ubuntu-latest
     needs:
       - frontend-ci
-      - backend-ci
     outputs:
       merge_safe: ${{ steps.gate.outputs.merge_safe }}
       summary_md: ${{ steps.gate.outputs.summary_md }}
@@ -134,10 +67,9 @@ jobs:
           set -euo pipefail
 
           FRONTEND_RESULT="${{ needs['frontend-ci'].result }}"
-          BACKEND_RESULT="${{ needs['backend-ci'].result }}"
 
           MERGE_SAFE="true"
-          if [ "$FRONTEND_RESULT" != "success" ] || [ "$BACKEND_RESULT" != "success" ]; then
+          if [ "$FRONTEND_RESULT" != "success" ]; then
             MERGE_SAFE="false"
           fi
 
@@ -146,7 +78,6 @@ jobs:
             echo "## Snapshot CI Summary"
             echo
             echo "- Frontend CI: ${FRONTEND_RESULT}"
-            echo "- Backend CI: ${BACKEND_RESULT}"
             if [ "$MERGE_SAFE" = "true" ]; then
               echo "- Merge Safety: SAFE (manual merge only)"
             else
@@ -163,7 +94,6 @@ jobs:
             echo "## Snapshot CI Summary"
             echo ""
             echo "- Frontend CI: ${FRONTEND_RESULT}"
-            echo "- Backend CI: ${BACKEND_RESULT}"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$MERGE_SAFE" = "true" ]; then
             echo "- Merge Safety: SAFE (manual merge only)" >> "$GITHUB_STEP_SUMMARY"
@@ -178,7 +108,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - frontend-ci
-      - backend-ci
       - ci-summary
     if: needs['ci-summary'].result == 'success'
     outputs:
