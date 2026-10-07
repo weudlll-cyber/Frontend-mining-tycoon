@@ -23,6 +23,8 @@ import {
   computeTradeUnlockOffsetsSeconds,
 } from '../config/index.js';
 import { initGameManagement } from './game-management.js';
+import { initEconomySettings } from './economy-settings.js';
+import { initAdminMetrics } from './admin-metrics.js';
 import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
 import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
 import {
@@ -588,6 +590,8 @@ export function init() {
   syncDefaultTradeCount();
   updateReview();
   initGameManagement();
+  initEconomySettings();
+  initAdminMetrics();
 }
 
 document.addEventListener('DOMContentLoaded', init);

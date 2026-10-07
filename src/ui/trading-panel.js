@@ -636,6 +636,15 @@ function resolveExecutionState(model, trading, isSubmitting) {
       reason: 'Trading is not enabled for this round.',
     };
   }
+  // Play-window gate from the board state (enrolling/finished round, async
+  // round without an active session). Backend 409 remains authoritative.
+  if (model.actionAvailability && !model.actionAvailability.allowed) {
+    return {
+      enabled: false,
+      buttonText: 'Execute Trade',
+      reason: model.actionAvailability.reason,
+    };
+  }
   if (!model.rules.trade_count) {
     return {
       enabled: false,
@@ -763,6 +772,7 @@ export function initTradingPanel(deps) {
     getActiveScoringMode,
     executeTrade,
     showToast,
+    getActionAvailability,
     tradingPanelRef,
     tradingStatusRef,
   } = deps || {};
@@ -794,6 +804,12 @@ export function initTradingPanel(deps) {
       console.error('[trading-panel] getTrading error:', err);
       return normalizeTradingCapability(null);
     }
+  }
+
+  function getActionAvailabilityState() {
+    return typeof getActionAvailability === 'function'
+      ? getActionAvailability()
+      : null;
   }
 
   function getCurrentState() {
@@ -871,6 +887,7 @@ export function initTradingPanel(deps) {
         rules,
         tradesUsed,
         elapsedSeconds,
+        actionAvailability: getActionAvailabilityState(),
       },
       trading,
       isTradeSubmitting
@@ -1009,6 +1026,7 @@ export function initTradingPanel(deps) {
         rules,
         tradesUsed,
         elapsedSeconds,
+        actionAvailability: getActionAvailabilityState(),
       },
       trading,
       isTradeSubmitting
@@ -1134,6 +1152,7 @@ export function initTradingPanel(deps) {
         rules,
         tradesUsed,
         elapsedSeconds,
+        actionAvailability: getActionAvailabilityState(),
       },
       trading,
       isTradeSubmitting

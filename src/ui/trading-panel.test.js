@@ -295,6 +295,51 @@ describe('trading-panel', () => {
       });
     });
 
+    it('disables execute with the play-window reason when actions are blocked', () => {
+      const getMeta = () => ({
+        conversion_fee_rate: 0.02,
+        scoring_mode: 'stockpile',
+        game_duration_seconds: 600,
+        trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+      });
+      const getLastGameData = () => ({
+        player_state: { balances: { spring: 1000, summer: 500 } },
+        seconds_remaining: 520,
+        trades_used: 0,
+        trading_rules: { trade_count: 2, unlock_offsets_seconds: [60, 180] },
+      });
+      let availability = {
+        allowed: false,
+        reason: 'Start a session to upgrade or trade.',
+      };
+
+      const api = initTradingPanel({
+        getGameMeta: getMeta,
+        getLastGameData,
+        getActionAvailability: () => availability,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+      api.renderTradingStatus();
+
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      amountInput.value = '75';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const blockedBtn = panelEl.querySelector('.trading-execute-btn');
+      expect(blockedBtn.disabled).toBe(true);
+      expect(blockedBtn.title).toBe('Start a session to upgrade or trade.');
+
+      availability = { allowed: true, reason: '' };
+      api.renderTradingStatus();
+      expect(panelEl.querySelector('.trading-execute-btn').title).toContain(
+        'backend-authoritative'
+      );
+      expect(panelEl.querySelector('.trading-execute-btn').disabled).toBe(
+        false
+      );
+    });
+
     it('uses season labels when token_names is an array and balances use numeric keys', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,

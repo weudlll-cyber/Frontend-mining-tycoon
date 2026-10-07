@@ -11,6 +11,7 @@ vi.mock('./services/auth-client.js', () => ({
   logout: vi.fn(),
   register: vi.fn(),
   resetPassword: vi.fn(),
+  changePassword: vi.fn(),
 }));
 
 function loadLobbyFixture() {
@@ -376,5 +377,172 @@ describe('lobby forgot-password dialog', () => {
     expect(document.getElementById('forgot-password-message').textContent).toBe(
       'User not found'
     );
+  });
+});
+
+describe('lobby change-password dialog', () => {
+  beforeEach(async () => {
+    // WHY: the auth-client mock factory is shared across tests in this file,
+    // so reset the mocks this block configures to keep each case isolated.
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.changePassword).mockReset();
+    vi.mocked(authClient.fetchCurrentUser).mockResolvedValue({
+      username: 'weudl',
+    });
+  });
+
+  async function fillAndSubmit({
+    current = 'OldPassword123!',
+    next = 'NewPassword123!',
+    confirm = next,
+  } = {}) {
+    const form = document.getElementById('change-password-form');
+    form.querySelector('#change-current-password').value = current;
+    form.querySelector('#change-new-password').value = next;
+    form.querySelector('#change-new-password-confirm').value = confirm;
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+  }
+
+  it('is only available while signed in', async () => {
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    expect(document.getElementById('open-change-password').disabled).toBe(true);
+  });
+
+  it('opens the native dialog with a cleared form', async () => {
+    await bootLobbySignedIn();
+    const dialog = document.getElementById('change-password-dialog');
+    dialog.showModal = vi.fn();
+    document.getElementById('change-password-message').textContent = 'old';
+
+    const openBtn = document.getElementById('open-change-password');
+    expect(openBtn.disabled).toBe(false);
+    openBtn.click();
+
+    expect(dialog.showModal).toHaveBeenCalled();
+    expect(document.getElementById('change-password-message').textContent).toBe(
+      ''
+    );
+
+    dialog.close = vi.fn();
+    document.getElementById('cancel-change-password').click();
+    expect(dialog.close).toHaveBeenCalled();
+  });
+
+  it('rejects a mismatched confirmation without calling the backend', async () => {
+    const authClient = await bootLobbySignedIn();
+
+    await fillAndSubmit({ confirm: 'Different123!' });
+
+    expect(authClient.changePassword).not.toHaveBeenCalled();
+    const message = document.getElementById('change-password-message');
+    expect(message.textContent).toBe(
+      'New password confirmation does not match.'
+    );
+    expect(message.dataset.kind).toBe('error');
+  });
+
+  it('shows backend validation messages inside the dialog', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.changePassword).mockRejectedValue(
+      Object.assign(
+        new Error('Password must contain at least one uppercase letter'),
+        { status: 422 }
+      )
+    );
+
+    await fillAndSubmit();
+
+    expect(authClient.changePassword).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      {
+        authToken: 'token',
+        currentPassword: 'OldPassword123!',
+        newPassword: 'NewPassword123!',
+      }
+    );
+    expect(document.getElementById('change-password-message').textContent).toBe(
+      'Password must contain at least one uppercase letter'
+    );
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('token');
+  });
+
+  it('falls back to a generic message when the error has none', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.changePassword).mockRejectedValue({ status: 400 });
+
+    await fillAndSubmit();
+
+    expect(document.getElementById('change-password-message').textContent).toBe(
+      'Password change failed.'
+    );
+  });
+
+  it('expires the local session when the backend answers 401', async () => {
+    const authClient = await bootLobbySignedIn();
+    const dialog = document.getElementById('change-password-dialog');
+    dialog.close = vi.fn();
+    vi.mocked(authClient.changePassword).mockRejectedValue(
+      Object.assign(new Error('Authentication required'), { status: 401 })
+    );
+
+    await fillAndSubmit();
+
+    expect(dialog.close).toHaveBeenCalled();
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
+    expect(document.getElementById('auth-message').textContent).toContain(
+      'session has expired'
+    );
+  });
+
+  it('asks for a sign-in when the session expired while the dialog was open', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchCurrentUser).mockRejectedValue(
+      Object.assign(new Error('Authentication required'), { status: 401 })
+    );
+    await bootLobbySignedIn();
+
+    await fillAndSubmit();
+
+    expect(authClient.changePassword).not.toHaveBeenCalled();
+    expect(document.getElementById('change-password-message').textContent).toBe(
+      'Please sign in first.'
+    );
+  });
+
+  it('shows an invalid backend URL inside the dialog', async () => {
+    const authClient = await bootLobbySignedIn();
+    localStorage.setItem('mining-tycoon:baseUrl', 'ftp://example.com');
+
+    await fillAndSubmit();
+
+    expect(authClient.changePassword).not.toHaveBeenCalled();
+    expect(document.getElementById('change-password-message').textContent).toBe(
+      'Backend URL must use http or https.'
+    );
+  });
+
+  it('signs the user out after a successful change', async () => {
+    const authClient = await bootLobbySignedIn();
+    const dialog = document.getElementById('change-password-dialog');
+    dialog.close = vi.fn();
+    vi.mocked(authClient.changePassword).mockResolvedValue({
+      message: 'Password changed successfully. Please log in again.',
+    });
+
+    await fillAndSubmit();
+
+    expect(dialog.close).toHaveBeenCalled();
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
+    expect(document.getElementById('account-summary').textContent).toBe(
+      'Not signed in.'
+    );
+    expect(document.getElementById('auth-message').textContent).toBe(
+      'Password changed. Please sign in again with your new password.'
+    );
+    expect(document.getElementById('open-change-password').disabled).toBe(true);
   });
 });

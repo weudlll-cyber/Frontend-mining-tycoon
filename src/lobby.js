@@ -9,6 +9,7 @@ import {
 import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
 import { toPlayerName } from './utils/player-name.js';
 import {
+  changePassword,
   fetchCurrentUser,
   fetchOpenGames,
   joinGame,
@@ -46,6 +47,15 @@ const openForgotBtn = document.getElementById('open-forgot-password');
 const cancelForgotBtn = document.getElementById('cancel-forgot-password');
 const forgotForm = document.getElementById('forgot-password-form');
 const forgotMessageEl = document.getElementById('forgot-password-message');
+const changePasswordDialog = document.getElementById('change-password-dialog');
+const openChangePasswordBtn = document.getElementById('open-change-password');
+const cancelChangePasswordBtn = document.getElementById(
+  'cancel-change-password'
+);
+const changePasswordForm = document.getElementById('change-password-form');
+const changePasswordMessageEl = document.getElementById(
+  'change-password-message'
+);
 const lastGameSummaryEl = document.getElementById('last-game-summary');
 const lastGameHighscoresEl = document.getElementById('last-game-highscores');
 
@@ -81,6 +91,12 @@ function setForgotMessage(message, kind = 'info') {
   if (!forgotMessageEl) return;
   forgotMessageEl.textContent = message;
   forgotMessageEl.dataset.kind = kind;
+}
+
+function setChangePasswordMessage(message, kind = 'info') {
+  if (!changePasswordMessageEl) return;
+  changePasswordMessageEl.textContent = message;
+  changePasswordMessageEl.dataset.kind = kind;
 }
 
 const PASSWORD_RESET_DISABLED_MESSAGE =
@@ -127,6 +143,11 @@ function updateJoinButtonState() {
 
   if (openForgotBtn) {
     openForgotBtn.disabled = authState.isAuthenticated;
+  }
+
+  // Changing a password needs the signed-in session's bearer token.
+  if (openChangePasswordBtn) {
+    openChangePasswordBtn.disabled = !authState.isAuthenticated;
   }
 }
 
@@ -498,6 +519,69 @@ async function handleForgotPasswordSubmit(event) {
   }
 }
 
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(changePasswordForm);
+  const currentPassword = String(formData.get('currentPassword') || '');
+  const newPassword = String(formData.get('newPassword') || '');
+  const newPasswordConfirm = String(formData.get('newPasswordConfirm') || '');
+
+  if (!authState.isAuthenticated) {
+    setChangePasswordMessage('Please sign in first.', 'error');
+    return;
+  }
+  // WHY: only the confirmation match is checked locally; password strength
+  // rules are owned by the backend and its 400/422 message is shown verbatim.
+  if (newPassword !== newPasswordConfirm) {
+    setChangePasswordMessage(
+      'New password confirmation does not match.',
+      'error'
+    );
+    return;
+  }
+
+  let baseUrl;
+  try {
+    baseUrl = getBackendUrlOrThrow();
+  } catch (error) {
+    setChangePasswordMessage(error.message, 'error');
+    return;
+  }
+
+  setChangePasswordMessage('Changing password...', 'info');
+  try {
+    await changePassword(baseUrl, {
+      authToken: authState.token,
+      currentPassword,
+      newPassword,
+    });
+  } catch (error) {
+    if (error?.status === 401) {
+      changePasswordDialog?.close();
+      expireStoredSession();
+      return;
+    }
+    setChangePasswordMessage(
+      error?.message || 'Password change failed.',
+      'error'
+    );
+    return;
+  }
+
+  // WHY: the backend revokes every session of the account after a password
+  // change, so the stored token is dead; clear it and ask for a fresh sign-in.
+  changePasswordForm?.reset();
+  setChangePasswordMessage('', 'info');
+  changePasswordDialog?.close();
+  clearAuthSessionData();
+  selectedGameId = '';
+  setAuthenticatedSession({ access_token: '' });
+  setAuthMessage(
+    'Password changed. Please sign in again with your new password.',
+    'success'
+  );
+}
+
 function resolvePasswordResetDisabledMessage(error) {
   const serverMessage = String(error?.message || '').trim();
   // readApiError falls back to "Request failed (403)" when the body has no message.
@@ -700,6 +784,17 @@ function bindEvents() {
   });
   forgotForm?.addEventListener('submit', (event) => {
     void handleForgotPasswordSubmit(event);
+  });
+  openChangePasswordBtn?.addEventListener('click', () => {
+    changePasswordForm?.reset();
+    setChangePasswordMessage('', 'info');
+    changePasswordDialog?.showModal();
+  });
+  cancelChangePasswordBtn?.addEventListener('click', () => {
+    changePasswordDialog?.close();
+  });
+  changePasswordForm?.addEventListener('submit', (event) => {
+    void handleChangePasswordSubmit(event);
   });
 
   // Keep lobby state fresh when users return from player view or a crashed tab.

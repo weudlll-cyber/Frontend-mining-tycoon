@@ -2,7 +2,8 @@
 File: admin.html
 Purpose: Admin-only round setup page. Allows operators to create new game rounds
          with full configuration (type, duration, scoring, trading) before sharing
-         a game ID with players.
+         a game ID with players, manage/reset games, edit the global economy
+         (applies to newly created games only) and view aggregated metrics.
 Security notes:
   - Requires X-Admin-Token header on POST /games when REQUIRE_ADMIN_FOR_GAME_CREATE=true.
   - Admin token is held in a session-scoped password input only; never persisted to storage.
@@ -276,6 +277,57 @@ Security notes:
         font-size: 0.8rem;
         color: var(--primary);
         word-break: break-all;
+      }
+
+      /* Grid/flex classes would otherwise override the hidden attribute. */
+      [hidden] {
+        display: none !important;
+      }
+
+      .result-box.info {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        color: #0c4a6e;
+        display: block;
+      }
+
+      .admin-row-btn {
+        padding: 0.4rem 0.8rem;
+        margin: 0 0.2rem 0.2rem 0;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .admin-row-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .admin-secondary-btn {
+        padding: 0.5rem 1rem;
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.875rem;
+      }
+
+      .admin-secondary-btn:hover {
+        background: var(--primary-hover);
+      }
+
+      .metrics-panel {
+        margin-top: 0.75rem;
+      }
+
+      .metrics-panel h3 {
+        font-size: 0.9rem;
+        margin-bottom: 0.4rem;
       }
 
       .section-note {
@@ -564,8 +616,10 @@ Security notes:
       <h2 id="section-games-title">8 — Game Management</h2>
       <p class="section-note" style="margin-bottom: 1rem">
         View and control all games. Sync games show player enrollment; async
-        games accept new players during their session window. Delete a game to
-        stop it and free up resources.
+        games accept new players during their session window. Metrics shows a
+        game's aggregated counters, Reset creates a new game with the same
+        settings (the original game is unchanged), and Delete stops a game and
+        frees up resources.
       </p>
 
       <div style="margin-bottom: 1rem">
@@ -662,6 +716,67 @@ Security notes:
         class="result-box"
         style="display: none; margin-top: 1rem"
       ></div>
+    </section>
+
+    <!-- Section 9: Global Economy -->
+    <section class="card" aria-labelledby="section-economy-title">
+      <h2 id="section-economy-title">9 — Global Economy</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Changes apply to newly created games only. Existing games keep the
+        economy snapshot taken when they were created.
+      </p>
+      <div style="margin-bottom: 0.75rem">
+        <button
+          id="admin-economy-load-btn"
+          class="admin-secondary-btn"
+          type="button"
+        >
+          Load economy settings
+        </button>
+      </div>
+      <p id="admin-economy-version" class="derived-note"></p>
+      <div id="admin-economy-fields" class="form-grid" hidden>
+        <!-- Populated by economy-settings.js from ECONOMY_FIELDS -->
+      </div>
+      <button
+        id="admin-economy-save-btn"
+        class="create-btn"
+        type="button"
+        disabled
+      >
+        Save changes
+      </button>
+      <div
+        id="admin-economy-result"
+        class="result-box"
+        aria-live="polite"
+      ></div>
+    </section>
+
+    <!-- Section 10: Metrics -->
+    <section class="card" aria-labelledby="section-metrics-title">
+      <h2 id="section-metrics-title">10 — Metrics</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Aggregated counters only (no personal data). Use the Metrics button in
+        Game Management to inspect a single game.
+      </p>
+      <button
+        id="admin-metrics-refresh-btn"
+        class="admin-secondary-btn"
+        type="button"
+      >
+        Load metrics summary
+      </button>
+      <div
+        id="admin-metrics-summary"
+        class="review-box metrics-panel"
+        hidden
+      ></div>
+      <div id="admin-game-metrics" class="review-box metrics-panel" hidden>
+        <h3 id="admin-game-metrics-title"></h3>
+        <div id="admin-game-metrics-body"></div>
+      </div>
+      <div id="admin-metrics-error" class="result-box" aria-live="polite"></div>
     </section>
 
     <script type="module" src="/src/admin/admin-setup.js"></script>

@@ -1,4 +1,15 @@
-// Admin game management helpers: list active games and handle deletes.
+/**
+ * File: src/admin/game-management.js
+ * Purpose: Admin game list with per-row actions: Metrics (per-game counters),
+ *          Reset (POST /admin/games/{id}/reset clones the game's settings into
+ *          a new game) and Delete.
+ * Role in system: Initialised from admin-setup.js; backend enforces admin access.
+ * Security notes: backend values are rendered via textContent/createElement;
+ *          game IDs are URL-encoded.
+ */
+import { adminRequest } from './admin-api.js';
+import { showGameMetrics } from './admin-metrics.js';
+
 function el(id) {
   return document.getElementById(id);
 }
@@ -80,6 +91,16 @@ function getRoundTypeLabel(roundType) {
     return '⏱ Async';
   }
   return '👥 Sync';
+}
+
+function createRowButton(label, background, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'admin-row-btn';
+  button.textContent = label;
+  button.style.background = background;
+  button.addEventListener('click', onClick);
+  return button;
 }
 
 async function fetchAndDisplayGames() {
@@ -202,6 +223,15 @@ async function fetchAndDisplayGames() {
       };
       deleteBtn.onclick = () => deleteGame(game.game_id, deleteBtn);
 
+      const metricsBtn = createRowButton('📊 Metrics', 'var(--primary)', () =>
+        showGameMetrics(game.game_id)
+      );
+      const resetBtn = createRowButton('♻ Reset', '#d97706', () =>
+        resetGame(game.game_id, resetBtn)
+      );
+
+      actionCell.appendChild(metricsBtn);
+      actionCell.appendChild(resetBtn);
       actionCell.appendChild(deleteBtn);
 
       row.appendChild(gameIdCell);
@@ -281,6 +311,52 @@ async function deleteGame(gameId, buttonEl) {
     resultEl.className = 'result-box error';
     resultEl.textContent = `❌ Failed to delete game: ${error.message}.`;
     resultEl.style.display = 'block';
+  }
+}
+
+/**
+ * Reset = clone: the backend creates a NEW game from the source game's
+ * settings snapshot (fresh seed). The source game itself is left unchanged.
+ * Uses the same confirm step as delete.
+ */
+export async function resetGame(gameId, buttonEl) {
+  if (
+    !confirm(
+      `Reset game ${gameId}? This creates a new game with the same settings. Game ${gameId} itself is not changed.`
+    )
+  ) {
+    return;
+  }
+
+  const resultEl = el('admin-delete-result');
+  if (!resultEl) return;
+  resultEl.style.display = 'none';
+  buttonEl.disabled = true;
+  buttonEl.textContent = '⏳ Resetting...';
+
+  try {
+    const result = await adminRequest(
+      `/admin/games/${encodeURIComponent(gameId)}/reset`,
+      { method: 'POST' }
+    );
+    resultEl.className = 'result-box success';
+    resultEl.replaceChildren();
+    const intro = document.createElement('div');
+    intro.textContent = `✅ Game ${gameId} was reset. New game ID:`;
+    const idEl = document.createElement('div');
+    idEl.className = 'game-id-display';
+    idEl.textContent = String(result?.new_game_id ?? '?');
+    resultEl.append(intro, idEl);
+    resultEl.style.display = 'block';
+
+    setTimeout(fetchAndDisplayGames, 800);
+  } catch (error) {
+    resultEl.className = 'result-box error';
+    resultEl.textContent = `❌ Failed to reset game: ${error.message}`;
+    resultEl.style.display = 'block';
+  } finally {
+    buttonEl.disabled = false;
+    buttonEl.textContent = '♻ Reset';
   }
 }
 

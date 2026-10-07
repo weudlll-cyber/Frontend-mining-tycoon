@@ -83,6 +83,30 @@ export async function resetPassword(baseUrl, payload) {
 }
 
 /**
+ * Change the signed-in account's password via POST /auth/change-password.
+ * Password strength rules are enforced by the backend (400/422 messages are
+ * surfaced as-is). On success the backend revokes every session of the account,
+ * so callers must treat the current token as expired.
+ */
+export async function changePassword(
+  baseUrl,
+  { authToken, currentPassword, newPassword } = {}
+) {
+  const headers = {};
+  if (safeTrim(authToken)) {
+    headers.Authorization = `Bearer ${safeTrim(authToken)}`;
+  }
+  return await requestJson(baseUrl, '/auth/change-password', {
+    method: 'POST',
+    headers,
+    body: {
+      current_password: String(currentPassword || ''),
+      new_password: String(newPassword || ''),
+    },
+  });
+}
+
+/**
  * Fetch the account behind a stored auth token.
  * Throws an Error with `status` (e.g. 401 for an expired/revoked session).
  */
