@@ -14,6 +14,8 @@ vi.mock('./services/auth-client.js', () => ({
   register: vi.fn(),
   resetPassword: vi.fn(),
   changePassword: vi.fn(),
+  deleteMyAccount: vi.fn(),
+  exportMyAccountData: vi.fn(),
 }));
 
 function loadLobbyFixture() {
@@ -875,5 +877,62 @@ describe('lobby results and history', () => {
       document.querySelector('.results-item.is-own .results-name').textContent
     ).toBe('Weudl');
     expect(window.location.search).toBe('');
+  });
+});
+
+describe('lobby account data protection', () => {
+  beforeEach(async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.deleteMyAccount).mockReset();
+    vi.mocked(authClient.fetchCurrentUser).mockResolvedValue({
+      username: 'weudl',
+    });
+  });
+
+  it('offers download and delete only while signed in', async () => {
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    expect(document.getElementById('download-account-data').disabled).toBe(
+      true
+    );
+    expect(document.getElementById('open-delete-account').disabled).toBe(true);
+  });
+
+  it('signs out locally after the account was deleted', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.deleteMyAccount).mockResolvedValue(null);
+    expect(document.getElementById('download-account-data').disabled).toBe(
+      false
+    );
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+
+    const dialog = document.getElementById('delete-account-dialog');
+    dialog.showModal = vi.fn();
+    dialog.close = vi.fn();
+    document.getElementById('open-delete-account').click();
+    document.getElementById('delete-account-password').value = 'Secret123!';
+    document.getElementById('delete-account-confirm').checked = true;
+    document
+      .getElementById('delete-account-form')
+      .dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+
+    expect(authClient.deleteMyAccount).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000',
+      { authToken: 'token', password: 'Secret123!' }
+    );
+    expect(dialog.close).toHaveBeenCalled();
+    expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
+    expect(document.getElementById('account-summary').textContent).toBe(
+      'Not signed in.'
+    );
+    expect(document.getElementById('auth-message').textContent).toBe(
+      'Your account has been deleted.'
+    );
+    expect(document.querySelector('.game-list-item.selected')).toBeNull();
+    expect(document.getElementById('open-delete-account').disabled).toBe(true);
+    expect(document.getElementById('join-selected-btn').disabled).toBe(true);
   });
 });

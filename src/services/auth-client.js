@@ -232,3 +232,29 @@ export async function fetchGameResults(baseUrl, gameId) {
     `/games/${encodeURIComponent(safeTrim(gameId))}/results`
   );
 }
+
+/**
+ * GET /auth/me/export: the signed-in account's personal data as JSON (the
+ * backend sends it as an attachment). Returns the parsed payload; the caller
+ * turns it into a file download. 401 = expired session.
+ */
+export async function exportMyAccountData(baseUrl, { authToken } = {}) {
+  return await requestJson(baseUrl, '/auth/me/export', {
+    headers: bearerHeaders(authToken),
+  });
+}
+
+/**
+ * DELETE /auth/me with the account password as confirmation. 204 on success
+ * (the account, its sessions and login history are gone). Errors carry
+ * `status`/`code`: 403 PASSWORD_INCORRECT, 401 expired session, 429 rate
+ * limited. Backends without the endpoint answer 404/405 and their message is
+ * surfaced as-is.
+ */
+export async function deleteMyAccount(baseUrl, { authToken, password } = {}) {
+  return await requestJson(baseUrl, '/auth/me', {
+    method: 'DELETE',
+    headers: bearerHeaders(authToken),
+    body: { password: String(password || '') },
+  });
+}

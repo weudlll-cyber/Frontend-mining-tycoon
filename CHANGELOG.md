@@ -10,6 +10,10 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Lobby account data protection: **Download my data** saves the
+  `GET /auth/me/export` JSON as `mining-tycoon-account-export.json`, and
+  **Delete account** opens a dialog (warning, password, confirmation checkbox)
+  that calls `DELETE /auth/me` and clears the local session on success.
 - Per-round options in the admin create form: optional "Conversion fee
   override (%)" and "Oracle spread override (%)" in section 5 (empty = global
   economy, current values as placeholders; sent as `conversion_fee_rate` /

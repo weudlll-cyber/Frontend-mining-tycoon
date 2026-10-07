@@ -42,7 +42,7 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 | Live tools window | `live-drawer.js` (floating window, tabs, drag, Escape/outside-click close), `trading-panel.js` + `trading-panel-formatters.js`, `chat-panel.js`, `leaderboard.js` (Top 5 tab) |
 | Events | `event-display.js` (`active_events` banner and indicators) |
 | Setup / session | `setup-shell.js`, `setup-state.js`, `setup-payload.js` (shared with admin), `round-context.js`, `async-duration.js`, `async-session-state.js`, `async-diagnostics.js`, `setup-async-diagnostics.js`, `session-timers.js`, `debug-panel-manager.js` |
-| Lobby helpers | `lobby-games.js`, `last-game-highscores.js`, `lobby-results.js` (history/results formatters and DOM builders), `lobby-results-dialog.js` ("My results" dialog controller) |
+| Lobby helpers | `lobby-games.js`, `last-game-highscores.js`, `lobby-results.js` (history/results formatters and DOM builders), `lobby-results-dialog.js` ("My results" dialog controller), `lobby-account-data.js` ("Download my data" and "Delete account" dialog controller) |
 | Shared | `micro-tooltip.js` (single tooltip contract), `badge.js`, `selection-persist.js`, `ui-update-state.js` |
 
 ## Dependency Rules

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   changePassword,
+  deleteMyAccount,
+  exportMyAccountData,
   fetchCurrentUser,
   fetchGameResults,
   fetchMyHistory,
@@ -511,6 +513,44 @@ describe('auth-client accounts, history and results', () => {
     await expect(fetchGameResults('http://h', '9')).rejects.toMatchObject({
       status: 409,
       code: 'GAME_NOT_FINISHED',
+    });
+  });
+
+  it('fetches the account data export with the bearer token', async () => {
+    const fetchMock = stubJson({ account: { username: 'weudl' } });
+
+    expect(
+      await exportMyAccountData('http://h', { authToken: ' jwt ' })
+    ).toEqual({ account: { username: 'weudl' } });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://h/auth/me/export');
+    expect(options.method).toBe('GET');
+    expect(options.headers.Authorization).toBe('Bearer jwt');
+  });
+
+  it('deletes the account with the password and handles 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(
+      await deleteMyAccount('http://h', { authToken: 'jwt', password: 'pw' })
+    ).toBeNull();
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://h/auth/me');
+    expect(options.method).toBe('DELETE');
+    expect(options.headers.Authorization).toBe('Bearer jwt');
+    expect(JSON.parse(options.body)).toEqual({ password: 'pw' });
+  });
+
+  it('surfaces 403 PASSWORD_INCORRECT from the account deletion', async () => {
+    stubJson(
+      { code: 'PASSWORD_INCORRECT', detail: 'Password is incorrect.' },
+      { ok: false, status: 403 }
+    );
+    await expect(deleteMyAccount('http://h')).rejects.toMatchObject({
+      status: 403,
+      code: 'PASSWORD_INCORRECT',
+      message: 'Password is incorrect.',
     });
   });
 });
