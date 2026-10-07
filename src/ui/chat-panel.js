@@ -44,8 +44,17 @@ export function resolveChatUserLabel(
     return fallback;
   }
 
-  const normalizedFallback = fallback.toLowerCase();
   const normalizedOwnId = normalizedOwnPlayerId.toLowerCase();
+  const messagePlayerId = String(message?.player_id ?? '')
+    .trim()
+    .toLowerCase();
+  if (messagePlayerId) {
+    return messagePlayerId === normalizedOwnId
+      ? normalizedOwnPlayerName
+      : fallback;
+  }
+
+  const normalizedFallback = fallback.toLowerCase();
   if (
     normalizedFallback === normalizedOwnId ||
     normalizedFallback === `player-${normalizedOwnId}`

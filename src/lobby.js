@@ -7,6 +7,7 @@ import {
   setStorageItem,
 } from './utils/storage-utils.js';
 import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
+import { toPlayerName } from './utils/player-name.js';
 import {
   fetchCurrentUser,
   fetchOpenGames,
@@ -150,7 +151,7 @@ function setAuthenticatedSession(payload) {
   setStorageItem(STORAGE_KEYS.authToken, token);
   setStorageItem(STORAGE_KEYS.authUsername, username);
   setStorageItem(STORAGE_KEYS.authDisplayName, displayName);
-  setStorageItem(STORAGE_KEYS.playerName, displayName || username || 'Player');
+  setStorageItem(STORAGE_KEYS.playerName, toPlayerName(displayName, username));
 
   if (accountSummaryEl) {
     accountSummaryEl.textContent = authState.isAuthenticated
@@ -323,10 +324,14 @@ async function handleJoinSelectedGame() {
   joinSelectedBtn.disabled = true;
   setLobbyMessage('Joining selected game...', 'info');
 
+  // WHY: the backend only accepts 1-24 chars of letters/digits/space/_-. while
+  // account display names allow 80 arbitrary chars, so map to a valid name.
+  const playerName = toPlayerName(authState.displayName, authState.username);
+
   try {
     const joinPayload = await joinGame(baseUrl, {
       gameId: selectedGameId,
-      playerName: authState.displayName || authState.username || 'Player',
+      playerName,
       authToken: authState.token,
     });
 
@@ -348,10 +353,7 @@ async function handleJoinSelectedGame() {
         playerToken
       );
     }
-    setStorageItem(
-      STORAGE_KEYS.playerName,
-      authState.displayName || authState.username || 'Player'
-    );
+    setStorageItem(STORAGE_KEYS.playerName, playerName);
 
     window.location.href = '/player.html?autostart=1';
   } catch (error) {
