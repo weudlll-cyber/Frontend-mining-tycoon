@@ -42,7 +42,7 @@ window to play with two accounts.
 ## 1. Admin Console (`admin.html`)
 
 1. Open `/admin.html`. The amber banner reads "Admin Setup - round configuration is snapshot-locked at creation".
-2. Verify **8 sections**: 1 Connection, 2 Round Type, 3 Time Configuration, 4 Scoring Mode, 5 Trading Rules, 6 Advanced Overrides (optional), 7 Review & Create, 8 Game Management.
+2. Verify **10 sections**: 1 Connection, 2 Round Type, 3 Time Configuration, 4 Scoring Mode, 5 Trading Rules, 6 Advanced Overrides (optional), 7 Review & Create, 8 Game Management, 9 Global Economy, 10 Metrics.
 3. Defaults (from `src/config/` and `src/admin/admin-setup.js`): Backend URL = stored URL or `VITE_API_BASE_URL` default; round type Sync; enrollment window 10 s; sync round 5m; async round 30m; async session 5m; scoring Stockpile.
 4. Sync presets include `1m` (temporary test preset), `3h` and `Custom...`. Async round presets: 1m, 5m, 10m, 15m, 30m, 1h, 3h, 6h, 12h, 1d, 3d, 7d. Session presets: 1m, 5m, 10m, 30m, 1h, 6h, 12h, 1d; a session longer than the round is clamped.
 5. **Trade schedule:** set Sync, round 30m, trade count 3. The preview shows `Trade 1: unlocks at 6m`, `Trade 2: ... 14m`, `Trade 3: ... 22m` (first unlock at 20 %, then evenly over the remaining 80 %). Changing the duration (or round type) resets the count to that duration's default (30m -> 2), so set the count last. In Async mode the preview is computed from the **session** duration and says "per session".
@@ -50,7 +50,9 @@ window to play with two accounts.
 7. **Create an async round:** Async, round 30m, session 5m, scoring Power. Review & Create shows these values; create succeeds.
 8. **Advanced overrides:** set anchor token / tokens per second / season cycles, create a round, and confirm in the player board's Debug panel (or `/games/{id}/meta`) that the values were applied.
 9. **Permission (if enforcement is on):** empty or wrong Admin Token -> inline red error, no modal. Correct token -> success.
-10. **Game Management:** "Refresh Game List" shows only enrolling/running games with ID, status, Sync/Async, time remaining (enrolling: enrollment time left; running: run time left) and player count. "Delete" asks for confirmation, deletes the game and refreshes the list.
+10. **Game Management:** "Refresh Game List" shows only enrolling/running games with ID, status, Sync/Async, time remaining (enrolling: enrollment time left; running: run time left) and player count. "Delete" asks for confirmation, deletes the game and refreshes the list. "📊 Metrics" shows that game's counters. "♻ Reset" asks for confirmation, clones the game (same settings) and shows the new Game ID.
+11. **Global Economy:** "Load" shows the current values, version and snapshot hash. Change one value and save: only the changed field is sent, the version increases, and a newly created game uses the new value while existing games keep their snapshot. Invalid input shows the backend message inline.
+12. **Metrics:** the summary shows total games and games per status.
 
 ---
 
@@ -58,11 +60,12 @@ window to play with two accounts.
 
 1. **Register:** "Create account" opens a dialog with username, display name, email, Discord handle (required), Telegram handle (optional), password and confirmation. Passwords need at least 12 characters with upper and lower case, a digit and a special character. A weak password or duplicate username shows the backend message in the dialog. Success signs you in.
 2. **Login / logout:** sign in; the account summary shows your name and "Logout" becomes enabled. Logout clears the local session even if the backend is unreachable.
-3. **Session check:** reload the page while signed in. The lobby calls `GET /auth/me`; a valid token keeps you signed in. Invalidate the token (log out in another tab or restart the backend with a fresh DB) and reload: the lobby clears the session and asks you to sign in.
-4. **Forgot password (default backend):** "Forgot password?" opens a dialog. Submitting shows "Password reset is not available. Please contact an administrator." (or the server's message) **inside the dialog**; the dialog stays open. With `ALLOW_UNVERIFIED_PASSWORD_RESET=true` a valid reset closes the dialog and shows a success message.
-5. **Open games:** the list shows enrolling games and running async games with a status badge and remaining time. Running sync games are not listed, and running async games are hidden when the session is not shorter than the remaining round time. The list refreshes every 10 s and when the tab becomes visible again.
-6. **Join:** "Enter game" is disabled until you are signed in and have selected a game. Clicking it joins and opens `player.html?autostart=1`. A name rejected by the backend shows the 422 message in the lobby.
-7. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5.
+3. **Change password:** signed in, "Change password" opens a dialog. A mismatched confirmation is rejected locally; a weak new password shows the backend rule; a valid change signs you out and asks you to sign in with the new password.
+4. **Session check:** reload the page while signed in. The lobby calls `GET /auth/me`; a valid token keeps you signed in. Invalidate the token (log out in another tab or restart the backend with a fresh DB) and reload: the lobby clears the session and asks you to sign in.
+5. **Forgot password (default backend):** "Forgot password?" opens a dialog. Submitting shows "Password reset is not available. Please contact an administrator." (or the server's message) **inside the dialog**; the dialog stays open. With `ALLOW_UNVERIFIED_PASSWORD_RESET=true` a valid reset closes the dialog and shows a success message.
+6. **Open games:** the list shows enrolling games and running async games with a status badge and remaining time. Running sync games are not listed, and running async games are hidden when the session is not shorter than the remaining round time. The list refreshes every 10 s and when the tab becomes visible again.
+7. **Join:** "Enter game" is disabled until you are signed in and have selected a game. Clicking it joins and opens `player.html?autostart=1`. The join name is your display name, or a cleaned/shortened version (1-24 letters, digits, spaces, `_ - .`), falling back to your username.
+8. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5.
 
 ---
 
@@ -72,7 +75,7 @@ Join an enrolling sync round from the lobby.
 
 1. **Autostart:** the board connects without further clicks; the setup panel ("Join Round": Backend URL, Player Name, Game ID, Player ID, Start Game / Stop Stream) collapses. No round-type, scoring or trade controls are visible to players.
 2. **Header:** countdown, Phase badge, Score, Rank, Top, scoring mode (for example "Scoring: Stockpile Mode"), connection badge. Debug toggle shows meta hash, backend URL and IDs inline.
-3. **Enrollment:** during enrolling, upgrades and trades are rejected; the toast shows the backend `detail` (409 `ACTION_NOT_ALLOWED_GAME_NOT_RUNNING`).
+3. **Enrollment:** during enrolling, the upgrade buttons and "Execute Trade" are disabled with a short reason. If a request still reaches the backend, the toast shows its `detail` (409 `ACTION_NOT_ALLOWED_GAME_NOT_RUNNING`).
 4. **Season cards (2x2):** each shows Balance, Output and Halving countdown (ticking every second, selectable text) and three inline upgrade lanes (Hashrate, Efficiency, Cooling) with columns `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. Change `Pay` to another token, upgrade, and confirm the balances follow the backend result. The selected pay token survives live updates.
 5. **Player State panel:** read-only matrix (Out/s, Bal, Price per token and total), footer with next halving, cumulative mined, and fee/spread. Large values use k/M/B with the exact value in the tooltip. Tooltips open on hover/focus/tap and close on leave or Escape.
 6. **Halving:** when a token halves, its output drops accordingly and the halving countdown moves to the next checkpoint (or "No further halvings").
@@ -173,8 +176,8 @@ Use this to validate mining balance (moved here from `README.md`).
 
 ## 9. Summary Checklist
 
-- [ ] Admin console: 8 sections, defaults, trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, game list + delete
-- [ ] Lobby: register, login, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join
+- [ ] Admin console: 10 sections, defaults, trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, game list + metrics/reset/delete, global economy edit, metrics summary
+- [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join
 - [ ] Player board: autostart, no host controls, season cards + upgrades, analytics, halving, events banner
 - [ ] Live tools window: Trade / Farm / Chat / Top 5, drag, Escape and outside-click close, board stays usable
 - [ ] Async: session start, session countdown, This session / Best this round, Session Finished -> lobby
