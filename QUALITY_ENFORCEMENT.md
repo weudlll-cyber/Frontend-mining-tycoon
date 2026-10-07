@@ -120,13 +120,13 @@ manual merge).
 - Final merge approval is manual. Auto-merge stays OFF.
 - PR bodies follow `.github/pull_request_template.md`: all sections, including
   `merge-safe = YES/NO` and a changed-files summary without full file bodies.
-- Intended merge method: squash merge.
-- Branch protection: `scripts/apply-branch-protection.ps1` requires `Lint`,
-  `Format check`, `Unit tests`, `Test coverage`, `Build`, `Security audit` and
-  `CI Summary (Manual Merge Gate)`. As of 2026-10-07 it has **not** been applied
-  to `main` (the branch is unprotected), and recent PRs were merged with merge
-  commits. **Owner decision pending:** apply the protection and enforce squash
-  merges, or relax this policy.
+- Merge method: merge commits (squash is allowed but not required).
+- Branch protection (owner decision 2026-10-07): the repository ruleset
+  "Protect main" (applied with `scripts/apply-branch-protection.ps1`) requires a
+  pull request for every change to `main` (no approvals required, single
+  maintainer) and a passing `CI Summary (Manual Merge Gate)` check; force pushes
+  and deleting `main` are blocked. There are no bypass actors, so workflows must
+  not push to `main` directly (`keepalive.yml` uses its own `keepalive` branch).
 
 ## 5) Test Quality Policy
 

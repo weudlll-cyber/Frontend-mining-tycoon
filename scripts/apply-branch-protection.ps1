@@ -1,12 +1,15 @@
 <#
 File: scripts/apply-branch-protection.ps1
-Purpose: Apply GitHub repository merge-safety settings for manual-final-approval workflow.
+Purpose: Apply the "Protect main" repository ruleset for the default branch.
 Role in system:
-- Configures repository merge settings (squash-only, auto-merge off) and branch protection.
-- Requires an authenticated GitHub token with repo administration permissions.
+- Creates or updates a branch ruleset: pull request required (no approvals,
+  single-maintainer project), the `CI Summary (Manual Merge Gate)` check must
+  pass, and the default branch cannot be force-pushed or deleted.
+- Idempotent: an existing ruleset with the same name is updated in place.
 Constraints:
-- Keeps merge finalization manual: PR approval + explicit Squash & Merge click in GitHub UI.
-- Enforces required status checks that are produced by .github/workflows/ci.yml.
+- Personal repositories cannot add GitHub Actions as a bypass actor, so no
+  workflow may push to the default branch directly (keepalive.yml pushes to
+  its own `keepalive` branch instead).
 Security notes:
 - Reads token from GITHUB_TOKEN only; never prints it.
 - Uses GitHub REST API over HTTPS.
@@ -17,10 +20,7 @@ param(
   [string]$Owner,
 
   [Parameter(Mandatory = $true)]
-  [string]$Repo,
-
-  [Parameter(Mandatory = $true)]
-  [string]$Branch
+  [string]$Repo
 )
 
 $token = $env:GITHUB_TOKEN
@@ -34,65 +34,53 @@ $headers = @{
   'X-GitHub-Api-Version' = '2022-11-28'
 }
 
-$repoUri = "https://api.github.com/repos/$Owner/$Repo"
-$branchProtectionUri = "$repoUri/branches/$Branch/protection"
-$enforceAdminsUri = "$repoUri/branches/$Branch/protection/enforce_admins"
+$rulesetName = 'Protect main'
+$rulesetsUri = "https://api.github.com/repos/$Owner/$Repo/rulesets"
 
-Write-Host "Configuring repository merge settings for $Owner/$Repo..."
-$repoBody = @{
-  allow_squash_merge = $true
-  allow_merge_commit = $false
-  allow_rebase_merge = $false
-  allow_auto_merge = $false
-  delete_branch_on_merge = $false
-} | ConvertTo-Json
-Invoke-RestMethod -Method Patch -Uri $repoUri -Headers $headers -ContentType 'application/json' -Body $repoBody | Out-Null
-
-Write-Host "Configuring branch protection for $Branch..."
-$protectionBody = @{
-  required_status_checks = @{
-    strict = $true
-    contexts = @(
-      'Lint',
-      'Format check',
-      'Unit tests',
-      'Test coverage',
-      'Build',
-      'Security audit',
-      'CI Summary (Manual Merge Gate)'
-    )
-  }
-  enforce_admins = $true
-  required_pull_request_reviews = @{
-    dismiss_stale_reviews = $true
-    require_code_owner_reviews = $false
-    required_approving_review_count = 1
-    require_last_push_approval = $false
-    bypass_pull_request_allowances = @{
-      users = @()
-      teams = @()
-      apps = @()
+$rulesetBody = @{
+  name = $rulesetName
+  target = 'branch'
+  enforcement = 'active'
+  conditions = @{ ref_name = @{ include = @('~DEFAULT_BRANCH'); exclude = @() } }
+  bypass_actors = @()
+  rules = @(
+    @{ type = 'deletion' },
+    @{ type = 'non_fast_forward' },
+    @{
+      type = 'pull_request'
+      parameters = @{
+        required_approving_review_count = 0
+        dismiss_stale_reviews_on_push = $false
+        require_code_owner_review = $false
+        require_last_push_approval = $false
+        required_review_thread_resolution = $false
+      }
+    },
+    @{
+      type = 'required_status_checks'
+      parameters = @{
+        strict_required_status_checks_policy = $false
+        required_status_checks = @(@{ context = 'CI Summary (Manual Merge Gate)' })
+      }
     }
-  }
-  restrictions = $null
-  required_linear_history = $true
-  allow_force_pushes = $false
-  allow_deletions = $false
-  block_creations = $false
-  required_conversation_resolution = $true
-  lock_branch = $false
-  allow_fork_syncing = $false
+  )
 } | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Method Put -Uri $branchProtectionUri -Headers $headers -ContentType 'application/json' -Body $protectionBody | Out-Null
-Invoke-RestMethod -Method Post -Uri $enforceAdminsUri -Headers $headers | Out-Null
+
+$existing = Invoke-RestMethod -Method Get -Uri $rulesetsUri -Headers $headers |
+  Where-Object { $_.name -eq $rulesetName } |
+  Select-Object -First 1
+
+if ($existing) {
+  Write-Host "Updating ruleset '$rulesetName' (id $($existing.id)) for $Owner/$Repo..."
+  Invoke-RestMethod -Method Put -Uri "$rulesetsUri/$($existing.id)" -Headers $headers -ContentType 'application/json' -Body $rulesetBody | Out-Null
+} else {
+  Write-Host "Creating ruleset '$rulesetName' for $Owner/$Repo..."
+  Invoke-RestMethod -Method Post -Uri $rulesetsUri -Headers $headers -ContentType 'application/json' -Body $rulesetBody | Out-Null
+}
 
 Write-Host ''
-Write-Host 'Applied configuration:'
-Write-Host '- Pull request required before merge'
-Write-Host '- At least 1 approval required'
-Write-Host '- Force pushes blocked'
-Write-Host '- Admin bypass disabled via enforce_admins'
-Write-Host '- Required checks enforced'
-Write-Host '- Linear history required'
-Write-Host '- Auto-merge disabled'
-Write-Host '- Squash merge allowed; merge-commit/rebase merge disabled'
+Write-Host 'Applied ruleset:'
+Write-Host '- Pull request required before merge (no approvals required)'
+Write-Host "- Required check: CI Summary (Manual Merge Gate)"
+Write-Host '- Force pushes and branch deletion blocked'
+Write-Host '- No bypass actors'
