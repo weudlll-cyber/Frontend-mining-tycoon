@@ -54,9 +54,6 @@ function buildDomFixture() {
       <select id="duration-custom-unit"><option value="seconds">seconds</option></select>
       <input id="enrollment-window" value="60" />
       <input id="game-id" value="game-1" />
-      <select id="active-game-select"><option value="">none</option></select>
-      <button id="refresh-active-games-btn" type="button">Refresh</button>
-      <div id="active-game-status"></div>
       <input id="player-id" value="player-1" />
       <input id="show-advanced-overrides" type="checkbox" />
       <div id="advanced-overrides" style="display:none"></div>
@@ -73,7 +70,6 @@ function buildDomFixture() {
       <div id="new-game-status"></div>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
-      <div id="upgrades"></div>
       <div id="my-score"></div>
       <div id="my-rank"></div>
       <div id="top-score"></div>
@@ -101,7 +97,8 @@ async function loadMainModuleWithSessionMock(mockResult) {
   vi.doMock('./services/session-actions.js', () => ({
     initSessionActions: () => {},
     createAsyncSession: vi.fn(async () => mockResult),
-    getSessionStreamTicket: vi.fn(async () => ({ ok: true, ticket: null })),
+    getStreamTicket: vi.fn(async () => ({ ok: true, ticket: null })),
+    probeRequirePlayerAuth: vi.fn(async () => ({ value: false })),
   }));
   vi.doMock('./services/stream-controller.js', () => ({
     initStreamController: () => {},

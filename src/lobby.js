@@ -1,11 +1,14 @@
 import './lobby.css';
 import {
   STORAGE_KEYS,
+  getPlayerTokenStorageKey,
   getStorageItem,
   normalizeBaseUrl,
   setStorageItem,
 } from './utils/storage-utils.js';
+import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
 import {
+  fetchCurrentUser,
   fetchOpenGames,
   joinGame,
   login,
@@ -19,7 +22,6 @@ import {
   renderLastGameHighscores,
 } from './ui/last-game-highscores.js';
 
-const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 const LOBBY_REFRESH_MS = 10000;
 
 const authMessageEl = document.getElementById('auth-message');
@@ -42,6 +44,7 @@ const forgotDialog = document.getElementById('forgot-password-dialog');
 const openForgotBtn = document.getElementById('open-forgot-password');
 const cancelForgotBtn = document.getElementById('cancel-forgot-password');
 const forgotForm = document.getElementById('forgot-password-form');
+const forgotMessageEl = document.getElementById('forgot-password-message');
 const lastGameSummaryEl = document.getElementById('last-game-summary');
 const lastGameHighscoresEl = document.getElementById('last-game-highscores');
 
@@ -72,6 +75,15 @@ function setRegisterMessage(message, kind = 'info') {
   registerMessageEl.textContent = message;
   registerMessageEl.dataset.kind = kind;
 }
+
+function setForgotMessage(message, kind = 'info') {
+  if (!forgotMessageEl) return;
+  forgotMessageEl.textContent = message;
+  forgotMessageEl.dataset.kind = kind;
+}
+
+const PASSWORD_RESET_DISABLED_MESSAGE =
+  'Password reset is not available. Please contact an administrator.';
 
 function getBackendUrlOrThrow() {
   const rawValue =
@@ -151,7 +163,7 @@ function setAuthenticatedSession(payload) {
 
 function clearOpenGames() {
   if (!openGamesListEl) return;
-  openGamesListEl.innerHTML = '';
+  openGamesListEl.replaceChildren();
   selectedGameId = '';
   updateJoinButtonState();
 }
@@ -159,7 +171,7 @@ function clearOpenGames() {
 function renderOpenGames(games = []) {
   if (!openGamesListEl) return;
   const previouslySelectedGameId = selectedGameId;
-  openGamesListEl.innerHTML = '';
+  openGamesListEl.replaceChildren();
 
   if (!games.length) {
     selectedGameId = '';
@@ -326,6 +338,16 @@ async function handleJoinSelectedGame() {
     setStorageItem(STORAGE_KEYS.baseUrl, baseUrl);
     setStorageItem(STORAGE_KEYS.gameId, selectedGameId);
     setStorageItem(STORAGE_KEYS.playerId, playerId);
+    // WHY: player.html authenticates upgrades/trades/SSE tickets with the
+    // per-game player token. Without it, REQUIRE_PLAYER_AUTH backends reject the
+    // stored player and the board silently re-joins as a new anonymous player.
+    const playerToken = String(joinPayload?.player_token || '').trim();
+    if (playerToken) {
+      setStorageItem(
+        getPlayerTokenStorageKey(selectedGameId, playerId),
+        playerToken
+      );
+    }
     setStorageItem(
       STORAGE_KEYS.playerName,
       authState.displayName || authState.username || 'Player'
@@ -449,20 +471,38 @@ async function handleForgotPasswordSubmit(event) {
     return;
   }
 
+  setForgotMessage('Submitting password reset...', 'info');
   try {
     await resetPassword(baseUrl, {
       username: formData.get('username'),
       email: formData.get('email'),
       newPassword: formData.get('newPassword'),
     });
+    setForgotMessage('', 'info');
     setAuthMessage(
       'Password reset succeeded. Please sign in with your new password.',
       'success'
     );
     forgotDialog?.close();
   } catch (error) {
-    setAuthMessage(error.message, 'error');
+    // WHY: the backend disables self-service reset unless a dev flag is set and
+    // answers 403 (code PASSWORD_RESET_DISABLED). Keep the dialog open and show
+    // the server's explanation instead of a generic failure.
+    const message =
+      error?.status === 403
+        ? resolvePasswordResetDisabledMessage(error)
+        : error?.message || 'Password reset failed.';
+    setForgotMessage(message, 'error');
   }
+}
+
+function resolvePasswordResetDisabledMessage(error) {
+  const serverMessage = String(error?.message || '').trim();
+  // readApiError falls back to "Request failed (403)" when the body has no message.
+  if (!serverMessage || /^Request failed \(\d+\)$/.test(serverMessage)) {
+    return PASSWORD_RESET_DISABLED_MESSAGE;
+  }
+  return serverMessage;
 }
 
 function clearAuthSessionData() {
@@ -558,9 +598,51 @@ function hydrateFromStorage() {
       'Session restored. Select an open game to continue.',
       'info'
     );
+    void validateStoredSession(savedToken);
   } else {
     setAuthMessage('Sign in or create a new account to join a game.', 'info');
     setAuthenticatedSession({ access_token: '' });
+  }
+}
+
+function expireStoredSession() {
+  clearAuthSessionData();
+  selectedGameId = '';
+  setAuthenticatedSession({ access_token: '' });
+  setAuthMessage('Your session has expired. Please sign in again.', 'error');
+}
+
+/**
+ * Re-validate a token restored from localStorage via GET /auth/me.
+ * 401 means the server-side session is gone (expired, revoked, password reset):
+ * clear local auth state so the login form is the only path forward.
+ * Network or other errors keep the restored session (backend may be restarting).
+ */
+async function validateStoredSession(token) {
+  let baseUrl;
+  try {
+    baseUrl = getBackendUrlOrThrow();
+  } catch {
+    return;
+  }
+
+  try {
+    const user = await fetchCurrentUser(baseUrl, { authToken: token });
+    // Ignore stale results if the user logged out/in while the request ran.
+    if (authState.token !== token) return;
+    const username = String(user?.username || authState.username || '').trim();
+    const displayName = String(
+      user?.display_name || authState.displayName || username
+    ).trim();
+    setAuthenticatedSession({
+      access_token: token,
+      username,
+      display_name: displayName,
+    });
+  } catch (error) {
+    if (error?.status === 401 && authState.token === token) {
+      expireStoredSession();
+    }
   }
 }
 
@@ -608,6 +690,7 @@ function bindEvents() {
     void handleLogoutClick();
   });
   openForgotBtn?.addEventListener('click', () => {
+    setForgotMessage('', 'info');
     forgotDialog?.showModal();
   });
   cancelForgotBtn?.addEventListener('click', () => {

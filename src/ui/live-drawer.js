@@ -1,12 +1,12 @@
 /**
 File: src/ui/live-drawer.js
-Purpose: Manage the optional live-tools drawer (Trade/Farm/Chat) without impacting core gameplay rendering.
+Purpose: Manage the optional live-tools drawer (Trade/Farm/Chat/Top 5) without impacting core gameplay rendering.
 Role in system: Provides a compact interaction shell so non-core panels stay reachable while preserving a low-scroll main board.
 Invariants: Gameplay cards and player-state panel remain always visible; drawer only hosts auxiliary panels.
 Security notes: UI-only state; no network or game-authority logic.
 */
 
-const VALID_TABS = ['trade', 'farm', 'chat'];
+const VALID_TABS = ['trade', 'farm', 'chat', 'leaderboard'];
 
 let _refs = {
   rootEl: null,

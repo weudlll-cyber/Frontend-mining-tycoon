@@ -133,77 +133,6 @@ export async function probeRequirePlayerAuth({ gameId, playerId }) {
   }
 }
 
-export async function probeSessionSupport({ gameId, playerId }) {
-  const baseUrl = _deps?.getNormalizedBaseUrlOrNull?.({ notify: false });
-  if (!baseUrl) {
-    return { supported: null, reason: 'missing-base-url' };
-  }
-  if (!gameId) {
-    return { supported: null, reason: 'missing-game-id' };
-  }
-
-  const encodedGameId = encodeURIComponent(gameId);
-  const url = `${baseUrl}/games/${encodedGameId}/sessions`;
-
-  try {
-    const optionsResponse = await fetch(url, {
-      method: 'OPTIONS',
-      headers: { 'X-Dry-Run': 'true' },
-    });
-
-    if (optionsResponse.status === 404) {
-      // Could be either "route not found" or "game not found" depending on backend.
-      // Defer a hard unsupported decision to the dry-run POST probe.
-      return { supported: null, code: optionsResponse.status };
-    }
-
-    if (optionsResponse.status === 501) {
-      return { supported: false, code: optionsResponse.status };
-    }
-
-    if (optionsResponse.ok) {
-      return { supported: true, code: optionsResponse.status };
-    }
-  } catch {
-    // Continue to POST inference if OPTIONS is blocked by intermediaries.
-  }
-
-  const dryRunBody = {
-    mode: 'async',
-  };
-  if (playerId) {
-    dryRunBody.player_id = playerId;
-  }
-
-  try {
-    const postResponse = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Dry-Run': 'true',
-      },
-      body: JSON.stringify(dryRunBody),
-    });
-
-    if (postResponse.status === 405 || postResponse.status === 501) {
-      return { supported: false, code: postResponse.status };
-    }
-
-    if (postResponse.status === 404) {
-      // 404 here is ambiguous across backend variants (missing game vs missing route).
-      // Keep diagnostics neutral to avoid false "endpoint unavailable" UI states.
-      return { supported: null, code: postResponse.status };
-    }
-
-    // WHY: Any non-capability error (400/401/403/409/422/etc.) still proves endpoint support.
-    return { supported: true, code: postResponse.status };
-  } catch {
-    // Network/CORS failures are not authoritative for capability support.
-    // Keep diagnostics neutral so users can still attempt real session start.
-    return { supported: null, reason: 'network-error' };
-  }
-}
-
 export async function createAsyncSession({ gameId, playerId }) {
   const baseUrl = _deps.getNormalizedBaseUrlOrNull({ notify: false });
   if (!baseUrl) {
@@ -310,18 +239,21 @@ export async function createAsyncSession({ gameId, playerId }) {
   }
 }
 
-export async function getSessionStreamTicket({
-  gameId,
-  playerId,
-  requirePlayerAuth,
-}) {
-  if (!requirePlayerAuth) {
-    return { ok: true, ticket: null };
-  }
-
+/**
+ * Fetch a fresh short-lived SSE ticket for the game/session stream.
+ * Called before every stream (re)connect because tickets expire after 60 s.
+ *
+ * - When player auth is known to be required, a missing token or a failed
+ *   ticket request is an error (the stream would be rejected anyway).
+ * - Otherwise the ticket is best-effort: backends without REQUIRE_PLAYER_AUTH
+ *   accept streams without a ticket, so failures resolve to `ticket: null`.
+ */
+export async function getStreamTicket({ gameId, playerId, requirePlayerAuth }) {
   const baseUrl = _deps.getNormalizedBaseUrlOrNull({ notify: false });
   if (!baseUrl) {
-    return { ok: false, message: 'Invalid backend URL.' };
+    return requirePlayerAuth
+      ? { ok: false, message: 'Invalid backend URL.' }
+      : { ok: true, ticket: null };
   }
 
   const encodedGameId = encodeURIComponent(gameId);
@@ -330,7 +262,7 @@ export async function getSessionStreamTicket({
     _deps.getPlayerTokenStorageKey(gameId, playerId)
   );
 
-  if (!playerToken) {
+  if (requirePlayerAuth && !playerToken) {
     return {
       ok: false,
       message: 'Missing player token for authenticated stream.',
@@ -343,10 +275,13 @@ export async function getSessionStreamTicket({
       `${baseUrl}/games/${encodedGameId}/sse-ticket?player_id=${encodedPlayerId}`,
       {
         method: 'GET',
-        headers: { 'X-Player-Token': playerToken },
+        headers: playerToken ? { 'X-Player-Token': playerToken } : {},
       }
     );
     if (!response.ok) {
+      if (!requirePlayerAuth) {
+        return { ok: true, ticket: null };
+      }
       const detail = await parseErrorDetail(
         response,
         `Ticket request failed: ${response.status} ${response.statusText}`
@@ -356,14 +291,18 @@ export async function getSessionStreamTicket({
 
     const payload = await response.json();
     if (!payload?.ticket) {
-      return { ok: false, message: 'Ticket response missing ticket.' };
+      return requirePlayerAuth
+        ? { ok: false, message: 'Ticket response missing ticket.' }
+        : { ok: true, ticket: null };
     }
 
     return { ok: true, ticket: payload.ticket };
   } catch {
-    return {
-      ok: false,
-      message: 'Network error while requesting stream ticket.',
-    };
+    return requirePlayerAuth
+      ? {
+          ok: false,
+          message: 'Network error while requesting stream ticket.',
+        }
+      : { ok: true, ticket: null };
   }
 }

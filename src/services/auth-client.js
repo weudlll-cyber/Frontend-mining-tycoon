@@ -6,6 +6,8 @@ Security notes:
 - Never logs credentials or tokens.
 */
 
+import { createApiError, readApiError } from '../utils/api-error.js';
+
 function safeTrim(value) {
   return String(value || '').trim();
 }
@@ -15,22 +17,6 @@ function mapRegisterErrorMessage(message) {
     return 'This email address is already in use, or the username is already taken.';
   }
   return message;
-}
-
-function normalizeApiError(payload, fallback) {
-  if (payload && typeof payload.detail === 'string' && payload.detail.trim()) {
-    return payload.detail.trim();
-  }
-  return fallback;
-}
-
-async function parseError(response, fallback) {
-  try {
-    const payload = await response.json();
-    return normalizeApiError(payload, fallback);
-  } catch {
-    return fallback;
-  }
 }
 
 async function requestJson(baseUrl, path, options = {}) {
@@ -45,7 +31,7 @@ async function requestJson(baseUrl, path, options = {}) {
 
   if (!response.ok) {
     const fallback = `Request failed (${response.status})`;
-    throw new Error(await parseError(response, fallback));
+    throw createApiError(await readApiError(response, fallback));
   }
 
   if (response.status === 204) {
@@ -95,6 +81,18 @@ export async function resetPassword(baseUrl, payload) {
   });
 }
 
+/**
+ * Fetch the account behind a stored auth token.
+ * Throws an Error with `status` (e.g. 401 for an expired/revoked session).
+ */
+export async function fetchCurrentUser(baseUrl, { authToken } = {}) {
+  const headers = {};
+  if (safeTrim(authToken)) {
+    headers.Authorization = `Bearer ${safeTrim(authToken)}`;
+  }
+  return await requestJson(baseUrl, '/auth/me', { headers });
+}
+
 export async function logout(baseUrl, { authToken } = {}) {
   const headers = {};
   if (safeTrim(authToken)) {
@@ -111,7 +109,9 @@ export async function fetchOpenGames(baseUrl) {
     method: 'GET',
   });
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not load open games.'));
+    throw createApiError(
+      await readApiError(response, 'Could not load open games.')
+    );
   }
   const payload = await response.json();
   return Array.isArray(payload) ? payload : [];
@@ -137,9 +137,16 @@ export async function joinGame(baseUrl, { gameId, playerName, authToken }) {
   );
 
   if (!response.ok) {
-    throw new Error(
-      await parseError(response, 'Could not join selected game.')
+    const apiError = await readApiError(
+      response,
+      'Could not join selected game.'
     );
+    // WHY: the backend validates player names (1-24 chars, letters/digits/space/_-.)
+    // and answers 422; surface its message so the player knows what to change.
+    if (apiError.status === 422) {
+      apiError.message = `Invalid player name: ${apiError.message}`;
+    }
+    throw createApiError(apiError);
   }
   return await response.json();
 }

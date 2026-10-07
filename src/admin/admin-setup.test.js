@@ -9,7 +9,7 @@
  *    correctly after init
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import {
   ROUND_DURATION_PRESETS,
@@ -106,7 +106,17 @@ function buildDom({
 
 // ── Import module after DOM is set —
 //   We import buildReviewSummary and buildGamePayload which read the global document.
-import { buildReviewSummary, buildGamePayload } from './admin-setup.js';
+import {
+  buildReviewSummary,
+  buildGamePayload,
+  createRound,
+  init,
+  initBackendUrlField,
+  renderCreateSuccess,
+  resolveTradeWindowSeconds,
+  syncDefaultTradeCount,
+  updateReview,
+} from './admin-setup.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -262,19 +272,19 @@ describe('buildGamePayload — advanced overrides excluded when blank', () => {
     buildDom({ roundType: 'sync' });
   });
 
-  it('does not include anchor_token when empty', () => {
+  it('does not include emission_anchor_token when empty', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_token).toBeUndefined();
+    expect(payload.emission_anchor_token).toBeUndefined();
   });
 
-  it('does not include anchor_rate when 0', () => {
+  it('does not include emission_anchor_tokens_per_second when blank', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_rate).toBeUndefined();
+    expect(payload.emission_anchor_tokens_per_second).toBeUndefined();
   });
 
-  it('does not include season_cycles when blank', () => {
+  it('does not include season_cycles_per_game when blank', () => {
     const payload = buildGamePayload();
-    expect(payload.season_cycles).toBeUndefined();
+    expect(payload.season_cycles_per_game).toBeUndefined();
   });
 });
 
@@ -288,19 +298,60 @@ describe('buildGamePayload — advanced overrides included when set', () => {
     dom.window.document.getElementById('admin-season-cycles').value = '2';
   });
 
-  it('includes anchor_token', () => {
+  it('includes emission_anchor_token (backend contract name)', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_token).toBe('spring');
+    expect(payload.emission_anchor_token).toBe('spring');
   });
 
-  it('includes anchor_rate as number', () => {
+  it('includes emission_anchor_tokens_per_second as number', () => {
     const payload = buildGamePayload();
-    expect(payload.anchor_rate).toBe(5.0);
+    expect(payload.emission_anchor_tokens_per_second).toBe(5.0);
   });
 
-  it('includes season_cycles as number', () => {
+  it('includes season_cycles_per_game as number', () => {
     const payload = buildGamePayload();
-    expect(payload.season_cycles).toBe(2);
+    expect(payload.season_cycles_per_game).toBe(2);
+  });
+
+  it('never sends the legacy field names the backend ignores', () => {
+    const payload = buildGamePayload();
+    expect(payload).not.toHaveProperty('anchor_token');
+    expect(payload).not.toHaveProperty('anchor_rate');
+    expect(payload).not.toHaveProperty('season_cycles');
+  });
+});
+
+describe('renderCreateSuccess — safe DOM rendering', () => {
+  beforeEach(() => {
+    buildDom({ roundType: 'sync' });
+  });
+
+  it('renders backend game_id as text, never as markup', () => {
+    const box = document.getElementById('admin-result-box');
+    renderCreateSuccess(box, {
+      gameId: '<img src=x onerror="alert(1)">',
+      joinUrl: 'http://localhost:5173/index.html',
+    });
+
+    expect(box.querySelector('img')).toBeNull();
+    expect(box.querySelector('#new-game-id-display')?.textContent).toBe(
+      'Game ID: <img src=x onerror="alert(1)">'
+    );
+    const link = box.querySelector('a.join-link');
+    expect(link?.getAttribute('href')).toBe('http://localhost:5173/index.html');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(box.className).toBe('result-box success');
+  });
+
+  it('does not set an href for non-http join URLs', () => {
+    const box = document.getElementById('admin-result-box');
+    renderCreateSuccess(box, {
+      gameId: 7,
+      joinUrl: 'javascript:alert(1)',
+    });
+    const link = box.querySelector('a.join-link');
+    expect(link?.hasAttribute('href')).toBe(false);
+    expect(link?.textContent).toBe('javascript:alert(1)');
   });
 });
 
@@ -325,5 +376,165 @@ describe('control-data wiring — ROUND_DURATION_PRESETS', () => {
 
   it('ASYNC_SESSION_DEFAULT_PRESET exists in ROUND_DURATION_PRESETS', () => {
     expect(ROUND_DURATION_PRESETS[ASYNC_SESSION_DEFAULT_PRESET]).toBeDefined();
+  });
+});
+
+describe('trade window — async rounds use the session duration', () => {
+  it('derives offsets from the session length so they fit inside the session', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 2 });
+    // 30m round, 24h session is clamped elsewhere; pick the 5m session preset.
+    dom.window.document.getElementById('admin-async-session-preset').value =
+      '5m';
+    const payload = buildGamePayload();
+    expect(resolveTradeWindowSeconds()).toBe(300);
+    expect(payload.trade_unlock_offsets_seconds).toHaveLength(2);
+    payload.trade_unlock_offsets_seconds.forEach((offset) => {
+      expect(offset).toBeLessThan(300);
+    });
+  });
+
+  it('uses the round duration for sync rounds', () => {
+    buildDom({ roundType: 'sync', tradeCount: 0 });
+    expect(resolveTradeWindowSeconds()).toBe(ROUND_DURATION_PRESETS['5m']);
+  });
+});
+
+describe('review panel and backend URL field', () => {
+  it('rebuilds the review list without innerHTML', () => {
+    buildDom({ roundType: 'sync' });
+    const dl = document.getElementById('admin-review-dl');
+    dl.appendChild(document.createElement('dt'));
+    updateReview();
+    const terms = Array.from(dl.querySelectorAll('dt')).map(
+      (node) => node.textContent
+    );
+    expect(terms[0]).toBe('Round type');
+    expect(terms).not.toContain('');
+  });
+
+  it('seeds an empty URL field from storage or the shared default and persists edits', () => {
+    const dom = buildDom({ roundType: 'sync' });
+    const input = dom.window.document.getElementById('admin-backend-url');
+    input.value = '';
+    localStorage.removeItem('mining-tycoon:baseUrl');
+    initBackendUrlField();
+    expect(input.value).toBe('http://127.0.0.1:8000');
+
+    input.value = 'https://api.example.test/';
+    input.dispatchEvent(new dom.window.Event('change'));
+    expect(localStorage.getItem('mining-tycoon:baseUrl')).toBe(
+      'https://api.example.test'
+    );
+
+    input.value = 'not a url';
+    input.dispatchEvent(new dom.window.Event('change'));
+    expect(localStorage.getItem('mining-tycoon:baseUrl')).toBe(
+      'https://api.example.test'
+    );
+
+    const dom2 = buildDom({ roundType: 'sync' });
+    const input2 = dom2.window.document.getElementById('admin-backend-url');
+    input2.value = '';
+    initBackendUrlField();
+    expect(input2.value).toBe('https://api.example.test');
+    localStorage.removeItem('mining-tycoon:baseUrl');
+  });
+});
+
+describe('createRound', () => {
+  it('renders the created game id safely on success', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ game_id: '<i>12</i>' }),
+    });
+
+    await createRound();
+
+    const box = document.getElementById('admin-result-box');
+    expect(box.className).toBe('result-box success');
+    expect(box.querySelector('i')).toBeNull();
+    expect(box.textContent).toContain('Game ID: <i>12</i>');
+    expect(document.getElementById('admin-create-btn').disabled).toBe(false);
+  });
+
+  it('shows backend validation detail on failure', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: async () => ({
+        detail: [{ loc: ['body', 'trade_count'], msg: 'too many' }],
+      }),
+    });
+
+    await createRound();
+
+    const box = document.getElementById('admin-result-box');
+    expect(box.className).toBe('result-box error');
+    expect(box.textContent).toContain('body.trade_count: too many');
+  });
+
+  it('explains missing admin permission on 403', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => ({ detail: 'Admin token required' }),
+    });
+
+    await createRound();
+
+    expect(document.getElementById('admin-result-box').textContent).toContain(
+      'Admin permission required to create rounds. Admin token required'
+    );
+  });
+});
+
+describe('async trade defaults and init', () => {
+  it('defaults the trade count from the session length (5m session = 0 trades)', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 3 });
+    const doc = dom.window.document;
+    doc.getElementById('admin-async-session-preset').value = '5m';
+    syncDefaultTradeCount();
+    expect(doc.getElementById('admin-trade-count').value).toBe('0');
+    expect(doc.getElementById('admin-trade-count-note').textContent).toBe(
+      'Trading disabled for this round.'
+    );
+  });
+
+  it('labels async trade schedules as per session', () => {
+    const dom = buildDom({ roundType: 'async', tradeCount: 2 });
+    dom.window.document.getElementById('admin-async-session-preset').value =
+      '24h';
+    updateReview();
+    expect(
+      dom.window.document.getElementById('admin-trade-count-note').textContent
+    ).toBe('2 trades scheduled per session.');
+  });
+
+  it('initializes the console without throwing and seeds the backend URL', async () => {
+    const dom = buildDom({ roundType: 'sync' });
+    dom.window.document.getElementById('admin-backend-url').value = '';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
+    localStorage.removeItem('mining-tycoon:baseUrl');
+
+    expect(() => init()).not.toThrow();
+    await Promise.resolve();
+
+    expect(dom.window.document.getElementById('admin-backend-url').value).toBe(
+      'http://127.0.0.1:8000'
+    );
+    const presetValues = Array.from(
+      dom.window.document.getElementById('admin-duration-preset').options
+    ).map((option) => option.value);
+    expect(presetValues).toContain('3h');
   });
 });

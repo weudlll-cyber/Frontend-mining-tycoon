@@ -4,6 +4,7 @@ Purpose: Render the compact top-5 leaderboard table.
 */
 
 import { clearNode, setElementTextValue } from '../utils/dom-utils.js';
+import { formatBackendScore } from '../utils/score-format.js';
 
 let _leaderboardEl = null;
 const _uiRefs = {
@@ -126,6 +127,12 @@ export function renderLeaderboard(data) {
 
     setElementTextValue(rowRefs.rank, `#${index + 1}`);
     setElementTextValue(rowRefs.name, player.name || player.player_id || '-');
-    setElementTextValue(rowRefs.score, String(Math.floor(player.score || 0)));
+    // Integers normally; "1.2345×" in efficiency mode (backend contract).
+    setElementTextValue(
+      rowRefs.score,
+      formatBackendScore(player.score ?? 0, data.scoring_mode, {
+        grouping: false,
+      })
+    );
   });
 }

@@ -5,17 +5,30 @@ Role in system:
 - Switches between legacy game streams and session-scoped streams based on explicit session context from the orchestrator.
 Invariants:
 - Session streams must not silently fall back to legacy game streams once a session exists.
-- Ticket query parameter is used only for authenticated session streams.
+- Every (re)connect fetches a fresh short-lived SSE ticket (backend TTL is 60 s):
+  the native EventSource auto-reconnect would replay the original, expired ticket
+  URL, so on error the source is closed and reopened by this module with backoff.
 Security notes:
 - Parse SSE payloads defensively.
-- Never append sensitive query params unless the backend requires the short-lived ticket flow.
+- The ticket is a short-lived, single-purpose credential; it is never logged.
 */
 
 import { debugLog } from '../utils/debug-log.js';
 
+// Backoff schedule for controller-driven reconnects (ms). The last value repeats.
+export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 15000];
+// After this many consecutive failed reconnect attempts the stream gives up
+// and surfaces an error instead of retrying forever.
+export const MAX_RECONNECT_ATTEMPTS = 20;
+
 let _deps = null;
 let _eventSource = null;
 let _waitingTimer = null;
+let _reconnectTimer = null;
+let _reconnectAttempts = 0;
+// Incremented on every startStream/close so stale async work (ticket fetches,
+// reconnect timers) from a previous stream can detect it was superseded.
+let _streamGeneration = 0;
 let _intentionalClose = false;
 let _payloadLogged = false;
 
@@ -30,11 +43,25 @@ function clearWaitingTimer() {
   }
 }
 
+function clearReconnectTimer() {
+  if (_reconnectTimer) {
+    clearTimeout(_reconnectTimer);
+    _reconnectTimer = null;
+  }
+}
+
 export function closeEventSourceIfOpen() {
+  clearReconnectTimer();
+  _streamGeneration += 1;
   if (_eventSource) {
     _eventSource.close();
     _eventSource = null;
   }
+}
+
+function getReconnectDelayMs(attempt) {
+  const index = Math.min(Math.max(attempt, 1), RECONNECT_DELAYS_MS.length) - 1;
+  return RECONNECT_DELAYS_MS[index];
 }
 
 export function stopLiveTimersAndHalving() {
@@ -96,116 +123,160 @@ export function startStream(gameId, playerId, streamContext = {}) {
       ? `${base}/sessions/${encodedSessionId}/stream?player_id=${encodedPlayerId}`
       : `${base}/games/${encodedGameId}/stream?player_id=${encodedPlayerId}`;
 
-    if (!sessionId) {
-      return baseStreamUrl;
+    // WHY: EventSource cannot send X-Player-Token, so the backend accepts a
+    // short-lived ticket query param instead (required for both game and
+    // session streams when REQUIRE_PLAYER_AUTH is on). Always request a fresh
+    // one per connect attempt; tickets expire after 60 s.
+    const ticketResult = await _deps.getStreamTicket({
+      gameId,
+      playerId,
+      requirePlayerAuth: Boolean(streamContext?.requiresPlayerAuth),
+    });
+    if (!ticketResult?.ok) {
+      throw new Error(
+        ticketResult?.message || 'Unable to open authenticated stream.'
+      );
     }
-
-    // WHY: Authenticated session streams require a short-lived ticket because EventSource cannot send custom headers.
-    if (streamContext?.requiresPlayerAuth) {
-      const ticketResult = await _deps.getSessionStreamTicket({
-        gameId,
-        playerId,
-        requirePlayerAuth: true,
-      });
-      if (!ticketResult?.ok || !ticketResult.ticket) {
-        throw new Error(
-          ticketResult?.message ||
-            'Unable to open authenticated session stream.'
-        );
-      }
+    if (ticketResult.ticket) {
       return `${baseStreamUrl}&ticket=${encodeURIComponent(ticketResult.ticket)}`;
     }
-
-    // WHY: Once a session exists, staying on the session transport preserves backend-authoritative context and avoids silent drift.
+    // Once a session exists, staying on the session transport preserves
+    // backend-authoritative context and avoids silent drift.
     return baseStreamUrl;
+  }
+
+  function finishStream() {
+    _intentionalClose = true;
+    _deps.onStreamStateChange(false);
+    closeEventSourceIfOpen();
+    _deps.clearCountdownInterval();
+    _deps.stopNextHalvingCountdown();
+    clearWaitingTimer();
+    _deps.disconnectChat();
+    _deps.updateSetupActionsState();
+  }
+
+  function giveUp(message) {
+    _deps.onStreamStateChange(false);
+    _deps.updateSetupActionsState();
+    _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
+    _deps.onSessionStreamError?.(message);
+  }
+
+  function scheduleReconnect(generation) {
+    if (generation !== _streamGeneration || _intentionalClose) return;
+    clearReconnectTimer();
+    _reconnectAttempts += 1;
+    if (_reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+      giveUp('Live stream connection lost. Please re-enter the game.');
+      return;
+    }
+    _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
+    const delay = getReconnectDelayMs(_reconnectAttempts);
+    debugLog('stream', 'scheduling reconnect', {
+      attempt: _reconnectAttempts,
+      delay,
+    });
+    _reconnectTimer = setTimeout(() => {
+      _reconnectTimer = null;
+      if (generation !== _streamGeneration || _intentionalClose) return;
+      connect(generation, { isReconnect: true });
+    }, delay);
+  }
+
+  function openEventSource(url, generation) {
+    _eventSource = new EventSource(url);
+
+    _eventSource.onopen = () => {
+      _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
+      _deps.updateSetupActionsState();
+
+      clearWaitingTimer();
+      _waitingTimer = setTimeout(() => {
+        if (_eventSource && _eventSource.readyState === EventSource.OPEN) {
+          _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
+        }
+      }, 3000);
+
+      _deps
+        .fetchMetaSnapshot(base, gameId)
+        .catch((err) => console.warn('Meta refresh on connect failed:', err));
+    };
+
+    _eventSource.onmessage = (event) => {
+      clearWaitingTimer();
+      _reconnectAttempts = 0;
+      _deps.setBadgeStatus(_deps.connStatusEl, 'connected');
+
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        console.error('Failed to parse SSE data.');
+        return;
+      }
+
+      if (!_payloadLogged) {
+        // Payload structure logged once for debugging (if needed, can be re-enabled)
+        _payloadLogged = true;
+      }
+
+      _deps.onData(data);
+
+      const sessionStatus = String(data?.session?.status || '').toLowerCase();
+      if (sessionStatus === 'finished') {
+        finishStream();
+        _deps.onSessionStreamFinished?.(data);
+        return;
+      }
+
+      if (data?.game_status === 'finished') {
+        finishStream();
+      }
+    };
+
+    _eventSource.onerror = () => {
+      clearWaitingTimer();
+
+      if (_intentionalClose || generation !== _streamGeneration) {
+        _deps.onStreamStateChange(false);
+        _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
+        _deps.updateSetupActionsState();
+        return;
+      }
+
+      // WHY: close the native source so the browser does not auto-reconnect
+      // with the original (by now possibly expired) ticket URL; reconnect
+      // ourselves with a freshly issued ticket instead.
+      if (_eventSource) {
+        _eventSource.close();
+        _eventSource = null;
+      }
+      scheduleReconnect(generation);
+    };
+  }
+
+  function connect(generation, { isReconnect = false } = {}) {
+    buildSseUrl()
+      .then((url) => {
+        if (generation !== _streamGeneration || _intentionalClose) return;
+        openEventSource(url, generation);
+      })
+      .catch((error) => {
+        if (generation !== _streamGeneration) return;
+        if (isReconnect) {
+          // Ticket/network failures during reconnect are usually transient.
+          scheduleReconnect(generation);
+          return;
+        }
+        giveUp(error?.message || 'Unable to start session stream.');
+      });
   }
 
   _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
   _intentionalClose = false;
-
-  buildSseUrl()
-    .then((url) => {
-      _eventSource = new EventSource(url);
-
-      _eventSource.onopen = () => {
-        _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
-        _deps.updateSetupActionsState();
-
-        _waitingTimer = setTimeout(() => {
-          if (_eventSource && _eventSource.readyState === EventSource.OPEN) {
-            _deps.setBadgeStatus(_deps.connStatusEl, 'waiting');
-          }
-        }, 3000);
-
-        _deps
-          .fetchMetaSnapshot(base, gameId)
-          .catch((err) => console.warn('Meta refresh on connect failed:', err));
-      };
-
-      _eventSource.onmessage = (event) => {
-        clearWaitingTimer();
-        _deps.setBadgeStatus(_deps.connStatusEl, 'connected');
-
-        let data;
-        try {
-          data = JSON.parse(event.data);
-        } catch {
-          console.error('Failed to parse SSE data:', event.data);
-          return;
-        }
-
-        if (!_payloadLogged) {
-          // Payload structure logged once for debugging (if needed, can be re-enabled)
-          _payloadLogged = true;
-        }
-
-        _deps.onData(data);
-
-        const sessionStatus = String(data?.session?.status || '').toLowerCase();
-        if (sessionStatus === 'finished') {
-          _intentionalClose = true;
-          _deps.onStreamStateChange(false);
-          closeEventSourceIfOpen();
-          _deps.clearCountdownInterval();
-          _deps.stopNextHalvingCountdown();
-          clearWaitingTimer();
-          _deps.disconnectChat();
-          _deps.updateSetupActionsState();
-          _deps.onSessionStreamFinished?.(data);
-          return;
-        }
-
-        if (data?.game_status === 'finished') {
-          _intentionalClose = true;
-          _deps.onStreamStateChange(false);
-          closeEventSourceIfOpen();
-          _deps.clearCountdownInterval();
-          _deps.stopNextHalvingCountdown();
-          clearWaitingTimer();
-          _deps.disconnectChat();
-          _deps.updateSetupActionsState();
-        }
-      };
-
-      _eventSource.onerror = () => {
-        clearWaitingTimer();
-
-        if (!_intentionalClose) {
-          _deps.setBadgeStatus(_deps.connStatusEl, 'reconnecting');
-          // Connection error - will attempt to reconnect
-        } else {
-          _deps.onStreamStateChange(false);
-          _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
-          _deps.updateSetupActionsState();
-        }
-      };
-    })
-    .catch((error) => {
-      _deps.onStreamStateChange(false);
-      _deps.updateSetupActionsState();
-      _deps.setBadgeStatus(_deps.connStatusEl, 'idle');
-      _deps.onSessionStreamError?.(
-        error?.message || 'Unable to start session stream.'
-      );
-    });
+  _reconnectAttempts = 0;
+  clearReconnectTimer();
+  _streamGeneration += 1;
+  connect(_streamGeneration);
 }

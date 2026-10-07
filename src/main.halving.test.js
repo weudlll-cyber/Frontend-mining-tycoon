@@ -25,7 +25,6 @@ function buildDomFixture() {
       <div id="meta-debug"></div>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
-      <div id="upgrades"></div>
       <div id="portfolio-value">—</div>
     </div>
   `;

@@ -84,4 +84,53 @@ describe('stream start join behavior', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('/games/game-7/state');
     expect(fetchMock.mock.calls[1][0]).toContain('/games/game-7/join');
   });
+
+  it('surfaces the backend 422 player-name validation message on join', async () => {
+    const module = await loadMainModule();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        json: async () => ({
+          detail: [
+            {
+              loc: ['body', 'name'],
+              msg: 'Value error, Name contains invalid characters',
+            },
+          ],
+        }),
+      })
+    );
+
+    await expect(
+      module.ensurePlayerJoinedForStream({
+        baseUrl: 'http://127.0.0.1:8000',
+        gameId: 'game-7',
+        playerId: '',
+      })
+    ).rejects.toThrow('Invalid player name: Name contains invalid characters');
+  });
+
+  it('prefixes other join failures with the backend detail', async () => {
+    const module = await loadMainModule();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: async () => ({ detail: 'Enrollment closed' }),
+      })
+    );
+
+    await expect(
+      module.ensurePlayerJoinedForStream({
+        baseUrl: 'http://127.0.0.1:8000',
+        gameId: 'game-7',
+        playerId: '',
+      })
+    ).rejects.toThrow('Join failed: Enrollment closed');
+  });
 });

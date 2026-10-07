@@ -38,11 +38,6 @@ function buildDomFixture() {
         <input id="async-auto-start" type="checkbox" />
       </label>
       <input id="game-id" value="1" />
-      <select id="active-game-select">
-        <option value="">No joinable games found</option>
-      </select>
-      <button id="refresh-active-games-btn" type="button"></button>
-      <div id="active-game-status"></div>
       <input id="player-id" value="1" />
       <input id="show-advanced-overrides" type="checkbox" />
       <div id="advanced-overrides" style="display:none"></div>
@@ -77,7 +72,6 @@ function buildDomFixture() {
       </button>
       <div id="player-state"></div>
       <div id="leaderboard"></div>
-      <div id="upgrades"></div>
       <div id="portfolio-value">—</div>
     </div>
   `;

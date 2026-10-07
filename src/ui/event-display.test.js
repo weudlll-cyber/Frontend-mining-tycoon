@@ -7,6 +7,7 @@ Invariants/Security: Keeps event UX non-blocking and safely rendered via control
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  getActiveEvents,
   initEventDisplay,
   renderEventBanner,
   annotateAffectedValues,
@@ -20,16 +21,20 @@ function buildFixture() {
     <div id="tooltip-layer" class="tooltip-layer"></div>
     <div class="seasons-scroll">
       <div class="seasons-grid">
-        <div class="season-card">
+        <div class="season-card" data-season="spring">
           <div class="season-output">1.50/s</div>
+          <span class="upgrade-row-cost">10</span>
         </div>
-        <div class="season-card">
+        <div class="season-card" data-season="summer">
           <div class="season-output">2.00/s</div>
+          <span class="upgrade-row-cost">20</span>
         </div>
       </div>
     </div>
     <div id="player-state">
       <div class="ps-cell" data-row="output" data-token="spring">1.50</div>
+      <div class="ps-cell" data-row="output" data-token="summer">2.00</div>
+      <div class="ps-cell" data-row="price" data-token="spring">1.10</div>
       <div class="ps-cell" data-row="price" data-token="summer">2.50</div>
       <div class="ps-footer-content">No further halvings | Mined 100 | fee 0.02 / spread 0.01</div>
     </div>
@@ -207,22 +212,16 @@ describe('event display', () => {
       });
     });
 
-    it('adds indicator to cooling upgrade when cooling domain affected', () => {
-      const data = {
+    it('ignores domains the backend never emits (e.g. cooling)', () => {
+      annotateAffectedValues({
         active_event: {
           name: 'Heatwave',
           effect_description: '−20% Cooling',
           domains: ['cooling'],
-          end_unix: Date.now() / 1000 + 3600,
         },
-      };
+      });
 
-      annotateAffectedValues(data);
-
-      const indicators = document.querySelectorAll(
-        '.upgrade-row-benefit[data-upgrade-type="cooling"] .event-indicator'
-      );
-      expect(indicators.length).toBeGreaterThan(0);
+      expect(document.querySelectorAll('.event-indicator')).toHaveLength(0);
     });
 
     it('adds indicator to upgrade cost when upgrade_cost domain affected', () => {
@@ -432,6 +431,216 @@ describe('event display', () => {
       }).not.toThrow();
 
       // May not be created, but should not error
+    });
+  });
+
+  describe('backend active_events list contract', () => {
+    const meta = { sim_months_per_real_second: 0.5 };
+
+    function demandSurge(overrides = {}) {
+      return {
+        event_id: 'e1',
+        event_type: 'DEMAND_SURGE',
+        domain: 'oracle_price',
+        token: 'summer',
+        magnitude: 1.25,
+        label: 'Demand Surge',
+        start_sim_month: 4,
+        end_sim_month: 7,
+        ...overrides,
+      };
+    }
+
+    function liquidityCrunch(overrides = {}) {
+      return {
+        event_id: 'e2',
+        event_type: 'LIQUIDITY_CRUNCH',
+        domain: 'oracle_spread',
+        token: null,
+        magnitude: 0.04,
+        label: 'Liquidity Crunch',
+        start_sim_month: 5,
+        end_sim_month: 6,
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      initEventDisplay({
+        seasonScrollEl: document.querySelector('.seasons-scroll'),
+        getActiveGameMeta: (gameId) => (gameId === '42' ? meta : null),
+      });
+    });
+
+    it('prefers the active_events list over legacy keys', () => {
+      const events = getActiveEvents({
+        active_events: [demandSurge(), null, 'bad'],
+        active_event: { name: 'Legacy' },
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0].label).toBe('Demand Surge');
+      expect(getActiveEvents({ active_events: [] })).toEqual([]);
+      expect(getActiveEvents({})).toEqual([]);
+    });
+
+    it('renders label, derived effect and real-time remaining from meta rate', () => {
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [demandSurge()],
+      });
+
+      const banner = document.querySelector('.event-banner');
+      expect(banner.classList.contains('event-banner-hidden')).toBe(false);
+      // (7 - 5) months / 0.5 months-per-second = 4 seconds
+      expect(banner.textContent).toContain(
+        '⚡ Event: Demand Surge (Oracle price +25% (summer)) — 00:04 remaining'
+      );
+    });
+
+    it('lists multiple concurrent events in the banner and tooltip', () => {
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [demandSurge(), liquidityCrunch()],
+      });
+
+      const content = document.querySelector('.event-banner-content');
+      expect(content.textContent).toContain('⚡ 2 events:');
+      expect(content.textContent).toContain('Demand Surge');
+      expect(content.textContent).toContain(
+        'Liquidity Crunch (Spread +4.0% (all tokens))'
+      );
+      const tooltip = getEventTooltipElement();
+      expect(tooltip.textContent.split('\n')).toHaveLength(2);
+    });
+
+    it('falls back to remaining sim-months when no rate is known', () => {
+      renderEventBanner({
+        game_id: 'unknown',
+        current_sim_month: 6,
+        active_events: [demandSurge({ token: null, magnitude: 0.8 })],
+      });
+
+      const content = document.querySelector('.event-banner-content');
+      expect(content.textContent).toContain('Oracle price −20% (all tokens)');
+      expect(content.textContent).toContain('1 sim-month remaining');
+    });
+
+    it('humanizes event_type when label is missing', () => {
+      renderEventBanner({
+        active_events: [
+          { event_type: 'MINER_STRIKE', domain: 'output', magnitude: 0.7 },
+        ],
+      });
+      const content = document.querySelector('.event-banner-content');
+      expect(content.textContent).toContain('Miner Strike (Output −30%');
+      expect(content.textContent).toContain('— remaining');
+    });
+
+    it('hides the banner when the list is empty', () => {
+      renderEventBanner({ active_events: [demandSurge()] });
+      renderEventBanner({ active_events: [] });
+      const banner = document.querySelector('.event-banner');
+      expect(banner.classList.contains('event-banner-hidden')).toBe(true);
+    });
+
+    it('marks only the targeted token for token-scoped output events', () => {
+      annotateAffectedValues({
+        active_events: [
+          {
+            ...demandSurge(),
+            domain: 'output',
+            token: 'spring',
+            label: 'Mining Boom',
+          },
+        ],
+      });
+
+      expect(
+        document.querySelectorAll(
+          '.season-card[data-season="spring"] .season-output .event-indicator'
+        )
+      ).toHaveLength(1);
+      expect(
+        document.querySelectorAll(
+          '.season-card[data-season="summer"] .season-output .event-indicator'
+        )
+      ).toHaveLength(0);
+      expect(
+        document.querySelectorAll(
+          '.ps-cell[data-row="output"][data-token="spring"] .event-indicator'
+        )
+      ).toHaveLength(1);
+      expect(
+        document.querySelectorAll(
+          '.ps-cell[data-row="output"][data-token="summer"] .event-indicator'
+        )
+      ).toHaveLength(0);
+    });
+
+    it('marks every token for global events and the spread footer', () => {
+      annotateAffectedValues({
+        active_events: [
+          demandSurge({ token: null }),
+          liquidityCrunch(),
+          {
+            ...demandSurge(),
+            domain: 'upgrade_cost',
+            token: 'summer',
+            label: 'Parts Shortage',
+          },
+        ],
+      });
+
+      expect(
+        document.querySelectorAll('.ps-cell[data-row="price"] .event-indicator')
+      ).toHaveLength(2);
+      expect(
+        document.querySelectorAll('.ps-footer-content .event-indicator')
+      ).toHaveLength(1);
+      expect(
+        document.querySelectorAll(
+          '.season-card[data-season="summer"] .upgrade-row-cost .event-indicator'
+        )
+      ).toHaveLength(1);
+      expect(
+        document.querySelectorAll(
+          '.season-card[data-season="spring"] .upgrade-row-cost .event-indicator'
+        )
+      ).toHaveLength(0);
+    });
+
+    it('uses one indicator listing all events that hit the same cell', () => {
+      annotateAffectedValues({
+        current_sim_month: 5,
+        active_events: [
+          demandSurge({ token: 'summer' }),
+          demandSurge({ event_id: 'e3', label: 'Market Rally', token: null }),
+        ],
+      });
+
+      const indicators = document.querySelectorAll(
+        '.ps-cell[data-row="price"][data-token="summer"] .event-indicator'
+      );
+      expect(indicators).toHaveLength(1);
+      expect(indicators[0].getAttribute('aria-label')).toBe(
+        'Affected by Demand Surge, Market Rally'
+      );
+      const bubble = document.getElementById(
+        indicators[0].getAttribute('aria-describedby')
+      );
+      expect(bubble.textContent).toContain('Demand Surge');
+      expect(bubble.textContent).toContain('Market Rally');
+    });
+
+    it('ignores tokens that are not simple identifiers', () => {
+      expect(() =>
+        annotateAffectedValues({
+          active_events: [demandSurge({ token: '"] , body' })],
+        })
+      ).not.toThrow();
+      expect(document.querySelectorAll('.event-indicator')).toHaveLength(0);
     });
   });
 });

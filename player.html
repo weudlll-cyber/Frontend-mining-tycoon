@@ -164,11 +164,8 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               <div class="setup-grid">
                 <div class="form-group form-span-2 player-core-field">
                   <label>Backend URL:</label>
-                  <input
-                    id="base-url"
-                    type="text"
-                    value="http://127.0.0.1:8000"
-                  />
+                  <!-- Value is seeded from src/config/backend-url.js (VITE_API_BASE_URL) or localStorage by main.js. -->
+                  <input id="base-url" type="text" autocomplete="off" />
                 </div>
                 <div class="form-group form-span-2 player-core-field">
                   <label>Player Name:</label>
@@ -775,6 +772,17 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                 >
               </button>
             </div>
+            <div class="bottom-bar-item">
+              <button
+                id="leaderboard-drawer-btn"
+                class="btn-secondary drawer-open-btn"
+                type="button"
+                aria-controls="live-drawer"
+                data-live-tab="leaderboard"
+              >
+                🏆 Top 5
+              </button>
+            </div>
             <div class="bottom-bar-item trading-status status-pill">
               <span class="label">Trading</span>
               <span id="trading-status" class="bottom-bar-value"
@@ -845,6 +853,17 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     aria-selected="false"
                   >
                     Chat
+                  </button>
+                  <button
+                    id="live-tab-leaderboard"
+                    class="live-drawer-tab"
+                    type="button"
+                    role="tab"
+                    data-live-tab="leaderboard"
+                    aria-controls="live-panel-leaderboard"
+                    aria-selected="false"
+                  >
+                    Top 5
                   </button>
                 </div>
                 <button
@@ -922,6 +941,22 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       <button type="submit" class="btn-secondary">Send</button>
                     </form>
                   </aside>
+                </section>
+
+                <section
+                  id="live-panel-leaderboard"
+                  class="live-drawer-panel"
+                  role="tabpanel"
+                  data-live-panel="leaderboard"
+                  hidden
+                >
+                  <div class="card leaderboard-card">
+                    <h2>Top 5</h2>
+                    <!-- Filled from SSE leaderboard_top_5 by src/ui/leaderboard.js -->
+                    <div id="leaderboard" aria-live="polite">
+                      <p class="placeholder">Waiting for game data...</p>
+                    </div>
+                  </div>
                 </section>
               </div>
             </div>

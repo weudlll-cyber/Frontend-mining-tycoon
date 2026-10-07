@@ -339,11 +339,17 @@ export function renderPlayerState(data) {
   const isAsyncMode =
     String(data?.scoring_aggregate || '').toLowerCase() === 'best_of';
   if (isAsyncMode) {
+    const scoringMode =
+      data?.scoring_mode ||
+      _getActiveGameMeta?.(String(data?.game_id || ''))?.scoring_mode ||
+      null;
     const thisSessionScore = formatScoreLineValue(
-      resolveDisplayedSessionScore(data, playerState, _sessionScoreState)
+      resolveDisplayedSessionScore(data, playerState, _sessionScoreState),
+      scoringMode
     );
     const bestRoundScore = formatScoreLineValue(
-      resolveDisplayedBestRoundScore(data, playerState)
+      resolveDisplayedBestRoundScore(data, playerState),
+      scoringMode
     );
     setTextNodeValue(
       refs.thisSessionNode,

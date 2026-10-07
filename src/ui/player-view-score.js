@@ -3,6 +3,8 @@ File: src/ui/player-view-score.js
 Purpose: Resolve and format session score values for player-view rendering.
 */
 
+import { formatBackendScore } from '../utils/score-format.js';
+
 function firstFiniteNumber(candidates) {
   for (const candidate of candidates) {
     const numeric = Number(candidate);
@@ -18,16 +20,9 @@ function normalizeSessionId(raw) {
   return String(raw).trim();
 }
 
-export function formatScoreLineValue(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return { display: '—', exact: '—' };
-  }
-  const floored = Math.floor(numeric);
-  return {
-    display: floored.toLocaleString(),
-    exact: floored.toLocaleString(),
-  };
+export function formatScoreLineValue(value, scoringMode = null) {
+  const text = formatBackendScore(value, scoringMode);
+  return { display: text, exact: text };
 }
 
 export function resolveDisplayedSessionScore(

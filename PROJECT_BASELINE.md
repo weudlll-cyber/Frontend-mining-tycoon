@@ -149,18 +149,17 @@ Frontend structure is modular:
 
 - Main orchestration module (`main.js`): coordinates SSE lifecycle, data rendering, and user interactions.
 - Session transport module (`services/stream-controller.js`): owns SSE setup, reconnect state, and timer cleanup.
-- Action module (`services/game-actions.js`): owns create/join flow and upgrade submission requests.
+- Action module (`services/game-actions.js`): owns upgrade and trade submission requests (game creation is admin-only via `admin.html`).
 - Setup shell module (`ui/setup-shell.js`): manages setup panel state, action enablement, and live-board navigation.
 - Summary module (`ui/live-summary.js`): renders score/rank/top-score stats and a live score-context metric display.
-- Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table.
+- Leaderboard module (`ui/leaderboard.js`): renders the live top-5 table (SSE `leaderboard_top_5`) in the "Top 5" tab of the live tools window.
 - Season card module (`ui/season-cards.js`): updates balances, output rates, and per-card halving countdowns.
 - Season focus module (`ui/season-focus.js`): keeps mobile layout compact by focusing one season card at a time.
-- Live drawer module (`ui/live-drawer.js`): manages non-core panel access (trade/farm/chat) without crowding the core board.
+- Live drawer module (`ui/live-drawer.js`): manages non-core panel access (trade/farm/chat/top 5) without crowding the core board.
 - Player state analytics render module (`player-view.js`): orchestrates per-token output, balances, cumulative mined, oracle prices, and conversion parameter display.
 - Player analytics layout helper (`ui/player-view-layout.js`): owns analytics matrix construction and tooltip trigger/bubble anchors.
 - Player analytics score helper (`ui/player-view-score.js`): owns `This session` / `Best this round` display resolution and score formatting.
 - Inline upgrade rendering module (`upgrade-panel-inline.js`): renders upgrade lanes (hashrate, efficiency, cooling) within each seasonal card as a compact row-table with headers `Upgrade | Lvl | Cost | Pay | Out/s | BEP` plus inline info tooltip trigger.
-- Legacy upgrade panel module (`upgrade-panel.js`): maintained for backward compatibility (not visible in new inline layout).
 - Countdown module: manages game duration and enrollment countdown timers.
 - Halving display module: calculates and renders halving schedules and countdowns per token.
 - Control-data layer (`src/config/game-control-data.js`): centralises all game setup tunables — duration presets, round/session limits, enrollment window defaults, async defaults, and scoring mode constants. `src/config/trading-control-data.js` holds trade-scheduling tunables. UI modules and `main.js` import from here; constants are not duplicated inline.
@@ -177,7 +176,7 @@ Frontend session-mode readiness:
 - Async enrollment phase is intentionally skipped: because `enrollment_window_seconds=0`, the backend transitions directly from creation to `running` without an `enrolling` phase. The frontend detects async mode via `getRoundModeFromMeta() === 'async'` from the game meta payload and skips the enrollment countdown, showing the round duration countdown immediately instead.
 - Policy-window denials (`403`/`409`) render inline non-blocking setup status text and do not use modals.
 - Async stream start is session-only: frontend uses `/sessions/{session_id}/stream` and never falls back to `/games/{id}/stream` for async mode.
-- In auth-required mode, frontend requests `GET /games/{id}/sse-ticket` with `X-Player-Token` and appends `ticket` only to the session stream URL.
+- Before every stream connect/reconnect the frontend requests a fresh `GET /games/{id}/sse-ticket` (with `X-Player-Token` when stored) and appends `ticket` to the game or session stream URL; reconnects are driven by the frontend so an expired ticket is never replayed.
 - Async best-of attempts are backend-reset per session start: player state is reset to deterministic baseline (balances/tracks/upgrades/cumulative mined) before each new async session, so attempts are directly comparable.
 - Best-of visibility is surfaced in Player State panel during async rounds only: shows `This session` and `Best this round` (read-only backend values from backend payload). Hidden in sync mode.
 - Live tools behavior is split intentionally: core mining/analytics remain always visible, while trade/farm/chat are reachable via an inline non-blocking bottom drawer.

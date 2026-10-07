@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  fetchCurrentUser,
   fetchOpenGames,
   joinGame,
   login,
@@ -133,5 +134,227 @@ describe('auth-client', () => {
     const [, options] = fetchMock.mock.calls[0];
     expect(options.method).toBe('POST');
     expect(options.headers.Authorization).toBe('Bearer jwt-logout');
+  });
+
+  it('validates the stored token via GET /auth/me with a bearer header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ username: 'alice', display_name: 'Alice' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = await fetchCurrentUser('http://127.0.0.1:8000', {
+      authToken: ' jwt-me ',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/auth/me');
+    expect(options.method).toBe('GET');
+    expect(options.headers.Authorization).toBe('Bearer jwt-me');
+    expect(user.display_name).toBe('Alice');
+  });
+
+  it('exposes the 401 status when the stored session is no longer valid', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Authentication required' }),
+      })
+    );
+
+    await expect(
+      fetchCurrentUser('http://127.0.0.1:8000', { authToken: 'old' })
+    ).rejects.toMatchObject({
+      status: 401,
+      message: 'Authentication required',
+    });
+  });
+
+  it('carries status and code of a disabled password reset', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          detail: {
+            code: 'PASSWORD_RESET_DISABLED',
+            message:
+              'Password reset is not available. Please contact an administrator.',
+          },
+        }),
+      })
+    );
+
+    await expect(
+      resetPassword('http://127.0.0.1:8000', {
+        username: 'alice',
+        email: 'a@example.com',
+        newPassword: 'x',
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: 'PASSWORD_RESET_DISABLED',
+      message:
+        'Password reset is not available. Please contact an administrator.',
+    });
+  });
+
+  it('shows the backend name validation message on 422 join', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: [
+            {
+              loc: ['body', 'name'],
+              msg: 'String should have at most 24 characters',
+            },
+          ],
+        }),
+      })
+    );
+
+    await expect(
+      joinGame('http://127.0.0.1:8000', {
+        gameId: 'game-1',
+        playerName: 'x'.repeat(30),
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      message: 'Invalid player name: String should have at most 24 characters',
+    });
+  });
+});
+
+describe('auth-client contract errors', () => {
+  it('validates the stored token via GET /auth/me with a bearer header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ username: 'alice', display_name: 'Alice' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = await fetchCurrentUser('http://127.0.0.1:8000', {
+      authToken: ' jwt-me ',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/auth/me');
+    expect(options.method).toBe('GET');
+    expect(options.headers.Authorization).toBe('Bearer jwt-me');
+    expect(user.display_name).toBe('Alice');
+  });
+
+  it('exposes the 401 status when the stored session is no longer valid', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Authentication required' }),
+      })
+    );
+
+    await expect(
+      fetchCurrentUser('http://127.0.0.1:8000', { authToken: 'old' })
+    ).rejects.toMatchObject({
+      status: 401,
+      message: 'Authentication required',
+    });
+  });
+
+  it('carries status and code of a disabled password reset', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          detail: {
+            code: 'PASSWORD_RESET_DISABLED',
+            message:
+              'Password reset is not available. Please contact an administrator.',
+          },
+        }),
+      })
+    );
+
+    await expect(
+      resetPassword('http://127.0.0.1:8000', {
+        username: 'alice',
+        email: 'a@example.com',
+        newPassword: 'x',
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: 'PASSWORD_RESET_DISABLED',
+      message:
+        'Password reset is not available. Please contact an administrator.',
+    });
+  });
+
+  it('shows the backend name validation message on 422 join', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: [
+            {
+              loc: ['body', 'name'],
+              msg: 'String should have at most 24 characters',
+            },
+          ],
+        }),
+      })
+    );
+
+    await expect(
+      joinGame('http://127.0.0.1:8000', {
+        gameId: 'game-1',
+        playerName: 'x'.repeat(30),
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      message: 'Invalid player name: String should have at most 24 characters',
+    });
+  });
+
+  it('keeps generic join failures unprefixed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ detail: 'Game already finished' }),
+      })
+    );
+
+    await expect(
+      joinGame('http://127.0.0.1:8000', { gameId: 'g', playerName: 'A' })
+    ).rejects.toMatchObject({ status: 409, message: 'Game already finished' });
+  });
+
+  it('surfaces backend detail when the open-games list fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ detail: 'Maintenance' }),
+      })
+    );
+
+    await expect(fetchOpenGames('http://127.0.0.1:8000')).rejects.toMatchObject(
+      { status: 503, message: 'Maintenance' }
+    );
   });
 });

@@ -206,6 +206,29 @@ describe('player state matrix', () => {
     );
   });
 
+  it('formats session scores as ratios in efficiency mode', () => {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      scoring_aggregate: 'best_of',
+      scoring_mode: 'efficiency',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 10,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      output_rate_per_token: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      conversion_fee_rate: 0.02,
+      oracle_spread: 0.01,
+      current_session_score: 1.2345,
+      player_best_of_score: 1.5,
+    });
+
+    const lines = document.querySelectorAll('.ps-session-score-line');
+    expect(lines[0].textContent).toContain('This session: 1.2345×');
+    expect(lines[1].textContent).toContain('Best this round: 1.5000×');
+  });
+
   it('hides This session and Best this round lines in sync mode', () => {
     renderPlayerState({
       game_id: 'g1',
