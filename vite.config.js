@@ -4,6 +4,7 @@
  *   - main   → index.html  (auth + lobby start screen)
  *   - player → player.html (live player dashboard)
  *   - admin  → admin.html  (admin-only round setup)
+ *   - howToPlay → how-to-play.html (static player guide, no script)
  */
 
 import { fileURLToPath } from 'url';
@@ -35,6 +36,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         player: resolve(__dirname, 'player.html'),
         admin: resolve(__dirname, 'admin.html'),
+        howToPlay: resolve(__dirname, 'how-to-play.html'),
       },
     },
   },

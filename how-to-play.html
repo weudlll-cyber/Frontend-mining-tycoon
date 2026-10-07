@@ -1,0 +1,455 @@
+<!--
+File: how-to-play.html
+Purpose: Static player-facing "How to play" guide for Mining Tycoon.
+Role in system: Linked from the lobby (index.html) and the player board (player.html). It has no script and does not talk to the backend.
+Invariants: Content must match the current backend rules (backend README, app/policy/control_data.py, app/services/scoring_service.py). No features that do not exist.
+Security notes: Static HTML only; no script, no external fonts or CDNs.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mining Tycoon | How to play</title>
+    <link rel="stylesheet" href="/src/how-to-play.css" />
+  </head>
+  <body class="page-guide">
+    <main class="guide-shell">
+      <header id="top" class="guide-header">
+        <p class="guide-back"><a href="/">&larr; Back to the lobby</a></p>
+        <h1>How to play Mining Tycoon</h1>
+        <p class="guide-lead">
+          Mine the four seasonal tokens, upgrade your rigs, time your trades and
+          finish the round with the best score. Everything below describes the
+          game as it works today.
+        </p>
+      </header>
+
+      <nav class="guide-toc" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#quick-start">Quick start</a></li>
+          <li><a href="#goal">The goal and the four tokens</a></li>
+          <li><a href="#mining">Mining</a></li>
+          <li><a href="#upgrades">Upgrades</a></li>
+          <li><a href="#halvings">Halvings</a></li>
+          <li><a href="#oracle-prices">Oracle prices</a></li>
+          <li><a href="#trading">Trading</a></li>
+          <li><a href="#round-types">Round types: sync and async</a></li>
+          <li><a href="#scoring">Scoring modes</a></li>
+          <li><a href="#events">Events</a></li>
+          <li><a href="#live-tools">Live tools window and tooltips</a></li>
+          <li><a href="#accounts">Accounts and your name</a></li>
+          <li><a href="#farming">Farming (coming later)</a></li>
+        </ol>
+      </nav>
+
+      <section id="quick-start" class="guide-section">
+        <h2>Quick start</h2>
+        <ol>
+          <li>Create an account or sign in on the lobby page.</li>
+          <li>
+            Pick a game in <strong>Open Games</strong> and click
+            <strong>Enter game</strong>. The game board opens and connects by
+            itself.
+          </li>
+          <li>
+            Your four tokens start mining at once. Buy upgrades in the season
+            cards to mine faster.
+          </li>
+          <li>
+            When a trade unlocks, open <strong>Trade</strong> to move tokens
+            into the season you want to hold.
+          </li>
+          <li>
+            When the round (or your session) ends, a
+            <strong>Game Over</strong> screen appears. Click it to go back to
+            the lobby, where <strong>Last Game Highscores</strong> shows the Top
+            5.
+          </li>
+        </ol>
+      </section>
+
+      <section id="goal" class="guide-section">
+        <h2>The goal and the four tokens</h2>
+        <p>
+          There are four seasonal tokens: <strong>Spring</strong>,
+          <strong>Summer</strong>, <strong>Autumn</strong> and
+          <strong>Winter</strong>. Every player in a round starts from the same
+          position: 1,000 of each token and no upgrades. The round's conditions
+          (prices, halvings and events) are fixed when the round is created and
+          are the same for everyone.
+        </p>
+        <p>
+          Your goal is the best score at the end of the round. How the score is
+          counted depends on the round's
+          <a href="#scoring">scoring mode</a>. There is no real money in the
+          game and you never trade with other players.
+        </p>
+        <p>
+          The game runs on a simulated calendar of <em>sim-months</em> that is
+          compressed into the real round length. One season cycle is 36
+          sim-months; longer rounds play more cycles. The clock in the header
+          (⏱) shows the real time that is left.
+        </p>
+      </section>
+
+      <section id="mining" class="guide-section">
+        <h2>Mining</h2>
+        <ul>
+          <li>
+            You mine all four tokens at the same time, every second. You do not
+            have to click anything to mine.
+          </li>
+          <li>
+            Each season card shows the token's <strong>Balance</strong>, its
+            <strong>Output</strong> per second and the time to its next
+            <strong>Halving</strong>.
+          </li>
+          <li>
+            Output per token = base rate &times; hashrate &times; efficiency
+            &times; (1 + cooling), reduced by halvings and changed by active
+            <a href="#events">output events</a>.
+          </li>
+          <li>
+            The <strong>Player State</strong> panel shows output per token and
+            in total, your balances, oracle prices, cumulative mined tokens and
+            the conversion fee and spread.
+          </li>
+        </ul>
+      </section>
+
+      <section id="upgrades" class="guide-section">
+        <h2>Upgrades</h2>
+        <p>
+          Every season card has three upgrade lanes. An upgrade only improves
+          the token of that card, and each lane has its own level per season.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Upgrade</th>
+                <th scope="col">What it does (default economy)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Hashrate</td>
+                <td>
+                  Raises the hashrate multiplier by 0.1 per level (starts at
+                  1.0).
+                </td>
+              </tr>
+              <tr>
+                <td>Efficiency</td>
+                <td>
+                  Raises the efficiency multiplier by 0.05 per level (starts at
+                  1.0).
+                </td>
+              </tr>
+              <tr>
+                <td>Cooling</td>
+                <td>
+                  Adds 0.1 per level to the cooling bonus; output is multiplied
+                  by (1 + cooling).
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>
+            <strong>Costs rise with every level.</strong> With the default
+            economy a level costs 50 &times; 1.2<sup>level</sup> of the card's
+            token (50, 60, 72, ...). Upgrade-cost events can make upgrades
+            cheaper or more expensive for a while.
+          </li>
+          <li>
+            <strong>Pay with any token.</strong> The <strong>Pay</strong> column
+            chooses which balance you pay with. If you pay with a different
+            token, the cost is converted at the current oracle prices plus the
+            conversion fee and spread, rounded up to whole tokens. This does not
+            use up one of your trades.
+          </li>
+          <li>
+            The lane table shows <strong>Lvl</strong> (current level),
+            <strong>Cost</strong> (in the card's token),
+            <strong>Out/s</strong> (extra output per second) and
+            <strong>BEP</strong> (break-even time: how long the upgrade needs to
+            pay for itself).
+          </li>
+          <li>
+            The server sets the final price. Upgrades are only accepted while
+            the round runs (sync) or while your session is active (async);
+            outside that window the buttons are disabled with a short reason.
+          </li>
+        </ul>
+        <p class="guide-note">
+          The admin can tune the economy for new rounds. A round's values are
+          locked when it is created, so the numbers on your board are the ones
+          that count.
+        </p>
+      </section>
+
+      <section id="halvings" class="guide-section">
+        <h2>Halvings</h2>
+        <ul>
+          <li>
+            A halving cuts a token's mining output in half. Each token halves
+            once per 36-sim-month cycle.
+          </li>
+          <li>
+            Halvings are staggered 9 sim-months apart: Spring right at the start
+            of each cycle, then Summer (month 9), Autumn (month 18) and Winter
+            (month 27).
+          </li>
+          <li>
+            A halving also makes the token scarcer, which pushes its
+            <a href="#oracle-prices">oracle price</a> up.
+          </li>
+          <li>
+            The <strong>Halving</strong> line on each season card counts down
+            the real time to that token's next halving and changes color when it
+            is close. Player State also shows the next halving.
+          </li>
+        </ul>
+      </section>
+
+      <section id="oracle-prices" class="guide-section">
+        <h2>Oracle prices</h2>
+        <p>
+          Every token has an oracle price that the server calculates the same
+          way for everyone. Prices change over the round:
+        </p>
+        <ul>
+          <li>
+            One season is in favor at a time and gets a higher price; the
+            favored season rotates every few sim-months.
+          </li>
+          <li>Halvings raise a token's price because it becomes scarcer.</li>
+          <li>
+            Price events push one token or all tokens up or down for a while.
+          </li>
+        </ul>
+        <p>
+          Prices decide what you get in a trade, what an upgrade costs when you
+          pay with another token, and your score in Power mode. The current
+          prices are in the Player State panel.
+        </p>
+      </section>
+
+      <section id="trading" class="guide-section">
+        <h2>Trading</h2>
+        <ul>
+          <li>
+            A trade converts part of one token balance into another token at the
+            oracle prices, minus the conversion fee and spread (by default 2%
+            fee + 1% spread; the current values are shown in Player State). You
+            trade with the game, not with other players.
+          </li>
+          <li>
+            Each round has a <strong>limited number of trades</strong>. The
+            admin sets the count when creating the round (0 means no trading);
+            the default depends on the round length (session length in async
+            rounds).
+          </li>
+          <li>
+            Trades <strong>unlock at fixed times</strong>. By default the first
+            trade unlocks after 20% of the round (or session) and the others are
+            spread evenly over the rest. In async rounds the times count from
+            the start of your session. A trade you do not use stays available
+            for later.
+          </li>
+          <li>
+            The <strong>Trade</strong> tab shows trades used, when the next
+            trade unlocks and the full schedule. The
+            <strong>Trading</strong> status in the action bar is always visible.
+          </li>
+        </ul>
+      </section>
+
+      <section id="round-types" class="guide-section">
+        <h2>Round types: sync and async</h2>
+        <h3>Sync round (everyone plays together)</h3>
+        <ul>
+          <li>
+            The game is open for joining during a short enrollment window.
+          </li>
+          <li>
+            When the window closes, the round starts for everyone at the same
+            time and runs for its set length. You cannot join after the start.
+          </li>
+        </ul>
+        <h3>Async round (play when you like)</h3>
+        <ul>
+          <li>
+            The round stays open for a longer period. You can enter at any time
+            while it is open and a full session still fits into the remaining
+            round time.
+          </li>
+          <li>
+            Entering starts your <strong>session</strong>, which has a fixed
+            length. You only mine while your session is running.
+          </li>
+          <li>
+            Every session starts from the same baseline (1,000 of each token, no
+            upgrades). Your best finished session is the score that counts.
+            Note: entering the game again from the lobby currently adds a new
+            leaderboard entry for you instead of continuing your earlier one.
+          </li>
+          <li>
+            The header shows your session time and how much round time is left;
+            Player State shows <strong>This session</strong> and
+            <strong>Best this round</strong>.
+          </li>
+        </ul>
+      </section>
+
+      <section id="scoring" class="guide-section">
+        <h2>Scoring modes</h2>
+        <p>
+          The admin picks one mode when creating the round. It never changes
+          during the round, and the <strong>Scoring</strong> badge in the header
+          shows which one applies.
+        </p>
+        <dl class="guide-defs">
+          <dt>Stockpile (default)</dt>
+          <dd>
+            Your score is the total number of tokens you hold, all four seasons
+            added up.
+          </dd>
+          <dt>Power</dt>
+          <dd>
+            Each balance is multiplied by its oracle price at the end and the
+            results are added up, so holding the valuable tokens pays off.
+          </dd>
+          <dt>Mining Time</dt>
+          <dd>
+            Your balances are turned into seconds of starting-level mining for
+            each token and added up, so tokens that mine slowly count more per
+            token.
+          </dd>
+          <dt>Efficiency</dt>
+          <dd>
+            How much you mined compared with a player who never upgraded over
+            the same time (1.0000&times; = no upgrades); trades and starting
+            balances do not count.
+          </dd>
+        </dl>
+      </section>
+
+      <section id="events" class="guide-section">
+        <h2>Events</h2>
+        <p>
+          Global events are scheduled when the round is created, so every player
+          sees the same events at the same sim-month. An event lasts a few
+          sim-months and hits either one token or all tokens. Several events can
+          be active at once.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Kind</th>
+                <th scope="col">Effect</th>
+                <th scope="col">Examples</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Output</td>
+                <td>
+                  Mining output up or down (between &times;0.5 and &times;1.5)
+                </td>
+                <td>Hashrate Festival, Energy Shock</td>
+              </tr>
+              <tr>
+                <td>Upgrade cost</td>
+                <td>Upgrades cheaper or more expensive</td>
+                <td>Component Discount, Mining Tax</td>
+              </tr>
+              <tr>
+                <td>Oracle price</td>
+                <td>Token prices up or down</td>
+                <td>Demand Surge, Market Crash</td>
+              </tr>
+              <tr>
+                <td>Spread</td>
+                <td>Conversions (trades and cross-token payments) cost more</td>
+                <td>Liquidity Crunch</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The event banner above the season cards lists all active events and
+          how long they last; &#9889; marks the values they affect.
+        </p>
+      </section>
+
+      <section id="live-tools" class="guide-section">
+        <h2>Live tools window and tooltips</h2>
+        <p>
+          The buttons <strong>Trade</strong>, <strong>Farm</strong>,
+          <strong>Chat</strong> and <strong>Top 5</strong> in the action bar
+          open a small floating window. It does not block the board: drag it by
+          its header, resize it, and close it with the close button, Escape or a
+          click outside.
+        </p>
+        <ul>
+          <li>
+            <strong>Trade:</strong> convert tokens (see
+            <a href="#trading">Trading</a>).
+          </li>
+          <li><strong>Farm:</strong> placeholder, farming is coming later.</li>
+          <li>
+            <strong>Chat:</strong> talk to the other players in the round. Chat
+            is social only, has no effect on the game and is not saved. A small
+            preview with an unread counter stays visible on the board.
+          </li>
+          <li><strong>Top 5:</strong> the current leaderboard.</li>
+        </ul>
+        <p>
+          <strong>Tooltips:</strong> hover over or focus a small <em>i</em> icon
+          or a value to see an explanation or the exact number (large numbers
+          are shortened to k, M and B). Move away or press Escape to close it.
+        </p>
+      </section>
+
+      <section id="accounts" class="guide-section">
+        <h2>Accounts and your name</h2>
+        <ul>
+          <li>
+            You need an account to enter a game. Create one with
+            <strong>Create account</strong> in the lobby (username, display
+            name, email, Discord handle, optional Telegram handle and a password
+            of at least 12 characters with upper and lower case, a digit and a
+            special character).
+          </li>
+          <li>
+            Your <strong>display name</strong> is your name in the game and on
+            the leaderboard. In-game names may only use letters, digits, spaces
+            and <code>_ - .</code> and have at most 24 characters; other
+            characters are replaced, and if nothing usable is left your username
+            is used.
+          </li>
+          <li>You can change your password from the lobby while signed in.</li>
+        </ul>
+      </section>
+
+      <section id="farming" class="guide-section">
+        <h2>Farming (coming later)</h2>
+        <p>
+          Farming is planned but not playable yet. The <strong>Farm</strong> tab
+          and the <strong>Farming</strong> status in the action bar are
+          placeholders until it arrives.
+        </p>
+      </section>
+
+      <footer class="guide-footer">
+        <p><a href="#top">Back to top</a> &middot; <a href="/">Lobby</a></p>
+      </footer>
+    </main>
+  </body>
+</html>

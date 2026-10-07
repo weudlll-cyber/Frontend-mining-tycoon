@@ -10,6 +10,11 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- "How to play" guide (`how-to-play.html`): a static page covering the goal
+  and tokens, mining, upgrades, halvings, oracle prices, trading, sync/async
+  rounds, scoring modes, events, the live tools window, accounts and farming
+  (coming later). Linked from the lobby (same tab) and the player-board header
+  (new tab); built by Vite and served by the deploy scripts.
 - Admin console section 11 "Game Settings": admins edit duration presets
   (including short test presets), which presets are offered for sync rounds,
   async rounds and sessions, defaults, limits, the default trade-count table and
