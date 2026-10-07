@@ -206,6 +206,26 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
+/* Account data-protection row (download / delete), below the account
+   buttons so the main row stays short. */
+.account-data-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+.account-data-label {
+  color: var(--lobby-text-soft);
+  font-size: 0.85rem;
+}
+
+.danger-btn {
+  border-color: rgba(255, 120, 120, 0.55);
+  color: var(--lobby-danger);
+}
+
 .link-button {
   border: 0;
   background: transparent;
@@ -484,6 +504,40 @@ dialog::backdrop {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+/* Delete-account dialog: the destructive action is visually distinct. */
+.delete-account-warning {
+  font-size: 0.88rem;
+  color: var(--lobby-text-soft);
+}
+
+.delete-account-warning p,
+.delete-account-warning ul {
+  margin: 0.2rem 0;
+}
+
+.delete-account-warning ul {
+  padding-left: 1.2rem;
+}
+
+.delete-account-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+.dialog-actions .danger-button {
+  background: #b23a3a;
+  border-color: #b23a3a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.dialog-actions .danger-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* "My results" dialog: wider than the form dialogs so result rows fit. */

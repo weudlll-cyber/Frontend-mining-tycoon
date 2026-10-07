@@ -21,6 +21,7 @@ Historical frontend security snapshots live under `docs/history/audits/`.
 - Joining a game returns a per-game `player_token`, stored under `mining-tycoon:playerToken:{game}:{player}` and sent as `X-Player-Token` for upgrades, trades, session start and SSE/chat ticket requests.
 - SSE and chat use short-lived tickets: a fresh `GET /games/{id}/sse-ticket` before every stream connect and reconnect; an expired ticket is never replayed.
 - Tokens and tickets are never logged or rendered.
+- Account data protection: "Download my data" fetches `GET /auth/me/export` with the bearer token and saves it through a Blob and a temporary object URL (revoked right after the download starts); nothing is sent to third parties. "Delete account" re-asks for the password (sent only in the `DELETE /auth/me` body, never stored or rendered) and needs a confirmation checkbox; on `204` the local session is cleared like a logout.
 - **Known trade-off:** the account token (`mining-tycoon:authToken`) and player tokens are kept in `localStorage`, so any script running on the page origin could read them. This makes the "no untrusted `innerHTML`" rule and a strict deployment (static `dist/` only, security headers from `deploy/nginx/mining-frontend.conf`) essential. A move to httpOnly cookies would need backend changes and is not planned yet.
 - The admin token is typed into `admin.html` per visit and is not persisted; only the backend URL is stored.
 

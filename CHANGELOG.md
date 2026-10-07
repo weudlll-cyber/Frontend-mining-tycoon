@@ -10,6 +10,10 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Lobby account data protection: **Download my data** saves the
+  `GET /auth/me/export` JSON as `mining-tycoon-account-export.json`, and
+  **Delete account** opens a dialog (warning, password, confirmation checkbox)
+  that calls `DELETE /auth/me` and clears the local session on success.
 - "How to play" guide (`how-to-play.html`): a static page covering the goal
   and tokens, mining, upgrades, halvings, oracle prices, trading, sync/async
   rounds, scoring modes, events, the live tools window, accounts and farming

@@ -1,7 +1,7 @@
 /**
 File: src/lobby.js
 Purpose: Lobby page (index.html): register / login / logout / change password,
-  the open-games list with join and rejoin, "My results" (account history and
+  account data download and account deletion, the open-games list with join and rejoin, "My results" (account history and
   full final leaderboards) and the "Last Game Highscores" panel.
 Role in system: entry point before the player board. Stores the backend URL,
   account session and per-game player credentials for player.html.
@@ -49,6 +49,11 @@ import {
   openMyResults,
   resetLobbyResults,
 } from './ui/lobby-results-dialog.js';
+import {
+  ACCOUNT_DELETED_MESSAGE,
+  initAccountData,
+  setAccountDataEnabled,
+} from './ui/lobby-account-data.js';
 
 const LOBBY_REFRESH_MS = 10000;
 const ACCOUNT_REQUIRED_MESSAGE = 'Sign in to join this game.';
@@ -186,6 +191,9 @@ function updateJoinButtonState() {
   if (openChangePasswordBtn) {
     openChangePasswordBtn.disabled = !authState.isAuthenticated;
   }
+
+  // "Download my data" / "Delete account" also need the bearer token.
+  setAccountDataEnabled(authState.isAuthenticated);
 }
 
 function setAuthenticatedSession(payload) {
@@ -784,6 +792,22 @@ function hydrateFromStorage() {
   }
 }
 
+/**
+ * DELETE /auth/me answered 204: the account and all of its sessions are gone
+ * on the server, so clear the local session exactly like a logout.
+ */
+function handleAccountDeleted() {
+  clearAuthSessionData();
+  selectedGameId = '';
+  setAuthenticatedSession({ access_token: '' });
+  Array.from(
+    openGamesListEl?.querySelectorAll('.game-list-item.selected') || []
+  ).forEach((item) => {
+    item.classList.remove('selected');
+  });
+  setAuthMessage(ACCOUNT_DELETED_MESSAGE, 'success');
+}
+
 function expireStoredSession() {
   clearAuthSessionData();
   selectedGameId = '';
@@ -955,6 +979,16 @@ function bootstrap() {
       authToken: authState.token,
     }),
     onAuthInvalid: expireStoredSession,
+  });
+
+  initAccountData({
+    getContext: () => ({
+      baseUrl: getBackendUrlOrThrow(),
+      authToken: authState.token,
+    }),
+    onAuthInvalid: expireStoredSession,
+    onAccountDeleted: handleAccountDeleted,
+    setStatus: setAuthMessage,
   });
 
   hydrateFromStorage();
