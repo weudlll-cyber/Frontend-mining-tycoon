@@ -21,6 +21,8 @@
  *    box; the backend decides per round and refuses the chat socket when off.
  *  - `account_policy.require_account_to_join` is enforced by the backend on
  *    join (401 ACCOUNT_REQUIRED); the frontend only edits/displays it.
+ *  - `defaults.farming_*` only pre-fill the create form's farming options;
+ *    the `farming_*` limits bound them. The backend validates POST /games.
  *  - Malformed backend sections fall back per top-level key, so one bad
  *    field never breaks the whole admin form.
  * Security notes: pure data handling, no DOM or network access.
@@ -41,6 +43,9 @@ import {
   SCORING_CONTROL,
   ACCOUNT_POLICY_DEFAULTS,
   CHAT_ENABLED_DEFAULT,
+  FARMING_DEFAULTS,
+  FARMING_MIN_DURATION_LIMITS,
+  FARMING_REWARD_RATE_LIMITS,
 } from './game-control-data.js';
 import {
   TRADE_COUNT_LIMITS,
@@ -81,6 +86,9 @@ export function buildFallbackGameConfig() {
       enrollment_window_seconds: ENROLLMENT_WINDOW_DEFAULT_SECONDS,
       scoring_mode: 'stockpile',
       chat_enabled: CHAT_ENABLED_DEFAULT,
+      farming_enabled: FARMING_DEFAULTS.enabled,
+      farming_min_duration_seconds: FARMING_DEFAULTS.min_duration_seconds,
+      farming_reward_rate: FARMING_DEFAULTS.reward_rate,
     },
     duration_limits: {
       min_seconds: ROUND_DURATION_LIMITS.min,
@@ -100,6 +108,14 @@ export function buildFallbackGameConfig() {
       remaining_window_fraction: REMAINING_WINDOW_FRACTION,
     },
     account_policy: { ...ACCOUNT_POLICY_DEFAULTS },
+    farming_min_duration_limits: {
+      min_seconds: FARMING_MIN_DURATION_LIMITS.min,
+      max_seconds: FARMING_MIN_DURATION_LIMITS.max,
+    },
+    farming_reward_rate_limits: {
+      min: FARMING_REWARD_RATE_LIMITS.min,
+      max: FARMING_REWARD_RATE_LIMITS.max,
+    },
   };
 }
 
@@ -225,6 +241,22 @@ function normalizeDefaults(raw, fallback, config) {
       typeof source.chat_enabled === 'boolean'
         ? source.chat_enabled
         : fallback.chat_enabled,
+    // Farming defaults: a missing/invalid key (older backend) keeps the
+    // fallback (farming off, 300 s cycle, 5 % reward).
+    farming_enabled:
+      typeof source.farming_enabled === 'boolean'
+        ? source.farming_enabled
+        : fallback.farming_enabled,
+    farming_min_duration_seconds:
+      isFiniteNumber(source.farming_min_duration_seconds) &&
+      source.farming_min_duration_seconds > 0
+        ? source.farming_min_duration_seconds
+        : fallback.farming_min_duration_seconds,
+    farming_reward_rate:
+      isFiniteNumber(source.farming_reward_rate) &&
+      source.farming_reward_rate > 0
+        ? source.farming_reward_rate
+        : fallback.farming_reward_rate,
   };
 }
 
@@ -286,6 +318,18 @@ export function normalizeGameConfig(raw) {
     account_policy: normalizeAccountPolicy(
       source.account_policy,
       fallback.account_policy
+    ),
+    farming_min_duration_limits: normalizeRange(
+      source.farming_min_duration_limits,
+      fallback.farming_min_duration_limits,
+      'min_seconds',
+      'max_seconds'
+    ),
+    farming_reward_rate_limits: normalizeRange(
+      source.farming_reward_rate_limits,
+      fallback.farming_reward_rate_limits,
+      'min',
+      'max'
     ),
   };
   config.defaults = normalizeDefaults(

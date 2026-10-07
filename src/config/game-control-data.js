@@ -98,6 +98,24 @@ export const ACCOUNT_POLICY_DEFAULTS = Object.freeze({
 // chat on for every round (today's behavior).
 export const CHAT_ENABLED_DEFAULT = true;
 
+// ── Farming (Stage 1, passive) ───────────────────────────────────────────────
+// Fallbacks for `defaults.farming_*` and the farming limits when the backend
+// sends no game_config (older backend): farming stays off for new rounds.
+// Mirror the backend seed values in app/policy/control_data.py.
+export const FARMING_DEFAULTS = Object.freeze({
+  enabled: false,
+  min_duration_seconds: 300,
+  reward_rate: 0.05, // fraction per completed cycle (0.05 = 5 %)
+});
+export const FARMING_MIN_DURATION_LIMITS = Object.freeze({
+  min: 10,
+  max: 604800, // 7 days
+});
+export const FARMING_REWARD_RATE_LIMITS = Object.freeze({
+  min: 0.0001,
+  max: 1.0,
+});
+
 // ── Scoring modes ───────────────────────────────────────────────────────────
 // DEFAULT_MODE is the full canonical mode used throughout the app.
 // ALLOWED_MODES are the short aliases accepted by the backend scoring_mode field.

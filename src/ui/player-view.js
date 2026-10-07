@@ -2,6 +2,8 @@
 File: src/ui/player-view.js
 Purpose: Compact player-state matrix renderer with optional non-blocking micro-tooltips.
 Constraints: Display-only analytics; backend remains source-of-truth for prices/balances/output.
+  "Bal" is the spendable balance; tokens locked in farming (Stage 1) are listed
+  on a separate "Farmed" line so total holdings stay visible.
 */
 
 import { setTextNodeValue } from '../utils/dom-utils.js';
@@ -24,6 +26,7 @@ import {
   ensurePlayerStateViewLayout,
   toTokenLabel,
 } from './player-view-layout.js';
+import { resolveFarmedAmounts } from './farming-state.js';
 import {
   formatScoreLineValue,
   resolveDisplayedBestRoundScore,
@@ -111,6 +114,8 @@ const _uiRefs = {
   bestRoundNode: null,
   thisSessionEl: null,
   bestRoundEl: null,
+  farmedNode: null,
+  farmedEl: null,
 };
 
 export function calculateCurrentMiningRate(playerState) {
@@ -143,6 +148,8 @@ export function resetPlayerStateView() {
   _uiRefs.bestRoundNode = null;
   _uiRefs.thisSessionEl = null;
   _uiRefs.bestRoundEl = null;
+  _uiRefs.farmedNode = null;
+  _uiRefs.farmedEl = null;
   _sessionScoreState.sessionId = null;
   _sessionScoreState.baselineCumulativeMined = null;
   _footerClockState = null;
@@ -185,6 +192,29 @@ function updatePrecisionTooltip(node, label, tokenNames, values) {
     .map((token) => `${toTokenLabel(token)} ${format4(values?.[token])}`)
     .join(' | ');
   setTextNodeValue(node, `${label} Precision: ${details || 'unavailable'}.`);
+}
+
+/**
+ * "Farmed (not spendable): Spring 12.5 · Winter 3" for tokens currently in
+ * farming; hidden when nothing is farmed (or the round has no farming).
+ */
+function renderFarmedLine(refs, data, tokenNames) {
+  if (!refs.farmedEl || !refs.farmedNode) return;
+  const farmed = resolveFarmedAmounts(data);
+  const parts = tokenNames
+    .filter((token) => farmed[token] > 0)
+    .map(
+      (token) =>
+        `${toTokenLabel(token)} ${formatCompactDisplay(farmed[token]).display}`
+    );
+  refs.farmedEl.hidden = parts.length === 0;
+  setTextNodeValue(
+    refs.farmedNode,
+    parts.length ? `Farmed (not spendable): ${parts.join(' · ')}` : 'Farmed: —'
+  );
+  refs.farmedEl.title = parts.length
+    ? 'Tokens in farming. They count toward your holdings and score but cannot be spent until withdrawn.'
+    : '';
 }
 
 function renderFooterHalvingState() {
@@ -367,6 +397,8 @@ export function renderPlayerState(data) {
     refs.thisSessionEl.hidden = true;
     refs.bestRoundEl.hidden = true;
   }
+
+  renderFarmedLine(refs, data, tokenNames);
 
   setTextNodeValue(refs.footerLine2Node, `Fee ${feeSpreadPart}`);
 

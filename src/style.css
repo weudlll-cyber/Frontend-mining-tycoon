@@ -1551,7 +1551,7 @@ body {
   overflow-y: auto;
 }
 
-.farming-placeholder-card,
+.farming-card,
 .leaderboard-card {
   padding: 1rem;
   border: 1px solid var(--border-light);
@@ -1559,13 +1559,13 @@ body {
   background: #fff;
 }
 
-.farming-placeholder-card h2,
+.farming-card h2,
 .leaderboard-card h2 {
   margin-bottom: 0.5rem;
 }
 
 /* Round option "chat disabled": the tab stays visible with an explanatory
-   note (like the Farming placeholder); list and composer are hidden. */
+   note (like the Farming status line); list and composer are hidden. */
 .chat-disabled-note {
   margin: 0;
   color: var(--text-secondary);
@@ -2049,7 +2049,8 @@ button {
   row-gap: 0.08rem;
 }
 
-.ps-session-score-line {
+.ps-session-score-line,
+.ps-farmed-line {
   font-size: 0.82rem;
   color: var(--text-secondary);
   font-family: 'Courier New', monospace;
@@ -2443,6 +2444,132 @@ button {
   .trading-controls {
     grid-template-columns: 1fr;
   }
+}
+
+/* Farm tab (Stage 1 passive farming), inside the live tools window.
+   Compact rows so all four tokens fit the floating window; the panel scrolls
+   internally (.live-drawer-panel), never the page. */
+.farming-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.farming-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.farming-card-header h2 {
+  margin-bottom: 0;
+}
+
+.farming-stage {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.farming-status-line {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.farming-status-line[data-farming-state='enabled'] {
+  color: var(--status-green);
+}
+
+.farming-rules {
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+}
+
+.farming-rule-summary {
+  margin: 0 0 0.2rem;
+  color: var(--text-primary);
+}
+
+.farming-rule-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.farming-availability-note {
+  margin: 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.farming-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.farming-rules[hidden],
+.farming-rows[hidden],
+.farming-availability-note[hidden] {
+  display: none;
+}
+
+.farming-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.farming-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.farming-token {
+  min-width: 4rem;
+}
+
+.farming-stat-label {
+  color: var(--text-secondary);
+  margin-right: 0.25rem;
+}
+
+.farming-stat-value {
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.farming-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.farming-amount {
+  flex: 1 1 5rem;
+  min-width: 0;
+}
+
+.farming-btn {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+/* Bottom Bar Farming Status */
+.farming-status-disabled {
+  color: var(--text-secondary);
+}
+
+.farming-status-enabled {
+  color: var(--status-green);
+  font-weight: 600;
 }
 
 /* Bottom Bar Trading Status */

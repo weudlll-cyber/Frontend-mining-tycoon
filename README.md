@@ -16,8 +16,9 @@ Four pages:
 The current implementation state, recent changes and open work are tracked in
 [PROJECT_BASELINE.md](PROJECT_BASELINE.md) (section 10). In short: mining,
 upgrades, halvings, events, trading, sync and async rounds, best-of scoring,
-chat, accounts (linked to players, with result history) and the admin console
-work end to end. Farming and production hardening are open.
+chat, accounts (linked to players, with result history), Farming Stage 1
+(passive farming, UI side; needs the matching backend) and the admin console
+work end to end. Farming Stage 2 and production hardening are open.
 
 ## Documentation
 
@@ -106,10 +107,10 @@ console all use this default; the Backend URL fields on `player.html` and
 - **Header:** countdown, phase, score, rank, top score, scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs; a **How to play** link opens the guide in a new tab so the running game stays open.
 - **Join Round panel:** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async rounds), `Stop Stream`. It collapses once the stream runs. Players cannot create games here; the legacy host controls in the HTML are always hidden (`.admin-only`).
 - **Season cards (2x2):** Balance, Output and Halving per season, plus three inline upgrade lanes (Hashrate, Efficiency, Cooling) as a table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. `Pay` chooses the token you pay with; the backend decides the final cost.
-- **Player State (right):** read-only matrix of output, balances and oracle prices per token and in total, plus next halving, cumulative mined and fee/spread. Large numbers use k/M/B; tooltips show exact values.
+- **Player State (right):** read-only matrix of output, balances (spendable) and oracle prices per token and in total, plus next halving, cumulative mined and fee/spread. Tokens in farming are listed on a separate "Farmed (not spendable)" line when there are any. Large numbers use k/M/B; tooltips show exact values.
 - **Event banner:** one line above the season grid listing all active events; ⚡ marks affected values.
-- **Action bar:** score context, Trading and Farming status (always visible), buttons `Trade`, `Farm`, `Chat`, `🏆 Top 5`, and a chat preview dock with unread badge.
-- **Live tools window:** a floating, non-modal window with the tabs Trade, Farm (placeholder), Chat and Top 5. Drag it by its header, resize it, close it with the close button, Escape or a click outside. The rest of the board stays usable.
+- **Action bar:** score context (the holdings value counts spendable and farmed tokens), Trading and Farming status (always visible; Farming shows e.g. "Enabled (5% / 5m)" or "Not enabled"), buttons `Trade`, `Farm`, `Chat`, `🏆 Top 5`, and a chat preview dock with unread badge.
+- **Live tools window:** a floating, non-modal window with the tabs Trade, Farm, Chat and Top 5. Drag it by its header, resize it, close it with the close button, Escape or a click outside. The rest of the board stays usable.
 - **Game Over:** after the round finishes (or the async session ends) a full-screen overlay appears; a click returns to the lobby. A **View full results** link opens the lobby's full results view for that round instead; after an async session it notes "Final results are available when the round ends." This is the only full-screen overlay (see `LOCKED_DECISIONS.md` §C).
 
 Layout rules: desktop (1440x900) has no page scroll, only internal scroll areas;
@@ -120,7 +121,7 @@ tablets stack the grid; phones show one season card at a time. See
 
 A static guide without script: quick start, goal and tokens, mining, upgrades,
 halvings, oracle prices, trading, sync/async rounds, scoring modes, events, the
-live tools window, accounts and farming (coming later), with a table of
+live tools window, accounts and farming (Stage 1 rules), with a table of
 contents and section anchors (for example `/how-to-play.html#scoring`). It
 describes the current backend rules; update it in the same change when a game
 rule changes. `src/how-to-play.test.js` guards the anchors and both links.
@@ -129,8 +130,9 @@ rule changes. `src/how-to-play.test.js` guards the anchors and both links.
 
 Eleven sections: 1 Connection (backend URL, optional admin token),
 2 Round Type (Sync / Async, "Chat enabled"), 3 Time Configuration,
-4 Scoring Mode, 5 Trading Rules (count, unlock preview and optional conversion
-fee / oracle spread overrides), 6 Advanced Overrides (anchor token,
+4 Scoring Mode, 5 Trading & Farming Rules (count, unlock preview, optional
+conversion fee / oracle spread overrides and the Farming Stage 1 options),
+6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
 per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
@@ -140,7 +142,12 @@ per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
 for sync rounds / async rounds / async sessions, create-form defaults,
 duration / enrollment / trade-count limits, default trade count by round
 length, trade unlock fractions, "Chat enabled by default"
-(`defaults.chat_enabled`, fallback on, sent only when changed) and the account
+(`defaults.chat_enabled`, fallback on, sent only when changed), the
+"Farming (Stage 1)" defaults and limits (`defaults.farming_enabled`,
+`defaults.farming_min_duration_seconds`, `defaults.farming_reward_rate`,
+`farming_min_duration_limits`, `farming_reward_rate_limits`; fallbacks off,
+300 s, 5 %, 10 s..7 d, 0.01 %..100 %; rewards edited in percent; sent only
+when changed) and the account
 policy "Require sign-in to join" (`account_policy.require_account_to_join`,
 fallback off, sent only when changed); round-setup values apply to newly
 created rounds only, existing rounds keep their settings).
@@ -154,7 +161,15 @@ Round options (per round, snapshot-locked at creation, backend validates):
   client only rejects non-numbers and values outside 0 % to below 100 %.
 - **Chat enabled** in section 2, pre-ticked from `defaults.chat_enabled`
   (fallback on). `chat_enabled` is sent only when the admin changes it.
-- Section 7 lists the effective choice for all three. Omitted fields leave the
+- **Farming enabled**, **Farming minimum duration** (value + unit) and
+  **Reward per completed cycle (%)** in section 5, pre-filled from the
+  farming defaults and bounded by the farming limits of Game Settings. The
+  client checks the limits and that the minimum duration is shorter than the
+  round (sync) or session (async). Enabled: `farming_enabled: true`,
+  `farming_min_duration_seconds` and `farming_reward_rate` (rate, 5 % = 0.05)
+  are sent. Disabled: nothing is sent unless the default is on
+  (then `farming_enabled: false`).
+- Section 7 lists the effective choice for all of them. Omitted fields leave the
   backend defaults in place, so an older backend behaves as before.
 
 Presets and defaults come from the backend: `GET /meta` carries the current
@@ -249,6 +264,29 @@ The trading panel's cost note shows the round's effective fee and, when the
 game meta carries it, the oracle spread (`conversion_fee_rate`,
 `oracle_spread` from `/games/{id}/meta`). A 0 % fee override is shown as 0 %.
 
+## Farming (Stage 1)
+
+Passive farming, per round. Contract (backend authoritative):
+
+- Round options in `POST /games`: `farming_enabled`,
+  `farming_min_duration_seconds`, `farming_reward_rate` (see Admin console).
+- `/games/{id}/meta` carries `farming: {enabled, min_duration_seconds,
+  reward_rate}`; `/state` and SSE carry `farming` with the same fields plus
+  `positions: {<token>: {amount, next_reward_in_seconds, cycles_completed}}`.
+- `POST /games/{id}/players/{pid}/farm/deposit` `{token, amount}` and
+  `.../farm/withdraw` `{token, amount}` (`null` = all), with the same
+  `X-Player-Token` header as trades; the response `updated_state` is merged
+  into the board like a trade result.
+
+The Farm tab (`src/ui/farming-panel.js`, helpers in `src/ui/farming-state.js`)
+shows the status line, the rules, and per token the balance, farmed amount,
+cycles completed and next-reward countdown (ticks locally between SSE updates)
+with an amount field and Deposit / Withdraw / Withdraw all. Buttons follow the
+play-window gate (`src/ui/action-availability.js`); backend errors
+(409 `FARMING_DISABLED`, `ACTION_NOT_ALLOWED_*`, 400 insufficient balance) are
+shown verbatim as toasts. Without a `farming` block (older backend) the tab
+says "Farming is not enabled for this round." and the pill "Not enabled".
+
 ## Visual Assets
 
 - `public/assets/backgrounds/`: lobby backgrounds (the lobby uses `Seasonal Enterteinment.png`)
@@ -332,7 +370,7 @@ how-to-play.html    player guide (static) -> src/how-to-play.css
 src/config/         control data and backend URL default
 src/services/       auth, game actions, async sessions, SSE stream controller
 src/meta/           meta fetch/cache and contract version
-src/ui/             rendering modules (season cards, upgrades, analytics, live tools window, trading, chat, Top 5, events, setup)
+src/ui/             rendering modules (season cards, upgrades, analytics, live tools window, trading, farming, chat, Top 5, events, setup)
 src/utils/          DOM, storage, score and error helpers
 public/assets/      images
 deploy/             server installer and nginx template used by deploy-to-vps.ps1

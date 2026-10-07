@@ -6,7 +6,8 @@
  *          submits POST /games with an optional X-Admin-Token header.
  *          Re-renders the form when /meta loads or the admin saves new
  *          Game Settings (section 11). Per-round options (fee/spread
- *          overrides, chat) live in round-options.js.
+ *          overrides, chat) live in round-options.js, the Farming Stage 1
+ *          options in farming-options.js.
  *
  * No runtime dependencies on main.js or setup-shell.js; standalone module.
  * Security notes: backend values (game_id) and derived URLs are rendered via
@@ -35,6 +36,12 @@ import {
   collectRoundOptionsPayload,
   refreshRateOverrideHints,
 } from './round-options.js';
+import {
+  applyFarmingDefaults,
+  bindFarmingInputs,
+  buildFarmingReviewRows,
+  collectFarmingPayload,
+} from './farming-options.js';
 import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
 import { fillPresetSelect } from '../ui/async-duration.js';
 import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
@@ -116,6 +123,7 @@ export function applyGameConfigToForm() {
   el('admin-trade-count').max = String(config.trade_count_limits.max);
 
   applyChatDefault(config);
+  applyFarmingDefaults(config);
   // /meta also carries the global fee/spread used as override placeholders.
   refreshRateOverrideHints();
 
@@ -340,6 +348,8 @@ export function buildReviewSummary() {
 
   rows.push(['Trade count', String(tradeCount)]);
   rows.push(...buildRoundOptionsReviewRows());
+  // Farming's minimum duration must fit the round (sync) / session (async).
+  rows.push(...buildFarmingReviewRows(resolveTradeWindowSeconds()));
 
   return rows;
 }
@@ -426,6 +436,9 @@ export function buildGamePayload() {
   // Optional per-round options (fee/spread overrides, chat); throws on
   // invalid overrides, which createRound shows as the error message.
   Object.assign(payload, collectRoundOptionsPayload());
+  // Farming Stage 1 options; throws when enabled values are invalid or the
+  // minimum duration is not shorter than the round/session.
+  Object.assign(payload, collectFarmingPayload(resolveTradeWindowSeconds()));
 
   return payload;
 }
@@ -598,6 +611,7 @@ export function init() {
     el(id).addEventListener('input', updateReview)
   );
   el('admin-chat-enabled').addEventListener('change', updateReview);
+  bindFarmingInputs(updateReview);
 
   el('admin-create-btn').addEventListener('click', createRound);
 

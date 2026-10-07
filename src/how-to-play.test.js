@@ -66,12 +66,15 @@ describe('how-to-play guide page', () => {
     expect(readRepoFile('src/how-to-play.css')).not.toMatch(/@import|url\(/);
   });
 
-  it('lists all four scoring modes and marks farming as coming later', () => {
+  it('lists all four scoring modes and explains farming Stage 1', () => {
     const scoring = doc.getElementById('scoring').textContent;
     for (const mode of ['Stockpile', 'Power', 'Mining Time', 'Efficiency']) {
       expect(scoring).toContain(mode);
     }
-    expect(doc.getElementById('farming').textContent).toMatch(/coming later/i);
+    const farming = doc.getElementById('farming').textContent;
+    expect(farming).not.toMatch(/not playable yet/i);
+    expect(farming).toMatch(/restarts that token's cycle timer/);
+    expect(farming).toMatch(/Stage 2/);
   });
 
   it('is a Vite build input and covered by the format check', () => {

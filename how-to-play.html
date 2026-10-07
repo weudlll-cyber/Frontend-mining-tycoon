@@ -40,7 +40,7 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           <li><a href="#events">Events</a></li>
           <li><a href="#live-tools">Live tools window and tooltips</a></li>
           <li><a href="#accounts">Accounts and your name</a></li>
-          <li><a href="#farming">Farming (coming later)</a></li>
+          <li><a href="#farming">Farming</a></li>
         </ol>
       </nav>
 
@@ -404,7 +404,11 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
             <strong>Trade:</strong> convert tokens (see
             <a href="#trading">Trading</a>).
           </li>
-          <li><strong>Farm:</strong> placeholder, farming is coming later.</li>
+          <li>
+            <strong>Farm:</strong> deposit tokens into farming and withdraw them
+            (see <a href="#farming">Farming</a>). When the round has no farming,
+            the tab says "Farming is not enabled for this round."
+          </li>
           <li>
             <strong>Chat:</strong> talk to the other players in the round. Chat
             is social only, has no effect on the game and is not saved. A small
@@ -443,11 +447,44 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
       </section>
 
       <section id="farming" class="guide-section">
-        <h2>Farming (coming later)</h2>
+        <h2>Farming</h2>
         <p>
-          Farming is planned but not playable yet. The <strong>Farm</strong> tab
-          and the <strong>Farming</strong> status in the action bar are
-          placeholders until it arrives.
+          Farming (Stage 1, passive farming) lets you put tokens to work. The
+          admin decides per round whether farming is on, how long one reward
+          cycle (the <em>minimum duration</em>) lasts and how big the reward is.
+          The <strong>Farming</strong> status in the action bar shows this, for
+          example "Enabled (5% / 5m)".
+        </p>
+        <ul>
+          <li>
+            Open the <strong>Farm</strong> tab, enter an amount for a token and
+            press <strong>Deposit</strong>. <strong>Withdraw</strong> takes an
+            amount back out, <strong>Withdraw all</strong> everything of that
+            token.
+          </li>
+          <li>
+            After each full minimum duration the token earns its reward, for
+            example 5% of the farmed amount. Rewards are added to the farmed
+            amount, so they compound.
+          </li>
+          <li>
+            A new deposit restarts that token's cycle timer. Withdrawing before
+            a cycle completes earns nothing for that cycle.
+          </li>
+          <li>
+            Farmed tokens cannot be spent on upgrades or trades until you
+            withdraw them, but they still count toward the Stockpile, Power and
+            Mining Time scores. The Player State panel lists them on a separate
+            "Farmed" line.
+          </li>
+          <li>
+            Like upgrades and trades, farming only works while the round is
+            running (and, in async rounds, during your session).
+          </li>
+        </ul>
+        <p>
+          Stage 2 (rotating farming, where the most rewarding token changes over
+          time) will come later.
         </p>
       </section>
 

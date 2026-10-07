@@ -10,6 +10,28 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Farming Stage 1 (passive farming) in the UI. The Farm tab of the live tools
+  window shows the round status ("Farming is not enabled for this round." when
+  off), the rules (reward % per completed minimum duration, timer restart on
+  deposit, no reward for an unfinished cycle, compounding, farmed tokens not
+  spendable but scored) and one row per token with balance, farmed amount,
+  cycles completed, a locally ticking next-reward countdown, an amount field
+  and Deposit / Withdraw / Withdraw all (`POST .../farm/deposit` and
+  `.../farm/withdraw`, same player-token header as trades). Buttons follow the
+  play-window gate; backend errors (409 `FARMING_DISABLED`,
+  `ACTION_NOT_ALLOWED_*`, 400 insufficient balance) are shown as toasts. The
+  Farming pill in the action bar shows "Enabled (5% / 5m)" or "Not enabled".
+  The Player State panel lists farmed tokens on a "Farmed" line and the
+  action-bar holdings value includes them.
+- Admin create form section 5 "Trading & Farming Rules": "Farming enabled",
+  minimum duration (value + unit) and reward per cycle (%), with defaults and
+  limits from Game Settings and a client check that the minimum duration is
+  shorter than the round (sync) or session (async). Sent as
+  `farming_enabled`, `farming_min_duration_seconds`, `farming_reward_rate`;
+  section 7 lists it. Game Settings (section 11) gains a "Farming (Stage 1)"
+  block for the defaults and limits (fallbacks: off, 300 s, 5 %; limits
+  10 s..7 d and 0.01 %..100 %).
+
 - Per-round options in the admin create form: optional "Conversion fee
   override (%)" and "Oracle spread override (%)" in section 5 (empty = global
   economy, current values as placeholders; sent as `conversion_fee_rate` /

@@ -200,6 +200,8 @@ import {
   CHAT_DISABLED_TEXT,
 } from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
+import { initFarmingPanel } from './ui/farming-panel.js';
+import { mergeFarmUpdatedState } from './ui/farming-state.js';
 import { resolvePlayerActionAvailability } from './ui/action-availability.js';
 import {
   initLiveDrawer,
@@ -215,6 +217,8 @@ import {
 } from './services/stream-controller.js';
 import {
   initGameActions,
+  performFarmDeposit,
+  performFarmWithdraw,
   performTrade,
   performUpgrade,
 } from './services/game-actions.js';
@@ -341,6 +345,9 @@ const chatDockUnreadEl = document.getElementById('chat-dock-unread');
 // DOM elements - trading panel
 const tradingPanelEl = document.getElementById('trading-panel');
 const tradingStatusEl = document.getElementById('trading-status');
+// DOM elements - farming panel (Farm tab) and action-bar pill
+const farmingPanelEl = document.getElementById('farming-panel');
+const farmingStatusEl = document.getElementById('farming-status');
 const tradeDrawerBtnEl = document.getElementById('trade-drawer-btn');
 const farmDrawerBtnEl = document.getElementById('farm-drawer-btn');
 const liveDrawerEl = document.getElementById('live-drawer');
@@ -407,6 +414,7 @@ const editableInputs = [
 let lastGameData = null;
 let modulesInitialized = false;
 let tradingPanelApi = null;
+let farmingPanelApi = null;
 let isStreamActive = false;
 let isSetupBusy = false;
 let latestGameStatus = null;
@@ -1427,12 +1435,13 @@ function setLiveSessionActive(isActive) {
   document.body.classList.toggle('live-session', Boolean(isActive));
 }
 
-/** Re-render upgrade lanes and the trade panel against the current gate. */
+/** Re-render upgrade lanes, trade and farm panels against the current gate. */
 function refreshPlayerActionControls() {
   if (lastGameData) {
     renderAllSeasonUpgrades(lastGameData, getGameMeta);
   }
   tradingPanelApi?.renderTradingStatus?.();
+  farmingPanelApi?.renderFarmingStatus?.();
 }
 
 /**
@@ -1642,6 +1651,8 @@ function initializeModules() {
         renderUpgradeMetrics(lastGameData);
       }
       updateScoringModeUi(lastGameData);
+      // Round meta carries the farming rules (enabled, cycle, reward).
+      farmingPanelApi?.renderFarmingStatus?.();
       void refreshAsyncDiagnostics({ force: true });
     },
     showToast,
@@ -1726,6 +1737,17 @@ function initializeModules() {
     tradingPanelRef: tradingPanelEl,
     tradingStatusRef: tradingStatusEl,
   });
+  farmingPanelApi = initFarmingPanel({
+    getGameMeta: () => getGameMeta(gameIdInput?.value),
+    getLastGameData: () => lastGameData,
+    getActionAvailability: getPlayerActionAvailability,
+    depositFarm: async ({ token, amount }) => performFarmDeposit(token, amount),
+    withdrawFarm: async ({ token, amount }) =>
+      performFarmWithdraw(token, amount),
+    showToast,
+    farmingPanelRef: farmingPanelEl,
+    farmingStatusRef: farmingStatusEl,
+  });
   initStreamController({
     clearCountdownInterval,
     stopNextHalvingCountdown,
@@ -1807,6 +1829,19 @@ function initializeModules() {
       if (tradingPanelApi?.renderTradingStatus) {
         tradingPanelApi.renderTradingStatus();
       }
+      farmingPanelApi?.renderFarmingStatus?.();
+    },
+    onFarmUpdated(payload) {
+      // Same flow as trades: the backend returns the new state, the board
+      // re-renders balances, farmed amounts and holdings from it.
+      const updatedState = payload?.updated_state;
+      if (!updatedState || typeof updatedState !== 'object') return;
+      lastGameData = mergeFarmUpdatedState(lastGameData, updatedState);
+      renderPlayerState(lastGameData);
+      renderQuickStats(lastGameData);
+      renderPortfolioValue(lastGameData);
+      tradingPanelApi?.renderTradingStatus?.();
+      farmingPanelApi?.renderFarmingStatus?.();
     },
   });
   initSessionActions({
@@ -2056,6 +2091,7 @@ function applyUIUpdate(data) {
   if (tradingPanelApi?.renderTradingStatus) {
     tradingPanelApi.renderTradingStatus();
   }
+  farmingPanelApi?.renderFarmingStatus?.();
   updateSetupActionsState();
 }
 

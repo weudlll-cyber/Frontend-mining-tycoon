@@ -91,6 +91,19 @@ function buildDom({
     <input id="admin-spread-override" type="number" value="" />
     <p id="admin-spread-override-note"></p>
 
+    <div id="admin-farming-fields">
+      <input id="admin-farming-enabled" type="checkbox" />
+      <input id="admin-farming-min-duration-value" type="number" value="5" />
+      <select id="admin-farming-min-duration-unit">
+        <option value="seconds">seconds</option>
+        <option value="minutes" selected>minutes</option>
+        <option value="hours">hours</option>
+        <option value="days">days</option>
+      </select>
+      <input id="admin-farming-reward" type="number" value="5" />
+      <p id="admin-farming-note"></p>
+    </div>
+
     <select id="admin-anchor-token"><option value="">—</option></select>
     <input id="admin-anchor-rate" type="number" value="" />
     <input id="admin-season-cycles" type="number" value="" />
@@ -765,5 +778,47 @@ describe('per-round options (fee/spread overrides, chat)', () => {
     expect(text).toContain('Global economy (1%)');
     expect(text).toContain('Disabled');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('farming options (Stage 1)', () => {
+  beforeEach(() => setGameConfigDocument(null));
+
+  it('omits farming while off and sends it when enabled, with a review row', () => {
+    const doc = buildDom({ roundType: 'sync' }).window.document;
+    applyGameConfigToForm();
+    expect(buildGamePayload()).not.toHaveProperty('farming_enabled');
+    expect(Object.fromEntries(buildReviewSummary()).Farming).toBe('Disabled');
+
+    doc.getElementById('admin-farming-enabled').checked = true;
+    doc.getElementById('admin-farming-min-duration-value').value = '1';
+    doc.getElementById('admin-farming-reward').value = '5';
+    const payload = buildGamePayload();
+    expect(payload).toMatchObject({
+      farming_enabled: true,
+      farming_min_duration_seconds: 60,
+      farming_reward_rate: 0.05,
+    });
+    expect(Object.fromEntries(buildReviewSummary()).Farming).toBe(
+      'Enabled: 5% per 1m cycle'
+    );
+  });
+
+  it('checks the farming duration against the async session, not the round', async () => {
+    const doc = buildDom({ roundType: 'async' }).window.document;
+    applyGameConfigToForm();
+    doc.getElementById('admin-round-type-async').checked = true;
+    doc.getElementById('admin-round-type-sync').checked = false;
+    doc.getElementById('admin-async-session-preset').value = '5m';
+    doc.getElementById('admin-farming-enabled').checked = true;
+    doc.getElementById('admin-farming-min-duration-value').value = '5';
+    globalThis.fetch = vi.fn();
+
+    await createRound();
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(doc.getElementById('admin-result-box').textContent).toBe(
+      '❌ Farming minimum duration (5m) must be shorter than the round/session duration (5m).'
+    );
   });
 });

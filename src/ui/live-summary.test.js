@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   initLiveSummary,
   renderAsyncSessionBadge,
+  renderPortfolioValue,
   renderQuickStats,
 } from './live-summary.js';
 
@@ -143,5 +144,36 @@ describe('live-summary async badge', () => {
 
     expect(document.getElementById('my-score')?.textContent).toBe('50');
     expect(document.getElementById('top-score')?.textContent).toBe('50');
+  });
+});
+
+describe('live-summary holdings value with farming', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<span id="portfolio-value"></span>';
+    initLiveSummary({
+      portfolioValueEl: document.getElementById('portfolio-value'),
+      getGameMeta: () => ({
+        token_names: ['spring', 'summer', 'autumn', 'winter'],
+        oracle_prices: { spring: 2, summer: 1, autumn: 1, winter: 1 },
+      }),
+      defaultTokenNames: ['spring', 'summer', 'autumn', 'winter'],
+    });
+  });
+
+  it('counts farmed tokens as holdings next to spendable balances', () => {
+    renderPortfolioValue({
+      game_id: 'g',
+      player_state: {
+        balances: { spring: 10, summer: 0, autumn: 0, winter: 0 },
+      },
+      farming: {
+        enabled: true,
+        positions: { spring: { amount: 5, cycles_completed: 0 } },
+      },
+    });
+    // (10 spendable + 5 farmed) * 2 = 30
+    expect(
+      document.getElementById('portfolio-value').getAttribute('data-full-value')
+    ).toBe('30.00');
   });
 });
