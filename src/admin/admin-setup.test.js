@@ -96,11 +96,10 @@ function buildDom({
     <button id="admin-create-btn">Create Round</button>
   </body></html>`);
 
-  // Expose DOM globally so the module's el() helper works
-  // eslint-disable-next-line no-undef
-  global.document = dom.window.document;
-  // eslint-disable-next-line no-undef
-  global.window = dom.window;
+  // Expose DOM globally so the module's el() helper works. vitest's jsdom
+  // environment defines document as a getter, so stub instead of assigning.
+  vi.stubGlobal('document', dom.window.document);
+  vi.stubGlobal('window', dom.window);
   return dom;
 }
 
