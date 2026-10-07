@@ -4,11 +4,12 @@ Browser frontend for Mining Tycoon (Seasonal Tycoon), built with Vite. The
 backend lives in the sibling repo `Mining-tycoon` and is authoritative for all
 gameplay outcomes; this frontend only displays state and sends player intent.
 
-Three pages:
+Four pages:
 
 - **Lobby** (`index.html`): register, log in/out, pick an open game, join it, see the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
 - **Admin console** (`admin.html`): create rounds with snapshot-locked settings, list and delete active games.
+- **How to play** (`how-to-play.html`): static player guide (rules, upgrades, halvings, trading, round types, scoring modes, events). Linked from the lobby and from the player-board header (opens in a new tab).
 
 ## Status
 
@@ -97,11 +98,11 @@ console all use this default; the Backend URL fields on `player.html` and
 - **Open Games** lists enrolling games and running async games (only while the session still fits into the remaining round time). The list refreshes every 10 seconds and when the tab becomes visible.
 - **Enter game** (requires sign-in and a selected game) joins, stores the game ID, player ID and `player_token`, and opens `player.html?autostart=1`.
 - **Last Game Highscores** shows the Top 5 of your last finished round (stored in the browser).
-- An **Admin setup** link leads to `admin.html`.
+- A **How to play** link opens the player guide (`how-to-play.html`) in the same tab; an **Admin setup** link leads to `admin.html`.
 
 ### Player board (`player.html`, `src/main.js`)
 
-- **Header:** countdown, phase, score, rank, top score, scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs.
+- **Header:** countdown, phase, score, rank, top score, scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs; a **How to play** link opens the guide in a new tab so the running game stays open.
 - **Join Round panel:** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async rounds), `Stop Stream`. It collapses once the stream runs. Players cannot create games here; the legacy host controls in the HTML are always hidden (`.admin-only`).
 - **Season cards (2x2):** Balance, Output and Halving per season, plus three inline upgrade lanes (Hashrate, Efficiency, Cooling) as a table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. `Pay` chooses the token you pay with; the backend decides the final cost.
 - **Player State (right):** read-only matrix of output, balances and oracle prices per token and in total, plus next halving, cumulative mined and fee/spread. Large numbers use k/M/B; tooltips show exact values.
@@ -113,6 +114,15 @@ console all use this default; the Backend URL fields on `player.html` and
 Layout rules: desktop (1440x900) has no page scroll, only internal scroll areas;
 tablets stack the grid; phones show one season card at a time. See
 `LOCKED_DECISIONS.md` for the binding UI invariants.
+
+### How to play (`how-to-play.html`, `src/how-to-play.css`)
+
+A static guide without script: quick start, goal and tokens, mining, upgrades,
+halvings, oracle prices, trading, sync/async rounds, scoring modes, events, the
+live tools window, accounts and farming (coming later), with a table of
+contents and section anchors (for example `/how-to-play.html#scoring`). It
+describes the current backend rules; update it in the same change when a game
+rule changes. `src/how-to-play.test.js` guards the anchors and both links.
 
 ### Admin console (`admin.html`, `src/admin/`)
 
@@ -239,11 +249,11 @@ npm scripts (`package.json`):
 | Script | Purpose |
 |---|---|
 | `npm run dev` / `dev:fixed` | Vite dev server (both identical) |
-| `npm run build` | production build into `dist/` (all three pages) |
+| `npm run build` | production build into `dist/` (all four pages) |
 | `npm run preview` | serve the production build locally |
 | `npm run lint` | ESLint on `src/` |
 | `npm run clean:audit` | ESLint with zero warnings + knip (unused files/deps/unresolved imports) |
-| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the three HTML files) |
+| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the four HTML files) |
 | `npm run format:check` | Prettier check (same files) |
 | `npm run test` | all Vitest tests once (jsdom) |
 | `npm run test:fast` | `test:services` + `test:ui` |
@@ -290,6 +300,7 @@ for the local gate, required CI checks and scheduled audits. In short:
 index.html          lobby page            -> src/lobby.js
 player.html         player board          -> src/main.js
 admin.html          admin console         -> src/admin/admin-setup.js, game-management.js
+how-to-play.html    player guide (static) -> src/how-to-play.css
 src/config/         control data and backend URL default
 src/services/       auth, game actions, async sessions, SSE stream controller
 src/meta/           meta fetch/cache and contract version

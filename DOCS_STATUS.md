@@ -34,6 +34,7 @@ Read these first in every new chat/session:
 | `AUDIT_MATRIX.md` | Redirect stub; the matrix now lives in `QUALITY_ENFORCEMENT.md`. |
 | `.github/pull_request_template.md` | Required PR body sections. |
 | `public/assets/README.md` | Where to put images and how to name them. |
+| `how-to-play.html` | Player-facing guide page (not a Markdown doc): game rules as implemented today. Update it with any rule change. |
 
 ### Product / Design Reference (intent, with status notes)
 

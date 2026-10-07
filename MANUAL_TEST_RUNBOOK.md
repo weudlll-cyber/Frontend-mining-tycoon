@@ -67,6 +67,7 @@ window to play with two accounts.
 6. **Open games:** the list shows enrolling games and running async games with a status badge and remaining time. Running sync games are not listed, and running async games are hidden when the session is not shorter than the remaining round time. The list refreshes every 10 s and when the tab becomes visible again.
 7. **Join:** "Enter game" is disabled until you are signed in and have selected a game. Clicking it joins and opens `player.html?autostart=1`. The join name is your display name, or a cleaned/shortened version (1-24 letters, digits, spaces, `_ - .`), falling back to your username.
 8. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5.
+9. **How to play:** the "How to play" link opens `how-to-play.html` in the same tab. Check: the table of contents jumps to each section, "Back to the lobby" returns, the page reads well at desktop width and on a phone (no sideways page scroll; tables scroll inside their box), and the rules still match the current game (upgrade increments and costs, halving order, trade schedule, scoring modes, event kinds).
 
 ---
 
@@ -75,7 +76,7 @@ window to play with two accounts.
 Join an enrolling sync round from the lobby.
 
 1. **Autostart:** the board connects without further clicks; the setup panel ("Join Round": Backend URL, Player Name, Game ID, Player ID, Start Game / Stop Stream) collapses. No round-type, scoring or trade controls are visible to players.
-2. **Header:** countdown, Phase badge, Score, Rank, Top, scoring mode (for example "Scoring: Stockpile Mode"), connection badge. Debug toggle shows meta hash, backend URL and IDs inline.
+2. **Header:** countdown, Phase badge, Score, Rank, Top, scoring mode (for example "Scoring: Stockpile Mode"), connection badge. Debug toggle shows meta hash, backend URL and IDs inline. "How to play" opens the guide in a new tab; the board keeps running and the page still does not scroll.
 3. **Enrollment:** during enrolling, the upgrade buttons and "Execute Trade" are disabled with a short reason. If a request still reaches the backend, the toast shows its `detail` (409 `ACTION_NOT_ALLOWED_GAME_NOT_RUNNING`).
 4. **Season cards (2x2):** each shows Balance, Output and Halving countdown (ticking every second, selectable text) and three inline upgrade lanes (Hashrate, Efficiency, Cooling) with columns `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. Change `Pay` to another token, upgrade, and confirm the balances follow the backend result. The selected pay token survives live updates.
 5. **Player State panel:** read-only matrix (Out/s, Bal, Price per token and total), footer with next halving, cumulative mined, and fee/spread. Large values use k/M/B with the exact value in the tooltip. Tooltips open on hover/focus/tap and close on leave or Escape.

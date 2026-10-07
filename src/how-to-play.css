@@ -1,0 +1,183 @@
+/*
+File: src/how-to-play.css
+Purpose: Styles for the static "How to play" guide (how-to-play.html).
+Role in system: Loaded only by how-to-play.html; mirrors the lobby palette
+  (src/lobby.css) so the guide looks like part of the lobby.
+Constraints: No external fonts or CDNs (system font stack only). The guide is a
+  normal scrolling document; the no-page-scroll rule applies to player.html only.
+*/
+
+:root {
+  --guide-bg: #081626;
+  --guide-card: rgba(8, 16, 30, 0.82);
+  --guide-line: rgba(255, 255, 255, 0.22);
+  --guide-text: #f2f4e8;
+  --guide-text-soft: #bfd2de;
+  --guide-accent: #f3b431;
+  --guide-accent-strong: #d69414;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.page-guide {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--guide-text);
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    Roboto,
+    sans-serif;
+  line-height: 1.55;
+  background-color: var(--guide-bg);
+  background-image:
+    radial-gradient(
+      circle at 12% 18%,
+      rgba(243, 180, 49, 0.18),
+      transparent 44%
+    ),
+    radial-gradient(
+      circle at 88% 10%,
+      rgba(43, 193, 147, 0.14),
+      transparent 48%
+    ),
+    linear-gradient(130deg, #0f2238, #081626);
+  background-attachment: fixed;
+}
+
+.guide-shell {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.guide-header h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  color: var(--guide-accent);
+}
+
+.guide-lead {
+  margin: 0 0 1.25rem;
+  color: var(--guide-text-soft);
+}
+
+.guide-back {
+  margin: 0;
+}
+
+.page-guide a {
+  color: var(--guide-accent);
+}
+
+.page-guide a:hover,
+.page-guide a:focus-visible {
+  color: var(--guide-accent-strong);
+}
+
+.guide-toc,
+.guide-section {
+  background: var(--guide-card);
+  border: 1px solid var(--guide-line);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.guide-toc h2,
+.guide-section h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.25rem;
+}
+
+.guide-section h3 {
+  margin: 1rem 0 0.4rem;
+  font-size: 1.05rem;
+  color: var(--guide-text-soft);
+}
+
+/* Two columns keep the table of contents short on wide screens. */
+.guide-toc ol {
+  margin: 0;
+  padding-left: 1.4rem;
+  columns: 2;
+  column-gap: 2rem;
+}
+
+.guide-section ul,
+.guide-section ol {
+  padding-left: 1.3rem;
+}
+
+.guide-section li + li {
+  margin-top: 0.35rem;
+}
+
+/* Anchor jumps land below the top edge instead of flush against it. */
+.guide-section {
+  scroll-margin-top: 1rem;
+}
+
+.guide-note {
+  color: var(--guide-text-soft);
+  font-size: 0.92rem;
+}
+
+/* Tables scroll inside their wrapper so phones never get page-wide overflow. */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.guide-section table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.guide-section th,
+.guide-section td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--guide-line);
+}
+
+.guide-section th {
+  color: var(--guide-text-soft);
+  font-weight: 600;
+}
+
+.guide-defs dt {
+  font-weight: 700;
+  color: var(--guide-accent);
+  margin-top: 0.6rem;
+}
+
+.guide-defs dd {
+  margin: 0.15rem 0 0;
+}
+
+.guide-section code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+}
+
+.guide-footer {
+  text-align: center;
+  color: var(--guide-text-soft);
+}
+
+@media (max-width: 640px) {
+  .guide-toc ol {
+    columns: 1;
+  }
+
+  .guide-toc,
+  .guide-section {
+    padding: 0.85rem 0.9rem;
+  }
+}

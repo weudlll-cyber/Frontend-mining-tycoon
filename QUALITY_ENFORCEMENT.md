@@ -58,7 +58,7 @@ Other local checks:
 - `npm run mutation:check` (Stryker dry run) and `npm run mutation` (full run, config in `stryker.config.mjs`).
 - `npm run audit:health`: the advisory code-health report on its own.
 
-`format:check` covers `src/**/*.{js,css}` and the three HTML entry points.
+`format:check` covers `src/**/*.{js,css}` and the four HTML entry points.
 Markdown is not format-checked; keep it tidy by hand.
 
 ## 2) Merge-Time CI (Pull Requests)

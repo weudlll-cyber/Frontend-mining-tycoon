@@ -43,7 +43,7 @@ readonly DOMAIN_RE='^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-
 if [ -n "$LE_EMAIL" ]; then
     [[ $LE_EMAIL =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || die "--letsencrypt-email is not an e-mail address"
 fi
-for page in index.html player.html admin.html; do
+for page in index.html player.html admin.html how-to-play.html; do
     [ -f "$SRC_DIR/dist/$page" ] || die "$SRC_DIR/dist/$page is missing; upload the built dist/ first"
 done
 
@@ -126,7 +126,7 @@ fetch_via_nginx() {
 }
 
 log "Checking the pages through nginx"
-for page in index.html player.html admin.html; do
+for page in index.html player.html admin.html how-to-play.html; do
     fetch_via_nginx "$page" || die "GET /$page through nginx failed (check $site_available and DNS/TLS)"
     echo "    /$page OK"
 done

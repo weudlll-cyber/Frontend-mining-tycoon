@@ -14,7 +14,7 @@ The implemented stack is:
 
 - Backend service handling game lifecycle, simulation, economy, events, validation, and security.
 - Simulation worker (started inside the backend process) advancing game time and applying mining yields.
-- Frontend with three pages: lobby (`index.html`), live player board (`player.html`, SSE-driven: player state, upgrades, trading, Top 5 leaderboard, halving/event context, chat) and admin console (`admin.html`).
+- Frontend with three pages: lobby (`index.html`), live player board (`player.html`, SSE-driven: player state, upgrades, trading, Top 5 leaderboard, halving/event context, chat) admin console (`admin.html`) and a static player guide (`how-to-play.html`, linked from the lobby and the player-board header).
 
 The game is built around deterministic simulation inputs (seeded timelines and snapshot-locked settings) and server-authoritative outcomes.
 
