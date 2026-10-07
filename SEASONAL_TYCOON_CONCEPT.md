@@ -87,7 +87,7 @@ All players assigned to the same round can communicate in that common channel, r
 
 Chat is intentionally independent from gameplay outcomes. It does not change scoring, economic behavior, or deterministic simulation logic. Its role is social and communal: helping players share reactions, compare approaches, and experience the round together.
 
-The UI keeps chat non-intrusive by docking it inline within the dashboard instead of opening overlays. This preserves focus on gameplay information while still supporting round-wide social interaction.
+The UI keeps chat non-intrusive: it lives in a small floating, non-modal tools window (next to Trade, Farm and Top 5) that the player opens on demand, moves aside and closes with Escape or an outside click, plus a compact preview with an unread badge. It never blocks the gameplay board (see the REDESIGN DECISION in [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md) §D).
 
 By keeping chat separate from core mechanics, Seasonal Tycoon supports community interaction without compromising fairness.
 
@@ -95,11 +95,13 @@ By keeping chat separate from core mechanics, Seasonal Tycoon supports community
 
 Seasonal Tycoon supports two conceptual round formats chosen by the host.
 
-Asynchronous challenge rounds are the default format. In these rounds, players can begin their identical time-limited session at any point within the round window. Each participant faces the same underlying scenario and timeline, and results are compared through the leaderboard.
+Asynchronous challenge rounds are the intended main format. In these rounds, players can begin their identical time-limited session at any point within the round window. Each participant faces the same underlying scenario and timeline, and results are compared through the leaderboard.
 
 Synchronous live event rounds use a fixed host-scheduled start. In this format, all players begin at the same time and play through the same rule set under the same deterministic model. Round-wide chat is active during the live event to reinforce the shared moment.
 
 These round types change when players participate, not how the core economy behaves.
+
+Implementation note (2026-10-07): both formats are implemented. The admin console pre-selects **Sync** as the round type, so sync is the current default in practice. Sync rounds start automatically when the enrollment window ends; a host-scheduled start date/time does not exist yet.
 
 ## Determinism & Fairness Across Round Types
 
@@ -132,7 +134,7 @@ The dashboard is organized into four key regions:
 1. **Status Bar (top)**: Game phase, remaining time, quick stats (score, rank, top score).
 2. **Seasonal Cards (left, 2×2 grid)**: Each season displays balance, mining output rate, and halving countdown. Inline upgrade controls are part of each card, showing all three upgrade paths (hashrate, efficiency, cooling) at once.
 3. **Player State Analytics (right panel)**: Per-token output, cumulative mined amount, seasonal balances, oracle prices, conversion parameters (fee and spread).
-4. **Bottom Bar**: Score context display, and placeholders for Trading and Farming status, even when disabled.
+4. **Bottom Bar**: Score context display, Trading and Farming status (visible even when disabled), and buttons that open the floating live tools window (Trade, Farm, Chat, Top 5).
 
 ### Strategic Rationale
 
@@ -191,8 +193,8 @@ Each player runs an identical, time-limited session inside that round. Players m
 
 Two round formats are part of the agreed model:
 
-- asynchronous challenge rounds (default)
-- synchronous live event rounds (host-scheduled)
+- asynchronous challenge rounds (intended main format; the admin console currently pre-selects sync)
+- synchronous live event rounds (host-scheduled; currently they start when the enrollment window ends)
 
 Round conditions are defined at creation and do not change while the round is active.
 This fixed round definition includes `scoring_mode`, selected before round start and applied identically to all players.
@@ -209,16 +211,39 @@ Short games default to zero trades.
 
 Trading is never enabled automatically. If trading is enabled by the host, both a fixed trade count and fixed minimum trade start times are defined in advance. Those limits and timings are identical for all players in the round and remain fixed during play.
 
+Implementation note: the admin console pre-fills a default trade count from the round (or session) length, so rounds of 15 minutes and longer get trades unless the admin sets the count to 0. The count and schedule are still fixed at creation and identical for all players.
+
 ### Default Trading Values by Game Length
 
-Default trading values are:
+> **Open product decision.** The concept table and the implemented defaults
+> differ. Until the owner decides which one is right, the implemented table is
+> what players get.
+
+Concept (agreed earlier):
 
 - five-minute games: zero trades
 - ten- to fifteen-minute games: one trade, typically in the middle portion
 - twenty- to forty-minute games: two trades, typically in middle and later portions
 - sixty-minute-and-longer games: three trades, typically across early, middle, and later portions
 
-Hosts may override both trade count and trade timing before round start.
+Implemented (`getDefaultTradeCount()` in `src/config/trading-control-data.js`; the admin can change the count, 0-10):
+
+| Round length (sync) or session length (async) | Default trades |
+|---|---|
+| 5-10 min | 0 |
+| 15-30 min | 2 |
+| 45-60 min | 3 |
+| 2-3 h | 4 |
+| 6-12 h | 5 |
+| 24 h and longer | 6 |
+| lengths between these ranges | nearest bucket |
+
+Unlock times (`computeTradeUnlockOffsetsSeconds()`): the first trade unlocks
+after 20 % of the duration, the others are spread evenly over the remaining
+80 %. Example: 30 minutes with 3 trades unlocks at 6, 14 and 22 minutes. In
+async rounds the offsets count from the start of each player's session.
+
+Hosts may override the trade count before round start. Overriding individual unlock times is not implemented.
 
 ### Scoring & Leaderboards
 
@@ -276,8 +301,31 @@ All farming parameters must be fixed before round start and must apply equally t
 
 Farming is intentionally limited to Stage 1 (Passive Farming) and Stage 2 (Rotating Farming), with no Stage 3 or further escalation layers planned. This is a deliberate design choice to preserve clarity, flexibility, and round-based playability.
 
-## Implementation Reality Check (2026-03-23)
+## Farming Roadmap (Staged Introduction)
 
-- Current implementation/validation focus is Mining.
-- Trading and Farming remain concept-defined, but dedicated UI implementation work for those pillars has not started yet.
-- Structured playtest validation is still needed for mining pace, upgrade economy tuning, and halving behavior quality.
+Farming is the planned third economic pillar alongside mining and trading. It represents liquidity provision, demand creation, and long-term stability within the seasonal economy. It does not replace mining as the production layer or trading as the allocation layer; it adds another way for players to position themselves within the cycle.
+
+Its introduction is staged rather than universal:
+
+- In an initial stage, some game modes have no farming at all and stay focused on mining, or mining with trading.
+- In a limited stage, farming is a simple allocation choice: players commit tokens in exchange for steady, relatively low-risk returns without continual rotation (Stage 1, Passive Farming, above).
+- In a more strategic stage, farming rewards rotate across seasonal tokens over time, so players reallocate positions as the cycle changes and farming competes with mining upgrades and trading for attention and resources (Stage 2, Rotating Farming).
+
+The locked scope ends at Stage 2 (see [LOCKED_DECISIONS.md](LOCKED_DECISIONS.md) §E); an endgame-oriented Stage 3 is explicitly out of scope.
+
+The relationship to game modes is selective:
+
+- short games may exclude farming entirely
+- medium games may treat farming as optional or limited
+- long games may use farming as a core strategic layer
+
+Farming does not introduce player-to-player markets, real-world liquidity pools, or real-money mechanics. It remains an abstracted, deterministic system inside the game's own economy.
+
+## Implementation Reality Check (2026-10-07)
+
+- Mining (season cards, three upgrade lanes, halvings, events, oracle prices) is implemented end to end.
+- Trading is implemented: host-configured trade count and unlock schedule, backend-authoritative conversion with fee and spread, executed from the Trade tab of the live tools window. A per-round fee override by the host is not implemented.
+- Farming is not started; the UI shows a placeholder tab and a status pill.
+- All four scoring modes are evaluated by the backend; the `mining_time` and `efficiency` formulas still need product confirmation (see [SCORING_MODES.md](SCORING_MODES.md)).
+- Sync and async rounds, async sessions and best-of scoring are implemented.
+- Structured playtests for mining pace, upgrade economy and halving behavior are still pending (checklist in [MANUAL_TEST_RUNBOOK.md](MANUAL_TEST_RUNBOOK.md)).

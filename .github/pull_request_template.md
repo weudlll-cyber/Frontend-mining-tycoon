@@ -11,7 +11,7 @@ Provide a concise generated summary of what changed and why.
 - [ ] Desktop gameplay still keeps important information visible without page scrolling.
 - [ ] Shared micro-tooltip contract remains intact (`.ps-tip-trigger`, `.ps-tip-bubble`, `#tooltip-layer`).
 - [ ] Trading/Farming remain visible as sections even when disabled.
-- [ ] Chat remains social-only, docked inline, internally scrollable, and non-gameplay.
+- [ ] Chat remains social-only, internally scrollable, non-gameplay, and inside the non-modal live tools window (`LOCKED_DECISIONS.md` §D).
 
 ## Security Notes
 

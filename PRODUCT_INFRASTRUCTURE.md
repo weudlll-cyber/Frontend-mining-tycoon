@@ -8,9 +8,16 @@ All systems in this document are governed by the same project invariants defined
 - Outcomes are deterministic.
 - Fairness is preserved unconditionally.
 
+This is an intent document. Each section carries an implementation status
+marker (verified against both repos on 2026-10-07): **Implemented**,
+**Partial** or **Not started**. For the full factual state see
+[PROJECT_BASELINE.md](PROJECT_BASELINE.md).
+
 ---
 
 ## 1. Player Creation & Player Profiles
+
+> **Status: Partial.** Accounts exist (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/change-password`). Registration in the lobby collects username, display name, email, a **Discord handle (required)**, a **Telegram handle (optional)** and a password (min. 12 characters with upper/lowercase, digit and special character). The Discord/Telegram handles are stored as contact fields only; there is no Discord or Telegram integration (see Section 9). Accounts are **not yet linked** to in-game players: joining creates a per-game player with the account's display name and a per-game `player_token`. No avatars or cosmetic metadata.
 
 ### What a Player Profile Represents
 
@@ -42,6 +49,8 @@ Player identity is created and maintained server-side. The backend is the author
 
 ## 2. Player Profile Persistence
 
+> **Status: Partial.** Account records persist in the backend database across rounds. Because accounts are not linked to game players yet, per-round results are not attributed to a persistent profile.
+
 ### Why Persistence Is Required
 
 A player who returns after one round ends should be recognizable as the same participant. Without persistent profiles, every game session produces an isolated, anonymous participant — which breaks leaderboard continuity, result attribution, and any future per-player historical view.
@@ -65,6 +74,8 @@ The minimum viable player profile stores only what is needed to identify a consi
 ---
 
 ## 3. Admin Roles & Permissions
+
+> **Status: Partial.** Admin rights are a shared admin token (`X-Admin-Token`, backend `ADMIN_TOKEN`), enforced server-side for game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on and for the `/admin/*` routes (without `ADMIN_TOKEN` the admin routes are localhost-only). Accounts have an `is_admin` field, but no role-based admin login exists yet. Rounds start automatically after the enrollment window; there is no manual "start round" control.
 
 ### Not All Users Are Equal
 
@@ -93,6 +104,8 @@ Admin permissions do not affect gameplay fairness. Admins configure the game env
 
 ## 4. Admin-Only Game Setup (Separation of Concerns)
 
+> **Status: Implemented** for scoring mode, round type, durations, enrollment window, trade count and advanced emission overrides (`admin.html`). Farming rules and a per-round chat opt-out do not exist yet. Players cannot create games.
+
 ### Setup vs. Play
 
 Game configuration and game participation are logically and functionally separated.
@@ -119,6 +132,8 @@ All parameters set in the admin workflow become snapshot-locked at round creatio
 
 ## 5. Highscores & Leaderboards (Sync & Async)
 
+> **Status: Partial.** All four scoring modes are evaluated by the backend. Players see a live Top 5 (SSE `leaderboard_top_5`) in the "Top 5" tab of the live tools window, plus rank and top score in the header. Missing: a full leaderboard view and a "provisional vs. final" marker for async rounds.
+
 ### Leaderboard Scope
 
 Leaderboards are scoped per round and per scoring mode. A leaderboard entry for a given round is only meaningful in the context of that round's fixed scoring mode, because different scoring modes evaluate entirely different quantities. Cross-round and cross-mode comparison requires explicit context.
@@ -140,6 +155,8 @@ Determinism and fairness are preserved regardless of session timing. Because all
 ---
 
 ## 6. Async Rounds & "Best-Of" Handling
+
+> **Status: Implemented.** Async rounds allow repeated sessions; each session starts from the same baseline state, the backend keeps the best finalized score, and the Player State panel shows `This session` and `Best this round`.
 
 ### Multiple Sessions per Player
 
@@ -169,6 +186,8 @@ Retry count itself is never a scoring factor.
 ---
 
 ## 7. Result History & Past Rounds
+
+> **Status: Not started.** There is no backend archive or history endpoint. The only "history" is the last finished game's highscore snapshot, kept in the browser's localStorage and shown in the lobby ("Last Game Highscores").
 
 ### The Need for Historical Results
 
@@ -206,6 +225,8 @@ Result history is a non-gameplay, read-only system. It does not affect simulatio
 
 ## 8. Chat System (Social, Non-Gameplay)
 
+> **Status: Partial.** Round-scoped, non-persistent WebSocket chat with server-side rate limits and server-derived `user`/`ts` is implemented; in the UI it is the Chat tab of the floating live tools window plus a preview dock. Emoji support, admin moderation (mute/clear) and the per-round opt-out are not started.
+
 ### Chat Is Social-Only
 
 The chat system provides a communication layer for players during a round. It is explicitly bounded to social interaction. Chat messages do not trigger game actions, are not interpreted by the simulation, and have no effect on scoring, token balances, or any gameplay state.
@@ -240,6 +261,8 @@ Chat can be disabled on a per-round basis by the admin during game configuration
 ---
 
 ## 9. Scope Boundaries
+
+> **Status: Respected.** None of the out-of-scope items below are implemented. Collecting Discord/Telegram handles at registration is contact data only and is not a chat or notification integration.
 
 The following items are explicitly outside the current product scope. They are listed here to prevent scope creep during design and implementation discussions.
 
