@@ -1,125 +1,195 @@
-# VPS Deployment Guide
+# Frontend VPS Deployment Guide
 
-This file is the current frontend deployment guide.
-For the current implementation state, always cross-check with `README.md`, `PROJECT_BASELINE.md`, and `DOCS_STATUS.md`.
+This is the deployment runbook for the Mining Tycoon frontend. For the current
+implementation state, cross-check `README.md`, `PROJECT_BASELINE.md` and
+`DOCS_STATUS.md`. The backend (and the combined full-stack deploy) is
+documented in the sibling backend repo's `BACKEND_DEPLOY.md`.
 
-## Quick Start (3 Steps)
+## What Gets Deployed
 
-```powershell
-# 1. Deploy with the script
-.\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/game"
+Only the Vite build output `dist/` is published:
 
-# 2. Or with SSH key
-.\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/game" -SshKey "C:\path\to\id_rsa"
+- `index.html` (start/lobby), `player.html` (game), `admin.html` (round setup)
+- `assets/` - hashed JS/CSS bundles plus the images from `public/assets/`
+- `vite.svg`
 
-# 3. Or preview first (dry-run)
-.\scripts\deploy-to-vps.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -VpsPath "/var/www/game" -DryRun
-```
+Source files (`src/`, the source HTML that references `/src/*.js`),
+`package*.json`, `node_modules/`, `data/`, `docs/`, tests, tooling and dot
+files are never uploaded. The server serves `dist/` from
+`/var/www/mining-tycoon` (root-owned, read-only for nginx).
 
-If frontend and backend should be deployed to the same VPS, use the full-stack script from the sibling backend repo instead:
+## Backend URL (`VITE_API_BASE_URL`)
 
-```powershell
-Set-Location "..\Mining tycoon"
-& .\deploy-full-stack.ps1 -VpsUser "deploy" -VpsHost "your-vps.com" -FrontendDomain "game.your-vps.com" -ApiDomain "api.your-vps.com"
-```
+The backend URL is fixed at build time through the Vite environment variable
+`VITE_API_BASE_URL`, e.g. `https://api.example.com`. Without it the build
+falls back to `http://127.0.0.1:8000`, which only works for local
+development. The deploy script:
 
-## What Gets Deployed?
+- requires `-ApiBaseUrl` and refuses empty, `localhost` or non-`https` values
+  (`-AllowInsecureHttp` permits `http://` for testing only),
+- sets `VITE_API_BASE_URL` for `npm run build` only,
+- refuses to deploy if the URL does not appear in the built bundle (for
+  example when building a frontend version without `VITE_API_BASE_URL` support).
 
-Included in production deploy:
-- `dist/` - Compiled & optimized app
-- `public/` - Assets (favicon, etc.)
-- `index.html` - Entry point
+The backend must allow the game origin: its `CORS_ALLOWED_ORIGINS` and
+`ALLOWED_WS_ORIGINS` must be `https://game.example.com` (set automatically by
+the backend deploy script).
 
-Not deployed:
-- `src/` - Source code
-- `node_modules/` - Dependencies
-- `scripts/` - Build scripts
-- `*.test.js` - Test files
-- `.github/`, `.git/` - VCS stuff
-- Documentation (`*.md`)
+## Prerequisites
 
-## What You Need On The VPS
+- Debian 12 / Ubuntu 22.04+ server with systemd; an SSH user with
+  **passwordless sudo** (the installer runs via `sudo -n`).
+- DNS for the game domain pointing to the server (needed for TLS).
+- Locally (Windows): Node.js/npm, PowerShell 7 (5.1 also works), the OpenSSH
+  client (`ssh`, `scp`) and `tar.exe` (both ship with Windows 10/11).
+  `rsync` is not needed locally; the installer installs `rsync` and `nginx`
+  on the server if missing.
 
-Minimum setup:
-1. A web server such as nginx, Apache, or a static file server
-2. Your backend URL, for example `http://api.your-game.com`
-3. Correct backend CORS configuration if frontend and backend are on different origins
+## Deploy Procedure
 
-Note: this frontend script deploys only the static production assets. Backend bootstrap work such as `venv`, `systemd`, and health checks is handled by `..\Mining tycoon\scripts\deploy-backend.ps1` or by `..\Mining tycoon\deploy-full-stack.ps1`.
+1. Deploy the backend first (see `BACKEND_DEPLOY.md`), or use the full-stack
+   script from the backend repo, which runs both deploys in order:
 
-## Example Nginx Config
+   ```powershell
+   Set-Location "..\Mining tycoon"
+   .\deploy-full-stack.ps1 -VpsUser deploy -VpsHost 203.0.113.10 `
+       -FrontendDomain game.example.com -ApiDomain api.example.com `
+       -LetsEncryptEmail ops@example.com
+   ```
+
+2. Frontend only:
+
+   ```powershell
+   .\scripts\deploy-to-vps.ps1 -VpsUser deploy -VpsHost 203.0.113.10 `
+       -FrontendDomain game.example.com -ApiBaseUrl https://api.example.com `
+       -LetsEncryptEmail ops@example.com
+   ```
+
+   Add `-DryRun` to build and list the package without contacting the server.
+
+3. What the script does:
+   1. `npm ci` (only if `node_modules/` is missing), then
+      `npm run build` with `VITE_API_BASE_URL` set; any build error stops the deploy.
+   2. Checks that `dist/index.html`, `dist/player.html`, `dist/admin.html` exist
+      and that the bundle contains the API URL.
+   3. Packs `dist/` and `deploy/` with `tar.exe`, uploads them with `scp` to
+      `~/mining-frontend-upload.tgz` and runs
+      `deploy/remote/install-frontend.sh` with `sudo -n` on the server.
+   4. The installer publishes `dist/` to `/var/www/mining-tycoon` with
+      `rsync --delete --delay-updates`, writes the nginx site on the first
+      deploy, runs certbot when `-LetsEncryptEmail` is given, and fetches the
+      three pages through nginx.
+
+4. Open `https://game.example.com/`.
+
+### Script Parameters
+
+| Parameter | Meaning |
+| --- | --- |
+| `-VpsUser`, `-VpsHost` | SSH login (user needs passwordless sudo) |
+| `-FrontendDomain` | game host name, e.g. `game.example.com` (nginx `server_name`) |
+| `-ApiBaseUrl` | public backend URL baked into the build, e.g. `https://api.example.com` |
+| `-LetsEncryptEmail` | request/install a TLS certificate with certbot (`--redirect --hsts`) |
+| `-SshKey`, `-SshPort` | optional SSH key file and port (default 22) |
+| `-ResetNginxConfig` | rewrite the nginx site from the template (re-runs certbot when `-LetsEncryptEmail` is set) |
+| `-AllowInsecureHttp` | allow an `http://` API URL - testing only |
+| `-DryRun` | build and pack only; nothing is uploaded |
+
+## nginx
+
+Template: `deploy/nginx/mining-frontend.conf` (placeholders
+`__FRONTEND_DOMAIN__`, `__WEB_ROOT__`), installed as
+`/etc/nginx/sites-available/mining-frontend.conf`:
 
 ```nginx
 server {
     listen 80;
-    server_name your-game-domain.com;
-    root /var/www/game;
+    listen [::]:80;
+    server_name game.example.com;
+
+    root /var/www/mining-tycoon;
     index index.html;
-    
-    # Single-page app fallback
-    location / {
-        try_files $uri /index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript image/svg+xml application/json;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location ~ /\. { deny all; }
+
+    # Hashed Vite bundles: cache forever.
+    location ~ "^/assets/[^/]+-[A-Za-z0-9_-]{8}\.(js|css)$" {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        # (security headers repeated here, see the template)
+        try_files $uri =404;
     }
-    
-    # Cache static assets
-    location ~* \.(js|css|svg|png|jpg|gif)$ {
+
+    # Unhashed images from public/assets: one week.
+    location /assets/ {
         expires 7d;
-        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # HTML pages: always revalidate so a deploy is visible immediately.
+    location / {
+        expires -1;
+        try_files $uri $uri.html $uri/ =404;
     }
 }
 ```
 
-## Deploy Without `rsync`
+This is a multi-page app, not an SPA: `/`, `/index.html`, `/player.html` and
+`/admin.html` (also `/player`, `/admin`) are served; unknown paths return 404.
 
-If your VPS does not have `rsync`, use one of these alternatives.
+The installer writes the site only if it does not exist yet (or with
+`-ResetNginxConfig`), because certbot edits it in place when adding TLS.
 
-### Option 1: ZIP + upload
-```powershell
-# Lokal:
-npm run build
-Compress-Archive -Path dist, public, index.html -DestinationPath deploy.zip
+## TLS
 
-# Then upload deploy.zip to the VPS and extract it
-unzip deploy.zip -d /var/www/game
-```
+With `-LetsEncryptEmail` the installer runs:
 
-### Option 2: Git Push
 ```bash
-# Git repo auf VPS, dann:
-git pull origin main
+sudo certbot --nginx --non-interactive --agree-tos -m ops@example.com \
+    --redirect --hsts --keep-until-expiring -d game.example.com
+```
+
+Without it, run that command yourself once DNS points to the server.
+Renewal runs automatically via the packaged `certbot.timer`
+(`sudo certbot renew --dry-run` to test). Only ports 80 and 443 (plus SSH)
+need to be open (`sudo ufw allow 'Nginx Full'`).
+
+## Manual Deploy (Without the Script)
+
+```powershell
+$env:VITE_API_BASE_URL = "https://api.example.com"
+npm ci
 npm run build
-# (oder im VPS ein post-receive hook mit npm run build)
+Remove-Item Env:VITE_API_BASE_URL
+ssh deploy@203.0.113.10 "rm -rf ~/mining-frontend-staging && mkdir ~/mining-frontend-staging"
+scp -r dist deploy deploy@203.0.113.10:mining-frontend-staging/
+ssh deploy@203.0.113.10 "sudo bash ~/mining-frontend-staging/deploy/remote/install-frontend.sh --frontend-domain game.example.com && rm -rf ~/mining-frontend-staging"
 ```
-
-### Option 3: FTP/SFTP fallback
-Using WinSCP or FileZilla:
-1. Lokal: `npm run build`
-2. Upload `dist/`, `public/`, `index.html` in VPS-Pfad
-
-## Configure The Backend URL
-
-The app must know where the backend is. Configure it in the app settings, for example:
-```
-http://api.your-vps.com:5000
-```
-
-Make sure:
-- the backend sends CORS headers for your frontend origin
-- the backend is reachable
-- firewall rules allow the connection
 
 ## Troubleshooting
 
-**"dist/" errors**
-```powershell
-npm run build  # Run manually and fix the reported build errors
-```
+**Build fails** - run `npm run build` locally and fix the reported errors; the
+deploy script stops on any non-zero exit code.
 
-**"rsync: command not found"**
-Install `rsync` on the VPS: `sudo apt install rsync`
+**"The built bundle does not contain ..."** - the checked-out frontend does
+not read `VITE_API_BASE_URL`; update the frontend before deploying.
 
-**"404 when reloading a route"**
-Check whether your web server is configured with `try_files $uri /index.html`.
+**`sudo: a password is required`** - configure passwordless sudo for the
+deploy user (`visudo -f /etc/sudoers.d/deploy`).
 
-**"CORS error in browser"**
-The backend must send `Access-Control-Allow-Origin` for the frontend origin.
+**404 for a page** - check that `dist/` contained it and that
+`/var/www/mining-tycoon/<page>.html` exists; there is no SPA fallback by design.
+
+**CORS or chat errors in the browser** - the backend's `CORS_ALLOWED_ORIGINS`
+and `ALLOWED_WS_ORIGINS` must exactly match `https://game.example.com`
+(scheme + host, no trailing slash). Re-run the backend deploy with the
+correct `-FrontendOrigin`.
+
+**Mixed content errors** - the page is served over https but the build points
+to an `http://` API. Rebuild with an `https://` `-ApiBaseUrl`.
