@@ -1,6 +1,13 @@
 /**
- * This is tuning/control data for trade defaults and schedule rules.
- * UI modules must import from here and must not duplicate trade default numbers.
+ * Built-in tuning/control data for trade defaults and schedule rules.
+ *
+ * These are the FALLBACK values used when the backend /meta does not send a
+ * `game_config` (older backend). The live values are admin-editable in the
+ * backend; src/config/game-config.js resolves the effective config and owns
+ * the helper functions (clampTradeCount, getDefaultTradeCount,
+ * computeTradeUnlockOffsetsSeconds). UI modules must not duplicate these numbers.
+ *
+ * File: src/config/trading-control-data.js
  */
 
 export const TRADE_COUNT_LIMITS = { min: 0, max: 10 };
@@ -8,84 +15,21 @@ export const TRADE_COUNT_LIMITS = { min: 0, max: 10 };
 export const FIRST_TRADE_UNLOCK_FRACTION = 0.2;
 export const REMAINING_WINDOW_FRACTION = 0.8;
 
-const TRADE_DEFAULT_RANGES = [
-  { minSeconds: 300, maxSeconds: 600, tradeCount: 0 },
-  { minSeconds: 900, maxSeconds: 1800, tradeCount: 2 },
-  { minSeconds: 2700, maxSeconds: 3600, tradeCount: 3 },
-  { minSeconds: 7200, maxSeconds: 10800, tradeCount: 4 },
-  { minSeconds: 21600, maxSeconds: 43200, tradeCount: 5 },
+// Default trade count by trade-window length, in the backend `trade_defaults`
+// shape: ascending buckets, the first bucket whose max_duration_seconds is
+// >= the duration wins, `null` means "longer than all other buckets".
+// WHY these boundaries: older backends use inclusive ranges (5-10m -> 0,
+// 15-30m -> 2, 45-60m -> 3, 2-3h -> 4, 6-12h -> 5, >= 24h -> 6) and fill the
+// gaps with the nearest range center (600, 1350, 3150, 9000, 32400, 86400 s).
+// The 601-899 s gap is closer to 600 than to 1350, so the first bucket ends at
+// 899; the other boundaries are the midpoints between neighbouring centers
+// (2250, 6075, 20700, 59400, ties go to the shorter bucket as before). This
+// reproduces the old behavior exactly for whole-second durations.
+export const TRADE_DEFAULT_BUCKETS = [
+  { max_duration_seconds: 899, trade_count: 0 },
+  { max_duration_seconds: 2250, trade_count: 2 },
+  { max_duration_seconds: 6075, trade_count: 3 },
+  { max_duration_seconds: 20700, trade_count: 4 },
+  { max_duration_seconds: 59400, trade_count: 5 },
+  { max_duration_seconds: null, trade_count: 6 },
 ];
-
-const NEAREST_BUCKETS = [
-  { centerSeconds: 600, tradeCount: 0 },
-  { centerSeconds: 1350, tradeCount: 2 },
-  { centerSeconds: 3150, tradeCount: 3 },
-  { centerSeconds: 9000, tradeCount: 4 },
-  { centerSeconds: 32400, tradeCount: 5 },
-  { centerSeconds: 86400, tradeCount: 6 },
-];
-
-export function clampTradeCount(value) {
-  const numeric = Number.isFinite(Number(value)) ? Number(value) : 0;
-  const rounded = Math.round(numeric);
-  return Math.max(
-    TRADE_COUNT_LIMITS.min,
-    Math.min(TRADE_COUNT_LIMITS.max, rounded)
-  );
-}
-
-export function getDefaultTradeCount(durationSeconds) {
-  const duration = Math.max(
-    0,
-    Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) : 0
-  );
-
-  if (duration >= 86400) {
-    return clampTradeCount(6);
-  }
-
-  const matchingRange = TRADE_DEFAULT_RANGES.find(
-    (range) => duration >= range.minSeconds && duration <= range.maxSeconds
-  );
-  if (matchingRange) {
-    return clampTradeCount(matchingRange.tradeCount);
-  }
-
-  // For gaps (for example 31m-44m or 13h-23h), pick the nearest configured bucket.
-  const nearest = NEAREST_BUCKETS.reduce((best, candidate) => {
-    if (!best) return candidate;
-    const bestDistance = Math.abs(duration - best.centerSeconds);
-    const candidateDistance = Math.abs(duration - candidate.centerSeconds);
-    return candidateDistance < bestDistance ? candidate : best;
-  }, null);
-
-  return clampTradeCount(nearest?.tradeCount ?? 0);
-}
-
-export function computeTradeUnlockOffsetsSeconds(durationSeconds, tradeCount) {
-  const duration = Math.max(0, Math.round(Number(durationSeconds) || 0));
-  const count = clampTradeCount(tradeCount);
-  if (duration <= 0 || count <= 0) {
-    return [];
-  }
-
-  const firstUnlock = Math.ceil(duration * FIRST_TRADE_UNLOCK_FRACTION);
-  const remainingWindow = duration * REMAINING_WINDOW_FRACTION;
-  const interval = remainingWindow / count;
-
-  const offsets = [];
-  let previous = 0;
-
-  for (let idx = 0; idx < count; idx += 1) {
-    let nextOffset = firstUnlock + Math.ceil(interval * idx);
-    nextOffset = Math.max(nextOffset, previous + 1);
-    nextOffset = Math.min(nextOffset, Math.max(1, duration - 1));
-    if (nextOffset <= previous) {
-      nextOffset = Math.min(duration - 1, previous + 1);
-    }
-    offsets.push(nextOffset);
-    previous = nextOffset;
-  }
-
-  return offsets;
-}

@@ -138,18 +138,17 @@ import {
   syncSessionDurationOptions,
   getAsyncDurationPreset,
   presetToSeconds,
+  populateHostPresetSelects,
 } from './ui/async-duration.js';
+// Round-setup values come from the effective game config (backend /meta
+// `game_config`, fallback src/config constants).
 import {
-  TRADE_COUNT_LIMITS,
+  SCORING_CONTROL,
+  getEffectiveGameConfig,
   clampTradeCount,
   getDefaultTradeCount,
   computeTradeUnlockOffsetsSeconds,
-} from './config/trading-control-data.js';
-import {
-  SCORING_CONTROL,
-  ASYNC_ROUND_DEFAULT_PRESET,
-  ASYNC_SESSION_DEFAULT_PRESET,
-} from './config/game-control-data.js';
+} from './config/index.js';
 import {
   resolveDurationSecondsFromInputs,
   collectAdvancedOverridesFromInputs,
@@ -1495,11 +1494,13 @@ function saveSettings() {
   setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
   setStorageItem(
     STORAGE_KEYS.asyncDurationPreset,
-    asyncHostDurationPresetInput?.value || ASYNC_ROUND_DEFAULT_PRESET
+    asyncHostDurationPresetInput?.value ||
+      getEffectiveGameConfig().defaults.async_round_preset
   );
   setStorageItem(
     STORAGE_KEYS.asyncDurationCustomMinutes,
-    asyncSessionDurationPresetInput?.value || ASYNC_SESSION_DEFAULT_PRESET
+    asyncSessionDurationPresetInput?.value ||
+      getEffectiveGameConfig().defaults.async_session_preset
   );
   setStorageItem(
     STORAGE_KEYS.asyncAutoStart,
@@ -2348,8 +2349,18 @@ durationCustomUnitInput?.addEventListener('change', () => {
   saveSettings();
 });
 enrollmentWindowInput?.addEventListener('change', saveSettings);
-tradeCountInput?.setAttribute('min', String(TRADE_COUNT_LIMITS.min));
-tradeCountInput?.setAttribute('max', String(TRADE_COUNT_LIMITS.max));
+function applyGameConfigToHostControls() {
+  // Legacy host controls on player.html are always hidden (.admin-only), but
+  // keep their options and limits in line with the effective game config.
+  populateHostPresetSelects({
+    durationPresetInput,
+    asyncDurationPresetInput: asyncHostDurationPresetInput,
+    asyncSessionPresetInput: asyncSessionDurationPresetInput,
+  });
+  const { min, max } = getEffectiveGameConfig().trade_count_limits;
+  tradeCountInput?.setAttribute('min', String(min));
+  tradeCountInput?.setAttribute('max', String(max));
+}
 tradeCountInput?.addEventListener('change', () => {
   tradeCountManuallyOverridden = true;
   if (tradeCountInput) {
@@ -2388,6 +2399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeModules();
   initializeHeaderInteractions();
   ensureInputsEditable();
+  applyGameConfigToHostControls();
   loadSettings();
   // Apply the session-duration guard immediately after settings are restored
   // so the dropdown reflects the saved round duration on first render.
@@ -2407,6 +2419,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   try {
     await fetchMetaSnapshot(baseUrl, gameIdInput.value || null);
+    // /meta may carry an admin-edited game_config; refresh the host controls.
+    applyGameConfigToHostControls();
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }

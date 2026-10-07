@@ -1,10 +1,13 @@
 /**
- * Control data / tuning values (Steuerdaten) for game setup settings.
+ * Built-in control data / tuning values for game setup settings.
  *
- * Change values here to tune defaults and limits for duration presets,
- * enrollment windows, scoring modes, and async session defaults.
- * All other modules must import from here and must not duplicate these
- * constants inline.
+ * Since the admin "Game Settings" section (admin.html, section 11) the backend
+ * owns the live values: GET /meta exposes them as `game_config`, and
+ * src/config/game-config.js resolves the effective config. The constants in
+ * this file are the FALLBACK used when the backend does not send a
+ * `game_config` (older backend). They mirror backend app/policy/control_data.py.
+ * Other modules must read the effective config via src/config/game-config.js
+ * and must not duplicate these constants inline.
  *
  * File: src/config/game-control-data.js
  */
@@ -29,6 +32,16 @@ export const ROUND_DURATION_PRESETS = {
   '3d': 259200,
   '7d': 604800,
 };
+
+// ── Sync round duration ─────────────────────────────────────────────────────
+// Every preset is valid for sync rounds in the backend, so the sync dropdown
+// offers the full table. '5m' is the default for manual testing.
+export const SYNC_ROUND_PRESET_IDS = Object.keys(ROUND_DURATION_PRESETS);
+export const SYNC_ROUND_DEFAULT_PRESET = '5m';
+
+// Round type preselected in the admin create form. Uses the same strings the
+// create-game API accepts in `round_type` ('synchronous' | 'asynchronous').
+export const DEFAULT_ROUND_TYPE = 'synchronous';
 
 // Min/max for custom duration entry (same as backend DURATION_MIN/MAX_SECONDS)
 export const ROUND_DURATION_LIMITS = { min: 60, max: 2592000 }; // 2592000 = 30 days

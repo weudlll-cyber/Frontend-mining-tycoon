@@ -1,6 +1,8 @@
 /**
  * Barrel export for src/config.
- * Import game setup tunables (duration, scoring, enrollment, trading) from here.
+ * Built-in fallback tunables (duration, scoring, enrollment, trading) and the
+ * effective-config resolver (game-config.js) that prefers the backend
+ * `game_config` from GET /meta.
  *
  * File: src/config/index.js
  */
@@ -8,6 +10,9 @@
 export {
   ROUND_DURATION_PRESETS,
   ROUND_DURATION_LIMITS,
+  SYNC_ROUND_PRESET_IDS,
+  SYNC_ROUND_DEFAULT_PRESET,
+  DEFAULT_ROUND_TYPE,
   ASYNC_ROUND_PRESET_IDS,
   ASYNC_ROUND_DEFAULT_PRESET,
   ASYNC_SESSION_PRESET_IDS,
@@ -21,7 +26,21 @@ export {
   TRADE_COUNT_LIMITS,
   FIRST_TRADE_UNLOCK_FRACTION,
   REMAINING_WINDOW_FRACTION,
+  TRADE_DEFAULT_BUCKETS,
+} from './trading-control-data.js';
+
+export {
+  ROUND_TYPE_VALUES,
+  isAsyncRoundType,
+  buildFallbackGameConfig,
+  normalizeGameConfig,
+  setGameConfigDocument,
+  getActiveGameConfigDocument,
+  getEffectiveGameConfig,
+  getPresetSeconds,
   clampTradeCount,
+  clampEnrollmentWindowSeconds,
   getDefaultTradeCount,
   computeTradeUnlockOffsetsSeconds,
-} from './trading-control-data.js';
+  formatPresetLabel,
+} from './game-config.js';

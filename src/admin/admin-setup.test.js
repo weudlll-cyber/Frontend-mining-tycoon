@@ -91,6 +91,7 @@ function buildDom({
 
     <div id="admin-sync-fields"></div>
     <div id="admin-async-fields" class="hidden-section"></div>
+    <p id="admin-game-config-source"></p>
     <dl id="admin-review-dl"></dl>
     <div id="admin-result-box"></div>
     <button id="admin-create-btn">Create Round</button>
@@ -105,11 +106,14 @@ function buildDom({
 
 // ── Import module after DOM is set —
 //   We import buildReviewSummary and buildGamePayload which read the global document.
+import { setGameConfigDocument } from '../config/index.js';
 import {
+  applyGameConfigToForm,
   buildReviewSummary,
   buildGamePayload,
   createRound,
   init,
+  refreshGameConfigFromMeta,
   initBackendUrlField,
   renderCreateSuccess,
   resolveTradeWindowSeconds,
@@ -535,5 +539,139 @@ describe('async trade defaults and init', () => {
       dom.window.document.getElementById('admin-duration-preset').options
     ).map((option) => option.value);
     expect(presetValues).toContain('3h');
+  });
+});
+
+// ── Effective game config (backend /meta game_config) ───────────────────────
+
+const GAME_CONFIG_DOC = {
+  version: 7,
+  config_hash: 'feedbeefcafe0123',
+  config: {
+    duration_presets: { '2m': 120, '5m': 300, '30m': 1800, '24h': 86400 },
+    sync_round_preset_ids: ['2m', '5m'],
+    async_round_preset_ids: ['30m', '24h'],
+    async_session_preset_ids: ['2m', '5m'],
+    defaults: {
+      round_type: 'asynchronous',
+      sync_round_preset: '2m',
+      async_round_preset: '24h',
+      async_session_preset: '5m',
+      enrollment_window_seconds: 20,
+      scoring_mode: 'power',
+    },
+    duration_limits: { min_seconds: 30, max_seconds: 7200 },
+    enrollment_window_limits: { min_seconds: 15, max_seconds: 60 },
+    trade_count_limits: { min: 0, max: 4 },
+    trade_defaults: [
+      { max_duration_seconds: 120, trade_count: 1 },
+      { max_duration_seconds: null, trade_count: 3 },
+    ],
+    trade_unlock: {
+      first_unlock_fraction: 0.5,
+      remaining_window_fraction: 0.5,
+    },
+  },
+};
+
+function optionValues(doc, id) {
+  return Array.from(doc.getElementById(id).options).map((o) => o.value);
+}
+
+describe('create form from the effective game config', () => {
+  beforeEach(() => setGameConfigDocument(null));
+
+  it('renders the built-in fallback when the backend sent no game config', () => {
+    const doc = buildDom().window.document;
+    applyGameConfigToForm();
+    expect(optionValues(doc, 'admin-duration-preset')).toContain('custom');
+    expect(doc.getElementById('admin-duration-preset').value).toBe('5m');
+    expect(doc.getElementById('admin-round-type-sync').checked).toBe(true);
+    expect(
+      doc.getElementById('admin-game-config-source').textContent
+    ).toContain('built-in fallback');
+  });
+
+  it('builds options, defaults and limits from the backend game config', () => {
+    const doc = buildDom().window.document;
+    setGameConfigDocument(GAME_CONFIG_DOC);
+    applyGameConfigToForm();
+
+    expect(optionValues(doc, 'admin-duration-preset')).toEqual([
+      '2m',
+      '5m',
+      'custom',
+    ]);
+    expect(optionValues(doc, 'admin-async-duration-preset')).toEqual([
+      '30m',
+      '24h',
+    ]);
+    expect(doc.getElementById('admin-async-duration-preset').value).toBe('24h');
+    expect(doc.getElementById('admin-async-session-preset').value).toBe('5m');
+    expect(doc.getElementById('admin-round-type-async').checked).toBe(true);
+    expect(doc.getElementById('admin-scoring-power').checked).toBe(true);
+    const enrollment = doc.getElementById('admin-enrollment-window');
+    expect([enrollment.min, enrollment.max, enrollment.value]).toEqual([
+      '15',
+      '60',
+      '20',
+    ]);
+    expect(doc.getElementById('admin-duration-custom-value').max).toBe('7200');
+    expect(doc.getElementById('admin-trade-count').max).toBe('4');
+    // 5m session > 120 s bucket -> open-ended bucket = 3 trades.
+    expect(doc.getElementById('admin-trade-count').value).toBe('3');
+    expect(doc.getElementById('admin-game-config-source').textContent).toBe(
+      'Options and defaults: backend Game Settings v7 (feedbeefcafe).'
+    );
+
+    const payload = buildGamePayload();
+    expect(payload.round_type).toBe('asynchronous');
+    expect(payload.duration_preset).toBe('24h');
+    expect(payload.session_duration_seconds).toBe(300);
+    expect(payload.trade_unlock_offsets_seconds).toEqual([150, 200, 250]);
+  });
+
+  it('clamps the session to the round using the backend preset seconds', () => {
+    const doc = buildDom().window.document;
+    setGameConfigDocument({
+      ...GAME_CONFIG_DOC,
+      config: {
+        ...GAME_CONFIG_DOC.config,
+        async_round_preset_ids: ['2m', '30m'],
+        defaults: {
+          ...GAME_CONFIG_DOC.config.defaults,
+          async_round_preset: '2m',
+        },
+      },
+    });
+    init();
+    doc
+      .getElementById('admin-async-fields')
+      .dispatchEvent(new doc.defaultView.Event('change'));
+    expect(doc.getElementById('admin-async-session-preset').value).toBe('2m');
+  });
+
+  it('re-renders from GET /meta and skips invalid backend URLs', async () => {
+    const doc = buildDom().window.document;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ meta_hash: 'm1', game_config: GAME_CONFIG_DOC }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    doc.getElementById('admin-backend-url').value = 'not a url';
+    await refreshGameConfigFromMeta();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    doc.getElementById('admin-backend-url').value = 'http://127.0.0.1:8000';
+    await refreshGameConfigFromMeta();
+    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:8000/meta');
+    expect(optionValues(doc, 'admin-duration-preset')).toEqual([
+      '2m',
+      '5m',
+      'custom',
+    ]);
+    vi.unstubAllGlobals();
   });
 });

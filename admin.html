@@ -3,7 +3,9 @@ File: admin.html
 Purpose: Admin-only round setup page. Allows operators to create new game rounds
          with full configuration (type, duration, scoring, trading) before sharing
          a game ID with players, manage/reset games, edit the global economy
-         (applies to newly created games only) and view aggregated metrics.
+         and the round-setup game settings (both apply to newly created games
+         only) and view aggregated metrics. Create-form options and defaults
+         come from the backend game config (GET /meta `game_config`).
 Security notes:
   - Requires X-Admin-Token header on POST /games when REQUIRE_ADMIN_FOR_GAME_CREATE=true.
   - Admin token is held in a session-scoped password input only; never persisted to storage.
@@ -337,6 +339,61 @@ Security notes:
         font-style: italic;
       }
 
+      /* Section 11 — Game Settings editor */
+      .gc-fieldset {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .gc-fieldset legend {
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0 0.3rem;
+      }
+
+      .gc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .gc-table th {
+        text-align: left;
+        padding: 0.3rem 0.4rem;
+        font-weight: 600;
+      }
+
+      .gc-table td {
+        padding: 0.25rem 0.4rem;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      .gc-checklist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+        margin: 0.3rem 0 0.75rem;
+        font-size: 0.875rem;
+      }
+
+      .gc-checklist label {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-weight: 400;
+      }
+
       .async-fields {
         margin-top: 0.5rem;
         padding: 0.6rem 0.8rem;
@@ -426,6 +483,11 @@ Security notes:
           </label>
         </div>
       </div>
+      <p
+        id="admin-game-config-source"
+        class="derived-note"
+        aria-live="polite"
+      ></p>
     </section>
 
     <!-- Section 3: Time Configuration -->
@@ -446,13 +508,14 @@ Security notes:
             max="3600"
           />
           <p class="derived-note">
-            How long players can join before the round starts (5 – 3 600 s).
+            How long players can join before the round starts (limits come from
+            Game Settings).
           </p>
         </div>
         <div class="form-group">
           <label for="admin-duration-preset">Round Duration</label>
           <select id="admin-duration-preset">
-            <!-- Populated by admin-setup.js from ROUND_DURATION_PRESETS -->
+            <!-- Populated by admin-setup.js from the effective game config -->
           </select>
         </div>
         <div
@@ -485,13 +548,13 @@ Security notes:
         <div class="form-group">
           <label for="admin-async-duration-preset">Round Duration</label>
           <select id="admin-async-duration-preset">
-            <!-- Populated by admin-setup.js from ASYNC_ROUND_PRESET_IDS -->
+            <!-- Populated by admin-setup.js from the effective game config -->
           </select>
         </div>
         <div class="form-group">
           <label for="admin-async-session-preset">Session Duration</label>
           <select id="admin-async-session-preset">
-            <!-- Populated by admin-setup.js from ASYNC_SESSION_PRESET_IDS -->
+            <!-- Populated by admin-setup.js from the effective game config -->
           </select>
         </div>
         <p class="section-note full-width">
@@ -777,6 +840,245 @@ Security notes:
         <div id="admin-game-metrics-body"></div>
       </div>
       <div id="admin-metrics-error" class="result-box" aria-live="polite"></div>
+    </section>
+
+    <!-- Section 11: Game Settings -->
+    <section class="card" aria-labelledby="section-gameconfig-title">
+      <h2 id="section-gameconfig-title">11 — Game Settings</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Applies to newly created rounds only; existing rounds keep their
+        settings. Duration presets, the presets offered per round type,
+        create-form defaults, limits and default trade counts.
+      </p>
+      <div style="margin-bottom: 0.75rem">
+        <button
+          id="admin-gameconfig-load-btn"
+          class="admin-secondary-btn"
+          type="button"
+        >
+          Load game settings
+        </button>
+      </div>
+      <p id="admin-gameconfig-version" class="derived-note"></p>
+      <div id="admin-gameconfig-editor" hidden>
+        <fieldset class="gc-fieldset">
+          <legend>Duration presets</legend>
+          <p class="derived-note">
+            Preset id (e.g. 2m) and its length in seconds. Short presets are
+            useful for testing.
+          </p>
+          <table class="gc-table">
+            <thead>
+              <tr>
+                <th scope="col">Preset id</th>
+                <th scope="col">Duration (seconds)</th>
+                <th scope="col"><span class="visually-hidden">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="admin-gameconfig-presets-body"></tbody>
+          </table>
+          <button
+            id="admin-gameconfig-add-preset-btn"
+            class="admin-secondary-btn"
+            type="button"
+          >
+            Add preset
+          </button>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Offered presets</legend>
+          <p class="derived-note">
+            Which presets the create form offers (listed shortest first). Untick
+            a preset to stop offering it for new rounds.
+          </p>
+          <p><strong>Sync round duration</strong></p>
+          <div id="admin-gameconfig-offer-sync" class="gc-checklist"></div>
+          <p><strong>Async round duration</strong></p>
+          <div
+            id="admin-gameconfig-offer-async-round"
+            class="gc-checklist"
+          ></div>
+          <p><strong>Async session duration</strong></p>
+          <div
+            id="admin-gameconfig-offer-async-session"
+            class="gc-checklist"
+          ></div>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Create-form defaults</legend>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="admin-gameconfig-default-round-type"
+                >Round type</label
+              >
+              <select id="admin-gameconfig-default-round-type">
+                <option value="synchronous">Sync</option>
+                <option value="asynchronous">Async (host)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-scoring-mode"
+                >Scoring mode</label
+              >
+              <select id="admin-gameconfig-default-scoring-mode"></select>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-sync-round-preset"
+                >Sync round duration</label
+              >
+              <select id="admin-gameconfig-default-sync-round-preset"></select>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-async-round-preset"
+                >Async round duration</label
+              >
+              <select id="admin-gameconfig-default-async-round-preset"></select>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-async-session-preset"
+                >Async session duration</label
+              >
+              <select
+                id="admin-gameconfig-default-async-session-preset"
+              ></select>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-enrollment"
+                >Enrollment window (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-default-enrollment"
+                type="number"
+                step="1"
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Limits</legend>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="admin-gameconfig-duration-min"
+                >Custom duration min (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-duration-min"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-duration-max"
+                >Custom duration max (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-duration-max"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-enrollment-min"
+                >Enrollment window min (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-enrollment-min"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-enrollment-max"
+                >Enrollment window max (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-enrollment-max"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-trade-min">Trade count min</label>
+              <input id="admin-gameconfig-trade-min" type="number" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-trade-max">Trade count max</label>
+              <input id="admin-gameconfig-trade-max" type="number" step="1" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Default trade count by round length</legend>
+          <p class="derived-note">
+            Ascending. The first row whose max duration is &gt;= the trade
+            window wins; the last row covers everything longer.
+          </p>
+          <table class="gc-table">
+            <thead>
+              <tr>
+                <th scope="col">Max duration (seconds)</th>
+                <th scope="col">Trade count</th>
+                <th scope="col"><span class="visually-hidden">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="admin-gameconfig-trade-body"></tbody>
+          </table>
+          <button
+            id="admin-gameconfig-add-trade-row-btn"
+            class="admin-secondary-btn"
+            type="button"
+          >
+            Add row
+          </button>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Trade unlock schedule</legend>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="admin-gameconfig-first-unlock"
+                >First unlock (fraction of window)</label
+              >
+              <input
+                id="admin-gameconfig-first-unlock"
+                type="number"
+                step="any"
+              />
+              <p class="derived-note">e.g. 0.2 = first trade after 20%.</p>
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-remaining-window"
+                >Remaining window (fraction)</label
+              >
+              <input
+                id="admin-gameconfig-remaining-window"
+                type="number"
+                step="any"
+              />
+              <p class="derived-note">
+                Share of the window the other trades are spread over.
+              </p>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+      <button
+        id="admin-gameconfig-save-btn"
+        class="create-btn"
+        type="button"
+        disabled
+      >
+        Save changes
+      </button>
+      <div
+        id="admin-gameconfig-result"
+        class="result-box"
+        aria-live="polite"
+      ></div>
     </section>
 
     <script type="module" src="/src/admin/admin-setup.js"></script>
