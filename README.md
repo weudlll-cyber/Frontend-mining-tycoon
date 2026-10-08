@@ -69,7 +69,8 @@ the sibling backend repo docs in the same workstream.
 3. Create a round: open `http://127.0.0.1:5173/admin.html`, choose Sync or
    Async, durations, scoring mode and trades, then click **Create Round**. If
    the backend enforces admin auth (`REQUIRE_ADMIN_FOR_GAME_CREATE=true`),
-   enter the admin token in section 1.
+   sign in with an administrator account in section 1 or enter the admin
+   token there.
 
 4. Play: open `http://127.0.0.1:5173/`, create an account or sign in, select
    the game in **Open Games** and click **Enter game**. The player board opens
@@ -145,7 +146,8 @@ links.
 
 ### Admin console (`admin.html`, `src/admin/`)
 
-Eleven sections: 1 Connection (backend URL, optional admin token),
+Twelve sections: 1 Connection (backend URL, "Sign in as administrator" or
+the admin token, see below),
 2 Round Type (Sync / Async, "Chat enabled"), 3 Time Configuration,
 4 Scoring Mode, 5 Trading & Farming Rules (count, unlock preview, optional
 conversion fee / oracle spread overrides and the Farming Stage 1 options),
@@ -167,7 +169,41 @@ length, trade unlock fractions, "Chat enabled by default"
 when changed) and the account
 policy "Require sign-in to join" (`account_policy.require_account_to_join`,
 fallback off, sent only when changed); round-setup values apply to newly
-created rounds only, existing rounds keep their settings).
+created rounds only, existing rounds keep their settings), 12 Administrators
+(`GET /admin/users?query=&limit=&offset=`: search box, 20 accounts per page
+with username, display name, email, admin, active and created date; "Make
+admin" / "Remove admin" asks for confirmation and sends
+`PATCH /admin/users/{id}` `{"is_admin": bool}`; 409 `LAST_ADMIN` is explained
+as "This is the last administrator. Make another account an administrator
+first."; disabled until an administrator is signed in or the token field is
+filled).
+
+Admin sign-in (section 1, `src/admin/admin-account.js`,
+`src/admin/admin-session.js`):
+
+- **Sign in as administrator:** username + password -> `POST /auth/login`.
+  Only an account with `user.is_admin: true` is kept ("Signed in as <name>
+  (administrator)"); a non-admin login shows "This account is not an
+  administrator." and its fresh session is revoked (`POST /auth/logout`).
+  **Sign out** forgets the session and calls `POST /auth/logout`.
+- **Admin token** stays the alternative ("or use the admin token"). Every
+  admin request (`/admin/*` and `POST /games`) sends `X-Admin-Token` when the
+  field is filled, otherwise `Authorization: Bearer <session token>` when an
+  administrator is signed in, otherwise no credentials (exactly the old
+  token-only behavior).
+- The session token (`session_token`, falling back to `access_token`) is kept
+  in `sessionStorage` (`mining-tycoon:adminSession`, this tab only) and cleared
+  on sign out, after `expires_at`, on 401 `ACCOUNT_AUTH_INVALID` ("Your
+  administrator session has expired. Please sign in again.") and on 403
+  `ADMIN_REQUIRED` ("This account is not an administrator."). On page load a
+  stored session is re-checked with `GET /auth/me`.
+- **Lobby reuse:** when the console has no session but the lobby is signed in
+  (`mining-tycoon:authToken`) and `GET /auth/me` returns `is_admin: true`, the
+  console uses that session ("... (using your lobby sign-in)"). Signing out in
+  the console revokes that session, which also signs the lobby out on its
+  next check. Backends without `is_admin` never trigger the reuse.
+- The lobby labels the link "Admin setup (you are an administrator)" for an
+  administrator account (`is_admin` from login or `/auth/me`).
 
 Round options (per round, snapshot-locked at creation, backend validates):
 
@@ -209,8 +245,9 @@ Production defaults and test presets are set by admins in Game Settings
 
 Permission enforcement is done by the backend: with
 `REQUIRE_ADMIN_FOR_GAME_CREATE=true` and `ADMIN_TOKEN` set, game creation and
-the `/admin/*` routes require the `X-Admin-Token` header. Joining never needs
-the admin token.
+the `/admin/*` routes require the `X-Admin-Token` header or the session of an
+administrator account (`Authorization: Bearer`). Joining never needs admin
+credentials.
 
 ## Sync and Async Rounds
 
