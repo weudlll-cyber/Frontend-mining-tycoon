@@ -56,6 +56,11 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Privacy: the lobby fonts (Sora, Space Grotesk) are self-hosted via
+  `@fontsource` (OFL-1.1) instead of Google Fonts, so no visitor IP reaches
+  Google; the privacy template no longer needs a Google Fonts section.
+- Privacy: the nginx frontend template logs the path without query string or
+  referrer (`mining_frontend_noquery` log format).
 - `main` is protected by the "Protect main" ruleset: pull request plus a green
   `CI Summary (Manual Merge Gate)` check (#31).
 - Join names are mapped to the backend rules (1-24 letters, digits, spaces,

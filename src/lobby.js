@@ -15,6 +15,14 @@ Backend contract notes:
 Security notes: tokens are never rendered; all backend text uses textContent.
 */
 
+// Fonts are self-hosted (bundled by Vite from @fontsource, OFL-1.1) so the
+// lobby makes no requests to Google Fonts.
+import '@fontsource/sora/latin-400.css';
+import '@fontsource/sora/latin-500.css';
+import '@fontsource/sora/latin-600.css';
+import '@fontsource/sora/latin-700.css';
+import '@fontsource/space-grotesk/latin-500.css';
+import '@fontsource/space-grotesk/latin-700.css';
 import './lobby.css';
 import {
   STORAGE_KEYS,

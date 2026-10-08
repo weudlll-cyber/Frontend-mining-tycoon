@@ -104,6 +104,13 @@ Template: `deploy/nginx/mining-frontend.conf` (placeholders
 `__FRONTEND_DOMAIN__`, `__WEB_ROOT__`), installed as
 `/etc/nginx/sites-available/mining-frontend.conf`:
 
+Access logs go to `/var/log/nginx/mining-frontend.access.log` in the
+`mining_frontend_noquery` format: client IP, time, method, path **without the
+query string**, status, size and user agent (no referrer). Retention follows the
+system logrotate policy for `/var/log/nginx/*.log`; state it in the privacy
+notice. The excerpt below omits the log lines; see the template for the full
+file.
+
 ```nginx
 server {
     listen 80;
