@@ -20,6 +20,7 @@ describe('resolvePlayerActionAvailability', () => {
     expect(result.allowed).toBe(false);
     expect(result.code).toBe(ACTION_BLOCK_CODES.GAME_NOT_RUNNING);
     expect(result.reason).toMatch(/round starts/);
+    expect(result.farmReason).toBe('Farming opens when the round starts.');
   });
 
   it('blocks actions after the round finished (case-insensitive)', () => {
@@ -31,6 +32,7 @@ describe('resolvePlayerActionAvailability', () => {
     expect(result.allowed).toBe(false);
     expect(result.code).toBe(ACTION_BLOCK_CODES.GAME_NOT_RUNNING);
     expect(result.reason).toMatch(/finished/);
+    expect(result.farmReason).toMatch(/Farming is closed/);
   });
 
   it('blocks async actions without an active session', () => {
@@ -42,6 +44,7 @@ describe('resolvePlayerActionAvailability', () => {
     expect(result.allowed).toBe(false);
     expect(result.code).toBe(ACTION_BLOCK_CODES.NO_ACTIVE_SESSION);
     expect(result.reason).toBe('Start a session to upgrade or trade.');
+    expect(result.farmReason).toBe('Start a session to deposit or withdraw.');
   });
 
   it('allows async actions during an active session', () => {

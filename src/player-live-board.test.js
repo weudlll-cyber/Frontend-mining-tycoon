@@ -5,6 +5,7 @@ Covers:
 - Compact top-5 leaderboard (SSE leaderboard_top_5) mounted in the live tools window.
 - Event banner rendering from the backend `active_events` list.
 - Backend URL seeded from src/config/backend-url.js instead of hard-coded HTML.
+- Farm tab (Farming Stage 1): status from SSE `farming`, deposit `updated_state` merge.
 - No stray console.log calls in the main entry point.
 */
 
@@ -164,6 +165,85 @@ describe('player live board wiring', () => {
       'Chat is ready'
     );
     vi.unstubAllGlobals();
+  });
+
+  it('renders the Farm tab from SSE farming and applies a deposit updated_state', async () => {
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    const panel = document.getElementById('farming-panel');
+    const pill = document.getElementById('farming-status');
+
+    // Before any farming data (older backend): explicit status text.
+    expect(panel.textContent).toContain(
+      'Farming is not enabled for this round.'
+    );
+    expect(pill.textContent).toBe('Not enabled');
+
+    deps.onData({
+      game_id: 7,
+      player_id: 3,
+      game_status: 'running',
+      player_state: {
+        balances: { spring: 100, summer: 0, autumn: 0, winter: 0 },
+      },
+      farming: {
+        enabled: true,
+        min_duration_seconds: 300,
+        reward_rate: 0.05,
+        positions: {
+          spring: {
+            amount: 0,
+            next_reward_in_seconds: null,
+            cycles_completed: 0,
+          },
+        },
+      },
+    });
+    expect(pill.textContent).toBe('Enabled (5% / 5m)');
+    expect(panel.querySelector('.farming-status-line').textContent).toBe(
+      'Farming is enabled for this round.'
+    );
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({
+        updated_state: {
+          balances: { spring: 60, summer: 0, autumn: 0, winter: 0 },
+          farming: {
+            positions: {
+              spring: {
+                amount: 40,
+                next_reward_in_seconds: 300,
+                cycles_completed: 0,
+              },
+            },
+          },
+        },
+      }),
+    });
+    const input = panel.querySelector('input[data-token="spring"]');
+    input.value = '40';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    panel
+      .querySelector('button[data-farm-action="deposit"][data-token="spring"]')
+      .click();
+
+    await vi.waitFor(() => {
+      const values = [
+        ...panel.querySelectorAll(
+          '.farming-row[data-token="spring"] .farming-stat-value'
+        ),
+      ].map((node) => node.textContent);
+      expect(values).toEqual(['60', '40', '0', '5m']);
+    });
+    const [url, init] = globalThis.fetch.mock.calls[0];
+    expect(String(url)).toMatch(/\/games\/7\/players\/3\/farm\/deposit$/);
+    expect(JSON.parse(init.body)).toEqual({ token: 'spring', amount: 40 });
+    expect(document.querySelector('.ps-farmed-line').textContent).toContain(
+      'SPR 40'
+    );
   });
 
   it('seeds the backend URL field from the shared config module', async () => {

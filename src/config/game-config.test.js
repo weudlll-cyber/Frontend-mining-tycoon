@@ -41,6 +41,9 @@ const BACKEND_CONFIG = {
     enrollment_window_seconds: 20,
     scoring_mode: 'power',
     chat_enabled: false,
+    farming_enabled: true,
+    farming_min_duration_seconds: 120,
+    farming_reward_rate: 0.1,
   },
   duration_limits: { min_seconds: 30, max_seconds: 7200 },
   enrollment_window_limits: { min_seconds: 15, max_seconds: 60 },
@@ -51,6 +54,8 @@ const BACKEND_CONFIG = {
   ],
   trade_unlock: { first_unlock_fraction: 0.5, remaining_window_fraction: 0.5 },
   account_policy: { require_account_to_join: true },
+  farming_min_duration_limits: { min_seconds: 30, max_seconds: 3600 },
+  farming_reward_rate_limits: { min: 0.01, max: 0.5 },
 };
 
 function doc(config, version = 3) {
@@ -85,6 +90,17 @@ describe('effective config resolution', () => {
       enrollment_window_seconds: 10,
       scoring_mode: 'stockpile',
       chat_enabled: true,
+      farming_enabled: false,
+      farming_min_duration_seconds: 300,
+      farming_reward_rate: 0.05,
+    });
+    expect(config.farming_min_duration_limits).toEqual({
+      min_seconds: 10,
+      max_seconds: 604800,
+    });
+    expect(config.farming_reward_rate_limits).toEqual({
+      min: 0.0001,
+      max: 1,
     });
   });
 
@@ -148,10 +164,26 @@ describe('normalizeGameConfig', () => {
         remaining_window_fraction: 0.5,
       },
       account_policy: { require_account_to_join: 'yes' },
+      farming_min_duration_limits: { min_seconds: 'x', max_seconds: 5 },
+      farming_reward_rate_limits: { min: 0.5, max: 0.1 },
     });
     expect(config).toEqual(fallback);
     expect(fallback.account_policy).toEqual({ require_account_to_join: false });
     expect(normalizeGameConfig(null)).toEqual(fallback);
+    // Invalid farming defaults fall back to the seed values (off, 300 s, 5 %).
+    expect(
+      normalizeGameConfig({
+        defaults: {
+          farming_enabled: 'yes',
+          farming_min_duration_seconds: -5,
+          farming_reward_rate: 'high',
+        },
+      }).defaults
+    ).toMatchObject({
+      farming_enabled: false,
+      farming_min_duration_seconds: 300,
+      farming_reward_rate: 0.05,
+    });
     // A non-boolean chat default falls back to "chat on" (today's behavior).
     expect(
       normalizeGameConfig({ defaults: { chat_enabled: 'no' } }).defaults

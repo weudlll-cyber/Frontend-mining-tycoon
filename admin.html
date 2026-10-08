@@ -176,6 +176,11 @@ Security notes:
         outline-offset: 2px;
       }
 
+      /* Farming options greyed out while "Farming enabled" is unticked. */
+      .farming-fields-off .form-group:not(:first-child) {
+        opacity: 0.6;
+      }
+
       .hidden-section {
         display: none;
       }
@@ -592,9 +597,9 @@ Security notes:
       </div>
     </section>
 
-    <!-- Section 5: Trading Rules -->
+    <!-- Section 5: Trading & Farming Rules -->
     <section class="card" aria-labelledby="section-trading-title">
-      <h2 id="section-trading-title">5 — Trading Rules</h2>
+      <h2 id="section-trading-title">5 — Trading &amp; Farming Rules</h2>
       <div class="form-grid">
         <div class="form-group">
           <label for="admin-trade-count"
@@ -642,6 +647,61 @@ Security notes:
           />
           <p id="admin-spread-override-note" class="derived-note">
             Empty = use the global economy value (section 9).
+          </p>
+        </div>
+      </div>
+      <!-- Farming Stage 1 (passive): defaults and limits come from Game
+           Settings (section 11); populated by farming-options.js. -->
+      <div
+        id="admin-farming-fields"
+        class="form-grid"
+        style="margin-top: 0.75rem"
+      >
+        <div class="form-group full-width">
+          <label for="admin-farming-enabled">
+            <input id="admin-farming-enabled" type="checkbox" />
+            Farming enabled (Stage 1, passive)
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="admin-farming-min-duration-value"
+            >Farming minimum duration (one reward cycle)</label
+          >
+          <div style="display: flex; gap: 0.5rem">
+            <input
+              id="admin-farming-min-duration-value"
+              type="number"
+              min="1"
+              step="any"
+              value="5"
+              style="flex: 2"
+            />
+            <select id="admin-farming-min-duration-unit" style="flex: 1">
+              <option value="seconds">seconds</option>
+              <option value="minutes" selected>minutes</option>
+              <option value="hours">hours</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="admin-farming-reward"
+            >Reward per completed cycle (%)</label
+          >
+          <input
+            id="admin-farming-reward"
+            type="number"
+            min="0.01"
+            max="100"
+            step="0.01"
+            value="5"
+          />
+        </div>
+        <div class="form-group full-width">
+          <p id="admin-farming-note" class="derived-note">
+            Rewards are added after each full minimum duration and compound. The
+            minimum duration must be shorter than the round (sync) or session
+            (async).
           </p>
         </div>
       </div>
@@ -1080,6 +1140,83 @@ Security notes:
           >
             Add row
           </button>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Farming (Stage 1)</legend>
+          <label for="admin-gameconfig-default-farming-enabled">
+            <input
+              id="admin-gameconfig-default-farming-enabled"
+              type="checkbox"
+            />
+            Farming enabled by default
+          </label>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="admin-gameconfig-default-farming-min-duration"
+                >Default minimum duration (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-default-farming-min-duration"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-default-farming-reward"
+                >Default reward per cycle (%)</label
+              >
+              <input
+                id="admin-gameconfig-default-farming-reward"
+                type="number"
+                step="any"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-farming-duration-min"
+                >Minimum duration limit min (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-farming-duration-min"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-farming-duration-max"
+                >Minimum duration limit max (seconds)</label
+              >
+              <input
+                id="admin-gameconfig-farming-duration-max"
+                type="number"
+                step="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-farming-reward-min"
+                >Reward limit min (%)</label
+              >
+              <input
+                id="admin-gameconfig-farming-reward-min"
+                type="number"
+                step="any"
+              />
+            </div>
+            <div class="form-group">
+              <label for="admin-gameconfig-farming-reward-max"
+                >Reward limit max (%)</label
+              >
+              <input
+                id="admin-gameconfig-farming-reward-max"
+                type="number"
+                step="any"
+              />
+            </div>
+          </div>
+          <p class="derived-note">
+            Pre-fills the create form's farming options and bounds them. Each
+            round keeps the farming rules it was created with.
+          </p>
         </fieldset>
 
         <fieldset class="gc-fieldset">

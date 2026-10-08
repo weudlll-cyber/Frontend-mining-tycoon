@@ -438,11 +438,99 @@ describe('editing and saving', () => {
     await loadWith();
     const { config, errors } = readGameConfigDraft();
     expect(errors).toEqual([]);
-    // The legacy CONFIG has no chat default; the editor reads it as enabled.
+    // The legacy CONFIG has no chat or farming keys; the editor reads the
+    // fallbacks (chat on, farming off / 300 s / 5 %, seed limits).
     expect(config).toEqual({
       ...CONFIG,
-      defaults: { ...CONFIG.defaults, chat_enabled: true },
+      defaults: {
+        ...CONFIG.defaults,
+        chat_enabled: true,
+        farming_enabled: false,
+        farming_min_duration_seconds: 300,
+        farming_reward_rate: 0.05,
+      },
+      farming_min_duration_limits: { min_seconds: 10, max_seconds: 604800 },
+      farming_reward_rate_limits: { min: 0.0001, max: 1 },
     });
+    // ...and an unchanged legacy form sends nothing (no farming keys either).
+    expect(buildGameConfigPatch(config, CONFIG)).toEqual({});
+  });
+});
+
+describe('farming settings (Stage 1)', () => {
+  const FARMING_CONFIG = {
+    ...CONFIG,
+    defaults: {
+      ...CONFIG.defaults,
+      farming_enabled: true,
+      farming_min_duration_seconds: 600,
+      farming_reward_rate: 0.1,
+    },
+    farming_min_duration_limits: { min_seconds: 30, max_seconds: 86400 },
+    farming_reward_rate_limits: { min: 0.01, max: 0.5 },
+  };
+
+  it('renders farming defaults and limits (rewards in percent)', async () => {
+    await loadWith(documentFor(FARMING_CONFIG));
+    expect($('default-farming-enabled').checked).toBe(true);
+    expect($('default-farming-min-duration').value).toBe('600');
+    expect($('default-farming-reward').value).toBe('10');
+    expect($('farming-duration-min').value).toBe('30');
+    expect($('farming-duration-max').value).toBe('86400');
+    expect($('farming-reward-min').value).toBe('1');
+    expect($('farming-reward-max').value).toBe('50');
+  });
+
+  it('saves only the changed farming values', async () => {
+    const fetchMock = await loadWith(documentFor(FARMING_CONFIG));
+    $('default-farming-enabled').checked = false;
+    $('default-farming-reward').value = '7';
+    $('farming-reward-max').value = '60';
+    fetchMock.mockResolvedValueOnce(okResponse(documentFor(FARMING_CONFIG, 2)));
+    $('save-btn').click();
+    await flush();
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      defaults: { farming_enabled: false, farming_reward_rate: 0.07 },
+      farming_reward_rate_limits: { min: 0.01, max: 0.6 },
+    });
+  });
+
+  it('rejects farming values outside their limits before saving', async () => {
+    const fetchMock = await loadWith(documentFor(FARMING_CONFIG));
+    $('default-farming-min-duration').value = '5';
+    $('farming-reward-min').value = '0';
+    $('save-btn').click();
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(resultText()).toContain(
+      'Default farming minimum duration must be within the farming duration limits.'
+    );
+    expect(resultText()).toContain('Farming reward limits');
+  });
+
+  it('reports unparsable farming inputs', async () => {
+    await loadWith(documentFor(FARMING_CONFIG));
+    $('default-farming-min-duration').value = '1.5';
+    $('farming-reward-max').value = '';
+    const { errors } = readGameConfigDraft();
+    expect(errors).toEqual([
+      'Default farming minimum duration must be a whole number.',
+      'Farming reward limits max must be a number.',
+    ]);
+  });
+
+  it('validates farming limit ranges', () => {
+    const draft = structuredClone(FARMING_CONFIG);
+    draft.farming_min_duration_limits = { min_seconds: 100, max_seconds: 50 };
+    draft.farming_reward_rate_limits = { min: 0.2, max: 1.5 };
+    draft.defaults.farming_reward_rate = 0.1;
+    expect(validateGameConfigDraft(draft)).toEqual([
+      'Farming duration limits: min must be >= 1 and <= max.',
+      'Farming reward limits: min must be > 0% and <= max, max <= 100%.',
+      'Default farming minimum duration must be within the farming duration limits.',
+      'Default farming reward must be within the farming reward limits.',
+    ]);
   });
 });
 

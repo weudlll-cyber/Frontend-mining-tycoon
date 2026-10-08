@@ -62,6 +62,14 @@ implementation definitions".
 > **Confirmed by the project owner (2026-10-07):** the `mining_time` and
 > `efficiency` formulas above are the approved definitions of these modes.
 
+**Holdings and farming (Stage 1):** `balance[t]` above means the player's
+holdings of token `t`, i.e. the spendable balance **plus** the amount currently
+in farming. Farmed tokens cannot be spent until withdrawn but count toward the
+`stockpile`, `power` and `mining_time` scores (the backend computes this). The
+frontend shows the spendable balance in the Player State "Bal" row, farmed
+tokens on a separate "Farmed" line, and includes both in the action-bar
+holdings value.
+
 Frontend display (`src/utils/score-format.js`): integers for `stockpile`,
 `power` and `mining_time`; efficiency scores are shown as a ratio with four
 decimals and a `×` suffix (for example `1.2345×`). The admin console and the

@@ -903,12 +903,16 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   data-live-panel="farm"
                   hidden
                 >
-                  <div class="card farming-placeholder-card">
-                    <h2>Farming</h2>
-                    <p>
-                      Farming panel is planned and will be available here.
-                      Status stays visible in the action bar.
-                    </p>
+                  <div id="farming-panel" class="farming-panel">
+                    <!-- Farm tab (Stage 1 passive farming) is rendered here by
+                         farming-panel.js; the static text below is replaced
+                         on init and keeps the status visible without JS. -->
+                    <div class="card farming-card">
+                      <h2>Farming</h2>
+                      <p class="farming-status-line">
+                        Farming is not enabled for this round.
+                      </p>
+                    </div>
                   </div>
                 </section>
 

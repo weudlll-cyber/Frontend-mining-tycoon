@@ -247,7 +247,15 @@ export function ensurePlayerStateViewLayout({
   const bestRoundNode = document.createTextNode('Best this round: —');
   bestRoundLine.appendChild(bestRoundNode);
 
-  sessionScores.append(thisSessionLine, bestRoundLine);
+  // Farming Stage 1: tokens locked in farming are not in "Bal" (spendable);
+  // this line lists them so total holdings stay visible. Hidden when empty.
+  const farmedLine = document.createElement('div');
+  farmedLine.className = 'ps-farmed-line';
+  farmedLine.hidden = true;
+  const farmedNode = document.createTextNode('Farmed: —');
+  farmedLine.appendChild(farmedNode);
+
+  sessionScores.append(thisSessionLine, bestRoundLine, farmedLine);
 
   playerStateEl.append(matrix, sessionScores, footer);
 
@@ -280,6 +288,8 @@ export function ensurePlayerStateViewLayout({
   uiRefs.bestRoundNode = bestRoundNode;
   uiRefs.thisSessionEl = thisSessionLine;
   uiRefs.bestRoundEl = bestRoundLine;
+  uiRefs.farmedNode = farmedNode;
+  uiRefs.farmedEl = farmedLine;
 
   return { refs: uiRefs, disposeTooltips };
 }

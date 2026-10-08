@@ -1,12 +1,16 @@
 /**
 File: src/services/game-actions.js
-Purpose: Submit player upgrade and trade intents to the backend.
+Purpose: Submit player upgrade, trade and farm (deposit/withdraw) intents to the backend.
 Role in system:
 - Player-side intent calls only; game creation is admin-only (admin.html → admin-setup.js).
 Invariants:
 - No modal or blocking UX side-effects; feedback goes through the existing toast/status.
-- Backend stays authoritative: 409 (action outside an active round/session) is shown
-  verbatim from the backend instead of being reinterpreted client-side.
+- Backend stays authoritative: 409 (action outside an active round/session, or
+  FARMING_DISABLED) is shown verbatim from the backend instead of being
+  reinterpreted client-side.
+- Farm actions mirror trades: same X-Player-Token header, errors are thrown as
+  ApiError for the farming panel toast, success hands `updated_state` to
+  `onFarmUpdated`.
 Security notes:
 - Encode IDs in URLs and never surface or log token secrets.
 */
@@ -154,5 +158,76 @@ export async function performTrade(fromToken, toToken, amount) {
   if (typeof _deps.onTradeExecuted === 'function') {
     _deps.onTradeExecuted(payload);
   }
+  return payload;
+}
+
+/**
+ * POST a farm action for the current player.
+ * @param {'deposit'|'withdraw'} action
+ * @param {{ token: string, amount: number|null }} body amount null = withdraw all
+ */
+async function postFarmAction(action, body) {
+  if (!_deps) {
+    throw new Error('Game actions module is not initialized.');
+  }
+  const lastGameData = _deps.getLastGameData?.();
+  if (!lastGameData?.game_id || !lastGameData?.player_id) {
+    throw new Error('No game or player data available for farming');
+  }
+
+  const baseUrl = _deps.getNormalizedBaseUrlOrNull();
+  if (!baseUrl) {
+    throw new Error('Invalid backend URL');
+  }
+
+  const gameId = lastGameData.game_id;
+  const playerId = lastGameData.player_id;
+  const playerToken = _deps.getStorageItem(
+    _deps.getPlayerTokenStorageKey(gameId, playerId)
+  );
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (playerToken) {
+    headers['X-Player-Token'] = playerToken;
+  }
+
+  const response = await fetch(
+    `${baseUrl}/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/farm/${action}`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    // 409 FARMING_DISABLED / ACTION_NOT_ALLOWED_* and 400 (insufficient
+    // balance) carry a readable backend message; the panel shows it verbatim.
+    throw createApiError(
+      await readApiError(
+        response,
+        `${response.status} ${response.statusText}`.trim()
+      )
+    );
+  }
+
+  const payload = await response.json();
+  if (typeof _deps.onFarmUpdated === 'function') {
+    _deps.onFarmUpdated(payload);
+  }
+  return payload;
+}
+
+/** Move `amount` of `token` from the spendable balance into farming. */
+export async function performFarmDeposit(token, amount) {
+  const payload = await postFarmAction('deposit', { token, amount });
+  _deps.showToast('Deposited into farming.', 'success');
+  return payload;
+}
+
+/** Withdraw `amount` of `token` from farming; null withdraws everything. */
+export async function performFarmWithdraw(token, amount = null) {
+  const payload = await postFarmAction('withdraw', { token, amount });
+  _deps.showToast('Withdrawn from farming.', 'success');
   return payload;
 }

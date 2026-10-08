@@ -5,7 +5,8 @@
  *          tunables (duration presets, presets offered per round type,
  *          create-form defaults, limits, default trade counts by round length,
  *          trade unlock fractions, account policy "Require sign-in to join",
- *          "Chat enabled by default")
+ *          "Chat enabled by default", farming defaults and limits via
+ *          farming-config-fields.js)
  *          and saves edits via PATCH /admin/game-config sending only the
  *          changed top-level keys (`defaults` as a partial).
  * Role in system: Standalone admin module initialised from admin-setup.js.
@@ -28,6 +29,13 @@ import {
   normalizeGameConfig,
   setGameConfigDocument,
 } from '../config/index.js';
+import {
+  FARMING_DEFAULT_KEYS,
+  buildFarmingConfigPatch,
+  readFarmingConfigDraft,
+  renderFarmingConfig,
+  validateFarmingConfig,
+} from './farming-config-fields.js';
 
 const PREFIX = 'admin-gameconfig';
 
@@ -240,6 +248,7 @@ export function validateGameConfigDraft(config) {
     const value = config.trade_unlock[key];
     if (value <= 0 || value > 1) errors.push(`${label} must be > 0 and <= 1.`);
   });
+  errors.push(...validateFarmingConfig(config));
   return errors;
 }
 
@@ -257,7 +266,7 @@ export function buildGameConfigPatch(draft, baseline) {
   });
   const changedDefaults = {};
   Object.entries(draft.defaults).forEach(([key, value]) => {
-    if (key === 'chat_enabled') return;
+    if (key === 'chat_enabled' || FARMING_DEFAULT_KEYS.includes(key)) return;
     if (value !== baseline?.defaults?.[key]) changedDefaults[key] = value;
   });
   // WHY: an older backend has no `defaults.chat_enabled` (read as true), so the
@@ -270,6 +279,11 @@ export function buildGameConfigPatch(draft, baseline) {
       changedDefaults.chat_enabled = draft.defaults.chat_enabled;
     }
   }
+  // Farming keys are diffed against the normalized baseline so an older
+  // backend without them never receives unchanged fallback values.
+  const farmingPatch = buildFarmingConfigPatch(draft, baseline);
+  Object.assign(changedDefaults, farmingPatch.defaults);
+  Object.assign(patch, farmingPatch.limits);
   if (Object.keys(changedDefaults).length) patch.defaults = changedDefaults;
   // WHY: compared as a boolean so an older backend without `account_policy`
   // (read as false) never receives the key unless the admin ticks the box.
@@ -429,6 +443,7 @@ function renderDocument(doc) {
   });
   el(`${PREFIX}-require-account`).checked =
     config.account_policy.require_account_to_join;
+  renderFarmingConfig(config);
 
   const hash = String(doc?.config_hash || '').slice(0, 12);
   const updated = doc?.updated_at ? ` · updated ${doc.updated_at}` : '';
@@ -535,6 +550,13 @@ export function readGameConfigDraft() {
   config.account_policy = {
     require_account_to_join: el(`${PREFIX}-require-account`).checked,
   };
+
+  const farming = readFarmingConfigDraft(errors);
+  if (farming) {
+    Object.assign(config.defaults, farming.defaults);
+    config.farming_min_duration_limits = farming.farming_min_duration_limits;
+    config.farming_reward_rate_limits = farming.farming_reward_rate_limits;
+  }
 
   return { config, errors };
 }

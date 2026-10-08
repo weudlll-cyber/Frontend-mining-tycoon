@@ -155,8 +155,9 @@ Entry points (Vite multi-page build):
 
 - `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, Discord handle, optional Telegram handle, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus; requested with the account token, own games marked via `my_player_id`), join ("Enter game", or "Rejoin" for a game the account already plays), "Download my data" (`GET /auth/me/export` saved as a JSON file) and "Delete account" dialog (`DELETE /auth/me` with password + confirmation checkbox; clears the local session on 204), "My results" dialog (`GET /auth/me/history` with Load more, full final leaderboard via `GET /games/{id}/results` with the own row highlighted, deep link `index.html?results=<gameId>&player=<playerId>`), and "Last Game Highscores" (server history when signed in, otherwise the local snapshot). Joining sends the account bearer token, stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
-- `admin.html` + `src/admin/`: admin console with 11 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
+- `admin.html` + `src/admin/`: admin console with 11 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading & Farming Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
 - Round options (snapshot-locked per round, backend-validated): optional conversion fee / oracle spread overrides in percent (section 5; empty = global economy, sent as `conversion_fee_rate` / `oracle_spread` rates) and "Chat enabled" (section 2; default from `defaults.chat_enabled`, fallback on; `chat_enabled` sent only when changed). `/games/{id}/meta` exposes the effective `conversion_fee_rate`, `oracle_spread` and `chat_enabled`; the player board shows the round fee/spread in the trading panel and, with chat disabled, a "Chat is disabled for this round." Chat tab without opening a WebSocket (also on a `CHAT_DISABLED` socket error, no reconnect). Missing fields = today's behavior (chat on, economy snapshot fee).
+- Farming Stage 1 round options (section 5, `src/admin/farming-options.js`): "Farming enabled", minimum duration (value + unit) and reward per cycle (%), defaults/limits from Game Settings (`defaults.farming_*`, `farming_min_duration_limits`, `farming_reward_rate_limits`; fallbacks off / 300 s / 5 %, 10 s..7 d, 0.01 %..100 %), client check that the minimum duration is shorter than the round (sync) or session (async). Sent as `farming_enabled`, `farming_min_duration_seconds`, `farming_reward_rate` when enabled (only `farming_enabled: false` when unticked against an "on" default). Section 11 edits the farming defaults and limits (`src/admin/farming-config-fields.js`).
 
 The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 
@@ -183,9 +184,9 @@ Player board layout (desktop target 1440x900, no page scroll):
 - **Header:** countdown, phase, score, rank, top score, scoring mode, connection badge, async badge; inline Debug disclosure (meta hash, backend URL, IDs).
 - **Setup panel ("Join Round"):** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async only), `Stop Stream`. It collapses after the stream starts. Legacy host controls (round type, scoring, trade count, durations, overrides) remain in the HTML with `.admin-only` and are always hidden.
 - **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
-- **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values.
-- **Action bar:** score context value, Trading and Farming status pills (always visible), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
-- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (placeholder), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
+- **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, spendable balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values; a "Farmed (not spendable)" line lists tokens in farming when there are any.
+- **Action bar:** score context value (holdings value includes farmed tokens), Trading and Farming status pills (always visible; Farming "Enabled (5% / 5m)" or "Not enabled"), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
+- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (Farming Stage 1), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
 - **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the last-game highscores. The overlay's "View full results" link resets the board too and opens the lobby's full results view for that round (`index.html?results=<gameId>&player=<playerId>`); after an async session it notes that final results exist only once the round ends (the backend answers `409 GAME_NOT_FINISHED` until then).
 
 Responsive behavior:
@@ -289,6 +290,12 @@ Areas intentionally left open by current implementation:
 
 ## 10) Project Status & Next Steps (Non-Binding)
 
+### Checkpoint 2026-10-08: Farming Stage 1 (frontend)
+
+- Farm tab implemented (`src/ui/farming-panel.js`, `src/ui/farming-state.js`): status line, rule summary, per-token balance / farmed / cycles / next-reward countdown (local tick between SSE updates), Deposit / Withdraw / Withdraw all via `POST /games/{id}/players/{pid}/farm/deposit|withdraw` (`src/services/game-actions.js`, same player-token header and error toasts as trades), play-window gate, `updated_state` merge. Older backends without `farming` show "Farming is not enabled for this round."
+- Player State "Farmed" line and holdings value including farmed tokens; admin create-form farming options and Game Settings farming defaults/limits.
+- Needs the matching backend (farming fields in `/meta`, `/state`, SSE and the two farm endpoints). Stage 2 (rotating farming) remains open.
+
 ### Current status (checkpoint 2026-10-07)
 
 The core loop works end to end: backend-authoritative simulation, lobby, live player board, admin console, sync and async rounds, trading and chat. The project is not release-ready yet (see "Open work" below).
@@ -317,7 +324,7 @@ In progress elsewhere:
 Open work (summary):
 
 - Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
-- Gameplay features: Farming Stage 1 and Stage 2; secure email-based password reset; scheduled sync live rounds; chat moderation and emoji; season artwork (`public/assets/seasons/` images exist but are unused).
+- Gameplay features: Farming Stage 2 (Stage 1 is implemented in the UI, see the 2026-10-08 checkpoint); secure email-based password reset; scheduled sync live rounds; chat moderation and emoji; season artwork (`public/assets/seasons/` images exist but are unused).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
 - Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
 
@@ -329,7 +336,7 @@ Both round formats are implemented. Sync rounds start automatically when the enr
 
 ### Farming
 
-Not implemented; the UI shows a placeholder tab and a status pill. The staged farming design (Stage 1 passive, Stage 2 rotating, no Stage 3) is described in [SEASONAL_TYCOON_CONCEPT.md](SEASONAL_TYCOON_CONCEPT.md).
+Stage 1 (passive farming) is implemented in the UI: Farm tab, Farming status pill, Player State "Farmed" line, holdings value, admin round options and Game Settings defaults/limits (contract in `README.md`, section "Farming (Stage 1)"). Rules: a reward of `reward_rate` x farmed amount after each full minimum duration, compounding; a deposit restarts that token's cycle timer; withdrawing early earns nothing for the unfinished cycle; farmed tokens are not spendable until withdrawn but count toward the stockpile, power and mining-time scores. Stage 2 (rotating) is still open; Stage 3 is out of scope. The staged design is described in [SEASONAL_TYCOON_CONCEPT.md](SEASONAL_TYCOON_CONCEPT.md).
 
 ### UI & UX Work (Open)
 
@@ -398,7 +405,7 @@ Source-of-truth rule:
 
 #### B) Economy & Progression
 
-- Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).
+- ~~Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).~~ Implemented in the UI (2026-10-08; needs the matching backend).
 - Farming Stage 2 (rotating farming), the final planned farming layer.
 - ~~Per-round trading fee override.~~ Implemented (admin round options).
 
@@ -408,7 +415,7 @@ Source-of-truth rule:
 
 #### D) Frontend / UX
 
-- Farming panel (currently a placeholder tab).
+- ~~Farming panel (currently a placeholder tab).~~ Implemented (Farm tab, Stage 1).
 - Season artwork from `public/assets/seasons/` in the season cards.
 - Onboarding / how-to-play guidance.
 

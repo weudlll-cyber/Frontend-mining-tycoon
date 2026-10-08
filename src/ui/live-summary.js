@@ -6,6 +6,8 @@ Role in system:
 Invariants:
 - Summary remains backend-driven and display-only.
 - Async session state is displayed inline only; no popup affordances.
+- The holdings value counts spendable balances plus farmed tokens (Farming
+  Stage 1): farmed tokens still belong to the player and count toward scores.
 Security notes:
 - Render text only; no untrusted HTML.
 Session model relation:
@@ -19,6 +21,7 @@ import {
 } from '../utils/token-utils.js';
 import { setElementTextValue } from '../utils/dom-utils.js';
 import { debugLog } from '../utils/debug-log.js';
+import { resolveHoldings } from './farming-state.js';
 
 let _refs = null;
 let _getGameMeta = null;
@@ -178,8 +181,8 @@ function computeLiveAsyncScore(data) {
       ? data.token_names
       : activeGameMeta?.token_names || _defaultTokenNames
   );
-  const balances =
-    data?.player_state?.balances || data?.player_state?.tokens || null;
+  // Holdings = spendable balances + farmed tokens.
+  const balances = resolveHoldings(data);
   const oraclePrices =
     activeGameMeta?.oracle_prices || data?.oracle_prices || null;
 
@@ -247,8 +250,8 @@ export function renderPortfolioValue(data) {
       ? data.token_names
       : activeGameMeta?.token_names
   );
-  const balances =
-    data?.player_state?.balances || data?.player_state?.tokens || null;
+  // Holdings = spendable balances + farmed tokens.
+  const balances = resolveHoldings(data);
   const oraclePrices =
     activeGameMeta?.oracle_prices || data?.oracle_prices || null;
   const computed = computePortfolioValue(balances, oraclePrices, tokenNames);

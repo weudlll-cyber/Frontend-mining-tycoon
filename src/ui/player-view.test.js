@@ -602,3 +602,39 @@ describe('player state matrix', () => {
     expect(springOutput?.getAttribute('title')).toContain('1,234,567');
   });
 });
+
+describe('player state farmed line (Farming Stage 1)', () => {
+  function render(farming) {
+    renderPlayerState({
+      game_id: 'g1',
+      game_status: 'running',
+      token_names: ['spring', 'summer', 'autumn', 'winter'],
+      player_state: {
+        cumulative_mined: 1,
+        balances: { spring: 1, summer: 2, autumn: 3, winter: 4 },
+      },
+      ...(farming ? { farming } : {}),
+    });
+    return document.querySelector('.ps-farmed-line');
+  }
+
+  it('stays hidden without farming or farmed tokens', () => {
+    expect(render(null).hidden).toBe(true);
+    expect(
+      render({ enabled: true, positions: { spring: { amount: 0 } } }).hidden
+    ).toBe(true);
+  });
+
+  it('lists farmed tokens as not spendable', () => {
+    const line = render({
+      enabled: true,
+      positions: {
+        spring: { amount: 12.5, cycles_completed: 1 },
+        winter: { amount: 3, cycles_completed: 0 },
+      },
+    });
+    expect(line.hidden).toBe(false);
+    expect(line.textContent).toBe('Farmed (not spendable): SPR 12.5 · WIN 3');
+    expect(line.title).toMatch(/cannot be spent until withdrawn/);
+  });
+});

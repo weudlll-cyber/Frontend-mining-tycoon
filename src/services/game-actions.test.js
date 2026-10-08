@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as gameActions from './game-actions.js';
 import {
   initGameActions,
+  performFarmDeposit,
+  performFarmWithdraw,
   performTrade,
   performUpgrade,
 } from './game-actions.js';
@@ -182,5 +184,105 @@ describe('backend error surfacing', () => {
   it('no longer exposes the dead player-side create-game flow', () => {
     expect(gameActions.createNewGameAndJoin).toBeUndefined();
     expect(gameActions.startRoundSession).toBeUndefined();
+  });
+});
+
+describe('farm actions', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function okFetch(payload) {
+    return vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => payload,
+    });
+  }
+
+  it('posts a deposit with the player token header and hands updated_state on', async () => {
+    const onFarmUpdated = vi.fn();
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g 1', player_id: 'p/1' })),
+      getStorageItem: vi.fn(() => 'secret-token'),
+      onFarmUpdated,
+    });
+    initGameActions(deps);
+    const payload = { updated_state: { balances: { spring: 5 } } };
+    const fetchMock = okFetch(payload);
+    globalThis.fetch = fetchMock;
+
+    await expect(performFarmDeposit('spring', 10)).resolves.toBe(payload);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      'http://127.0.0.1:8000/games/g%201/players/p%2F1/farm/deposit'
+    );
+    expect(init.method).toBe('POST');
+    expect(init.headers['X-Player-Token']).toBe('secret-token');
+    expect(JSON.parse(init.body)).toEqual({ token: 'spring', amount: 10 });
+    expect(onFarmUpdated).toHaveBeenCalledWith(payload);
+    expect(deps.showToast).toHaveBeenCalledWith(
+      'Deposited into farming.',
+      'success'
+    );
+  });
+
+  it('posts a withdraw-all with amount null and no token header when absent', async () => {
+    initGameActions(
+      buildDeps({
+        getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+      })
+    );
+    const fetchMock = okFetch({ updated_state: {} });
+    globalThis.fetch = fetchMock;
+
+    await performFarmWithdraw('winter');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/farm\/withdraw$/);
+    expect(init.headers['X-Player-Token']).toBeUndefined();
+    expect(JSON.parse(init.body)).toEqual({ token: 'winter', amount: null });
+  });
+
+  it('rejects with the backend FARMING_DISABLED message and status', async () => {
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+    });
+    initGameActions(deps);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: async () => ({
+        detail: {
+          code: 'FARMING_DISABLED',
+          message: 'Farming is not enabled for this round.',
+        },
+      }),
+    });
+
+    await expect(performFarmWithdraw('spring', 2)).rejects.toMatchObject({
+      message: 'Farming is not enabled for this round.',
+      status: 409,
+      code: 'FARMING_DISABLED',
+    });
+    expect(deps.showToast).not.toHaveBeenCalled();
+  });
+
+  it('rejects without game context or backend URL', async () => {
+    initGameActions(buildDeps());
+    await expect(performFarmDeposit('spring', 1)).rejects.toThrow(
+      /No game or player data/
+    );
+    initGameActions(
+      buildDeps({
+        getLastGameData: vi.fn(() => ({ game_id: 'g', player_id: 'p' })),
+        getNormalizedBaseUrlOrNull: vi.fn(() => null),
+      })
+    );
+    await expect(performFarmDeposit('spring', 1)).rejects.toThrow(
+      'Invalid backend URL'
+    );
   });
 });
