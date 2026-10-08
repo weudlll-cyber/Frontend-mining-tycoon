@@ -1659,8 +1659,65 @@ body {
 
 .chat-form {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 0.6rem;
+}
+
+/* Emoji picker: inline grid inside the chat panel (not an overlay). */
+.chat-emoji-btn {
+  width: auto;
+  padding: 0.45rem 0.6rem;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.chat-emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.chat-emoji-picker[hidden] {
+  display: none;
+}
+
+.chat-emoji-option {
+  min-width: 0;
+  padding: 0.3rem 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.chat-emoji-option:hover,
+.chat-emoji-option:focus-visible {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+
+/* Moderation notices (muted) and the "chat was cleared" list entry. */
+.chat-notice {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.chat-notice[hidden] {
+  display: none;
+}
+
+.chat-message-system {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-style: italic;
 }
 
 .chat-form input {
@@ -2890,7 +2947,11 @@ button {
   }
 
   .chat-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto 1fr;
+  }
+
+  .chat-form button[type='submit'] {
+    grid-column: 1 / -1;
   }
 
   .countdown {

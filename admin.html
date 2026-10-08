@@ -1507,6 +1507,85 @@ Security notes:
       <div id="admin-users-result" class="result-box" aria-live="polite"></div>
     </section>
 
+    <!-- Section 13: Chat Moderation -->
+    <section class="card" aria-labelledby="section-chatmod-title">
+      <h2 id="section-chatmod-title">13 — Chat Moderation</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Chat is social-only. Mute a player in one game's chat (they can still
+        play) or clear that game's chat. Use the Chat button in Game Management
+        to choose a game.
+      </p>
+      <p id="admin-chat-gate" class="derived-note">
+        No game selected. Choose Chat on a game in section 8.
+      </p>
+      <div id="admin-chat-panel" hidden>
+        <h3 id="admin-chat-title" class="admin-subheading"></h3>
+
+        <h4 class="admin-subheading">Active mutes</h4>
+        <p id="admin-chat-mutes-empty" class="derived-note" hidden>
+          No player is muted in this game.
+        </p>
+        <div style="overflow-x: auto">
+          <table id="admin-chat-mutes-table" class="gc-table" hidden>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col">Player ID</th>
+                <th scope="col">Muted until</th>
+                <th scope="col"><span class="visually-hidden">Action</span></th>
+              </tr>
+            </thead>
+            <tbody id="admin-chat-mutes-tbody"></tbody>
+          </table>
+        </div>
+
+        <h4 class="admin-subheading">Mute a player</h4>
+        <form id="admin-chat-mute-form" class="admin-users-search">
+          <label for="admin-chat-mute-player" class="visually-hidden"
+            >Player to mute</label
+          >
+          <select id="admin-chat-mute-player" hidden></select>
+          <label for="admin-chat-mute-player-id" class="visually-hidden"
+            >Player ID to mute</label
+          >
+          <input
+            id="admin-chat-mute-player-id"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Player ID"
+          />
+          <label for="admin-chat-mute-duration" class="visually-hidden"
+            >Mute duration</label
+          >
+          <select id="admin-chat-mute-duration">
+            <option value="15">15 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="1440">24 hours</option>
+            <option value="round">Until the round ends</option>
+          </select>
+          <button
+            id="admin-chat-mute-btn"
+            class="admin-secondary-btn"
+            type="submit"
+          >
+            Mute
+          </button>
+        </form>
+
+        <h4 class="admin-subheading">Clear chat</h4>
+        <button
+          id="admin-chat-clear-btn"
+          class="admin-secondary-btn"
+          type="button"
+          style="background: var(--danger)"
+        >
+          🧹 Clear chat
+        </button>
+      </div>
+      <div id="admin-chat-result" class="result-box" aria-live="polite"></div>
+    </section>
+
     <script type="module" src="/src/admin/admin-setup.js"></script>
   </body>
 </html>

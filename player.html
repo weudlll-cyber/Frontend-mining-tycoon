@@ -983,12 +983,36 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                       class="chat-messages"
                       aria-live="polite"
                     ></ul>
+                    <p
+                      id="chat-notice"
+                      class="chat-notice"
+                      role="status"
+                      hidden
+                    ></p>
+                    <div
+                      id="chat-emoji-picker"
+                      class="chat-emoji-picker"
+                      role="group"
+                      aria-label="Emoji picker"
+                      hidden
+                    ></div>
                     <form id="chat-form" class="chat-form">
+                      <button
+                        id="chat-emoji-btn"
+                        type="button"
+                        class="btn-secondary chat-emoji-btn"
+                        aria-label="Insert emoji"
+                        aria-controls="chat-emoji-picker"
+                        aria-expanded="false"
+                      >
+                        <span aria-hidden="true">😀</span>
+                      </button>
                       <input
                         id="chat-input"
                         type="text"
                         maxlength="200"
                         autocomplete="off"
+                        aria-label="Chat message"
                         placeholder="Type a message (max 200 chars)"
                       />
                       <button type="submit" class="btn-secondary">Send</button>
