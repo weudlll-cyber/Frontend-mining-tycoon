@@ -35,6 +35,7 @@ Read these first in every new chat/session:
 | `.github/pull_request_template.md` | Required PR body sections. |
 | `public/assets/README.md` | Where to put images and how to name them. |
 | `how-to-play.html` | Player-facing guide page (not a Markdown doc): game rules as implemented today. Update it with any rule change. |
+| `privacy.html`, `imprint.html` | Legal page templates (not Markdown docs). The privacy notice describes what the software processes today; update it when data processing changes. Operators must fill the `[PLACEHOLDER]` markers before going live. |
 
 ### Product / Design Reference (intent, with status notes)
 

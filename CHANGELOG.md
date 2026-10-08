@@ -10,6 +10,13 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Legal page templates `privacy.html` (GDPR-oriented privacy notice that
+  describes what the software actually processes) and `imprint.html` (legal
+  notice), with a "Template" banner and highlighted `[PLACEHOLDER]` markers for
+  every operator-specific fact. Linked from a new lobby footer, the how-to-play
+  footer and the Create account dialog ("By creating an account you agree to
+  the privacy notice"); built by Vite and served by the deploy scripts. Not
+  legal advice: operators must complete and review them before going live.
 - Lobby account data protection: **Download my data** saves the
   `GET /auth/me/export` JSON as `mining-tycoon-account-export.json`, and
   **Delete account** opens a dialog (warning, password, confirmation checkbox)

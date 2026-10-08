@@ -4,12 +4,13 @@ Browser frontend for Mining Tycoon (Seasonal Tycoon), built with Vite. The
 backend lives in the sibling repo `Mining-tycoon` and is authoritative for all
 gameplay outcomes; this frontend only displays state and sends player intent.
 
-Four pages:
+Six pages:
 
 - **Lobby** (`index.html`): register, log in/out, pick an open game, join or rejoin it, see your result history, full final leaderboards and the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
 - **Admin console** (`admin.html`): create rounds with snapshot-locked settings, list and delete active games.
 - **How to play** (`how-to-play.html`): static player guide (rules, upgrades, halvings, trading, round types, scoring modes, events). Linked from the lobby and from the player-board header (opens in a new tab).
+- **Privacy notice** (`privacy.html`) and **Imprint** (`imprint.html`): static legal page **templates** for the operator, with a "Template" banner and `[PLACEHOLDER]` markers. They must be completed and reviewed before going live (see `PRODUCTION_DEFAULTS_CHECKLIST.md`). Linked from the lobby footer, the registration dialog (privacy notice) and the how-to-play footer.
 
 ## Status
 
@@ -102,6 +103,7 @@ console all use this default; the Backend URL fields on `player.html` and
 - **My results** (signed in only) opens a dialog with your finished rounds, newest first: date, round type, scoring mode, rank / participants, score and the name you played under, 20 per page with **Load more**, or "No finished rounds yet.". **Full results** shows the round's complete final leaderboard with your row highlighted. `index.html?results=<gameId>&player=<playerId>` (linked from the player board's Game Over overlay) opens that view directly, also signed out.
 - **Last Game Highscores** shows the Top 5 of your last finished round. Signed in, it uses the server (your newest history entry and its full results); signed out, or when the backend has no history endpoint, it shows the snapshot stored in this browser.
 - A **How to play** link opens the player guide (`how-to-play.html`) in the same tab; an **Admin setup** link leads to `admin.html`.
+- A footer links the **Privacy** notice and the **Imprint**; the **Create account** dialog notes "By creating an account you agree to the privacy notice" with a link (new tab, no checkbox).
 
 ### Player board (`player.html`, `src/main.js`)
 
@@ -126,6 +128,19 @@ live tools window, accounts and farming (coming later), with a table of
 contents and section anchors (for example `/how-to-play.html#scoring`). It
 describes the current backend rules; update it in the same change when a game
 rule changes. `src/how-to-play.test.js` guards the anchors and both links.
+
+### Legal page templates (`privacy.html`, `imprint.html`)
+
+Static templates without script that reuse `src/how-to-play.css`. They are
+not legal advice: every operator-specific fact is a highlighted
+`[PLACEHOLDER]` (for example `[OPERATOR NAME]`, `[CONTACT EMAIL]`,
+`[HOSTING PROVIDER]`, `[SUPERVISORY AUTHORITY]`) and a banner at the top says
+the pages must be completed and reviewed before going live. The privacy notice
+describes what the software actually processes (account, sessions, security
+log, gameplay and results, non-stored chat, logs, backups, browser storage,
+Google Fonts in the lobby); update it in the same change when data processing
+changes. `src/legal-pages.test.js` guards the banner, the placeholders and the
+links.
 
 ### Admin console (`admin.html`, `src/admin/`)
 
@@ -279,11 +294,11 @@ npm scripts (`package.json`):
 | Script | Purpose |
 |---|---|
 | `npm run dev` / `dev:fixed` | Vite dev server (both identical) |
-| `npm run build` | production build into `dist/` (all four pages) |
+| `npm run build` | production build into `dist/` (all six pages) |
 | `npm run preview` | serve the production build locally |
 | `npm run lint` | ESLint on `src/` |
 | `npm run clean:audit` | ESLint with zero warnings + knip (unused files/deps/unresolved imports) |
-| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the four HTML files) |
+| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the six HTML files) |
 | `npm run format:check` | Prettier check (same files) |
 | `npm run test` | all Vitest tests once (jsdom) |
 | `npm run test:fast` | `test:services` + `test:ui` |
@@ -331,6 +346,8 @@ index.html          lobby page            -> src/lobby.js
 player.html         player board          -> src/main.js
 admin.html          admin console         -> src/admin/admin-setup.js, game-management.js
 how-to-play.html    player guide (static) -> src/how-to-play.css
+privacy.html        privacy notice template (static) -> src/how-to-play.css
+imprint.html        imprint template (static)        -> src/how-to-play.css
 src/config/         control data and backend URL default
 src/services/       auth, game actions, async sessions, SSE stream controller
 src/meta/           meta fetch/cache and contract version
