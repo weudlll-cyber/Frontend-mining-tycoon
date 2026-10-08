@@ -10,6 +10,27 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Scheduled sync rounds (live events). Admin create form section 3: "Start
+  now" (default) or "Schedule start" with a local date-time picker (time zone
+  shown), client check >= now + 60 s and <= `scheduling.max_days_ahead` days
+  (fallback 30), review row "Starts: <local date/time> (in 2 h 15 min)",
+  `scheduled_start_at` (unix seconds UTC) on `POST /games`; hidden for async.
+  Admin Game Settings: "Max days ahead for scheduled rounds"
+  (`scheduling.max_days_ahead`, patched only when changed). Lobby: scheduled
+  rounds listed under "Upcoming" with a "Scheduled" badge, local start time
+  and a live "opens in ..." countdown; the join button is disabled ("Opens at
+  HH:MM") and the list reloads when the countdown reaches 0; 409
+  `JOIN_NOT_ALLOWED_SCHEDULED` is explained. Player board: status `scheduled`
+  shows "Scheduled — opens at <time>" in the phase badge, header countdown and
+  standings label, and the action gate keeps upgrades, trades and farming
+  disabled ("The round has not opened yet."). Without the new backend fields
+  everything behaves as before.
+- Keyboard access: the lobby's open-games list is a listbox (roving
+  tabindex, Arrow keys / Home / End move and select, Enter / Space select,
+  visible focus, focus kept across the 10-second refresh); the player board's
+  season focus strip (phones) supports Left / Right / Home / End like the
+  live tools window tabs.
+
 - Account-based admin sign-in in the admin console (section 1 "Sign in as
   administrator": `POST /auth/login`, only accounts with `is_admin` are kept,
   Sign out via `POST /auth/logout`). Admin requests send `X-Admin-Token` when

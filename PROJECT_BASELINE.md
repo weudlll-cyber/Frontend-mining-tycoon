@@ -159,6 +159,8 @@ Entry points (Vite multi-page build):
 - Round options (snapshot-locked per round, backend-validated): optional conversion fee / oracle spread overrides in percent (section 5; empty = global economy, sent as `conversion_fee_rate` / `oracle_spread` rates) and "Chat enabled" (section 2; default from `defaults.chat_enabled`, fallback on; `chat_enabled` sent only when changed). `/games/{id}/meta` exposes the effective `conversion_fee_rate`, `oracle_spread` and `chat_enabled`; the player board shows the round fee/spread in the trading panel and, with chat disabled, a "Chat is disabled for this round." Chat tab without opening a WebSocket (also on a `CHAT_DISABLED` socket error, no reconnect). Missing fields = today's behavior (chat on, economy snapshot fee).
 - Admin sign-in (section 1, `src/admin/admin-account.js` + `src/admin/admin-session.js`): "Sign in as administrator" (`POST /auth/login`, kept only when `user.is_admin` is true; a non-admin login shows "This account is not an administrator." and is revoked), Sign out (`POST /auth/logout`), the Admin Token field as the alternative. Admin requests (`adminRequest`, `POST /games`, game list/delete) send `X-Admin-Token` when the field is filled, else `Authorization: Bearer <session token>` for a signed-in administrator, else nothing. The session lives in `sessionStorage` (`mining-tycoon:adminSession`) and is cleared on sign out, after `expires_at`, on 401 `ACCOUNT_AUTH_INVALID` and on 403 `ADMIN_REQUIRED`; on load it is re-checked via `GET /auth/me`, and without one the lobby session is reused when `/auth/me` reports `is_admin: true`.
 - Administrators (section 12, `src/admin/admin-users.js`): `GET /admin/users` with search and paging (20 per page), "Make admin" / "Remove admin" with a confirm step (`PATCH /admin/users/{id}` `{"is_admin": bool}`), 409 `LAST_ADMIN` explained inline; removing your own rights ends the console session. Disabled without credentials.
+- Scheduled sync rounds (`src/admin/schedule-options.js`, `src/ui/lobby-game-list.js`, `src/utils/schedule-time.js`): admin section 3 "Start now" / "Schedule start" (sync only; local `datetime-local` picker with the time-zone name and UTC offset; client check >= now + 60 s and <= `scheduling.max_days_ahead` days, fallback 30; `scheduled_start_at` in unix seconds UTC on `POST /games`; review row "Starts: <local date/time> (in 2 h 15 min)"); Game Settings "Max days ahead for scheduled rounds" (`scheduling.max_days_ahead`, sent only when changed). Lobby: status `scheduled` items of `/games/active` are listed under an "Upcoming" divider with a Scheduled badge, local start time and a 1 s countdown (prefers `opens_in_seconds`, falls back to `scheduled_start_at`); the join button is disabled ("Opens at HH:MM"), the list reloads when a countdown reaches 0 (at most every 5 s while the backend still reports it scheduled), and 409 `JOIN_NOT_ALLOWED_SCHEDULED` (`opens_at`) is explained. Player board: `game_status: scheduled` shows "Scheduled — opens at <time>" in the phase badge, the header countdown ("Round opens at") and the standings label; the action gate treats it as not running ("The round has not opened yet."), also when the join itself is refused. The backend stays authoritative for when a round opens.
+- Keyboard access: the lobby open-games list is a single-select listbox (roving tabindex, Arrow keys / Home / End move and select, Enter / Space select, focus restored after each refresh); the phone season focus strip is a tablist with Left / Right / Home / End like the live tools window tabs.
 - Lobby: the "Admin setup" link reads "Admin setup (you are an administrator)" (accent color) when the signed-in account has `is_admin` (login payload or `/auth/me`); convenience only.
 - Farming Stage 1 round options (section 5, `src/admin/farming-options.js`): "Farming enabled", minimum duration (value + unit) and reward per cycle (%), defaults/limits from Game Settings (`defaults.farming_*`, `farming_min_duration_limits`, `farming_reward_rate_limits`; fallbacks off / 300 s / 5 %, 10 s..7 d, 0.01 %..100 %), client check that the minimum duration is shorter than the round (sync) or session (async). Sent as `farming_enabled`, `farming_min_duration_seconds`, `farming_reward_rate` when enabled (only `farming_enabled: false` when unticked against an "on" default). Section 11 edits the farming defaults and limits (`src/admin/farming-config-fields.js`).
 
@@ -184,7 +186,7 @@ Session-mode behavior:
 
 Player board layout (desktop target 1440x900, no page scroll):
 
-- **Header:** countdown, phase, score, rank, top score, scoring mode, connection badge, async badge; inline Debug disclosure (meta hash, backend URL, IDs).
+- **Header:** countdown, phase, score, rank, top score, standings label (Live / Provisional / Final / Scheduled), scoring mode, connection badge, async badge; inline Debug disclosure (meta hash, backend URL, IDs).
 - **Setup panel ("Join Round"):** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async only), `Stop Stream`. It collapses after the stream starts. Legacy host controls (round type, scoring, trade count, durations, overrides) remain in the HTML with `.admin-only` and are always hidden.
 - **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
 - **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, spendable balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values; a "Farmed (not spendable)" line lists tokens in farming when there are any.
@@ -293,6 +295,11 @@ Areas intentionally left open by current implementation:
 
 ## 10) Project Status & Next Steps (Non-Binding)
 
+### Checkpoint 2026-10-08: Scheduled sync rounds and lobby keyboard access (frontend)
+
+- Admin "Schedule start" for sync rounds and Game Settings "Max days ahead", lobby "Upcoming" group with live countdown and disabled "Opens at HH:MM" join, scheduled status on the player board (phase badge, header, standings label, action gate). Built against the backend contract (`scheduled_start_at`, status `scheduled`, `opens_in_seconds`, 409 `JOIN_NOT_ALLOWED_SCHEDULED` with `opens_at`, `scheduling.max_days_ahead`); without those fields everything behaves as before.
+- Lobby open-games list keyboard-operable (listbox); season focus strip arrow keys.
+
 ### Checkpoint 2026-10-08: Farming Stage 1 (frontend)
 
 - Farm tab implemented (`src/ui/farming-panel.js`, `src/ui/farming-state.js`): status line, rule summary, per-token balance / farmed / cycles / next-reward countdown (local tick between SSE updates), Deposit / Withdraw / Withdraw all via `POST /games/{id}/players/{pid}/farm/deposit|withdraw` (`src/services/game-actions.js`, same player-token header and error toasts as trades), play-window gate, `updated_state` merge. Older backends without `farming` show "Farming is not enabled for this round."
@@ -335,7 +342,7 @@ Last stable rollback tag: `checkpoint/2026-03-30-stable-01` (no newer stable tag
 
 ### Round Formats & Shared Chat
 
-Both round formats are implemented. Sync rounds start automatically when the enrollment window ends; host-scheduled start times are not implemented. Round-wide chat is available to all players of the same round in both formats.
+Both round formats are implemented. Sync rounds start automatically when the enrollment window ends; an admin can also schedule a sync round's start (live events, UI implemented 2026-10-08; needs the matching backend). Round-wide chat is available to all players of the same round in both formats.
 
 ### Farming
 
@@ -404,7 +411,7 @@ Source-of-truth rule:
 
 #### A) Core Game & Simulation
 
-- Host-scheduled synchronous live event rounds (fixed start date/time).
+- ~~Host-scheduled synchronous live event rounds (fixed start date/time).~~ Implemented in the UI (2026-10-08: admin "Schedule start", lobby "Upcoming" with countdown, scheduled status on the board; needs the matching backend).
 
 #### B) Economy & Progression
 
