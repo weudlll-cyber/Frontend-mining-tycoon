@@ -326,7 +326,7 @@ Open work (summary):
 - Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
 - Gameplay features: Farming Stage 2 (Stage 1 is implemented in the UI, see the 2026-10-08 checkpoint); secure email-based password reset; scheduled sync live rounds; chat moderation and emoji; season artwork (`public/assets/seasons/` images exist but are unused).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
-- Code health: `src/main.js` (~2,400 lines) and `src/ui/trading-panel.js` (~1,250 lines) should be split.
+- Code health: `src/main.js` was split into player-board modules (now ~750 lines, see `CODE_ORGANIZATION.md`); `src/ui/trading-panel.js` (~1,020 lines after moving its pure helpers to `trading-panel-model.js`) is still the largest UI module.
 
 Last stable rollback tag: `checkpoint/2026-03-30-stable-01` (no newer stable tag yet).
 

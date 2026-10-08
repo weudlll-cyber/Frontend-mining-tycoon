@@ -94,6 +94,17 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Refactor, no behavior change: `src/main.js` (2,590 lines) is now a thin
+  composition root (~750 lines). Its responsibilities moved into player-board
+  modules: `src/ui/board-dom.js`, `board-state.js`, `board-update.js`,
+  `live-board-lifecycle.js`, `session-clock.js`, `game-over.js`,
+  `start-flow.js`, `setup-controller.js`, `setup-settings.js`,
+  `setup-host-controls.js`, `scoring-mode-ui.js`, `meta-debug.js`,
+  `chat-preview.js` and `src/services/player-join.js`. The pure view-model
+  helpers of `src/ui/trading-panel.js` moved to `trading-panel-model.js`. The
+  board's duplicate scoring-mode normalization now reuses
+  `trading-panel-formatters.js`. New unit tests cover the extracted modules.
+
 - Colour contrast raised to WCAG AA (4.5:1) for status text and buttons on the
   player board: status green `#10b981` -> `#047857`, blue `#3b82f6` ->
   `#2563eb`, amber text `#f59e0b`/`#d97706`/`#c8960c` -> `#b45309`/`#a16207`,
