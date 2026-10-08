@@ -1,11 +1,21 @@
 /**
 File: src/main.js
-Purpose: Browser dashboard client for Mining Tycoon (SSE updates, upgrades, capabilities metadata, and post-game return flow).
+Purpose: Composition root of the player board (player.html): looks up the DOM,
+  wires the player-board modules together and runs the page bootstrap.
 Key responsibilities:
-- Manage SSE lifecycle and reconnect behavior.
-- Fetch/cache meta contracts with ETag, dedupe/throttle, and retention cleanup.
-- Render state/leaderboard/upgrades and enforce contract-version safety gates.
-- Drive explicit async session creation and session-scoped stream orchestration.
+- Initialize the board modules (state application, setup flow, game-over,
+  session clock, chat preview, settings) with their DOM elements and
+  callbacks, and lazily initialize the render modules (initializeModules).
+- Connect the stream controller, game actions and session actions to the
+  board, and handle DOMContentLoaded (settings, meta fetch, autostart).
+- Re-export the symbols the page-level tests import from './main.js'.
+Module map (details in CODE_ORGANIZATION.md):
+- board-dom.js (element lookup), board-state.js (shared mutable state),
+  board-update.js (stream payload -> UI), setup-controller.js / setup-settings.js
+  / setup-host-controls.js (setup shell, persistence, legacy host controls),
+  start-flow.js + services/player-join.js (enter game / start session),
+  session-clock.js, live-board-lifecycle.js, game-over.js, chat-preview.js,
+  meta-debug.js, scoring-mode-ui.js.
 Invariants:
 - Frontend remains display/intent only; backend stays authoritative for deterministic session policy and timing.
 - Core gameplay stays inline; only the end-of-game return overlay may block input after a round finishes.
@@ -13,11 +23,9 @@ Invariants:
 Security notes:
 - Use safe DOM APIs only and never render untrusted HTML.
 - Encode ids in URLs and never surface player tokens in UI.
-Entry points / public functions:
-- DOMContentLoaded bootstrap, start/stop/new-game handlers, fetchMetaSnapshot.
 Dependencies:
 - Browser fetch/EventSource/localStorage APIs and backend HTTP endpoints.
-Last updated: 2026-03-12
+Last updated: 2026-10-08
 Author/Owner: Frontend Team
 
 Manual QA (P2 Seasonal Oracle)
@@ -28,6 +36,17 @@ Manual QA (P2 Seasonal Oracle)
 5) Submit upgrade; verify winter balance decreases and summer efficiency increases after refresh.
 6) Switch pay_token and verify preview updates.
 7) Force unsupported api_contract_version (> max) and verify upgrades are disabled with out-of-date message.
+
+Manual QA (P2.4 Duration Presets & Overrides)
+1) Create game with preset "10m" → verify meta shows duration_preset=10m and game_duration_seconds=600
+2) Create game with custom "120" minutes → verify duration_custom_seconds=7200 (= 2 hours)
+3) Leave advanced overrides blank → backend chooses recommendations, meta shows them
+4) Fill anchor_token="summer" and anchor_rate="8.5" → backend respects, meta shows them
+5) Fill season_cycles="2" → meta shows the override applied
+6) Verify meta info displays in debug line: "Duration: 10m | Emission: spring @ 5.0/s | Cycles: 1"
+7) Ensure UI still works if meta fields absent (fallback gracefully)
+8) Check localStorage persists duration preset/custom choices across page reload
+9) Verify no innerHTML used in duration UI (all createElement/textContent)
 */
 
 import './style.css';
@@ -38,12 +57,8 @@ import {
   normalizeTokenNames,
 } from './utils/token-utils.js';
 import {
-  STORAGE_KEYS,
   getPlayerTokenStorageKey,
-  setStorageItem,
   getStorageItem,
-  normalizeBaseUrl,
-  getGameMetaHashStorageKey,
   markGameMetaSeen,
   cleanupGameMetaCache,
 } from './utils/storage-utils.js';
@@ -57,48 +72,28 @@ import {
   shouldShowTokenHalvingIndicator,
 } from './halving.js';
 import { setBadgeStatus } from './ui/badge.js';
-import {
-  initCountdown,
-  startCountdownTimer,
-  startEnrollmentCountdown,
-  stopCountdownTimer,
-  clearCountdownInterval,
-} from './ui/countdown.js';
+import { initCountdown, clearCountdownInterval } from './ui/countdown.js';
 import {
   initHalvingDisplay,
-  handleLastHalvingStateUpdate,
   resetTransientHalvingState,
   stopNextHalvingCountdown,
   computeNextHalvingHint,
   resolveNextHalvingTarget,
   shouldResetNextHalvingCountdownTarget,
 } from './ui/halving-display.js';
-import {
-  initEventDisplay,
-  renderEventBanner,
-  annotateAffectedValues,
-} from './ui/event-display.js';
+import { initEventDisplay } from './ui/event-display.js';
 import {
   initMetaManager,
   getGameMeta,
   isContractVersionSupported,
   isActiveContractSupported,
-  getActiveMetaHash,
-  setActiveMetaHashFromStorage,
-  getActiveContractVersion,
   getActiveUpgradeDefinitions,
-  shortMetaHash,
   setActiveMeta as setActiveMetaState,
   fetchMetaSnapshot,
 } from './meta/meta-manager.js';
-import {
-  initPlayerView,
-  renderPlayerState,
-  resetPlayerStateView,
-} from './ui/player-view.js';
+import { initPlayerView } from './ui/player-view.js';
 import {
   initSetupShell,
-  setSetupShellState,
   updateSetupActionsState as updateSetupShellActions,
   renderDebugContext as renderSetupDebugContext,
   setSetupCollapsed as setSetupShellCollapsed,
@@ -119,17 +114,8 @@ import {
   initLeaderboard,
   renderLeaderboard as renderTopLeaderboard,
 } from './ui/leaderboard.js';
-import { buildLastGameSnapshot } from './ui/last-game-highscores.js';
 import { ensureToastRegions, showToast } from './ui/toast.js';
-import {
-  initStandingsStatus,
-  renderStandingsStatus,
-  resolveStandingsStatus,
-} from './ui/standings-status.js';
-import {
-  snapSelection,
-  restoreSelectionIfValid,
-} from './ui/selection-persist.js';
+import { initStandingsStatus } from './ui/standings-status.js';
 import {
   initSeasonCards,
   formatRemainingMmSs,
@@ -141,58 +127,6 @@ import {
   renderSeasonData as renderSeasonCardData,
 } from './ui/season-cards.js';
 import {
-  syncSessionDurationOptions,
-  getAsyncDurationPreset,
-  presetToSeconds,
-  populateHostPresetSelects,
-} from './ui/async-duration.js';
-// Round-setup values come from the effective game config (backend /meta
-// `game_config`, fallback src/config constants).
-import {
-  SCORING_CONTROL,
-  getEffectiveGameConfig,
-  clampTradeCount,
-  getDefaultTradeCount,
-  computeTradeUnlockOffsetsSeconds,
-} from './config/index.js';
-import {
-  resolveDurationSecondsFromInputs,
-  collectAdvancedOverridesFromInputs,
-} from './ui/setup-payload.js';
-import {
-  getRoundModeFromMeta,
-  resolveAsyncWindowOpen,
-  computeCurrentRoundContext,
-} from './ui/round-context.js';
-import {
-  shouldResetAsyncDiagnostics,
-  createAsyncDiagnosticsProbeKey,
-  shouldSkipAsyncDiagnosticsProbe,
-  resolveRequirePlayerAuthValue,
-} from './ui/async-diagnostics.js';
-import {
-  computeRoundRemainingSeconds,
-  normalizeSessionTimerInputs,
-  shouldReuseSessionElapsedTimer,
-  computeElapsedSeconds,
-  isSessionExpired,
-  computeSessionLeftSeconds,
-} from './ui/session-timers.js';
-import {
-  buildSetupShellState,
-  buildStartSessionStatusClass,
-} from './ui/setup-state.js';
-import {
-  deriveStreamSessionState,
-  resolveCountdownMode,
-  stampIncomingUiData,
-  shouldScheduleUiRender,
-} from './ui/ui-update-state.js';
-import {
-  normalizeAsyncSessionStartFailure,
-  buildActiveSessionFromResult,
-} from './ui/async-session-state.js';
-import {
   initInlineUpgrades,
   renderAllSeasonUpgrades,
 } from './ui/upgrade-panel-inline.js';
@@ -200,27 +134,13 @@ import {
   initChatPanel,
   connectChat,
   disconnectChat,
-  resolveChatUserLabel,
-  setChatPanelOpen,
   isChatEnabledForRound,
-  CHAT_DISABLED_TEXT,
 } from './ui/chat-panel.js';
 import { initTradingPanel } from './ui/trading-panel.js';
 import { initFarmingPanel } from './ui/farming-panel.js';
-import { mergeFarmUpdatedState } from './ui/farming-state.js';
-import { resolvePlayerActionAvailability } from './ui/action-availability.js';
-import {
-  initLiveDrawer,
-  getLiveDrawerTab,
-  isLiveDrawerOpen,
-} from './ui/live-drawer.js';
+import { initLiveDrawer } from './ui/live-drawer.js';
 import { initSeasonFocus } from './ui/season-focus.js';
-import {
-  initStreamController,
-  startStream,
-  stopLiveTimersAndHalving,
-  closeEventSourceIfOpen,
-} from './services/stream-controller.js';
+import { initStreamController } from './services/stream-controller.js';
 import {
   initGameActions,
   performFarmDeposit,
@@ -230,1228 +150,118 @@ import {
 } from './services/game-actions.js';
 import {
   initSessionActions,
-  createAsyncSession,
   getStreamTicket,
-  probeRequirePlayerAuth,
 } from './services/session-actions.js';
-import { debugLog } from './utils/debug-log.js';
-import { readApiError } from './utils/api-error.js';
-import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
+import {
+  initPlayerJoin,
+  ensurePlayerJoinedForStream,
+} from './services/player-join.js';
+import { queryPlayerBoardDom } from './ui/board-dom.js';
+import { boardState } from './ui/board-state.js';
+import {
+  initBoardUpdate,
+  applyFarmUpdated,
+  applyTradeExecuted,
+  cancelPendingUiRender,
+  showSessionFinishedOverlay,
+  updateUI,
+} from './ui/board-update.js';
+import {
+  initChatPreview,
+  handleChatAvailabilityChange,
+  handleChatMessagePreview,
+  handleLiveDrawerStateChange,
+  markChatAsRead,
+  renderChatPreviewState,
+} from './ui/chat-preview.js';
+import {
+  initGameOver,
+  acknowledgeGameOverOverlay,
+  captureLastPlayedGameSnapshot,
+  hideGameOverOverlay,
+  isGameOverOverlayEligible,
+  showGameOverOverlay,
+  wireGameOverOverlayEvents,
+} from './ui/game-over.js';
+import {
+  initLiveBoardLifecycle,
+  getPlayerActionAvailability,
+  handleActiveSessionExpired,
+  resetLiveBoardState,
+} from './ui/live-board-lifecycle.js';
+import {
+  initMetaDebug,
+  renderDerivedEmissionPreview,
+  renderMetaDebugLine,
+} from './ui/meta-debug.js';
+import {
+  initScoringModeUi,
+  resolveActiveScoringMode,
+  updateScoringModeUi,
+} from './ui/scoring-mode-ui.js';
+import { initSessionClock } from './ui/session-clock.js';
+import {
+  initSetupController,
+  getNormalizedBaseUrlOrNull,
+  refreshAsyncDiagnostics,
+  setSetupStateForTests,
+  setStartSessionStatus,
+  syncSetupShellState,
+} from './ui/setup-controller.js';
+import {
+  initSetupHostControls,
+  applyGameConfigToHostControls,
+  collectAdvancedOverrides,
+  isTradeCountManuallyOverridden,
+  setSelectedRoundType,
+  syncHostSessionDurationOptions,
+  syncTradeCountWithDuration,
+  updateAsyncHostControlsVisibility,
+  wireHostControlEvents,
+} from './ui/setup-host-controls.js';
+import {
+  initSetupSettings,
+  loadSettings,
+  saveSettings,
+  wireSettingsPersistence,
+} from './ui/setup-settings.js';
+import {
+  initStartFlow,
+  handleStartAsyncSession,
+  resolveRequestedGameId,
+  runAutostartIfRequested,
+  runStartGameFlowSafely,
+} from './ui/start-flow.js';
 
-// DOM elements - inputs
-const baseUrlInput = document.getElementById('base-url');
-const playerNameInput = document.getElementById('player-name');
-const durationPresetInput = document.getElementById('duration-preset');
-const durationCustomInput = document.getElementById('duration-custom-input');
-const durationCustomValueInput = document.getElementById(
-  'duration-custom-value'
-);
-const durationCustomUnitInput = document.getElementById('duration-custom-unit');
-const enrollmentWindowInput = document.getElementById('enrollment-window');
-const scoringModeStockpileInput = document.getElementById(
-  'scoring-mode-stockpile'
-);
-const scoringModePowerInput = document.getElementById('scoring-mode-power');
-const scoringModeMiningTimeInput = document.getElementById(
-  'scoring-mode-mining-time'
-);
-const scoringModeEfficiencyInput = document.getElementById(
-  'scoring-mode-efficiency'
-);
-const roundTypeSyncInput = document.getElementById('round-type-sync');
-const roundTypeAsyncInput = document.getElementById('round-type-async');
-const syncHostControlsEl = document.getElementById('sync-host-controls');
-const asyncHostControlsEl = document.getElementById('async-host-controls');
-const asyncHostDurationPresetInput = document.getElementById(
-  'async-duration-preset'
-);
-const asyncSessionDurationPresetInput = document.getElementById(
-  'async-session-duration-preset'
-);
-const asyncHostAutoStartCheckbox = document.getElementById('async-auto-start');
-const tradeCountInput = document.getElementById('trade-count-input');
-const tradeCountModeNoteEl = document.getElementById('trade-count-mode-note');
-const tradeSchedulePreviewEl = document.getElementById(
-  'trade-schedule-preview'
-);
-const gameIdInput = document.getElementById('game-id');
-const playerIdInput = document.getElementById('player-id');
-const gameOverOverlayEl = document.getElementById('game-over-overlay');
-const gameOverTitleEl = document.getElementById('game-over-title');
-const gameOverMessageEl = document.getElementById('game-over-message');
-const gameOverResultsLinkEl = document.getElementById('game-over-results-link');
-const gameOverResultsNoteEl = document.getElementById('game-over-results-note');
+const dom = queryPlayerBoardDom();
+const {
+  gameIdInput,
+  playerIdInput,
+  playerNameInput,
+  startBtn,
+  stopBtn,
+  connStatusEl,
+} = dom;
+const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
+
+let modulesInitialized = false;
+let tradingPanelApi = null;
+let farmingPanelApi = null;
+
+// ── Lazy-init wrappers ─────────────────────────────────────────────────────
+// WHY: tests (and early callbacks) may call these before DOMContentLoaded, so
+// each one makes sure the render modules are initialized first.
 
 function setActiveMeta(meta) {
   initializeModules();
   setActiveMetaState(meta);
   void refreshAsyncDiagnostics({ force: true });
 }
-const showAdvancedCheckbox = document.getElementById('show-advanced-overrides');
-const advancedOverridesDiv = document.getElementById('advanced-overrides');
-const anchorTokenInput = document.getElementById('anchor-token');
-const anchorRateInput = document.getElementById('anchor-rate');
-const seasonCyclesInput = document.getElementById('season-cycles');
-const derivedEmissionPreviewEl = document.getElementById(
-  'derived-emission-preview'
-);
-
-// DOM elements - buttons
-const startBtn = document.getElementById('start-btn');
-const startSessionBtn = document.getElementById('start-session-btn');
-const stopBtn = document.getElementById('stop-btn');
-
-// DOM elements - status displays
-const connStatusEl = document.getElementById('conn-status');
-const gameStatusEl = document.getElementById('game-status');
-const countdownEl = document.getElementById('countdown');
-const countdownLabelEl = document.getElementById('countdown-label');
-const asyncSessionStatusEl = document.getElementById('async-session-status');
-const scoringModeStatusEl = document.getElementById('scoring-mode-status');
-const setupActionsNoteEl = document.getElementById('setup-actions-note');
-const roundModeBadgeEl = document.getElementById('round-mode-badge');
-const startSessionStatusEl = document.getElementById('start-session-status');
-const metaDebugEl = document.getElementById('meta-debug');
-const liveBoardEl = document.getElementById('live-board');
-const setupShellEl = document.getElementById('setup-shell');
-const setupToggleBtnEl = document.getElementById('setup-toggle-btn');
-const jumpLiveBtnEl = document.getElementById('jump-live-btn');
-const jumpLiveBtnSetupEl = document.getElementById('jump-live-btn-setup');
-const debugToggleBtnEl = document.getElementById('debug-toggle-btn');
-const debugPanelEl = document.getElementById('debug-panel');
-const debugBackendUrlEl = document.getElementById('debug-backend-url');
-const debugGameIdEl = document.getElementById('debug-game-id');
-const debugPlayerIdEl = document.getElementById('debug-player-id');
-const debugSessionIdEl = document.getElementById('debug-session-id');
-
-// DOM elements - async session UX helpers
-// roundRemainingHintEl: the <span> that wraps the "Round left: …" secondary
-//   countdown shown while a session is active (index.html #round-remaining-hint).
-// roundRemainingEl:     the inner <span> whose textContent we update with the
-//   formatted round-remaining time (#round-remaining).
-// sessionDurationWarningEl: small amber text shown below the Session Duration
-//   dropdown when syncSessionDurationOptions() had to auto-clamp the value.
-const roundRemainingHintEl = document.getElementById('round-remaining-hint');
-const roundRemainingEl = document.getElementById('round-remaining');
-const sessionDurationWarningEl = document.getElementById(
-  'session-duration-warning'
-);
-const chatPanelEl = document.getElementById('chat-panel');
-const chatToggleBtnEl = document.getElementById('chat-toggle-btn');
-const chatMessagesEl = document.getElementById('chat-messages');
-const chatFormEl = document.getElementById('chat-form');
-const chatInputEl = document.getElementById('chat-input');
-const chatStatusEl = document.getElementById('chat-status');
-const chatDisabledNoteEl = document.getElementById('chat-disabled-note');
-const chatUnreadBadgeEl = document.getElementById('chat-unread-badge');
-const chatDockBtnEl = document.getElementById('chat-dock-btn');
-const chatDockPreviewEl = document.getElementById('chat-dock-preview');
-const chatDockUnreadEl = document.getElementById('chat-dock-unread');
-
-// DOM elements - trading panel
-const tradingPanelEl = document.getElementById('trading-panel');
-const tradingStatusEl = document.getElementById('trading-status');
-// DOM elements - farming panel (Farm tab) and action-bar pill
-const farmingPanelEl = document.getElementById('farming-panel');
-const farmingStatusEl = document.getElementById('farming-status');
-const tradeDrawerBtnEl = document.getElementById('trade-drawer-btn');
-const farmDrawerBtnEl = document.getElementById('farm-drawer-btn');
-const liveDrawerEl = document.getElementById('live-drawer');
-const liveDrawerBackdropEl = document.getElementById('live-drawer-backdrop');
-const liveDrawerCloseBtnEl = document.getElementById('live-drawer-close-btn');
-const liveDrawerTabTradeEl = document.getElementById('live-tab-trade');
-const liveDrawerTabFarmEl = document.getElementById('live-tab-farm');
-const liveDrawerTabChatEl = document.getElementById('live-tab-chat');
-const liveDrawerTabLeaderboardEl = document.getElementById(
-  'live-tab-leaderboard'
-);
-const leaderboardDrawerBtnEl = document.getElementById(
-  'leaderboard-drawer-btn'
-);
-const liveDrawerPanelTradeEl = document.getElementById('live-panel-trade');
-const liveDrawerPanelFarmEl = document.getElementById('live-panel-farm');
-const liveDrawerPanelChatEl = document.getElementById('live-panel-chat');
-const liveDrawerPanelLeaderboardEl = document.getElementById(
-  'live-panel-leaderboard'
-);
-
-// DOM elements - player and leaderboard
-const playerStateEl = document.getElementById('player-state');
-// Compact top-5 leaderboard lives in the live tools window ("Top 5" tab).
-const leaderboardEl = document.getElementById('leaderboard');
-const seasonScrollEl = document.querySelector('.seasons-scroll');
-const seasonFocusStripEl = document.getElementById('season-focus-strip');
-const seasonFocusButtons = Array.from(
-  document.querySelectorAll('[data-season-focus]')
-);
-const seasonCards = Array.from(document.querySelectorAll('.season-card'));
-const myScoreEl = document.getElementById('my-score');
-const myRankEl = document.getElementById('my-rank');
-const topScoreEl = document.getElementById('top-score');
-const standingsStatusEl = document.getElementById('standings-status');
-const leaderboardStandingsStatusEl = document.getElementById(
-  'leaderboard-standings-status'
-);
-const portfolioValueEl = document.getElementById('portfolio-value');
-const scoreContextLabelEl = document.getElementById('score-context-label');
-const scoringModeInputs = [
-  scoringModeStockpileInput,
-  scoringModePowerInput,
-  scoringModeMiningTimeInput,
-  scoringModeEfficiencyInput,
-].filter(Boolean);
-const PLAYER_STATE_TOKENS = [...DEFAULT_TOKEN_NAMES];
-const editableInputs = [
-  baseUrlInput,
-  playerNameInput,
-  durationPresetInput,
-  durationCustomValueInput,
-  durationCustomUnitInput,
-  enrollmentWindowInput,
-  ...scoringModeInputs,
-  roundTypeSyncInput,
-  roundTypeAsyncInput,
-  asyncHostDurationPresetInput,
-  asyncSessionDurationPresetInput,
-  asyncHostAutoStartCheckbox,
-  gameIdInput,
-  playerIdInput,
-  anchorTokenInput,
-  anchorRateInput,
-  seasonCyclesInput,
-];
-
-let lastGameData = null;
-let modulesInitialized = false;
-let tradingPanelApi = null;
-let farmingPanelApi = null;
-let isStreamActive = false;
-let isSetupBusy = false;
-let latestGameStatus = null;
-let chatUnreadCount = 0;
-const CHAT_READY_PREVIEW = 'Chat is ready';
-let lastChatPreview = CHAT_READY_PREVIEW;
-let sessionStartSupported = true;
-let setupRoundModeOverride = null;
-let activeSession = null;
-// Whether the backend currently runs a session for this player (async rounds).
-// Drives the play-window gate for upgrade/trade buttons.
-let playerHasActiveSession = false;
-let sessionElapsedInterval = null;
-let sessionElapsedAnchorUnix = null;
-let sessionElapsedSeedSeconds = 0;
-let roundRemainingHintInterval = null;
-let asyncWindowOpen = null;
-let asyncRequirePlayerAuth = 'unknown';
-let asyncSessionSupportProbe = null;
-let asyncDiagnosticsProbeKey = '';
-let asyncDiagnosticsProbeInFlight = null;
-let selectedSetupRoundType = 'sync';
-let tradeCountManuallyOverridden = false;
-let pendingUiRenderFrame = null;
-let pendingUiRenderData = null;
-
-function renderChatPreviewState() {
-  const unreadText = chatUnreadCount > 99 ? '99+' : String(chatUnreadCount);
-
-  if (chatUnreadBadgeEl) {
-    chatUnreadBadgeEl.hidden = chatUnreadCount <= 0;
-    chatUnreadBadgeEl.textContent = unreadText;
-  }
-
-  if (chatDockUnreadEl) {
-    chatDockUnreadEl.hidden = chatUnreadCount <= 0;
-    chatDockUnreadEl.textContent = unreadText;
-  }
-
-  if (chatDockPreviewEl) {
-    chatDockPreviewEl.textContent = lastChatPreview;
-  }
-}
-
-function isChatTabVisible() {
-  return isLiveDrawerOpen() && getLiveDrawerTab() === 'chat';
-}
-
-function markChatAsRead() {
-  if (chatUnreadCount <= 0) return;
-  chatUnreadCount = 0;
-  renderChatPreviewState();
-}
-
-function handleChatMessagePreview(message) {
-  const user = resolveChatUserLabel(message, {
-    ownPlayerId: playerIdInput?.value,
-    ownPlayerName: playerNameInput?.value,
-  });
-  const text = String(message?.text || '').trim();
-  lastChatPreview = text ? `${user}: ${text}` : `${user}: (empty message)`;
-
-  if (!isChatTabVisible()) {
-    chatUnreadCount += 1;
-  }
-
-  renderChatPreviewState();
-}
-
-// Round option: keep the chat preview dock in sync with "chat disabled".
-// Re-enabling only resets the preview when it still shows the disabled text,
-// so a real last message is never overwritten.
-function handleChatAvailabilityChange(enabled) {
-  if (!enabled) {
-    lastChatPreview = CHAT_DISABLED_TEXT;
-  } else if (lastChatPreview === CHAT_DISABLED_TEXT) {
-    lastChatPreview = CHAT_READY_PREVIEW;
-  }
-  renderChatPreviewState();
-}
-
-function handleLiveDrawerStateChange(nextState) {
-  const chatVisible = Boolean(
-    nextState?.isOpen && nextState?.activeTab === 'chat'
-  );
-  setChatPanelOpen(chatVisible);
-  if (chatVisible) {
-    markChatAsRead();
-  }
-}
-let lastFinishedGameId = null;
-let currentViewedGameId = '';
-let _hasSeenPlayableStateForCurrentView = false;
-let lastGameStatusForCurrentView = null;
-
-const DEFAULT_SCORING_MODE = SCORING_CONTROL.DEFAULT_MODE;
-
-function normalizeScoringMode(rawMode) {
-  const mode = String(rawMode || '')
-    .trim()
-    .toLowerCase();
-  if (!mode) return DEFAULT_SCORING_MODE;
-  if (mode === 'stockpile_total_tokens' || mode === 'stockpile') {
-    return 'stockpile_total_tokens';
-  }
-  if (
-    mode === 'power_oracle_weighted' ||
-    mode === 'power' ||
-    mode === 'oracle_weighted'
-  ) {
-    return 'power_oracle_weighted';
-  }
-  if (mode === 'mining_time_equivalent' || mode === 'mining_time') {
-    return 'mining_time_equivalent';
-  }
-  if (mode === 'efficiency_system_mastery' || mode === 'efficiency') {
-    return 'efficiency_system_mastery';
-  }
-  return DEFAULT_SCORING_MODE;
-}
-
-function formatScoringModeName(mode) {
-  const normalized = normalizeScoringMode(mode);
-  if (normalized === 'power_oracle_weighted') return 'Power Mode';
-  if (normalized === 'mining_time_equivalent') {
-    return 'Mining Time Equivalent Mode';
-  }
-  if (normalized === 'efficiency_system_mastery') return 'Efficiency Mode';
-  return 'Stockpile Mode';
-}
-
-function getScoringModeScoreLabel(mode) {
-  const normalized = normalizeScoringMode(mode);
-  if (normalized === 'power_oracle_weighted') return 'Weighted Score';
-  if (normalized === 'mining_time_equivalent') return 'Mining-Time Equivalent';
-  if (normalized === 'efficiency_system_mastery') return 'Efficiency Score';
-  return 'Total Tokens';
-}
-
-function getSelectedScoringMode() {
-  if (scoringModePowerInput?.checked) return 'power_oracle_weighted';
-  if (scoringModeMiningTimeInput?.checked) return 'mining_time_equivalent';
-  if (scoringModeEfficiencyInput?.checked) return 'efficiency_system_mastery';
-  return DEFAULT_SCORING_MODE;
-}
-
-function setSelectedScoringMode(mode) {
-  const normalized = normalizeScoringMode(mode);
-  if (scoringModeStockpileInput) {
-    scoringModeStockpileInput.checked = normalized === 'stockpile_total_tokens';
-  }
-  if (scoringModePowerInput) {
-    scoringModePowerInput.checked = normalized === 'power_oracle_weighted';
-  }
-  if (scoringModeMiningTimeInput) {
-    scoringModeMiningTimeInput.checked =
-      normalized === 'mining_time_equivalent';
-  }
-  if (scoringModeEfficiencyInput) {
-    scoringModeEfficiencyInput.checked =
-      normalized === 'efficiency_system_mastery';
-  }
-}
-
-function resolveActiveScoringMode(data = null) {
-  const gameId = String(data?.game_id || gameIdInput?.value || '').trim();
-  const gameMeta = gameId ? getGameMeta(gameId) : null;
-  return normalizeScoringMode(
-    data?.scoring_mode || gameMeta?.scoring_mode || getSelectedScoringMode()
-  );
-}
-
-function updateScoringModeUi(data = null) {
-  const mode = resolveActiveScoringMode(data);
-  if (scoringModeStatusEl) {
-    scoringModeStatusEl.textContent = formatScoringModeName(mode);
-  }
-  if (scoreContextLabelEl) {
-    scoreContextLabelEl.textContent = getScoringModeScoreLabel(mode);
-  }
-
-  const status = String(
-    data?.game_status || latestGameStatus || ''
-  ).toLowerCase();
-  const lockModeSelection = status === 'running' || status === 'finished';
-  scoringModeInputs.forEach((input) => {
-    input.disabled = lockModeSelection;
-  });
-}
-
-function getSelectedRoundType() {
-  if (selectedSetupRoundType === 'async' || selectedSetupRoundType === 'sync') {
-    return selectedSetupRoundType;
-  }
-  return roundTypeAsyncInput?.checked ? 'async' : 'sync';
-}
-
-function formatOffsetLabel(seconds) {
-  const total = Math.max(0, Math.round(Number(seconds) || 0));
-  if (total < 3600) {
-    const mm = Math.floor(total / 60)
-      .toString()
-      .padStart(2, '0');
-    const ss = Math.floor(total % 60)
-      .toString()
-      .padStart(2, '0');
-    return `${mm}:${ss}`;
-  }
-  const hh = Math.floor(total / 3600)
-    .toString()
-    .padStart(2, '0');
-  const mm = Math.floor((total % 3600) / 60)
-    .toString()
-    .padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
-function getSelectedRoundDurationSecondsForTradingDefaults() {
-  if (getSelectedRoundType() === 'async') {
-    // Async trade offsets count from session start and must fit inside the
-    // session (backend validation), so the session length is the window.
-    return (
-      presetToSeconds(asyncSessionDurationPresetInput?.value) ||
-      presetToSeconds(getAsyncDurationPreset(asyncHostDurationPresetInput)) ||
-      600
-    );
-  }
-  let resolution;
-  try {
-    resolution = resolveDurationSeconds();
-  } catch {
-    return 600;
-  }
-  if (resolution.mode === 'custom') {
-    return Number(resolution.customSeconds) || 600;
-  }
-  return presetToSeconds(resolution.preset) || 600;
-}
-
-function getSelectedTradeCount() {
-  return clampTradeCount(Number(tradeCountInput?.value || 0));
-}
-
-function getTradeUnlockOffsets() {
-  const durationSeconds = getSelectedRoundDurationSecondsForTradingDefaults();
-  return computeTradeUnlockOffsetsSeconds(
-    durationSeconds,
-    getSelectedTradeCount()
-  );
-}
-
-function renderTradeSchedulePreview() {
-  if (!tradeSchedulePreviewEl) return;
-
-  const gameId = String(gameIdInput?.value || '').trim();
-  const gameMeta = gameId ? getGameMeta(gameId) : null;
-  const metaRules = gameMeta?.trading_rules;
-
-  let tradeCount;
-  let offsets;
-  let note;
-
-  if (metaRules && Number.isFinite(Number(metaRules.trade_count))) {
-    tradeCount = clampTradeCount(Number(metaRules.trade_count));
-    if (tradeCountInput) {
-      tradeCountInput.value = String(tradeCount);
-      tradeCountInput.disabled = true;
-    }
-    offsets = Array.isArray(metaRules.unlock_offsets_seconds)
-      ? metaRules.unlock_offsets_seconds
-          .map((value) => Number(value))
-          .filter((value) => Number.isFinite(value))
-      : [];
-    note = 'Using backend-authoritative trading rules for this game.';
-  } else {
-    if (tradeCountInput) {
-      tradeCountInput.disabled = false;
-    }
-    tradeCount = getSelectedTradeCount();
-    offsets = getTradeUnlockOffsets();
-    note = tradeCountManuallyOverridden
-      ? 'Manual override active (clamped to allowed limits).'
-      : 'Auto default from round duration.';
-  }
-
-  if (tradeCountModeNoteEl) {
-    tradeCountModeNoteEl.textContent = note;
-  }
-
-  if (tradeCount <= 0 || !offsets.length) {
-    tradeSchedulePreviewEl.textContent =
-      'Trade schedule: no trades in this round.';
-    return;
-  }
-
-  const lines = offsets.map(
-    (offset, idx) =>
-      `Trade ${idx + 1} available at ${formatOffsetLabel(offset)}`
-  );
-  tradeSchedulePreviewEl.textContent = lines.join(' | ');
-}
-
-function syncTradeCountWithDuration({ forceDefault = false } = {}) {
-  if (!tradeCountInput) return;
-
-  const durationSeconds = getSelectedRoundDurationSecondsForTradingDefaults();
-  const recommended = getDefaultTradeCount(durationSeconds);
-  if (forceDefault || !tradeCountManuallyOverridden) {
-    tradeCountInput.value = String(recommended);
-  } else {
-    tradeCountInput.value = String(
-      clampTradeCount(Number(tradeCountInput.value))
-    );
-  }
-  renderTradeSchedulePreview();
-}
-
-function shouldAutoStartAsyncSession() {
-  return Boolean(asyncHostAutoStartCheckbox?.checked);
-}
-
-function updateAsyncHostControlsVisibility() {
-  const isAsyncHost = getSelectedRoundType() === 'async';
-  if (syncHostControlsEl) {
-    syncHostControlsEl.hidden = isAsyncHost;
-  }
-  if (asyncHostControlsEl) {
-    asyncHostControlsEl.hidden = !isAsyncHost;
-  }
-}
-
-function setSelectedRoundType(roundType) {
-  selectedSetupRoundType = roundType === 'async' ? 'async' : 'sync';
-  if (roundTypeSyncInput) {
-    roundTypeSyncInput.checked = selectedSetupRoundType === 'sync';
-  }
-  if (roundTypeAsyncInput) {
-    roundTypeAsyncInput.checked = selectedSetupRoundType === 'async';
-  }
-  updateAsyncHostControlsVisibility();
-}
-
-function getCurrentRoundContext() {
-  const gameMeta = getGameMeta(gameIdInput?.value);
-  return computeCurrentRoundContext({
-    gameMeta,
-    selectedRoundType: getSelectedRoundType(),
-    isStreamActive,
-    latestGameStatus,
-    setupRoundModeOverride,
-    asyncSessionSupportProbe,
-    sessionStartSupported,
-  });
-}
-
-async function refreshAsyncDiagnostics({ force = false } = {}) {
-  const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
-  const gameId = String(gameIdInput?.value || '').trim();
-  const playerId = String(playerIdInput?.value || '').trim();
-  const gameMeta = getGameMeta(gameId);
-  const roundMode = getRoundModeFromMeta(gameMeta);
-
-  asyncWindowOpen = resolveAsyncWindowOpen(gameMeta);
-
-  if (shouldResetAsyncDiagnostics({ baseUrl, gameId, roundMode })) {
-    asyncSessionSupportProbe = null;
-    asyncRequirePlayerAuth = 'unknown';
-    updateSetupActionsState();
-    return;
-  }
-
-  // WHY: the backend meta exposes no explicit session capability and the old
-  // OPTIONS / X-Dry-Run probe was rejected by CORS (and a dry-run POST would
-  // create a real session). Async rounds always support POST /games/{id}/sessions,
-  // so the round type from meta is the capability signal.
-  asyncSessionSupportProbe = true;
-
-  const probeKey = createAsyncDiagnosticsProbeKey({
-    baseUrl,
-    gameId,
-    playerId,
-  });
-  const shouldSkipProbe = shouldSkipAsyncDiagnosticsProbe({
-    force,
-    probeKey,
-    previousProbeKey: asyncDiagnosticsProbeKey,
-    inFlight: asyncDiagnosticsProbeInFlight,
-  });
-  if (shouldSkipProbe) {
-    if (!asyncDiagnosticsProbeInFlight) {
-      updateSetupActionsState();
-    }
-    return;
-  }
-
-  asyncDiagnosticsProbeKey = probeKey;
-  asyncDiagnosticsProbeInFlight = (async () => {
-    const authResult = playerId
-      ? await probeRequirePlayerAuth({ gameId, playerId })
-      : { value: 'unknown', reason: 'missing-player-id' };
-
-    asyncRequirePlayerAuth = resolveRequirePlayerAuthValue(authResult);
-
-    debugLog('async-diagnostics', 'probe results', {
-      gameId,
-      roundMode,
-      windowOpen: asyncWindowOpen,
-      sessionApiSupported: asyncSessionSupportProbe,
-      requirePlayerAuth: asyncRequirePlayerAuth,
-      authProbeCode: authResult?.code ?? null,
-    });
-  })()
-    .catch(() => {
-      asyncRequirePlayerAuth = 'unknown';
-    })
-    .finally(() => {
-      asyncDiagnosticsProbeInFlight = null;
-      updateSetupActionsState();
-    });
-}
-
-function syncSetupShellState() {
-  const roundContext = getCurrentRoundContext();
-  const nextSetupState = buildSetupShellState({
-    isStreamActive,
-    isSetupBusy,
-    latestGameStatus,
-    roundMode: roundContext.roundMode,
-    sessionStartSupported: roundContext.supportsSessionStart,
-    sessionApiSupported: asyncSessionSupportProbe,
-    asyncWindowOpen,
-    requirePlayerAuth: asyncRequirePlayerAuth,
-    activeSession,
-    hostRoundType: getSelectedRoundType(),
-    asyncHostAutoStart: shouldAutoStartAsyncSession(),
-  });
-  setSetupShellState(nextSetupState);
-}
-
-function setStartSessionStatus(message = '', type = 'info') {
-  if (!startSessionStatusEl) return;
-  startSessionStatusEl.textContent = message;
-  startSessionStatusEl.className = buildStartSessionStatusClass(message, type);
-}
-
-function handleActiveSessionExpired() {
-  if (!activeSession?.sessionId) {
-    return;
-  }
-
-  // Clear session context first so subsequent UI updates use non-session paths.
-  activeSession = null;
-
-  // Session lifespan is reached: stop receiving live updates for this session
-  // so the player does not keep seeing halving ticks beyond configured duration.
-  cancelPendingUiRender();
-  closeEventSourceIfOpen();
-  stopLiveTimersAndHalving();
-  stopSessionElapsedTimer({ resetDisplay: false, hideRoundHint: false });
-  disconnectChat();
-
-  isStreamActive = false;
-  setLiveSessionActive(false);
-  // The stream is closed, so no further payload would re-render the action
-  // buttons: re-apply the play-window gate now.
-  refreshPlayerActionControls();
-  setBadgeStatus(connStatusEl, 'idle');
-  setStartSessionStatus(
-    'Session duration reached. Start Async Session to continue.',
-    'warning'
-  );
-  showToast('Session ended at configured duration.', 'info');
-
-  // Freeze session clock at 00 once no active session exists.
-  if (countdownLabelEl) {
-    countdownLabelEl.textContent = 'Session Left';
-    countdownLabelEl.hidden = false;
-  }
-  if (countdownEl) {
-    countdownEl.textContent = formatDurationCompact(0);
-  }
-
-  // Keep round-left countdown running independently after session expiry.
-  startRoundRemainingHintTimer();
-
-  updateSetupActionsState();
-  renderDebugContext();
-
-  // Show game-over overlay so the player is prompted to return to the lobby.
-  // This is the primary path for async session expiry — the client-side elapsed
-  // timer fires here before (or instead of) the backend's final SSE packet.
-  const expiredGameId = String(gameIdInput?.value || '').trim();
-  showGameOverOverlay(expiredGameId, {
-    title: 'Session Finished',
-    message:
-      'Your async session has ended. Click anywhere to return to the login lobby.',
-  });
-}
-
-function updateRoundRemainingHint() {
-  if (!roundRemainingHintEl || !roundRemainingEl) return;
-
-  const roundLeft = computeRoundRemainingSeconds(lastGameData);
-  if (!Number.isFinite(roundLeft)) {
-    roundRemainingHintEl.hidden = true;
-    return;
-  }
-
-  roundRemainingEl.textContent = formatDurationCompact(roundLeft);
-  roundRemainingHintEl.hidden = false;
-}
-
-function startRoundRemainingHintTimer() {
-  if (roundRemainingHintInterval) {
-    clearInterval(roundRemainingHintInterval);
-    roundRemainingHintInterval = null;
-  }
-  updateRoundRemainingHint();
-  roundRemainingHintInterval = setInterval(updateRoundRemainingHint, 500);
-}
-
-function stopRoundRemainingHintTimer(hide = true) {
-  if (roundRemainingHintInterval) {
-    clearInterval(roundRemainingHintInterval);
-    roundRemainingHintInterval = null;
-  }
-  if (hide && roundRemainingHintEl) {
-    roundRemainingHintEl.hidden = true;
-  }
-}
-
-function stopSessionElapsedTimer({
-  resetDisplay = true,
-  hideRoundHint = true,
-} = {}) {
-  if (sessionElapsedInterval) {
-    clearInterval(sessionElapsedInterval);
-    sessionElapsedInterval = null;
-  }
-  sessionElapsedAnchorUnix = null;
-  sessionElapsedSeedSeconds = 0;
-
-  if (resetDisplay) {
-    if (countdownLabelEl) {
-      countdownLabelEl.textContent = 'Time Remaining';
-      countdownLabelEl.hidden = false;
-    }
-    if (countdownEl) countdownEl.textContent = '-';
-  }
-
-  if (hideRoundHint) {
-    stopRoundRemainingHintTimer(true);
-  }
-}
-
-function startSessionElapsedTimer(sessionStartUnix, initialElapsedSeconds = 0) {
-  const normalizedInputs = normalizeSessionTimerInputs(
-    sessionStartUnix,
-    initialElapsedSeconds
-  );
-  if (!normalizedInputs) return;
-
-  const { normalizedStartUnix, nextInitialElapsed } = normalizedInputs;
-
-  if (
-    shouldReuseSessionElapsedTimer({
-      sessionElapsedInterval,
-      sessionElapsedAnchorUnix,
-      normalizedStartUnix,
-    })
-  ) {
-    sessionElapsedSeedSeconds = Math.max(
-      sessionElapsedSeedSeconds,
-      nextInitialElapsed
-    );
-    return;
-  }
-
-  stopSessionElapsedTimer();
-  clearCountdownInterval();
-  stopRoundRemainingHintTimer(false);
-
-  sessionElapsedAnchorUnix = normalizedStartUnix;
-  sessionElapsedSeedSeconds = nextInitialElapsed;
-
-  const update = () => {
-    const elapsed = computeElapsedSeconds({
-      sessionElapsedSeedSeconds,
-      sessionElapsedAnchorUnix,
-    });
-
-    const sessionDurationSec = Number(activeSession?.sessionDurationSec);
-    if (
-      isSessionExpired({
-        sessionDurationSec,
-        elapsedSeconds: elapsed,
-      })
-    ) {
-      handleActiveSessionExpired();
-      return;
-    }
-
-    // ── Primary header counter ──────────────────────────────────────────────
-    // WHY: Session timer should count down remaining session lifetime.
-    // Keep it compact for long sessions (h/d formatting).
-    if (countdownLabelEl) {
-      countdownLabelEl.textContent = 'Session Left';
-      countdownLabelEl.hidden = false;
-    }
-    const sessionLeft = computeSessionLeftSeconds({
-      sessionDurationSec,
-      elapsedSeconds: elapsed,
-    });
-    countdownEl.textContent = formatDurationCompact(sessionLeft);
-
-    // ── Secondary "Round left" indicator ───────────────────────────────────
-    // WHY: The round carries on beyond the session. Halvings, scoring, and
-    // the leaderboard all run until the *round* ends, not the session.
-    // Showing this number prevents confusion when halvings still fire after
-    // the session duration has elapsed.
-    //
-    // We read seconds_remaining from the most-recent stream payload
-    // (lastGameData) and subtract the time that has passed since that payload
-    // arrived so the display stays fresh between stream ticks.
-    updateRoundRemainingHint();
-  };
-
-  update();
-  sessionElapsedInterval = setInterval(update, 500);
-}
 
 function updateSetupActionsState() {
   initializeModules();
   syncSetupShellState();
   updateSetupShellActions();
-}
-
-function setSetupStateForTests({
-  streamActive,
-  gameStatus,
-  setupBusy,
-  roundMode,
-  hostRoundType,
-  asyncAutoStart,
-  supportsSessionStart,
-  sessionId,
-  windowOpen,
-  sessionApiSupported,
-  requirePlayerAuth,
-} = {}) {
-  if (typeof streamActive === 'boolean') {
-    isStreamActive = streamActive;
-  }
-  if (typeof gameStatus === 'string' || gameStatus === null) {
-    latestGameStatus = gameStatus;
-  }
-  if (typeof setupBusy === 'boolean') {
-    isSetupBusy = setupBusy;
-  }
-  if (roundMode === 'sync' || roundMode === 'async') {
-    setupRoundModeOverride = roundMode;
-  } else {
-    setupRoundModeOverride = null;
-  }
-  if (hostRoundType === 'sync' || hostRoundType === 'async') {
-    setSelectedRoundType(hostRoundType);
-  }
-  if (typeof asyncAutoStart === 'boolean' && asyncHostAutoStartCheckbox) {
-    asyncHostAutoStartCheckbox.checked = asyncAutoStart;
-  }
-  if (typeof supportsSessionStart === 'boolean') {
-    sessionStartSupported = supportsSessionStart;
-  }
-  if (typeof windowOpen === 'boolean' || windowOpen === null) {
-    asyncWindowOpen = windowOpen;
-  }
-  if (
-    typeof sessionApiSupported === 'boolean' ||
-    sessionApiSupported === null
-  ) {
-    asyncSessionSupportProbe = sessionApiSupported;
-  }
-  if (
-    requirePlayerAuth === true ||
-    requirePlayerAuth === false ||
-    requirePlayerAuth === 'unknown'
-  ) {
-    asyncRequirePlayerAuth = requirePlayerAuth;
-  }
-  if (sessionId === null) {
-    activeSession = null;
-  } else if (sessionId !== undefined) {
-    activeSession = {
-      sessionId,
-      sessionStartUnix: activeSession?.sessionStartUnix || null,
-      sessionDurationSec: activeSession?.sessionDurationSec || null,
-      requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
-    };
-  }
-  updateSetupActionsState();
-}
-
-// P2.4: Duration resolution helper
-function resolveDurationSeconds() {
-  return resolveDurationSecondsFromInputs({
-    durationPresetInput,
-    durationCustomValueInput,
-    durationCustomUnitInput,
-  });
-}
-
-// P2.4: Collect optional overrides from advanced form
-function collectAdvancedOverrides() {
-  return collectAdvancedOverridesFromInputs({
-    showAdvancedCheckbox,
-    anchorTokenInput,
-    anchorRateInput,
-    seasonCyclesInput,
-  });
-}
-
-/*
-Manual QA Checklist for P2.4 Duration Presets & Overrides:
-1) Create game with preset "10m" → verify meta shows duration_preset=10m and game_duration_seconds=600
-2) Create game with custom "120" minutes → verify duration_custom_seconds=7200 (= 2 hours)
-3) Leave advanced overrides blank → backend chooses recommendations, meta shows them
-4) Fill anchor_token="summer" and anchor_rate="8.5" → backend respects, meta shows them
-5) Fill season_cycles="2" → meta shows the override applied
-6) Verify meta info displays in debug line: "Duration: 10m | Emission: spring @ 5.0/s | Cycles: 1"
-7) Ensure UI still works if meta fields absent (fallback gracefully)
-8) Check localStorage persists duration preset/custom choices across page reload
-9) Verify no innerHTML used in duration UI (all createElement/textContent)
-*/
-
-function getNormalizedBaseUrlOrNull({ notify = true } = {}) {
-  const rawBaseUrl = String(baseUrlInput?.value || '').trim();
-  if (!rawBaseUrl && baseUrlInput) {
-    baseUrlInput.value = DEFAULT_BACKEND_URL;
-  }
-
-  try {
-    return normalizeBaseUrl(baseUrlInput.value);
-  } catch (e) {
-    if (notify) {
-      showToast(e.message, 'error');
-    }
-    return null;
-  }
-}
-
-function renderMetaDebugLine() {
-  if (!metaDebugEl) return;
-  const activeContractVersion = getActiveContractVersion();
-  const activeMetaHash = getActiveMetaHash();
-  const versionText = Number.isInteger(activeContractVersion)
-    ? `v${activeContractVersion}`
-    : 'v-';
-
-  let text = `contract ${versionText} | meta_hash ${shortMetaHash(activeMetaHash)}`;
-
-  const gameId = gameIdInput?.value;
-  if (gameId) {
-    const gameMeta = getGameMeta(gameId);
-    if (gameMeta && gameMeta.game_duration_seconds) {
-      const durationSec = gameMeta.game_duration_seconds;
-      let durationLabel;
-      if (durationSec < 60) durationLabel = `${durationSec}s`;
-      else if (durationSec < 3600)
-        durationLabel = `${Math.round(durationSec / 60)}m`;
-      else if (durationSec < 86400)
-        durationLabel = `${Math.round(durationSec / 3600)}h`;
-      else durationLabel = `${Math.round(durationSec / 86400)}d`;
-
-      text += ` | Duration: ${durationLabel}`;
-
-      if (gameMeta.emission_anchor_token) {
-        const rate = gameMeta.emission_anchor_tokens_per_second || '?';
-        text += ` | Emission: ${gameMeta.emission_anchor_token} @ ${rate}/s`;
-      }
-
-      if (gameMeta.season_cycles_per_game) {
-        text += ` | Cycles: ${gameMeta.season_cycles_per_game}`;
-      }
-
-      if (gameMeta.scoring_mode) {
-        text += ` | Scoring: ${formatScoringModeName(gameMeta.scoring_mode)}`;
-      }
-    }
-  }
-
-  metaDebugEl.textContent = text;
-}
-
-function renderDerivedEmissionPreview() {
-  if (!derivedEmissionPreviewEl) return;
-
-  const gameId = gameIdInput?.value;
-  if (!gameId) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const gameMeta = getGameMeta(gameId);
-  if (!gameMeta || !gameMeta.derived_emission_rates_per_second) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const rates = gameMeta.derived_emission_rates_per_second;
-  const hasAllTokens = PLAYER_STATE_TOKENS.every((token) => token in rates);
-
-  if (!hasAllTokens) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const ratesList = PLAYER_STATE_TOKENS.map((token) => {
-    const rate = Number(rates[token]).toFixed(2);
-    return `${token} ${rate}`;
-  }).join(', ');
-
-  derivedEmissionPreviewEl.textContent = `Derived Rates: ${ratesList} /s`;
-  derivedEmissionPreviewEl.style.display = 'block';
-}
-
-function storeLastPlayedGameSnapshot(snapshot) {
-  if (!snapshot) {
-    setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, '');
-    return;
-  }
-
-  setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, JSON.stringify(snapshot));
-}
-
-function captureLastPlayedGameSnapshot(data) {
-  const snapshot = buildLastGameSnapshot({
-    data,
-    gameId: data?.game_id || gameIdInput?.value,
-    scoringModeLabel: formatScoringModeName(resolveActiveScoringMode(data)),
-  });
-
-  if (!snapshot) {
-    return null;
-  }
-
-  lastFinishedGameId = snapshot.gameId;
-  // The lobby (index.html) renders this snapshot as "last game highscores".
-  storeLastPlayedGameSnapshot(snapshot);
-  return snapshot;
-}
-
-function showGameOverOverlay(gameId = '', options = {}) {
-  if (!gameOverOverlayEl) {
-    console.warn('[Game Over] Overlay element not found in DOM');
-    return;
-  }
-
-  const normalizedGameId = String(gameId || '').trim();
-  const title = String(options?.title || 'Game Over').trim() || 'Game Over';
-  const message = String(options?.message || '').trim();
-
-  if (gameOverTitleEl) {
-    gameOverTitleEl.textContent = title;
-  }
-  if (gameOverMessageEl) {
-    gameOverMessageEl.textContent =
-      message ||
-      (normalizedGameId
-        ? `Round ${normalizedGameId} finished. Click anywhere to return to the login lobby.`
-        : 'Round finished. Click anywhere to return to the login lobby.');
-  }
-  updateGameOverResultsLink(normalizedGameId, title === 'Session Finished');
-
-  gameOverOverlayEl.hidden = false;
-}
-
-/**
- * "View full results" deep link into the lobby results view
- * (index.html?results=<gameId>&player=<playerId>, the player id lets the lobby
- * highlight the own row). An ended async session usually finishes before the
- * round does, so the note explains when the final results exist.
- */
-function updateGameOverResultsLink(gameId, isSessionEnd) {
-  if (gameOverResultsNoteEl) {
-    gameOverResultsNoteEl.hidden = !(gameId && isSessionEnd);
-  }
-  if (!gameOverResultsLinkEl) return;
-  gameOverResultsLinkEl.hidden = !gameId;
-  const query = new URLSearchParams({ results: gameId });
-  const playerId = String(playerIdInput?.value || '').trim();
-  if (playerId) query.set('player', playerId);
-  gameOverResultsLinkEl.href = gameId ? `/index.html?${query}` : '/index.html';
-}
-
-function isGameOverOverlayEligible({
-  previousGameStatus,
-  gameStatus,
-  gameId,
-  currentGameId,
-} = {}) {
-  const normalizedPreviousStatus = String(previousGameStatus || '')
-    .trim()
-    .toLowerCase();
-  const normalizedCurrentStatus = String(gameStatus || '')
-    .trim()
-    .toLowerCase();
-  const normalizedGameId = String(gameId || '').trim();
-  const normalizedCurrentGameId = String(currentGameId || '').trim();
-
-  return (
-    normalizedPreviousStatus === 'running' &&
-    normalizedCurrentStatus === 'finished' &&
-    Boolean(normalizedGameId) &&
-    normalizedGameId === normalizedCurrentGameId
-  );
-}
-
-function hideGameOverOverlay() {
-  if (!gameOverOverlayEl) {
-    return;
-  }
-  gameOverOverlayEl.hidden = true;
-}
-
-function resetLiveBoardState({ clearPlayerContext = false } = {}) {
-  try {
-    cancelPendingUiRender();
-  } catch (e) {
-    console.error('[Reset] Error canceling pending UI render:', e);
-  }
-  isStreamActive = false;
-  latestGameStatus = null;
-  activeSession = null;
-  currentViewedGameId = '';
-  _hasSeenPlayableStateForCurrentView = false;
-  lastGameStatusForCurrentView = null;
-  try {
-    closeEventSourceIfOpen();
-  } catch (e) {
-    console.error('[Reset] Error closing event source:', e);
-  }
-  try {
-    stopLiveTimersAndHalving();
-  } catch (e) {
-    console.error('[Reset] Error stopping live timers:', e);
-  }
-  try {
-    disconnectChat();
-  } catch (e) {
-    console.error('[Reset] Error disconnecting chat:', e);
-  }
-  try {
-    stopSessionElapsedTimer();
-  } catch (e) {
-    console.error('[Reset] Error stopping session timer:', e);
-  }
-  setBadgeStatus(connStatusEl, 'idle');
-  setBadgeStatus(gameStatusEl, 'idle');
-  stopCountdownTimer();
-  lastGameData = null;
-  resetPlayerStateView();
-  renderLeaderboard(null);
-  renderStandingsStatus();
-  if (myScoreEl) myScoreEl.textContent = '—';
-  if (myRankEl) myRankEl.textContent = '—';
-  if (topScoreEl) topScoreEl.textContent = '—';
-  ensureInputsEditable();
-  setLiveSessionActive(false);
-  setStartSessionStatus('', 'info');
-
-  if (clearPlayerContext) {
-    if (gameIdInput) gameIdInput.value = '';
-    if (playerIdInput) playerIdInput.value = '';
-    setStorageItem(STORAGE_KEYS.gameId, '');
-    setStorageItem(STORAGE_KEYS.playerId, '');
-  }
-
-  updateSetupActionsState();
-}
-
-function acknowledgeGameOverOverlay(targetUrl = '/index.html') {
-  try {
-    hideGameOverOverlay();
-    resetLiveBoardState({ clearPlayerContext: true });
-  } catch (error) {
-    console.error('[Game Over] Failed to reset live board state:', error);
-    // Fallback: ensure overlay is hidden and navigate anyway
-    try {
-      gameOverOverlayEl.hidden = true;
-    } catch {
-      // Ignore
-    }
-  }
-  // Always attempt navigation, even if reset failed
-  try {
-    window.location.assign(targetUrl);
-  } catch (error) {
-    console.error('[Game Over] Navigation failed:', error);
-    // Last resort: use href
-    window.location.href = targetUrl;
-  }
-}
-
-function setLiveSessionActive(isActive) {
-  playerHasActiveSession = Boolean(isActive);
-  document.body.classList.toggle('live-session', Boolean(isActive));
-}
-
-/** Re-render upgrade lanes, trade and farm panels against the current gate. */
-function refreshPlayerActionControls() {
-  if (lastGameData) {
-    renderAllSeasonUpgrades(lastGameData, getGameMeta);
-  }
-  tradingPanelApi?.renderTradingStatus?.();
-  farmingPanelApi?.renderFarmingStatus?.();
-}
-
-/**
- * Play-window gate for upgrade/trade buttons, derived from state the board
- * already tracks. Backend stays authoritative (409 toast remains the fallback).
- */
-function getPlayerActionAvailability() {
-  return resolvePlayerActionAvailability({
-    gameStatus: latestGameStatus,
-    roundMode: getCurrentRoundContext().roundMode,
-    hasActiveSession: playerHasActiveSession,
-  });
 }
 
 function renderDebugContext() {
@@ -1499,216 +309,123 @@ function renderLeaderboard(data) {
   renderTopLeaderboard(data);
 }
 
-// The player board joins exactly the game chosen in the lobby (stored game id);
-// game selection lives in index.html, not here.
-function resolveRequestedGameId() {
-  return String(gameIdInput?.value || '').trim();
-}
-
 function renderSeasonData(data) {
   initializeModules();
   renderSeasonCardData(data);
 }
 
-function saveSettings() {
-  const baseUrlValue = String(baseUrlInput?.value || '').trim();
-  const effectiveBaseUrl = baseUrlValue || DEFAULT_BACKEND_URL;
-  if (baseUrlInput && !baseUrlValue) {
-    baseUrlInput.value = effectiveBaseUrl;
-  }
-
-  setStorageItem(STORAGE_KEYS.baseUrl, effectiveBaseUrl);
-  setStorageItem(STORAGE_KEYS.playerName, playerNameInput.value);
-  setStorageItem(STORAGE_KEYS.durationPreset, durationPresetInput.value);
-  setStorageItem(
-    STORAGE_KEYS.durationCustomValue,
-    durationCustomValueInput.value
-  );
-  setStorageItem(
-    STORAGE_KEYS.durationCustomUnit,
-    durationCustomUnitInput.value
-  );
-  setStorageItem(STORAGE_KEYS.enrollmentWindow, enrollmentWindowInput.value);
-  setStorageItem(STORAGE_KEYS.scoringMode, getSelectedScoringMode());
-  setStorageItem(STORAGE_KEYS.tradeCount, String(getSelectedTradeCount()));
-  setStorageItem(
-    STORAGE_KEYS.tradeCountOverride,
-    tradeCountManuallyOverridden ? 'true' : 'false'
-  );
-  setStorageItem(STORAGE_KEYS.roundType, getSelectedRoundType());
-  setStorageItem(
-    STORAGE_KEYS.asyncDurationPreset,
-    asyncHostDurationPresetInput?.value ||
-      getEffectiveGameConfig().defaults.async_round_preset
-  );
-  setStorageItem(
-    STORAGE_KEYS.asyncDurationCustomMinutes,
-    asyncSessionDurationPresetInput?.value ||
-      getEffectiveGameConfig().defaults.async_session_preset
-  );
-  setStorageItem(
-    STORAGE_KEYS.asyncAutoStart,
-    shouldAutoStartAsyncSession() ? 'true' : 'false'
-  );
-  setStorageItem(STORAGE_KEYS.gameId, gameIdInput.value);
-  setStorageItem(STORAGE_KEYS.playerId, playerIdInput.value);
-
-  renderDebugContext();
-  updateScoringModeUi();
-  renderTradeSchedulePreview();
-  updateSetupActionsState();
-  void refreshAsyncDiagnostics({ force: true });
+function renderUpgradeMetrics(data) {
+  initializeModules();
+  renderAllSeasonUpgrades(data, getGameMeta);
 }
 
-function initializeModules() {
-  if (modulesInitialized) {
-    return;
-  }
+function ensureInputsEditable() {
+  initializeModules();
+  ensureSetupInputsEditable();
+}
 
-  initSetupShell({
-    gameIdInput,
-    playerIdInput,
-    startBtn,
-    startSessionBtn,
-    stopBtn,
-    setupActionsNoteEl,
-    roundModeBadgeEl,
-    asyncSessionStatusEl,
-    renderAsyncSessionBadge,
-    startSessionStatusEl,
-    debugToggleBtnEl,
-    debugPanelEl,
-    debugBackendUrlEl,
-    debugGameIdEl,
-    debugPlayerIdEl,
-    debugSessionIdEl,
-    setupShellEl,
-    setupToggleBtnEl,
-    jumpLiveBtnEl,
-    jumpLiveBtnSetupEl,
-    onStartAsyncSession: handleStartAsyncSession,
-    roundTypeSyncInput,
-    roundTypeAsyncInput,
-    syncHostControlsEl,
-    asyncHostControlsEl,
-    asyncHostDurationPresetInput,
-    asyncSessionDurationPresetInput,
-    asyncHostAutoStartCheckbox,
-    onHostRoundTypeChanged(nextRoundType) {
-      setSelectedRoundType(nextRoundType);
-      syncSessionDurationOptions({
-        roundDurationInput: asyncHostDurationPresetInput,
-        sessionDurationInput: asyncSessionDurationPresetInput,
-        warningEl: sessionDurationWarningEl,
-        enforceLimit: getSelectedRoundType() === 'async',
-      });
-      syncTradeCountWithDuration();
-      updateSetupActionsState();
-      saveSettings();
-    },
-    onHostAsyncDurationChanged() {
-      // Keep the session dropdown in sync whenever the round duration changes:
-      // disable options that would exceed the round and auto-clamp if needed.
-      syncSessionDurationOptions({
-        roundDurationInput: asyncHostDurationPresetInput,
-        sessionDurationInput: asyncSessionDurationPresetInput,
-        warningEl: sessionDurationWarningEl,
-        enforceLimit: getSelectedRoundType() === 'async',
-      });
-      syncTradeCountWithDuration();
-      updateAsyncHostControlsVisibility();
-      updateSetupActionsState();
-      saveSettings();
-    },
-    onHostAutoStartChanged() {
-      updateSetupActionsState();
-      saveSettings();
-    },
-    liveBoardEl,
-    editableInputs,
-  });
-  initCountdown({ countdownEl, countdownLabelEl }, { get: () => lastGameData });
-  initHalvingDisplay({ getActiveGameMeta: getGameMeta });
-  initEventDisplay({ seasonScrollEl, getActiveGameMeta: getGameMeta });
-  initLiveSummary({
-    myScoreEl,
-    myRankEl,
-    topScoreEl,
-    portfolioValueEl,
-    asyncSessionStatusEl,
-    getGameMeta,
-    defaultTokenNames: PLAYER_STATE_TOKENS,
-  });
-  initLeaderboard({ leaderboardEl });
-  initStandingsStatus({
-    headerTagEl: standingsStatusEl,
-    panelNoteEl: leaderboardStandingsStatusEl,
-  });
-  // Live regions must exist before the first toast so it is announced.
-  ensureToastRegions();
-  initSeasonCards({ getGameMeta });
-  initMetaManager({
-    onMetaChanged() {
-      renderMetaDebugLine();
-      renderDerivedEmissionPreview();
-      if (lastGameData) {
-        renderUpgradeMetrics(lastGameData);
-      }
-      updateScoringModeUi(lastGameData);
-      // Round meta carries the farming rules (enabled, cycle, reward).
-      farmingPanelApi?.renderFarmingStatus?.();
-      void refreshAsyncDiagnostics({ force: true });
-    },
-    showToast,
-  });
-  initPlayerView({ playerStateEl, getActiveGameMeta: getGameMeta });
-  initInlineUpgrades({
-    getActiveGameMeta: getGameMeta,
-    isActiveContractSupported,
-    getActiveUpgradeDefinitions,
-    performUpgrade,
-    getActionAvailability: getPlayerActionAvailability,
-  });
-  initSeasonFocus({
-    stripEl: seasonFocusStripEl,
-    buttons: seasonFocusButtons,
-    cards: seasonCards,
-    defaultSeason: 'spring',
-  });
+// ── Board modules (wired at import time, like the former inline code) ──────
+
+initScoringModeUi(dom);
+initSetupHostControls(dom);
+initChatPreview(dom);
+initMetaDebug({ ...dom, tokens: PLAYER_STATE_TOKENS });
+initSetupController({ ...dom, updateSetupActionsState });
+initSetupSettings({
+  ...dom,
+  renderDebugContext,
+  updateSetupActionsState,
+  setSetupCollapsed,
+});
+initSessionClock({ ...dom, onSessionExpired: handleActiveSessionExpired });
+initGameOver({ ...dom, resetLiveBoardState });
+initLiveBoardLifecycle({
+  ...dom,
+  cancelPendingUiRender,
+  renderLeaderboard,
+  ensureInputsEditable,
+  updateSetupActionsState,
+  renderDebugContext,
+  getPanelApis: () => ({ tradingPanelApi, farmingPanelApi }),
+});
+initBoardUpdate({
+  ...dom,
+  renderSeasonData,
+  renderUpgradeMetrics,
+  renderLeaderboard,
+  renderQuickStats,
+  renderPortfolioValue,
+  autoCollapseSetupForLiveState,
+  updateSetupActionsState,
+});
+initPlayerJoin({
+  getPlayerName: () => playerNameInput?.value,
+  setPlayerId: (playerId) => {
+    playerIdInput.value = playerId;
+  },
+  onJoined: () => setSetupCollapsed(true),
+});
+initStartFlow({
+  ...dom,
+  updateSetupActionsState,
+  renderDebugContext,
+  setSetupCollapsed,
+});
+
+/** Host-control callbacks of the setup shell (legacy, hidden on player.html). */
+function handleHostRoundTypeChanged(nextRoundType) {
+  setSelectedRoundType(nextRoundType);
+  syncHostSessionDurationOptions();
+  syncTradeCountWithDuration();
+  updateSetupActionsState();
+  saveSettings();
+}
+
+function handleHostAsyncDurationChanged() {
+  // Keep the session dropdown in sync whenever the round duration changes:
+  // disable options that would exceed the round and auto-clamp if needed.
+  syncHostSessionDurationOptions();
+  syncTradeCountWithDuration();
+  updateAsyncHostControlsVisibility();
+  updateSetupActionsState();
+  saveSettings();
+}
+
+function initLiveToolsWindow() {
   initLiveDrawer({
-    rootEl: liveDrawerEl,
-    backdropEl: liveDrawerBackdropEl,
-    closeBtnEl: liveDrawerCloseBtnEl,
+    rootEl: dom.liveDrawerEl,
+    backdropEl: dom.liveDrawerBackdropEl,
+    closeBtnEl: dom.liveDrawerCloseBtnEl,
     tabButtons: [
-      liveDrawerTabTradeEl,
-      liveDrawerTabFarmEl,
-      liveDrawerTabChatEl,
-      liveDrawerTabLeaderboardEl,
+      dom.liveDrawerTabTradeEl,
+      dom.liveDrawerTabFarmEl,
+      dom.liveDrawerTabChatEl,
+      dom.liveDrawerTabLeaderboardEl,
     ],
     panels: [
-      liveDrawerPanelTradeEl,
-      liveDrawerPanelFarmEl,
-      liveDrawerPanelChatEl,
-      liveDrawerPanelLeaderboardEl,
+      dom.liveDrawerPanelTradeEl,
+      dom.liveDrawerPanelFarmEl,
+      dom.liveDrawerPanelChatEl,
+      dom.liveDrawerPanelLeaderboardEl,
     ],
     openButtons: [
-      tradeDrawerBtnEl,
-      farmDrawerBtnEl,
-      chatToggleBtnEl,
-      chatDockBtnEl,
-      leaderboardDrawerBtnEl,
+      dom.tradeDrawerBtnEl,
+      dom.farmDrawerBtnEl,
+      dom.chatToggleBtnEl,
+      dom.chatDockBtnEl,
+      dom.leaderboardDrawerBtnEl,
     ],
     defaultTab: 'trade',
     onStateChanged: handleLiveDrawerStateChange,
   });
   initChatPanel({
-    panelEl: chatPanelEl,
-    toggleBtnEl: chatToggleBtnEl,
-    messagesEl: chatMessagesEl,
-    formEl: chatFormEl,
-    inputEl: chatInputEl,
-    statusEl: chatStatusEl,
-    disabledNoteEl: chatDisabledNoteEl,
+    panelEl: dom.chatPanelEl,
+    toggleBtnEl: dom.chatToggleBtnEl,
+    messagesEl: dom.chatMessagesEl,
+    formEl: dom.chatFormEl,
+    inputEl: dom.chatInputEl,
+    statusEl: dom.chatStatusEl,
+    disabledNoteEl: dom.chatDisabledNoteEl,
     // `chat_enabled` from the round's game meta (fetched before the stream
     // starts); missing = enabled, as with older backends.
     isChatEnabled: () => isChatEnabledForRound(getGameMeta(gameIdInput?.value)),
@@ -1732,33 +449,59 @@ function initializeModules() {
   tradingPanelApi = initTradingPanel({
     // Bind current gameId so the panel resolves the correct meta object.
     getGameMeta: () => getGameMeta(gameIdInput?.value),
-    getLastGameData: () => lastGameData,
-    getActiveScoringMode: () => resolveActiveScoringMode(lastGameData),
+    getLastGameData: () => boardState.lastGameData,
+    getActiveScoringMode: () =>
+      resolveActiveScoringMode(boardState.lastGameData),
     executeTrade: async ({ fromToken, toToken, amount }) =>
       performTrade(fromToken, toToken, amount),
     showToast,
     getActionAvailability: getPlayerActionAvailability,
-    tradingPanelRef: tradingPanelEl,
-    tradingStatusRef: tradingStatusEl,
+    tradingPanelRef: dom.tradingPanelEl,
+    tradingStatusRef: dom.tradingStatusEl,
   });
   farmingPanelApi = initFarmingPanel({
     getGameMeta: () => getGameMeta(gameIdInput?.value),
-    getLastGameData: () => lastGameData,
+    getLastGameData: () => boardState.lastGameData,
     getActionAvailability: getPlayerActionAvailability,
     depositFarm: async ({ token, amount }) => performFarmDeposit(token, amount),
     withdrawFarm: async ({ token, amount }) =>
       performFarmWithdraw(token, amount),
     showToast,
-    farmingPanelRef: farmingPanelEl,
-    farmingStatusRef: farmingStatusEl,
+    farmingPanelRef: dom.farmingPanelEl,
+    farmingStatusRef: dom.farmingStatusEl,
   });
+}
+
+function handleSessionStreamFinished(data) {
+  const sessionStatus = String(data?.session?.status || '')
+    .trim()
+    .toLowerCase();
+  if (sessionStatus !== 'finished') {
+    return;
+  }
+
+  const finishedGameId = String(
+    data?.game_id || gameIdInput?.value || ''
+  ).trim();
+  if (finishedGameId && finishedGameId !== boardState.lastFinishedGameId) {
+    captureLastPlayedGameSnapshot(data);
+  }
+
+  showSessionFinishedOverlay(finishedGameId);
+  setStartSessionStatus(
+    'Async session ended. Start a new session to continue.',
+    'info'
+  );
+}
+
+function initNetworkServices() {
   initStreamController({
     clearCountdownInterval,
     stopNextHalvingCountdown,
     stopSeasonHalvingTimers,
     resetTransientHalvingState,
     onStreamStateChange(next) {
-      isStreamActive = next;
+      boardState.isStreamActive = next;
     },
     updateSetupActionsState,
     getNormalizedBaseUrlOrNull,
@@ -1774,630 +517,136 @@ function initializeModules() {
       setStartSessionStatus(message, 'error');
       showToast(message, 'error');
     },
-    onSessionStreamFinished(data) {
-      const sessionStatus = String(data?.session?.status || '')
-        .trim()
-        .toLowerCase();
-      if (sessionStatus !== 'finished') {
-        return;
-      }
-
-      const finishedGameId = String(
-        data?.game_id || gameIdInput?.value || ''
-      ).trim();
-      if (finishedGameId && finishedGameId !== lastFinishedGameId) {
-        captureLastPlayedGameSnapshot(data);
-      }
-
-      showGameOverOverlay(finishedGameId, {
-        title: 'Session Finished',
-        message:
-          'Your async session has finished. Click anywhere to return to the login lobby.',
-      });
-      setStartSessionStatus(
-        'Async session ended. Start a new session to continue.',
-        'info'
-      );
-    },
+    onSessionStreamFinished: handleSessionStreamFinished,
     disconnectChat,
     onGameStatusChange(next) {
-      latestGameStatus = next;
+      boardState.latestGameStatus = next;
     },
   });
   initGameActions({
     isActiveContractSupported,
     showToast,
-    getLastGameData: () => lastGameData,
+    getLastGameData: () => boardState.lastGameData,
     getNormalizedBaseUrlOrNull,
     getStorageItem,
     getPlayerTokenStorageKey,
-    onTradeExecuted(payload) {
-      if (!payload || typeof payload !== 'object') return;
-      const updatedState = payload.updated_state;
-      if (!updatedState || typeof updatedState !== 'object') return;
-
-      const tradeResult = payload.trade_result || {};
-      lastGameData = {
-        ...(lastGameData || {}),
-        player_state: updatedState,
-        trades_used: Number.isFinite(Number(tradeResult.trades_used))
-          ? Number(tradeResult.trades_used)
-          : Number(
-              updatedState.trades_used || updatedState.trade_count_used || 0
-            ),
-      };
-
-      renderPlayerState(lastGameData);
-      renderQuickStats(lastGameData);
-      renderPortfolioValue(lastGameData);
-      if (tradingPanelApi?.renderTradingStatus) {
-        tradingPanelApi.renderTradingStatus();
-      }
-      farmingPanelApi?.renderFarmingStatus?.();
-    },
-    onFarmUpdated(payload) {
-      // Same flow as trades: the backend returns the new state, the board
-      // re-renders balances, farmed amounts and holdings from it.
-      const updatedState = payload?.updated_state;
-      if (!updatedState || typeof updatedState !== 'object') return;
-      lastGameData = mergeFarmUpdatedState(lastGameData, updatedState);
-      renderPlayerState(lastGameData);
-      renderQuickStats(lastGameData);
-      renderPortfolioValue(lastGameData);
-      tradingPanelApi?.renderTradingStatus?.();
-      farmingPanelApi?.renderFarmingStatus?.();
-    },
+    onTradeExecuted: applyTradeExecuted,
+    onFarmUpdated: applyFarmUpdated,
   });
   initSessionActions({
     getNormalizedBaseUrlOrNull,
     getStorageItem,
     getPlayerTokenStorageKey,
   });
+}
+
+function initializeModules() {
+  if (modulesInitialized) {
+    return;
+  }
+
+  initSetupShell({
+    gameIdInput,
+    playerIdInput,
+    startBtn,
+    startSessionBtn: dom.startSessionBtn,
+    stopBtn,
+    setupActionsNoteEl: dom.setupActionsNoteEl,
+    roundModeBadgeEl: dom.roundModeBadgeEl,
+    asyncSessionStatusEl: dom.asyncSessionStatusEl,
+    renderAsyncSessionBadge,
+    startSessionStatusEl: dom.startSessionStatusEl,
+    debugToggleBtnEl: dom.debugToggleBtnEl,
+    debugPanelEl: dom.debugPanelEl,
+    debugBackendUrlEl: dom.debugBackendUrlEl,
+    debugGameIdEl: dom.debugGameIdEl,
+    debugPlayerIdEl: dom.debugPlayerIdEl,
+    debugSessionIdEl: dom.debugSessionIdEl,
+    setupShellEl: dom.setupShellEl,
+    setupToggleBtnEl: dom.setupToggleBtnEl,
+    jumpLiveBtnEl: dom.jumpLiveBtnEl,
+    jumpLiveBtnSetupEl: dom.jumpLiveBtnSetupEl,
+    onStartAsyncSession: handleStartAsyncSession,
+    roundTypeSyncInput: dom.roundTypeSyncInput,
+    roundTypeAsyncInput: dom.roundTypeAsyncInput,
+    syncHostControlsEl: dom.syncHostControlsEl,
+    asyncHostControlsEl: dom.asyncHostControlsEl,
+    asyncHostDurationPresetInput: dom.asyncHostDurationPresetInput,
+    asyncSessionDurationPresetInput: dom.asyncSessionDurationPresetInput,
+    asyncHostAutoStartCheckbox: dom.asyncHostAutoStartCheckbox,
+    onHostRoundTypeChanged: handleHostRoundTypeChanged,
+    onHostAsyncDurationChanged: handleHostAsyncDurationChanged,
+    onHostAutoStartChanged() {
+      updateSetupActionsState();
+      saveSettings();
+    },
+    liveBoardEl: dom.liveBoardEl,
+    editableInputs: dom.editableInputs,
+  });
+  initCountdown(
+    { countdownEl: dom.countdownEl, countdownLabelEl: dom.countdownLabelEl },
+    { get: () => boardState.lastGameData }
+  );
+  initHalvingDisplay({ getActiveGameMeta: getGameMeta });
+  initEventDisplay({
+    seasonScrollEl: dom.seasonScrollEl,
+    getActiveGameMeta: getGameMeta,
+  });
+  initLiveSummary({
+    myScoreEl: dom.myScoreEl,
+    myRankEl: dom.myRankEl,
+    topScoreEl: dom.topScoreEl,
+    portfolioValueEl: dom.portfolioValueEl,
+    asyncSessionStatusEl: dom.asyncSessionStatusEl,
+    getGameMeta,
+    defaultTokenNames: PLAYER_STATE_TOKENS,
+  });
+  initLeaderboard({ leaderboardEl: dom.leaderboardEl });
+  initStandingsStatus({
+    headerTagEl: dom.standingsStatusEl,
+    panelNoteEl: dom.leaderboardStandingsStatusEl,
+  });
+  // Live regions must exist before the first toast so it is announced.
+  ensureToastRegions();
+  initSeasonCards({ getGameMeta });
+  initMetaManager({
+    onMetaChanged() {
+      renderMetaDebugLine();
+      renderDerivedEmissionPreview();
+      if (boardState.lastGameData) {
+        renderUpgradeMetrics(boardState.lastGameData);
+      }
+      updateScoringModeUi(boardState.lastGameData);
+      // Round meta carries the farming rules (enabled, cycle, reward).
+      farmingPanelApi?.renderFarmingStatus?.();
+      void refreshAsyncDiagnostics({ force: true });
+    },
+    showToast,
+  });
+  initPlayerView({
+    playerStateEl: dom.playerStateEl,
+    getActiveGameMeta: getGameMeta,
+  });
+  initInlineUpgrades({
+    getActiveGameMeta: getGameMeta,
+    isActiveContractSupported,
+    getActiveUpgradeDefinitions,
+    performUpgrade,
+    getActionAvailability: getPlayerActionAvailability,
+  });
+  initSeasonFocus({
+    stripEl: dom.seasonFocusStripEl,
+    buttons: dom.seasonFocusButtons,
+    cards: dom.seasonCards,
+    defaultSeason: 'spring',
+  });
+  initLiveToolsWindow();
+  initNetworkServices();
 
   modulesInitialized = true;
 }
 
-function renderUpgradeMetrics(data) {
-  initializeModules();
-  renderAllSeasonUpgrades(data, getGameMeta);
-}
-
-function ensureInputsEditable() {
-  initializeModules();
-  ensureSetupInputsEditable();
-}
-
-function loadSettings() {
-  const savedBaseUrl = getStorageItem(STORAGE_KEYS.baseUrl);
-  const savedPlayerName = getStorageItem(STORAGE_KEYS.playerName);
-  const savedDurationPreset = getStorageItem(STORAGE_KEYS.durationPreset);
-  const savedDurationCustomValue = getStorageItem(
-    STORAGE_KEYS.durationCustomValue
-  );
-  const savedDurationCustomUnit = getStorageItem(
-    STORAGE_KEYS.durationCustomUnit
-  );
-  const savedEnrollmentWindow = getStorageItem(STORAGE_KEYS.enrollmentWindow);
-  const savedScoringMode = getStorageItem(STORAGE_KEYS.scoringMode);
-  const savedRoundType = getStorageItem(STORAGE_KEYS.roundType);
-  const savedTradeCount = getStorageItem(STORAGE_KEYS.tradeCount);
-  const savedTradeCountOverride = getStorageItem(
-    STORAGE_KEYS.tradeCountOverride
-  );
-  const savedAsyncDurationPreset = getStorageItem(
-    STORAGE_KEYS.asyncDurationPreset
-  );
-  const savedAsyncDurationCustomMinutes = getStorageItem(
-    STORAGE_KEYS.asyncDurationCustomMinutes
-  );
-  const savedAsyncAutoStart = getStorageItem(STORAGE_KEYS.asyncAutoStart);
-  const savedGameId = getStorageItem(STORAGE_KEYS.gameId);
-  const savedPlayerId = getStorageItem(STORAGE_KEYS.playerId);
-
-  if (savedBaseUrl && String(savedBaseUrl).trim()) {
-    baseUrlInput.value = String(savedBaseUrl).trim();
-  } else if (baseUrlInput && !String(baseUrlInput.value || '').trim()) {
-    baseUrlInput.value = DEFAULT_BACKEND_URL;
-  }
-  if (savedPlayerName) playerNameInput.value = savedPlayerName;
-  if (savedDurationPreset) durationPresetInput.value = savedDurationPreset;
-  if (savedDurationCustomValue)
-    durationCustomValueInput.value = savedDurationCustomValue;
-  if (savedDurationCustomUnit)
-    durationCustomUnitInput.value = savedDurationCustomUnit;
-  if (savedEnrollmentWindow)
-    enrollmentWindowInput.value = savedEnrollmentWindow;
-  setSelectedScoringMode(savedScoringMode || DEFAULT_SCORING_MODE);
-  tradeCountManuallyOverridden = savedTradeCountOverride === 'true';
-  if (savedTradeCount && tradeCountInput) {
-    tradeCountInput.value = String(clampTradeCount(Number(savedTradeCount)));
-  }
-  if (savedAsyncDurationPreset && asyncHostDurationPresetInput) {
-    asyncHostDurationPresetInput.value = savedAsyncDurationPreset;
-  }
-  if (savedAsyncDurationCustomMinutes && asyncSessionDurationPresetInput) {
-    asyncSessionDurationPresetInput.value = savedAsyncDurationCustomMinutes;
-  }
-  if (savedAsyncAutoStart !== null && asyncHostAutoStartCheckbox) {
-    asyncHostAutoStartCheckbox.checked = savedAsyncAutoStart !== 'false';
-  }
-  if (savedGameId) gameIdInput.value = savedGameId;
-  if (savedPlayerId) playerIdInput.value = savedPlayerId;
-  if (savedGameId && savedPlayerId) {
-    // Keep setup out of the way once the player already joined a game.
-    setSetupCollapsed(true);
-  }
-
-  setSelectedRoundType(savedRoundType === 'async' ? 'async' : 'sync');
-  updateAsyncHostControlsVisibility();
-  updateScoringModeUi();
-  syncTradeCountWithDuration({ forceDefault: !savedTradeCount });
-
-  // Update visibility of custom duration input
-  if (durationPresetInput.value === 'custom') {
-    durationCustomInput.style.display = 'flex';
-  }
-
-  try {
-    const loadedGameId = gameIdInput.value;
-    const gameHash = loadedGameId
-      ? getStorageItem(getGameMetaHashStorageKey(loadedGameId))
-      : null;
-    const globalHash = getStorageItem(STORAGE_KEYS.globalMetaHash);
-    setActiveMetaHashFromStorage(gameHash || globalHash || null);
-  } catch (e) {
-    console.warn('localStorage meta_hash load failed:', e);
-  }
-
-  renderMetaDebugLine();
-  renderDebugContext();
-  renderTradeSchedulePreview();
-  updateSetupActionsState();
-  void refreshAsyncDiagnostics({ force: true });
-}
-
-function applyUIUpdate(data) {
-  const normalizedGameStatus = String(data?.game_status || '')
-    .trim()
-    .toLowerCase();
-  const normalizedDataGameId = String(data?.game_id || '').trim();
-  const isCurrentViewedGame =
-    Boolean(normalizedDataGameId) &&
-    normalizedDataGameId === currentViewedGameId;
-  const previousGameStatusForCurrentView = lastGameStatusForCurrentView;
-
-  if (isCurrentViewedGame) {
-    // WHY: Only 'running' counts as having actually played a game.
-    // 'enrolling' is a waiting-room state — the player has not played at all.
-    // If the game jumps from enrolling directly to finished (e.g. cancelled or
-    // too few players), showing the Game Over overlay would be wrong.
-    if (normalizedGameStatus === 'running') {
-      _hasSeenPlayableStateForCurrentView = true;
-    }
-
-    if (normalizedGameStatus) {
-      lastGameStatusForCurrentView = normalizedGameStatus;
-    }
-  }
-
-  const streamSession = data?.session || null;
-  const sessionRenderState = deriveStreamSessionState({
-    activeSession,
-    streamSession,
-  });
-
-  // Keep frontend session state aligned with backend-truth from stream payload.
-  // Only clear activeSession if the backend EXPLICITLY confirms the session ended or
-  // a different session has taken over. If the payload simply doesn't include session
-  // data yet (e.g. first tick after session creation), keep the local session intact
-  // to avoid a false drop on startup.
-  if (sessionRenderState.shouldClearActiveSession) {
-    const clearReason = String(sessionRenderState.clearReason || '');
-    activeSession = null;
-    stopSessionElapsedTimer();
-    setStartSessionStatus(
-      'Async session ended. Start a new session to continue.',
-      'info'
-    );
-
-    if (clearReason === 'ended') {
-      const finishedGameId = String(
-        data?.game_id || gameIdInput?.value || ''
-      ).trim();
-      if (finishedGameId) {
-        captureLastPlayedGameSnapshot(data);
-      }
-      showGameOverOverlay(finishedGameId, {
-        title: 'Session Finished',
-        message:
-          'Your async session has finished. Click anywhere to return to the login lobby.',
-      });
-    }
-  }
-
-  const hasActiveSession = sessionRenderState.hasActiveSession;
-
-  if (hasActiveSession) {
-    startSessionElapsedTimer(
-      Number(activeSession.sessionStartUnix),
-      Number.isFinite(sessionRenderState.elapsedFromPayload)
-        ? sessionRenderState.elapsedFromPayload
-        : 0
-    );
-  } else {
-    stopSessionElapsedTimer();
-  }
-
-  setLiveSessionActive(hasActiveSession);
-  // WHY: the stream is player-scoped, so a running session in the payload is
-  // backend truth even before the local session record catches up.
-  playerHasActiveSession =
-    hasActiveSession || sessionRenderState.streamSessionRunning;
-  handleLastHalvingStateUpdate(data);
-
-  if (data.game_status) {
-    setBadgeStatus(gameStatusEl, data.game_status);
-    autoCollapseSetupForLiveState(data.game_status);
-
-    const countdownMode = resolveCountdownMode({
-      gameStatus: data.game_status,
-      hasActiveSession,
-    });
-
-    if (countdownMode === 'session') {
-      // Session timer is already updated above (using payload elapsed when available).
-      // Avoid starting a second interval here, which can cause visible header jitter.
-    } else if (countdownMode === 'enrolling') {
-      countdownLabelEl.textContent = 'Game starts in';
-      startEnrollmentCountdown();
-    } else if (countdownMode === 'running') {
-      countdownLabelEl.textContent = 'Time Remaining';
-      startCountdownTimer();
-    } else if (countdownMode === 'finished') {
-      countdownLabelEl.textContent = 'Time Remaining';
-      stopCountdownTimer();
-      stopNextHalvingCountdown();
-      const finishedGameId = String(
-        data?.game_id || gameIdInput?.value || ''
-      ).trim();
-      if (finishedGameId) {
-        const shouldCaptureSnapshot = finishedGameId !== lastFinishedGameId;
-        const shouldShowOverlay = isGameOverOverlayEligible({
-          previousGameStatus: previousGameStatusForCurrentView,
-          gameStatus: data.game_status,
-          gameId: finishedGameId,
-          currentGameId: currentViewedGameId,
-        });
-
-        if (shouldCaptureSnapshot) {
-          captureLastPlayedGameSnapshot(data);
-        }
-
-        if (shouldShowOverlay) {
-          showGameOverOverlay(finishedGameId);
-        } else {
-          hideGameOverOverlay();
-        }
-      }
-    }
-  }
-
-  renderSeasonData(data);
-  renderPlayerState(data);
-  renderUpgradeMetrics(data);
-  renderLeaderboard(data);
-  // Live (sync) / Provisional (async, round open) / Final (round finished).
-  renderStandingsStatus(
-    resolveStandingsStatus({
-      roundMode: getCurrentRoundContext().roundMode,
-      gameStatus: data?.game_status || latestGameStatus,
-    })
-  );
-  renderQuickStats(data);
-  renderPortfolioValue(data);
-  renderEventBanner(data);
-  annotateAffectedValues(data);
-  updateScoringModeUi(data);
-  renderTradeSchedulePreview();
-  if (tradingPanelApi?.renderTradingStatus) {
-    tradingPanelApi.renderTradingStatus();
-  }
-  farmingPanelApi?.renderFarmingStatus?.();
-  updateSetupActionsState();
-}
-
-function cancelPendingUiRender() {
-  if (pendingUiRenderFrame !== null) {
-    cancelAnimationFrame(pendingUiRenderFrame);
-    pendingUiRenderFrame = null;
-  }
-  pendingUiRenderData = null;
-}
-
-function updateUI(data) {
-  const { stampedData, latestGameStatus: nextGameStatus } =
-    stampIncomingUiData(data);
-  lastGameData = stampedData;
-  latestGameStatus = nextGameStatus;
-  void refreshAsyncDiagnostics();
-
-  pendingUiRenderData = stampedData;
-  if (!shouldScheduleUiRender(pendingUiRenderFrame)) {
-    return;
-  }
-
-  // WHY: Coalescing bursty SSE updates into one frame reduces flicker and keeps selection restore scoped to one DOM patch pass.
-  pendingUiRenderFrame = requestAnimationFrame(() => {
-    pendingUiRenderFrame = null;
-    const frameData = pendingUiRenderData;
-    pendingUiRenderData = null;
-    if (!frameData) return;
-
-    const activeEl = document.activeElement;
-    const shouldSkipSelectionPersistence =
-      activeEl instanceof HTMLInputElement ||
-      activeEl instanceof HTMLTextAreaElement ||
-      activeEl instanceof HTMLSelectElement ||
-      activeEl?.isContentEditable === true;
-    const selectionSnapshot = shouldSkipSelectionPersistence
-      ? null
-      : snapSelection(document.body);
-    applyUIUpdate(frameData);
-    restoreSelectionIfValid(selectionSnapshot);
-  });
-}
-
-async function startLiveStream(gameId, playerId, options = {}) {
-  const normalizedGameId = String(gameId || '').trim();
-  currentViewedGameId = normalizedGameId;
-  _hasSeenPlayableStateForCurrentView = false;
-  lastGameStatusForCurrentView = null;
-  hideGameOverOverlay();
-
-  const sessionId = activeSession?.sessionId || null;
-
-  startStream(gameId, playerId, {
-    sessionId,
-    requiresPlayerAuth: Boolean(activeSession?.requiresPlayerAuth),
-    roundMode: getCurrentRoundContext().roundMode,
-    forceSessionAttempt: Boolean(options.forceSessionAttempt),
-  });
-}
-
-async function canReusePlayerForGame({ baseUrl, gameId, playerId }) {
-  const normalizedGameId = String(gameId || '').trim();
-  const normalizedPlayerId = String(playerId || '').trim();
-  if (!normalizedGameId || !normalizedPlayerId) {
-    return false;
-  }
-
-  const headers = {};
-  const storedToken = getStorageItem(
-    getPlayerTokenStorageKey(normalizedGameId, normalizedPlayerId)
-  );
-  if (storedToken) {
-    headers['X-Player-Token'] = storedToken;
-  }
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/games/${encodeURIComponent(normalizedGameId)}/state?player_id=${encodeURIComponent(normalizedPlayerId)}`,
-      {
-        method: 'GET',
-        headers,
-      }
-    );
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const payload = await response.json();
-    return (
-      String(payload?.game_id || '') === normalizedGameId &&
-      String(payload?.player_id || '') === normalizedPlayerId
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function ensurePlayerJoinedForStream({ baseUrl, gameId, playerId }) {
-  const normalizedGameId = String(gameId || '').trim();
-  const existingPlayerId = String(playerId || '').trim();
-
-  if (!normalizedGameId) {
-    throw new Error('Enter a game ID before starting the stream.');
-  }
-
-  if (existingPlayerId) {
-    const canReuse = await canReusePlayerForGame({
-      baseUrl,
-      gameId: normalizedGameId,
-      playerId: existingPlayerId,
-    });
-    if (canReuse) {
-      return existingPlayerId;
-    }
-
-    // Existing player id does not belong to the selected game anymore.
-    playerIdInput.value = '';
-    setStorageItem(STORAGE_KEYS.playerId, '');
-  }
-
-  const playerName = String(playerNameInput?.value || '').trim() || 'Player';
-  // WHY: with the account token the backend links the player to the account
-  // and returns the account's existing player (rejoin) instead of a new one.
-  const joinHeaders = { 'Content-Type': 'application/json' };
-  const accountToken = String(
-    getStorageItem(STORAGE_KEYS.authToken) || ''
-  ).trim();
-  if (accountToken) joinHeaders.Authorization = `Bearer ${accountToken}`;
-  const joinResponse = await fetch(
-    `${baseUrl}/games/${encodeURIComponent(normalizedGameId)}/join`,
-    {
-      method: 'POST',
-      headers: joinHeaders,
-      body: JSON.stringify({ name: playerName }),
-    }
-  );
-
-  if (!joinResponse.ok) {
-    const { message, status } = await readApiError(
-      joinResponse,
-      `${joinResponse.status} ${joinResponse.statusText}`.trim()
-    );
-    // 422: backend rejected the player name (1-24 chars, letters/digits/space/_-.).
-    throw new Error(
-      status === 422
-        ? `Invalid player name: ${message}`
-        : `Join failed: ${message}`
-    );
-  }
-
-  const joinData = await joinResponse.json();
-  const joinedPlayerId = String(joinData?.player_id || '').trim();
-  if (!joinedPlayerId) {
-    throw new Error('Join succeeded but no player_id was returned.');
-  }
-
-  playerIdInput.value = joinedPlayerId;
-  if (joinData.player_token) {
-    setStorageItem(
-      getPlayerTokenStorageKey(normalizedGameId, joinedPlayerId),
-      joinData.player_token
-    );
-  }
-  setStorageItem(STORAGE_KEYS.gameId, normalizedGameId);
-  setStorageItem(STORAGE_KEYS.playerId, joinedPlayerId);
-  setSetupCollapsed(true);
-
-  return joinedPlayerId;
-}
-
-async function startAsyncSessionForGame({ gameId, playerId }) {
-  setStartSessionStatus('Starting async session...', 'info');
-  isSetupBusy = true;
-  updateSetupActionsState();
-  void refreshAsyncDiagnostics({ force: true });
-
-  // WHY: Session creation is explicit and backend-authoritative; stream transport must only switch after valid session metadata.
-  const result = await createAsyncSession({ gameId, playerId });
-  if (!result.ok) {
-    isSetupBusy = false;
-
-    const normalizedFailure = normalizeAsyncSessionStartFailure(result);
-    setStartSessionStatus(
-      normalizedFailure.message,
-      normalizedFailure.statusType
-    );
-    if (normalizedFailure.nextLatestGameStatus) {
-      latestGameStatus = normalizedFailure.nextLatestGameStatus;
-    }
-    updateSetupActionsState();
-    return normalizedFailure.response;
-  }
-
-  activeSession = buildActiveSessionFromResult(result);
-  sessionStartSupported = true;
-  renderDebugContext();
-  setStartSessionStatus('Async session started.', 'success');
-
-  isSetupBusy = false;
-  updateSetupActionsState();
-
-  await startLiveStream(gameId, playerId, { forceSessionAttempt: true });
-  setSetupCollapsed(true);
-  return { ok: true, sessionId: result.sessionId };
-}
-
-async function handleStartAsyncSession() {
-  const gameId = resolveRequestedGameId();
-  const existingPlayerId = playerIdInput.value;
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
-
-  if (!gameId) {
-    setStartSessionStatus(
-      'Choose an active game before starting a session.',
-      'error'
-    );
-    return;
-  }
-
-  let playerId;
-  try {
-    playerId = await ensurePlayerJoinedForStream({
-      baseUrl,
-      gameId,
-      playerId: existingPlayerId,
-    });
-  } catch (error) {
-    showToast(error.message, 'error');
-    setStartSessionStatus(error.message, 'error');
-    return;
-  }
-
-  await startAsyncSessionForGame({ gameId, playerId });
-}
-
-async function handleStartGameFlow() {
-  const gameId = resolveRequestedGameId();
-  const existingPlayerId = playerIdInput.value;
-  const baseUrl = getNormalizedBaseUrlOrNull();
-  if (!baseUrl) {
-    return;
-  }
-
-  if (!gameId) {
-    showToast('Choose an active game before entering the game.', 'error');
-    return;
-  }
-
-  let playerId;
-  try {
-    playerId = await ensurePlayerJoinedForStream({
-      baseUrl,
-      gameId,
-      playerId: existingPlayerId,
-    });
-  } catch (error) {
-    showToast(error.message, 'error');
-    return;
-  }
-
-  cleanupGameMetaCache();
-  markGameMetaSeen(gameId);
-
-  try {
-    await fetchMetaSnapshot(baseUrl, gameId);
-  } catch (e) {
-    console.warn('Initial meta fetch failed before stream start:', e);
-  }
-
-  const roundMode = getCurrentRoundContext().roundMode;
-  if (roundMode === 'async' && !activeSession?.sessionId) {
-    await startAsyncSessionForGame({ gameId, playerId });
-    return;
-  }
-
-  await startLiveStream(gameId, playerId, { forceSessionAttempt: false });
-  setSetupCollapsed(true);
-}
-
-async function runStartGameFlowSafely({ source = 'manual' } = {}) {
-  try {
-    await handleStartGameFlow();
-  } catch (error) {
-    const detail = String(error?.message || error || 'Unknown error');
-    console.error(`[Start Flow][${source}] Unhandled error:`, error);
-    showToast(`Could not start game: ${detail}`, 'error');
-    isSetupBusy = false;
-    updateSetupActionsState();
-  }
-}
+// ── Event wiring (at import time, before DOMContentLoaded) ─────────────────
 
 if (startBtn) {
   startBtn.addEventListener('click', async () => {
@@ -2412,94 +661,9 @@ if (stopBtn) {
   });
 }
 
-// P2.4: Duration preset and advanced overrides event listeners
-if (durationPresetInput) {
-  durationPresetInput.addEventListener('change', () => {
-    if (durationPresetInput.value === 'custom') {
-      durationCustomInput.style.display = 'flex';
-      durationCustomValueInput.focus();
-    } else {
-      durationCustomInput.style.display = 'none';
-    }
-    syncTradeCountWithDuration();
-    saveSettings();
-  });
-}
-
-if (showAdvancedCheckbox) {
-  showAdvancedCheckbox.addEventListener('change', () => {
-    advancedOverridesDiv.style.display = showAdvancedCheckbox.checked
-      ? 'block'
-      : 'none';
-  });
-}
-
-baseUrlInput?.addEventListener('change', saveSettings);
-playerNameInput?.addEventListener('change', saveSettings);
-durationCustomValueInput?.addEventListener('change', () => {
-  syncTradeCountWithDuration();
-  saveSettings();
-});
-durationCustomUnitInput?.addEventListener('change', () => {
-  syncTradeCountWithDuration();
-  saveSettings();
-});
-enrollmentWindowInput?.addEventListener('change', saveSettings);
-function applyGameConfigToHostControls() {
-  // Legacy host controls on player.html are always hidden (.admin-only), but
-  // keep their options and limits in line with the effective game config.
-  populateHostPresetSelects({
-    durationPresetInput,
-    asyncDurationPresetInput: asyncHostDurationPresetInput,
-    asyncSessionPresetInput: asyncSessionDurationPresetInput,
-  });
-  const { min, max } = getEffectiveGameConfig().trade_count_limits;
-  tradeCountInput?.setAttribute('min', String(min));
-  tradeCountInput?.setAttribute('max', String(max));
-}
-tradeCountInput?.addEventListener('change', () => {
-  tradeCountManuallyOverridden = true;
-  if (tradeCountInput) {
-    tradeCountInput.value = String(
-      clampTradeCount(Number(tradeCountInput.value))
-    );
-  }
-  renderTradeSchedulePreview();
-  saveSettings();
-});
-gameIdInput?.addEventListener('change', saveSettings);
-
-gameOverOverlayEl?.addEventListener('click', () => {
-  acknowledgeGameOverOverlay();
-});
-
-// The results link resets the board like any acknowledgement, then opens the
-// lobby results view instead of the plain lobby.
-gameOverResultsLinkEl?.addEventListener('click', (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-  acknowledgeGameOverOverlay(gameOverResultsLinkEl.getAttribute('href'));
-});
-
-gameOverOverlayEl?.addEventListener('keydown', (event) => {
-  // Enter on the focused results link is handled by the link's own click.
-  if (event.target === gameOverResultsLinkEl) return;
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    acknowledgeGameOverOverlay();
-  }
-});
-playerIdInput?.addEventListener('change', saveSettings);
-anchorTokenInput?.addEventListener('change', saveSettings);
-anchorRateInput?.addEventListener('change', saveSettings);
-seasonCyclesInput?.addEventListener('change', saveSettings);
-scoringModeInputs.forEach((input) => {
-  input.addEventListener('change', () => {
-    updateScoringModeUi();
-    saveSettings();
-  });
-});
-gameIdInput?.addEventListener('input', updateSetupActionsState);
+wireHostControlEvents({ onSettingsChanged: saveSettings });
+wireSettingsPersistence();
+wireGameOverOverlayEvents();
 
 document.addEventListener('DOMContentLoaded', async () => {
   initializeModules();
@@ -2509,13 +673,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadSettings();
   // Apply the session-duration guard immediately after settings are restored
   // so the dropdown reflects the saved round duration on first render.
-  syncSessionDurationOptions({
-    roundDurationInput: asyncHostDurationPresetInput,
-    sessionDurationInput: asyncSessionDurationPresetInput,
-    warningEl: sessionDurationWarningEl,
-    enforceLimit: getSelectedRoundType() === 'async',
+  syncHostSessionDurationOptions();
+  syncTradeCountWithDuration({
+    forceDefault: !isTradeCountManuallyOverridden(),
   });
-  syncTradeCountWithDuration({ forceDefault: !tradeCountManuallyOverridden });
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
   const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
@@ -2534,15 +695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   void refreshAsyncDiagnostics({ force: true });
   updateSetupActionsState();
 
-  const params = new URLSearchParams(window.location.search);
-  const shouldAutostart = params.get('autostart') === '1';
-  if (shouldAutostart && String(gameIdInput?.value || '').trim()) {
-    await runStartGameFlowSafely({ source: 'autostart' });
-    params.delete('autostart');
-    const nextQuery = params.toString();
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
-    window.history.replaceState({}, '', nextUrl);
-  }
+  await runAutostartIfRequested();
 });
 
 export {
