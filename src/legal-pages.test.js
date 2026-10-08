@@ -114,7 +114,7 @@ describe('privacy notice content', () => {
       'AUTH_AUDIT_RETENTION_DAYS',
       'Chat messages are not stored',
       '14 days',
-      'Google Fonts',
+      'do not load anything from Google Fonts',
       'Download my data',
       'Delete account',
       'Deleted player',
