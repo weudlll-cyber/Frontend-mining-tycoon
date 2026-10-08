@@ -227,7 +227,7 @@ Result history is a non-gameplay, read-only system. It does not affect simulatio
 
 ## 8. Chat System (Social, Non-Gameplay)
 
-> **Status: Partial.** Round-scoped, non-persistent WebSocket chat with server-side rate limits and server-derived `user`/`ts` is implemented; in the UI it is the Chat tab of the floating live tools window plus a preview dock. Emoji support, admin moderation (mute/clear) and the per-round opt-out are not started.
+> **Status: Implemented (frontend).** Round-scoped, non-persistent WebSocket chat with server-side rate limits and server-derived `user`/`ts`; in the UI it is the Chat tab of the floating live tools window plus a preview dock. The per-round opt-out (`chat_enabled`) is implemented. The frontend also has an inline emoji picker (curated list from `/meta` `chat_emoji`, built-in fallback for older backends) and admin moderation (section 13 of `admin.html`: mute for 15 min / 1 h / 24 h / until the round ends, unmute, clear chat; players see a muted note and a "cleared by an administrator" notice). Emoji curation and mute/clear enforcement are backend work in the `Mining-tycoon` repository.
 
 ### Chat Is Social-Only
 

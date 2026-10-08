@@ -101,4 +101,11 @@ describe('chat preview dock', () => {
     preview.handleChatAvailabilityChange(true);
     expect(els.chatDockPreviewEl.textContent).toBe(lastPreview);
   });
+
+  it('shows the cleared notice and resets unread after a moderation clear', () => {
+    preview.handleChatMessagePreview({ user: 'player-9', text: 'rude' });
+    preview.handleChatClearedPreview();
+    expect(els.chatDockPreviewEl.textContent).toBe(chatPanel.CHAT_CLEARED_TEXT);
+    expect(els.chatUnreadBadgeEl.hidden).toBe(true);
+  });
 });

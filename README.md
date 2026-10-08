@@ -154,7 +154,7 @@ links.
 
 ### Admin console (`admin.html`, `src/admin/`)
 
-Twelve sections: 1 Connection (backend URL, "Sign in as administrator" or
+Thirteen sections: 1 Connection (backend URL, "Sign in as administrator" or
 the admin token, see below),
 2 Round Type (Sync / Async, "Chat enabled"), 3 Time Configuration,
 4 Scoring Mode, 5 Trading & Farming Rules (count, unlock preview, optional
@@ -162,7 +162,7 @@ conversion fee / oracle spread overrides and the Farming Stage 1 options),
 6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
-per-row Metrics, Reset (clones the game) and Delete), 9 Global Economy
+per-row Metrics, Chat (opens section 13 for that game), Reset (clones the game) and Delete), 9 Global Economy
 (`GET`/`PATCH /admin/economy`; changes apply to newly created games only),
 10 Metrics (`GET /admin/metrics` summary), 11 Game Settings
 (`GET`/`PATCH /admin/game-config`: duration presets, which presets are offered
@@ -184,7 +184,14 @@ admin" / "Remove admin" asks for confirmation and sends
 `PATCH /admin/users/{id}` `{"is_admin": bool}`; 409 `LAST_ADMIN` is explained
 as "This is the last administrator. Make another account an administrator
 first."; disabled until an administrator is signed in or the token field is
-filled).
+filled), 13 Chat Moderation (`src/admin/chat-moderation.js`, opened by the
+Chat row action: active mutes from `GET /admin/games/{id}/chat/mutes` with
+Unmute (`DELETE /admin/games/{id}/chat/mute/{player_id}`), a mute form with a
+player picker from `GET /games/{id}/leaderboard` (player ID box when the game
+has no players) and 15 min / 1 h / 24 h / until the round ends
+(`POST /admin/games/{id}/chat/mute` `{"player_id", "minutes"}`, `null` = until
+the round ends), and "Clear chat" with confirmation
+(`POST /admin/games/{id}/chat/clear`); backend errors are shown as returned).
 
 Admin sign-in (section 1, `src/admin/admin-account.js`,
 `src/admin/admin-session.js`):
@@ -314,6 +321,20 @@ The frontend reads the backend list `active_events` from SSE and `/state`
 Chat is a non-persistent WebSocket side channel (`/ws/chat`) with
 server-assigned user and timestamp and server-side rate limits. It has no
 effect on gameplay.
+
+An emoji button next to the chat input opens a small inline picker inside the
+Chat tab (`src/ui/chat-emoji-picker.js`; no overlay). It inserts the chosen
+emoji at the cursor. The list comes from `/meta` `chat_emoji` (curated by the
+backend); older backends without it use a built-in list of 24 emoji. The
+picker is keyboard operable (Enter opens it, arrow keys / Home / End move,
+Escape closes only the picker) and every emoji has an aria-label with its name.
+
+Moderation: a `chat_error` with code `CHAT_MUTED` shows "You are muted in this
+round's chat (until HH:MM)." (or "until the round ends" when `muted_until` is
+null) and disables the input, Send and emoji button until `muted_until`; the
+socket stays open and no reconnect happens. A `chat_cleared` event empties the
+message list and shows "Chat was cleared by an administrator." (also in the
+preview dock). Admins mute, unmute and clear in admin section 13.
 
 Chat can be disabled per round (admin "Chat enabled" round option). When the
 game meta says `chat_enabled: false`, the Chat tab stays in the live tools

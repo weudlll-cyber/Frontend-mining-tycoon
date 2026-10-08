@@ -1,7 +1,7 @@
 /**
  * File: src/admin/game-management.test.js
- * Purpose: Verify admin game-list row actions: Metrics, Reset (clone with
- *          confirm step) and Delete wiring.
+ * Purpose: Verify admin game-list row actions: Metrics, Chat, Reset (clone
+ *          with confirm step) and Delete wiring.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,7 +82,12 @@ describe('game list row actions', () => {
     await flush();
 
     expect(document.querySelectorAll('#admin-games-tbody tr')).toHaveLength(1);
-    expect(rowButtonLabels()).toEqual(['📊 Metrics', '♻ Reset', '🗑 Delete']);
+    expect(rowButtonLabels()).toEqual([
+      '📊 Metrics',
+      '💬 Chat',
+      '♻ Reset',
+      '🗑 Delete',
+    ]);
   });
 
   it('opens per-game metrics from the row', async () => {
@@ -122,7 +127,7 @@ describe('game list row actions', () => {
 
     const resetBtn = document.querySelectorAll(
       '#admin-games-tbody .admin-row-btn'
-    )[1];
+    )[2];
     resetBtn.click();
     await flush();
 
