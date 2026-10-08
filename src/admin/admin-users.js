@@ -28,6 +28,9 @@ export const ADMIN_USERS_PAGE_SIZE = 20;
 export const LAST_ADMIN_MESSAGE =
   'This is the last administrator. Make another account an administrator first.';
 
+export const USER_NOT_FOUND_MESSAGE =
+  'This account no longer exists. Refresh the list.';
+
 const state = { query: '', offset: 0, total: 0 };
 
 function el(id) {
@@ -126,7 +129,10 @@ export async function loadAdminUsers() {
       offset: String(state.offset),
     });
     const page = await adminRequest(`/admin/users?${query}`);
-    const items = Array.isArray(page?.items) ? page.items : [];
+    // The backend answers `{users, total, limit, offset}`; `items` is accepted
+    // as well so a differently shaped page still renders.
+    const rows = page?.users ?? page?.items;
+    const items = Array.isArray(rows) ? rows : [];
     const total = Number(page?.total);
     state.total = Number.isFinite(total) ? total : items.length;
     el('admin-users-tbody')?.replaceChildren(...items.map(buildUserRow));
@@ -172,8 +178,9 @@ export async function toggleAdmin(user, button) {
     // Set after the reload so the list's own status does not replace it.
     setResult(done, 'success');
   } catch (error) {
-    const message =
-      error?.code === 'LAST_ADMIN' ? LAST_ADMIN_MESSAGE : error.message;
+    let message = error.message;
+    if (error?.code === 'LAST_ADMIN') message = LAST_ADMIN_MESSAGE;
+    else if (error?.code === 'USER_NOT_FOUND') message = USER_NOT_FOUND_MESSAGE;
     setResult(`Could not change ${name}: ${message}`, 'error');
   } finally {
     if (button) button.disabled = false;

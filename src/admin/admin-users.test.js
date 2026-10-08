@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ADMIN_USERS_PAGE_SIZE,
   LAST_ADMIN_MESSAGE,
+  USER_NOT_FOUND_MESSAGE,
   initAdminUsers,
   loadAdminUsers,
   resetAdminUsersState,
@@ -233,6 +234,38 @@ describe('toggleAdmin', () => {
     expect(q('admin-users-result').textContent).toBe(
       `Could not change ada: ${LAST_ADMIN_MESSAGE}`
     );
+  });
+
+  it('shows USER_NOT_FOUND as a refresh hint', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(404, { code: 'USER_NOT_FOUND', detail: 'not found' })
+        )
+    );
+    await toggleAdmin(user({ is_admin: true }), null);
+    expect(q('admin-users-result').textContent).toBe(
+      `Could not change ada: ${USER_NOT_FOUND_MESSAGE}`
+    );
+  });
+
+  it('renders the backend page shape {users, total, limit, offset}', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          users: [user(), user({ id: 8, username: 'bob' })],
+          total: 2,
+          limit: 20,
+          offset: 0,
+        })
+      )
+    );
+    await loadAdminUsers();
+    expect(q('admin-users-tbody').querySelectorAll('tr')).toHaveLength(2);
   });
 
   it('shows other errors as-is', async () => {
