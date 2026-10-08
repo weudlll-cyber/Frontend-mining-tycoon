@@ -42,7 +42,7 @@ describe('schedule-time', () => {
   it('formats local times', () => {
     const at = Math.floor(new Date(2026, 9, 9, 7, 5).getTime() / 1000);
     expect(formatLocalTime(at)).toBe('07:05');
-    expect(formatLocalDateTime(at)).toContain('2026');
+    expect(formatLocalDateTime(at)).toMatch(/2026.*, 07:05$/);
     const now = new Date(2026, 9, 9, 6, 0).getTime();
     expect(formatOpensAtShort(at, now)).toBe('07:05');
     // More than a day away: the date is added so the time is unambiguous.

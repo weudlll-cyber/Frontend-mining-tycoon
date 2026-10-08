@@ -67,16 +67,19 @@ export function formatLocalTime(unixSeconds) {
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
-/** Local date and time, e.g. "Thu, 8 Oct 2026, 14:30" (locale-dependent). */
+/**
+ * Local date and time, e.g. "Thu, 8 Oct 2026, 14:30". The date part follows
+ * the browser locale; the time is always 24 h "HH:MM", matching the
+ * "Opens at HH:MM" labels (some locales would otherwise show "02:30 PM").
+ */
 export function formatLocalDateTime(unixSeconds) {
-  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+  const day = new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
+  return `${day}, ${formatLocalTime(unixSeconds)}`;
 }
 
 /**
