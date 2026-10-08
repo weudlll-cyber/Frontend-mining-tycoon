@@ -4,6 +4,13 @@ Purpose: Manage the optional live-tools drawer (Trade/Farm/Chat/Top 5) without i
 Role in system: Provides a compact interaction shell so non-core panels stay reachable while preserving a low-scroll main board.
 Invariants: Gameplay cards and player-state panel remain always visible; drawer only hosts auxiliary panels.
 Security notes: UI-only state; no network or game-authority logic.
+Accessibility:
+- Tabs follow the WAI-ARIA tabs pattern: roving tabindex (only the active tab
+  is in the Tab order), ArrowLeft/ArrowRight/Home/End move between tabs and
+  activate them, aria-selected mirrors the active tab.
+- Opening from an action-bar button moves focus to the active tab; closing
+  while focus is inside the window returns focus to that opener.
+- Dragging is clamped so the header always stays inside the viewport.
 */
 
 const VALID_TABS = ['trade', 'farm', 'chat', 'leaderboard'];
@@ -20,6 +27,11 @@ let _refs = {
 let _onStateChanged = null;
 let _isOpen = false;
 let _activeTab = 'trade';
+let _lastOpenerEl = null;
+
+// Part of the window header that must stay on screen while dragging, so the
+// player can always grab it again (px).
+const DRAG_KEEP_VISIBLE_PX = 48;
 
 function normalizeTab(value) {
   const tab = String(value || '')
@@ -46,6 +58,8 @@ function renderState() {
     const isActive = tab === _activeTab;
     button.classList.toggle('live-drawer-tab-active', isActive);
     button.setAttribute('aria-selected', String(isActive));
+    // Roving tabindex: Tab enters the tablist on the active tab only.
+    button.tabIndex = isActive ? 0 : -1;
   });
 
   _refs.panels.forEach((panel) => {
@@ -75,8 +89,54 @@ export function openLiveDrawer(tab = _activeTab) {
 }
 
 export function closeLiveDrawer() {
+  const focusWasInside = Boolean(
+    _refs.rootEl && _refs.rootEl.contains(document.activeElement)
+  );
   _isOpen = false;
   renderState();
+  // Hidden elements lose focus; hand it back to the button that opened us.
+  if (focusWasInside && _lastOpenerEl?.isConnected) {
+    _lastOpenerEl.focus();
+  }
+}
+
+function getActiveTabButton() {
+  return (
+    _refs.tabButtons.find(
+      (button) => button && normalizeTab(button.dataset.liveTab) === _activeTab
+    ) || null
+  );
+}
+
+// Arrow/Home/End navigation inside the tablist (WAI-ARIA tabs pattern with
+// automatic activation). Returns true when the key was handled.
+function handleLiveDrawerTabKeydown(event) {
+  const buttons = _refs.tabButtons.filter(Boolean);
+  const currentIndex = buttons.indexOf(event.target);
+  if (currentIndex < 0) return false;
+
+  let nextIndex = null;
+  if (event.key === 'ArrowRight') {
+    nextIndex = (currentIndex + 1) % buttons.length;
+  } else if (event.key === 'ArrowLeft') {
+    nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+  } else if (event.key === 'Home') {
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    nextIndex = buttons.length - 1;
+  }
+  if (nextIndex === null) return false;
+
+  event.preventDefault();
+  const nextButton = buttons[nextIndex];
+  setLiveDrawerTab(nextButton.dataset.liveTab);
+  nextButton.focus();
+  return true;
+}
+
+/** Keep `value` between min and max (max wins when the range is empty). */
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
 export function isLiveDrawerOpen() {
@@ -97,9 +157,23 @@ function _initDrag(windowEl, handleEl) {
     startLeft = 0,
     startTop = 0;
 
+  // Clamp so at least DRAG_KEEP_VISIBLE_PX of the header stays inside the
+  // viewport; a window dragged off-screen (easy on phones) is unreachable.
   function applyDelta(clientX, clientY) {
-    windowEl.style.left = startLeft + (clientX - startX) + 'px';
-    windowEl.style.top = startTop + (clientY - startY) + 'px';
+    // Unknown width (not laid out yet): keep the left edge on screen.
+    const width = windowEl.offsetWidth || DRAG_KEEP_VISIBLE_PX;
+    const left = clamp(
+      startLeft + (clientX - startX),
+      DRAG_KEEP_VISIBLE_PX - width,
+      window.innerWidth - DRAG_KEEP_VISIBLE_PX
+    );
+    const top = clamp(
+      startTop + (clientY - startY),
+      0,
+      window.innerHeight - DRAG_KEEP_VISIBLE_PX
+    );
+    windowEl.style.left = left + 'px';
+    windowEl.style.top = top + 'px';
   }
 
   function onMouseMove(e) {
@@ -173,11 +247,15 @@ export function initLiveDrawer(deps) {
     button?.addEventListener('click', () => {
       openLiveDrawer(button.dataset.liveTab);
     });
+    button?.addEventListener('keydown', handleLiveDrawerTabKeydown);
   });
 
   _refs.openButtons.forEach((button) => {
     button?.addEventListener('click', () => {
+      _lastOpenerEl = button;
       openLiveDrawer(button.dataset.liveTab);
+      // Move keyboard focus into the (non-modal) window.
+      getActiveTabButton()?.focus();
     });
   });
 
@@ -206,6 +284,7 @@ export function initLiveDrawer(deps) {
   });
 
   _isOpen = false;
+  _lastOpenerEl = null;
   _activeTab = normalizeTab(deps.defaultTab);
   renderState();
 }

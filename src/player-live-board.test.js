@@ -67,6 +67,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Multi-update tests: run frames on a microtask so main.js records the frame
+// id before the callback clears it (the synchronous stub above only renders
+// the first update).
+function useMicrotaskAnimationFrames() {
+  globalThis.requestAnimationFrame = (callback) => {
+    Promise.resolve().then(callback);
+    return 1;
+  };
+}
+
 describe('player live board wiring', () => {
   it('mounts the top-5 leaderboard in the live tools window', () => {
     const panel = document.getElementById('live-panel-leaderboard');
@@ -119,6 +129,103 @@ describe('player live board wiring', () => {
     expect(banner.classList.contains('event-banner-hidden')).toBe(false);
     expect(banner.textContent).toContain('Liquidity Crunch');
     expect(banner.textContent).toContain('Spread +3.0% (all tokens)');
+  });
+
+  it('labels sync standings Live while running and Final when finished', async () => {
+    useMicrotaskAnimationFrames();
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    const headerTag = document.getElementById('standings-status');
+    const panelNote = document.getElementById('leaderboard-standings-status');
+
+    // Nothing to qualify before any game data arrives.
+    expect(headerTag.textContent).toBe('');
+    expect(headerTag.dataset.standingsState).toBe('none');
+
+    const payload = {
+      game_id: 7,
+      player_id: 3,
+      leaderboard_top_5: [{ player_id: 3, name: 'Alice', score: 10 }],
+    };
+    deps.onData({ ...payload, game_status: 'running' });
+    await Promise.resolve();
+    expect(headerTag.textContent).toBe('Live');
+    expect(headerTag.dataset.standingsState).toBe('live');
+    expect(panelNote.textContent).toBe(
+      'Live — standings update while the round runs.'
+    );
+
+    deps.onData({ ...payload, game_status: 'finished' });
+    await Promise.resolve();
+    expect(headerTag.textContent).toBe('Final');
+    expect(headerTag.title).toBe('Final — the round is finished.');
+    expect(panelNote.textContent).toBe('Final — the round is finished.');
+  });
+
+  it('labels async standings Provisional while the round is still open', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () =>
+        String(url).includes('/games/7/meta')
+          ? { meta_hash: 'game-7', round_type: 'asynchronous' }
+          : { meta_hash: 'global' },
+    }));
+    useMicrotaskAnimationFrames();
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    document.getElementById('game-id').value = '7';
+    await deps.fetchMetaSnapshot('http://127.0.0.1:8000', '7');
+
+    deps.onData({ game_id: 7, player_id: 3, game_status: 'running' });
+    await Promise.resolve();
+    const headerTag = document.getElementById('standings-status');
+    expect(headerTag.textContent).toBe('Provisional');
+    expect(headerTag.title).toBe('Provisional — the round is still open.');
+    expect(
+      document.getElementById('leaderboard-standings-status').textContent
+    ).toBe('Provisional — the round is still open.');
+
+    deps.onData({ game_id: 7, player_id: 3, game_status: 'finished' });
+    await Promise.resolve();
+    expect(headerTag.textContent).toBe('Final');
+  });
+
+  it('keeps the ticking countdown out of screen-reader announcements', () => {
+    const summary = document.querySelector('.game-summary-line');
+    expect(summary.hasAttribute('aria-live')).toBe(false);
+    expect(document.getElementById('countdown').getAttribute('aria-live')).toBe(
+      'off'
+    );
+    expect(
+      document.getElementById('round-remaining').getAttribute('aria-live')
+    ).toBe('off');
+    // The Top 5 table updates every tick, so it is not a live region either.
+    expect(
+      document.getElementById('leaderboard').hasAttribute('aria-live')
+    ).toBe(false);
+  });
+
+  it('hides decorative emoji from assistive technology', () => {
+    ['chat-toggle-btn', 'leaderboard-drawer-btn'].forEach((id) => {
+      const icon = document.querySelector(`#${id} span[aria-hidden="true"]`);
+      expect(icon).not.toBeNull();
+    });
+    document.querySelectorAll('.season-header h3').forEach((heading) => {
+      expect(heading.querySelector('span[aria-hidden="true"]')).not.toBeNull();
+    });
+    expect(
+      document.querySelector('.game-header h1 span[aria-hidden="true"]')
+    ).not.toBeNull();
+  });
+
+  it('wires the live tools tabs to labelled tab panels', () => {
+    document.querySelectorAll('#live-drawer [role="tab"]').forEach((tab) => {
+      const panel = document.getElementById(tab.getAttribute('aria-controls'));
+      expect(panel.getAttribute('role')).toBe('tabpanel');
+      expect(panel.getAttribute('aria-labelledby')).toBe(tab.id);
+    });
   });
 
   it('shows "Chat is disabled for this round." and opens no socket when game meta disables chat', async () => {

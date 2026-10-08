@@ -120,6 +120,12 @@ import {
   renderLeaderboard as renderTopLeaderboard,
 } from './ui/leaderboard.js';
 import { buildLastGameSnapshot } from './ui/last-game-highscores.js';
+import { ensureToastRegions, showToast } from './ui/toast.js';
+import {
+  initStandingsStatus,
+  renderStandingsStatus,
+  resolveStandingsStatus,
+} from './ui/standings-status.js';
 import {
   snapSelection,
   restoreSelectionIfValid,
@@ -382,6 +388,10 @@ const seasonCards = Array.from(document.querySelectorAll('.season-card'));
 const myScoreEl = document.getElementById('my-score');
 const myRankEl = document.getElementById('my-rank');
 const topScoreEl = document.getElementById('top-score');
+const standingsStatusEl = document.getElementById('standings-status');
+const leaderboardStandingsStatusEl = document.getElementById(
+  'leaderboard-standings-status'
+);
 const portfolioValueEl = document.getElementById('portfolio-value');
 const scoreContextLabelEl = document.getElementById('score-context-label');
 const scoringModeInputs = [
@@ -1240,19 +1250,6 @@ function renderDerivedEmissionPreview() {
   derivedEmissionPreviewEl.style.display = 'block';
 }
 
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => toast.classList.add('show'), 10);
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
-
 function storeLastPlayedGameSnapshot(snapshot) {
   if (!snapshot) {
     setStorageItem(STORAGE_KEYS.lastPlayedGameSnapshot, '');
@@ -1390,6 +1387,7 @@ function resetLiveBoardState({ clearPlayerContext = false } = {}) {
   lastGameData = null;
   resetPlayerStateView();
   renderLeaderboard(null);
+  renderStandingsStatus();
   if (myScoreEl) myScoreEl.textContent = '—';
   if (myRankEl) myRankEl.textContent = '—';
   if (topScoreEl) topScoreEl.textContent = '—';
@@ -1642,6 +1640,12 @@ function initializeModules() {
     defaultTokenNames: PLAYER_STATE_TOKENS,
   });
   initLeaderboard({ leaderboardEl });
+  initStandingsStatus({
+    headerTagEl: standingsStatusEl,
+    panelNoteEl: leaderboardStandingsStatusEl,
+  });
+  // Live regions must exist before the first toast so it is announced.
+  ensureToastRegions();
   initSeasonCards({ getGameMeta });
   initMetaManager({
     onMetaChanged() {
@@ -2082,6 +2086,13 @@ function applyUIUpdate(data) {
   renderPlayerState(data);
   renderUpgradeMetrics(data);
   renderLeaderboard(data);
+  // Live (sync) / Provisional (async, round open) / Final (round finished).
+  renderStandingsStatus(
+    resolveStandingsStatus({
+      roundMode: getCurrentRoundContext().roundMode,
+      gameStatus: data?.game_status || latestGameStatus,
+    })
+  );
   renderQuickStats(data);
   renderPortfolioValue(data);
   renderEventBanner(data);

@@ -108,7 +108,7 @@ console all use this default; the Backend URL fields on `player.html` and
 
 ### Player board (`player.html`, `src/main.js`)
 
-- **Header:** countdown, phase, score, rank, top score, scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs; a **How to play** link opens the guide in a new tab so the running game stays open.
+- **Header:** countdown, phase, score, rank, top score, a standings label (`Live` in a running sync round, `Provisional` while an async round is still open, `Final` once the round is finished), scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs; a **How to play** link opens the guide in a new tab so the running game stays open.
 - **Join Round panel:** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async rounds), `Stop Stream`. It collapses once the stream runs. Players cannot create games here; the legacy host controls in the HTML are always hidden (`.admin-only`).
 - **Season cards (2x2):** Balance, Output and Halving per season, plus three inline upgrade lanes (Hashrate, Efficiency, Cooling) as a table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. `Pay` chooses the token you pay with; the backend decides the final cost.
 - **Player State (right):** read-only matrix of output, balances (spendable) and oracle prices per token and in total, plus next halving, cumulative mined and fee/spread. Tokens in farming are listed on a separate "Farmed (not spendable)" line when there are any. Large numbers use k/M/B; tooltips show exact values.
@@ -120,6 +120,14 @@ console all use this default; the Backend URL fields on `player.html` and
 Layout rules: desktop (1440x900) has no page scroll, only internal scroll areas;
 tablets stack the grid; phones show one season card at a time. See
 `LOCKED_DECISIONS.md` for the binding UI invariants.
+
+Accessibility: all pages honour `prefers-reduced-motion` (no fades, slides or
+hover lifts) and show a visible `:focus-visible` ring. The live tools window
+tabs follow the ARIA tabs pattern (Tab enters on the active tab, arrow keys /
+Home / End switch tabs, Escape closes and returns focus to the opener). Toasts
+are announced through live regions (polite for info, assertive for errors);
+ticking countdowns and the Top 5 table are not announced. Status text colours
+meet WCAG AA (4.5:1). Checks: `MANUAL_TEST_RUNBOOK.md` section 3a.
 
 ### How to play (`how-to-play.html`, `src/how-to-play.css`)
 

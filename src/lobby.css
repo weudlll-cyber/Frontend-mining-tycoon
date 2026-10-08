@@ -119,7 +119,12 @@ input {
 }
 
 input:focus-visible,
-button:focus-visible {
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--lobby-accent);
   outline-offset: 2px;
 }
@@ -174,7 +179,8 @@ button:focus-visible {
 }
 
 .inline-link:disabled {
-  color: rgba(191, 210, 222, 0.55);
+  /* Disabled controls are exempt from WCAG contrast, still kept >= 4.5:1. */
+  color: rgba(191, 210, 222, 0.62);
   text-decoration: none;
   cursor: not-allowed;
 }
@@ -642,6 +648,12 @@ dialog::backdrop {
   .open-games-list {
     min-height: 280px;
   }
+
+  /* Phones (375px): header buttons wrap below the title instead of
+     pushing the panel wider than the viewport. */
+  .panel-header {
+    flex-wrap: wrap;
+  }
 }
 
 /* Legal links (privacy notice, imprint) below the lobby panels. */
@@ -657,4 +669,21 @@ dialog::backdrop {
 .lobby-footer a,
 #register-privacy-note a {
   color: inherit;
+}
+
+/* Respect the OS "reduce motion" setting (hover slide, dialog/list fades). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .game-list-item:hover {
+    transform: none;
+  }
 }
