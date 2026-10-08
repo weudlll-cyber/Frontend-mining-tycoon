@@ -974,3 +974,250 @@ describe('lobby account data protection', () => {
     expect(document.getElementById('join-selected-btn').disabled).toBe(true);
   });
 });
+
+// NOTE: lobby instances of earlier tests re-bootstrap on every
+// DOMContentLoaded and share the auth-client mock, so these tests assert on
+// the current page's DOM (which only this test's instance renders) instead of
+// mock call counts.
+describe('lobby scheduled rounds (Upcoming)', () => {
+  const NOW_MS = Date.now();
+  const SCHEDULED_GAME = {
+    game_id: 'sched-1',
+    game_status: 'scheduled',
+    round_type: 'synchronous',
+    scoring_mode: 'stockpile',
+    trade_count: 2,
+    players_count: 0,
+    scheduled_start_at: NOW_MS / 1000 + 3900,
+    opens_in_seconds: 3900,
+  };
+
+  beforeEach(async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.joinGame).mockReset();
+  });
+
+  it('lists scheduled rounds under Upcoming with a countdown and a disabled join button', async () => {
+    await bootLobbySignedIn({ games: [SCHEDULED_GAME, OPEN_SYNC_GAME] });
+
+    const list = document.getElementById('open-games-list');
+    const rows = Array.from(list.querySelectorAll('.game-list-item'));
+    // Joinable rounds first, then the Upcoming divider and scheduled rounds.
+    expect(rows.map((row) => row.dataset.gameId)).toEqual(['77', 'sched-1']);
+    const divider = list.querySelector('.game-list-group-label');
+    expect(divider.textContent).toBe('Upcoming');
+    expect(divider.getAttribute('aria-hidden')).toBe('true');
+    expect(document.getElementById('lobby-message').textContent).toBe(
+      'Loaded 1 open game. 1 upcoming.'
+    );
+
+    const scheduled = rows[1];
+    expect(scheduled.querySelector('.game-badge').textContent).toBe(
+      'Scheduled'
+    );
+    expect(scheduled.querySelector('.game-countdown').textContent).toBe(
+      'opens in 1 h 05 min'
+    );
+    expect(scheduled.querySelector('.game-start-time').textContent).toMatch(
+      /^Starts /
+    );
+
+    scheduled.click();
+    const joinBtn = document.getElementById('join-selected-btn');
+    expect(joinBtn.disabled).toBe(true);
+    expect(joinBtn.textContent).toMatch(/^Opens at \d\d:\d\d$/);
+    expect(document.getElementById('lobby-message').textContent).toContain(
+      'you can join then'
+    );
+
+    // Even if the button were clicked, no join request is sent.
+    joinBtn.disabled = false;
+    joinBtn.click();
+    await flushPromises();
+    const authClient = await import('./services/auth-client.js');
+    expect(authClient.joinGame).not.toHaveBeenCalled();
+    expect(document.getElementById('lobby-message').textContent).toContain(
+      'has not opened yet'
+    );
+
+    // Selecting an open round restores the normal join button.
+    rows[0].click();
+    expect(joinBtn.disabled).toBe(false);
+    expect(joinBtn.textContent).toBe('Enter game');
+  });
+
+  it('ticks the countdown and reloads the list when the round opens', async () => {
+    const authClient = await bootLobbySignedIn({
+      games: [{ ...SCHEDULED_GAME, opens_in_seconds: 3 }],
+    });
+    const countdown = () =>
+      document.querySelector('.game-list-item .game-countdown').textContent;
+    expect(countdown()).toBe('opens in 3 s');
+
+    await flushDeep();
+    vi.mocked(authClient.fetchOpenGames).mockResolvedValue([
+      { ...OPEN_SYNC_GAME, game_id: 'sched-1' },
+    ]);
+    vi.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(countdown()).toBe('opens in 2 s');
+    expect(
+      document.querySelector('.game-list-item .game-badge').textContent
+    ).toBe('Scheduled');
+
+    // Due at 3 s (well before the 10 s auto refresh): the list reloads.
+    vi.advanceTimersByTime(2000);
+    await flushPromises();
+    const row = document.querySelector('.game-list-item');
+    expect(row.querySelector('.game-badge').textContent).toBe('Enrolling');
+  });
+
+  it('re-lists a due round at most every 5 seconds', async () => {
+    const authClient = await bootLobbySignedIn({
+      games: [{ ...SCHEDULED_GAME, opens_in_seconds: 0 }],
+    });
+    await flushDeep();
+    const message = document.getElementById('lobby-message');
+    // The backend still reports the round as scheduled for a moment: the
+    // first due tick reloads (and re-announces the list)...
+    vi.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(message.textContent).toBe('Loaded 0 open games. 1 upcoming.');
+    // ...but the next ticks within 5 s do not reload again.
+    message.textContent = 'marker';
+    vi.advanceTimersByTime(2000);
+    await flushPromises();
+    expect(message.textContent).toBe('marker');
+    vi.advanceTimersByTime(4000);
+    await flushPromises();
+    expect(message.textContent).toBe('Loaded 0 open games. 1 upcoming.');
+    expect(authClient.fetchOpenGames).toHaveBeenCalled();
+  });
+
+  it('explains JOIN_NOT_ALLOWED_SCHEDULED and reloads the list', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.joinGame).mockRejectedValue(
+      Object.assign(new Error('This round has not opened yet.'), {
+        status: 409,
+        code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+        opensAt: NOW_MS / 1000 + 600,
+      })
+    );
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+    vi.mocked(authClient.fetchOpenGames).mockClear();
+    vi.mocked(authClient.fetchOpenGames).mockResolvedValue([
+      { ...SCHEDULED_GAME, game_id: '77', opens_in_seconds: 600 },
+    ]);
+    document.getElementById('join-selected-btn').click();
+    await flushPromises();
+
+    expect(document.getElementById('lobby-message').textContent).toMatch(
+      /^This round has not opened yet\. It opens at /
+    );
+    expect(authClient.fetchOpenGames).toHaveBeenCalled();
+    expect(document.getElementById('join-selected-btn').textContent).toMatch(
+      /^Opens at /
+    );
+
+    // Without opens_at the message still reads well.
+    vi.mocked(authClient.joinGame).mockRejectedValue(
+      Object.assign(new Error('x'), { code: 'JOIN_NOT_ALLOWED_SCHEDULED' })
+    );
+    vi.mocked(authClient.fetchOpenGames).mockResolvedValue([OPEN_SYNC_GAME]);
+    vi.advanceTimersByTime(10000);
+    await flushPromises();
+    document.querySelector('.game-list-item[data-game-id="77"]').click();
+    document.getElementById('join-selected-btn').click();
+    await flushPromises();
+    expect(document.getElementById('lobby-message').textContent).toBe(
+      'This round has not opened yet.'
+    );
+  });
+});
+
+describe('lobby open-games keyboard access', () => {
+  const GAMES = ['a', 'b', 'c'].map((id) => ({
+    ...OPEN_SYNC_GAME,
+    game_id: id,
+  }));
+
+  function key(target, keyName) {
+    const event = new KeyboardEvent('keydown', {
+      key: keyName,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  it('is a listbox of options with one roving tab stop', async () => {
+    await bootLobbySignedIn({ games: GAMES });
+    const list = document.getElementById('open-games-list');
+    expect(list.getAttribute('role')).toBe('listbox');
+    const rows = Array.from(list.querySelectorAll('.game-list-item'));
+    expect(rows.map((row) => row.getAttribute('role'))).toEqual([
+      'option',
+      'option',
+      'option',
+    ]);
+    expect(rows.map((row) => row.tabIndex)).toEqual([0, -1, -1]);
+    expect(rows.map((row) => row.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'false',
+      'false',
+    ]);
+  });
+
+  it('selects with Enter/Space and moves with arrows, Home and End', async () => {
+    await bootLobbySignedIn({ games: GAMES });
+    const list = document.getElementById('open-games-list');
+    const rowFor = (id) => list.querySelector(`[data-game-id="${id}"]`);
+    const joinBtn = document.getElementById('join-selected-btn');
+
+    rowFor('a').focus();
+    expect(key(rowFor('a'), 'Enter').defaultPrevented).toBe(true);
+    expect(rowFor('a').getAttribute('aria-selected')).toBe('true');
+    expect(joinBtn.disabled).toBe(false);
+
+    key(rowFor('a'), 'ArrowDown');
+    expect(document.activeElement).toBe(rowFor('b'));
+    expect(rowFor('b').getAttribute('aria-selected')).toBe('true');
+    expect(rowFor('a').tabIndex).toBe(-1);
+    expect(rowFor('b').tabIndex).toBe(0);
+
+    key(rowFor('b'), 'End');
+    expect(document.activeElement).toBe(rowFor('c'));
+    key(rowFor('c'), 'ArrowRight');
+    expect(document.activeElement).toBe(rowFor('c'));
+    key(rowFor('c'), 'ArrowUp');
+    expect(document.activeElement).toBe(rowFor('b'));
+    key(rowFor('b'), 'Home');
+    expect(document.activeElement).toBe(rowFor('a'));
+    key(rowFor('a'), 'ArrowLeft');
+    expect(document.activeElement).toBe(rowFor('a'));
+    key(rowFor('b'), ' ');
+    expect(rowFor('b').getAttribute('aria-selected')).toBe('true');
+
+    // Other keys, and keys outside a row, are left alone.
+    expect(key(rowFor('a'), 'x').defaultPrevented).toBe(false);
+    expect(key(list, 'ArrowDown').defaultPrevented).toBe(false);
+  });
+
+  it('keeps keyboard focus on the same game across the auto refresh', async () => {
+    await bootLobbySignedIn({ games: GAMES });
+    const list = document.getElementById('open-games-list');
+    list.querySelector('[data-game-id="b"]').focus();
+    vi.advanceTimersByTime(10000);
+    await flushPromises();
+    expect(document.activeElement.dataset.gameId).toBe('b');
+    expect(document.activeElement.isConnected).toBe(true);
+  });
+
+  it('drops the listbox role for an empty list', async () => {
+    await bootLobbySignedIn({ games: [] });
+    const list = document.getElementById('open-games-list');
+    expect(list.hasAttribute('role')).toBe(false);
+    expect(list.textContent).toContain('No joinable games right now.');
+  });
+});

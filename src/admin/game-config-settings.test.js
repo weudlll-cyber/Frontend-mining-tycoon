@@ -299,6 +299,42 @@ describe('editing and saving', () => {
     expect(resultText()).toContain('Saved account_policy.');
   });
 
+  it('saves "Max days ahead for scheduled rounds" only when changed', async () => {
+    // CONFIG has no `scheduling` (older backend): the editor shows 30.
+    const fetchMock = await loadWith();
+    expect($('scheduling-max-days').value).toBe('30');
+    await saveGameConfigSettings();
+    expect(resultText()).toBe('No changes to save.');
+
+    $('scheduling-max-days').value = '0';
+    await saveGameConfigSettings();
+    expect(resultText()).toContain(
+      'Max days ahead for scheduled rounds must be between 1 and 365.'
+    );
+    $('scheduling-max-days').value = '366';
+    await saveGameConfigSettings();
+    expect(resultText()).toContain('between 1 and 365');
+
+    $('scheduling-max-days').value = 'abc';
+    await saveGameConfigSettings();
+    expect(resultText()).toContain(
+      'Max days ahead for scheduled rounds must be a number.'
+    );
+
+    $('scheduling-max-days').value = '7';
+    fetchMock.mockResolvedValueOnce(
+      okResponse(
+        documentFor({ ...CONFIG, scheduling: { max_days_ahead: 7 } }, 2)
+      )
+    );
+    $('save-btn').click();
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      scheduling: { max_days_ahead: 7 },
+    });
+    expect($('scheduling-max-days').value).toBe('7');
+  });
+
   it('treats a backend without account_policy as "not required"', async () => {
     const legacyConfig = structuredClone(CONFIG);
     delete legacyConfig.account_policy;
@@ -451,6 +487,7 @@ describe('editing and saving', () => {
       },
       farming_min_duration_limits: { min_seconds: 10, max_seconds: 604800 },
       farming_reward_rate_limits: { min: 0.0001, max: 1 },
+      scheduling: { max_days_ahead: 30 },
     });
     // ...and an unchanged legacy form sends nothing (no farming keys either).
     expect(buildGameConfigPatch(config, CONFIG)).toEqual({});

@@ -14,6 +14,9 @@ Constraints:
 - Async rounds without an active session start one before streaming.
 - Errors never escape: the safe wrapper reports them and releases the setup
   busy state.
+- A join refused with 409 JOIN_NOT_ALLOWED_SCHEDULED (the round is scheduled
+  and has not opened yet) shows "Scheduled — opens at <time>" on the board
+  instead of a failure; actions stay disabled.
 Security notes: no token handling here; messages are shown as plain text.
 */
 
@@ -30,6 +33,7 @@ import {
   normalizeAsyncSessionStartFailure,
 } from './async-session-state.js';
 import { boardState } from './board-state.js';
+import { showScheduledRoundStatus } from './board-update.js';
 import { hideGameOverOverlay } from './game-over.js';
 import {
   getCurrentRoundContext,
@@ -40,6 +44,16 @@ import {
 import { showToast } from './toast.js';
 
 let _deps = {};
+
+const JOIN_NOT_ALLOWED_SCHEDULED = 'JOIN_NOT_ALLOWED_SCHEDULED';
+
+/** True (and the board shows the scheduled state) for a scheduled-round refusal. */
+function handleScheduledJoinRefusal(error) {
+  if (error?.code !== JOIN_NOT_ALLOWED_SCHEDULED) return false;
+  showScheduledRoundStatus(error.opensAt ?? null);
+  showToast('This round has not opened yet.', 'info');
+  return true;
+}
 
 /**
  * @param {{ gameIdInput, playerIdInput, updateSetupActionsState: () => void,
@@ -134,6 +148,7 @@ export async function handleStartAsyncSession() {
       playerId: existingPlayerId,
     });
   } catch (error) {
+    if (handleScheduledJoinRefusal(error)) return;
     showToast(error.message, 'error');
     setStartSessionStatus(error.message, 'error');
     return;
@@ -163,6 +178,7 @@ async function handleStartGameFlow() {
       playerId: existingPlayerId,
     });
   } catch (error) {
+    if (handleScheduledJoinRefusal(error)) return;
     showToast(error.message, 'error');
     return;
   }

@@ -11,7 +11,13 @@ Backend contract notes:
   (`rejoined: true`). 401 ACCOUNT_AUTH_INVALID = stale account token (treated
   like an expired session), 401 ACCOUNT_REQUIRED = round needs a sign-in.
 - /games/active with the token marks the caller's games via `my_player_id`.
+- Scheduled sync rounds (`status: "scheduled"`, `scheduled_start_at`,
+  `opens_in_seconds`) are listed under "Upcoming" with a live countdown; the
+  join button is disabled ("Opens at HH:MM") and the list reloads when the
+  countdown reaches 0. A join that races the opening gets 409
+  JOIN_NOT_ALLOWED_SCHEDULED (`opens_at`), shown as a friendly message.
 - Older backends omit these fields; the lobby then behaves as before.
+Accessibility: the list is a keyboard-operable listbox (src/ui/lobby-game-list.js).
 Security notes: tokens are never rendered; all backend text uses textContent.
 */
 
@@ -45,7 +51,19 @@ import {
   register,
   resetPassword,
 } from './services/auth-client.js';
-import { buildGameStatusBadge, normalizeGameItem } from './ui/lobby-games.js';
+import { readGameStatus } from './ui/lobby-games.js';
+import {
+  bindLobbyGameListKeyboard,
+  markSelectedRow,
+  renderLobbyGameList,
+  startScheduledCountdown,
+  stopScheduledCountdown,
+} from './ui/lobby-game-list.js';
+import {
+  formatLocalDateTime,
+  formatOpensAtShort,
+  normalizeUnixSeconds,
+} from './utils/schedule-time.js';
 import {
   initLastGameHighscores,
   renderLastGameHighscores,
@@ -65,6 +83,10 @@ import {
 
 const LOBBY_REFRESH_MS = 10000;
 const ACCOUNT_REQUIRED_MESSAGE = 'Sign in to join this game.';
+const JOIN_NOT_ALLOWED_SCHEDULED = 'JOIN_NOT_ALLOWED_SCHEDULED';
+// A scheduled round that should have opened is re-listed at most this often,
+// in case the backend still reports it as scheduled for a moment.
+const DUE_REFRESH_MIN_INTERVAL_MS = 5000;
 
 const authMessageEl = document.getElementById('auth-message');
 const lobbyMessageEl = document.getElementById('lobby-message');
@@ -106,6 +128,10 @@ let selectedGameId = '';
 // True when the selected open game already has this account's player
 // (`my_player_id`), so joining it is a rejoin of the same player.
 let selectedGameIsMine = false;
+// Opening time (unix seconds) of the selected game when it is a scheduled
+// round that cannot be joined yet; null otherwise.
+let selectedGameOpensAt = null;
+let lastDueRefreshMs = 0;
 let displayNameUserEdited = false;
 let authState = {
   isAuthenticated: false,
@@ -181,9 +207,15 @@ function renderLobbyLastGameHighscores(snapshot = null) {
 function updateJoinButtonState() {
   if (!joinSelectedBtn) return;
   const canJoin = authState.isAuthenticated && Boolean(selectedGameId);
-  joinSelectedBtn.disabled = !canJoin;
-  joinSelectedBtn.textContent =
-    canJoin && selectedGameIsMine ? 'Rejoin' : 'Enter game';
+  if (selectedGameId && selectedGameOpensAt !== null) {
+    // Scheduled round: visible and selectable, but not joinable yet.
+    joinSelectedBtn.disabled = true;
+    joinSelectedBtn.textContent = `Opens at ${formatOpensAtShort(selectedGameOpensAt)}`;
+  } else {
+    joinSelectedBtn.disabled = !canJoin;
+    joinSelectedBtn.textContent =
+      canJoin && selectedGameIsMine ? 'Rejoin' : 'Enter game';
+  }
 
   if (openResultsBtn) {
     openResultsBtn.disabled = !authState.isAuthenticated;
@@ -257,103 +289,76 @@ function setAuthenticatedSession(payload) {
   updateJoinButtonState();
 }
 
+function resetSelection() {
+  selectedGameId = '';
+  selectedGameIsMine = false;
+  selectedGameOpensAt = null;
+}
+
 function clearOpenGames() {
   if (!openGamesListEl) return;
+  stopScheduledCountdown();
   openGamesListEl.replaceChildren();
-  selectedGameId = '';
+  openGamesListEl.removeAttribute('role');
+  resetSelection();
   updateJoinButtonState();
+}
+
+/** Opening time in unix seconds for a selected scheduled game, else null. */
+function opensAtSecondsOf(game) {
+  return game?.isScheduled && game.opensAtMs !== null
+    ? Math.round(game.opensAtMs / 1000)
+    : null;
+}
+
+function handleGameSelected(game) {
+  selectedGameId = game.gameId;
+  selectedGameIsMine = Boolean(game.myPlayerId);
+  selectedGameOpensAt = opensAtSecondsOf(game);
+  let message;
+  if (game.isScheduled) {
+    message =
+      selectedGameOpensAt === null
+        ? `Selected ${game.gameId}. This round has not opened yet.`
+        : `Selected ${game.gameId}. It opens at ${formatLocalDateTime(selectedGameOpensAt)}; you can join then.`;
+  } else if (game.myPlayerId) {
+    message = `Selected ${game.gameId}. Rejoin to continue with your player.`;
+  } else {
+    message = `Selected ${game.gameId}. You can now enter the game.`;
+  }
+  setLobbyMessage(message, game.isScheduled ? 'info' : 'success');
+  updateJoinButtonState();
+}
+
+/** A scheduled round's countdown reached 0: reload so it shows as enrolling. */
+function handleScheduledGameDue() {
+  const now = Date.now();
+  if (now - lastDueRefreshMs < DUE_REFRESH_MIN_INTERVAL_MS) return;
+  lastDueRefreshMs = now;
+  void refreshOpenGames();
 }
 
 function renderOpenGames(games = []) {
   if (!openGamesListEl) return;
-  const previouslySelectedGameId = selectedGameId;
-  openGamesListEl.replaceChildren();
-
-  if (!games.length) {
-    selectedGameId = '';
-    selectedGameIsMine = false;
-    updateJoinButtonState();
-    const emptyItem = document.createElement('li');
-    emptyItem.className = 'game-list-empty';
-    emptyItem.textContent = 'No joinable games right now.';
-    openGamesListEl.appendChild(emptyItem);
-    return;
-  }
-
-  let selectedStillAvailable = false;
-
-  games.forEach((rawGame) => {
-    const game = normalizeGameItem(rawGame);
-    if (!game.gameId) return;
-
-    const row = document.createElement('li');
-    row.className = 'game-list-item';
-    row.dataset.gameId = game.gameId;
-    if (game.myPlayerId) {
-      row.dataset.myPlayerId = game.myPlayerId;
-    }
-    if (game.gameId === previouslySelectedGameId) {
-      row.classList.add('selected');
-      selectedStillAvailable = true;
-      selectedGameIsMine = Boolean(game.myPlayerId);
-    }
-
-    const left = document.createElement('div');
-    left.className = 'game-list-main';
-
-    const title = document.createElement('div');
-    title.className = 'game-id';
-    title.textContent = `${game.roundTypeLabel} • ${game.scoringModeLabel}`;
-    if (game.myPlayerId) {
-      const chip = document.createElement('span');
-      chip.className = 'game-mine-chip';
-      chip.textContent = 'You joined';
-      title.appendChild(chip);
-    }
-
-    const subtitle = document.createElement('div');
-    subtitle.className = 'game-subtitle';
-    subtitle.textContent = `${game.tradeCountLabel} • ${game.playersCount} player${game.playersCount === 1 ? '' : 's'} • ${game.remainingLabel}`;
-
-    left.appendChild(title);
-    left.appendChild(subtitle);
-
-    const badge = document.createElement('span');
-    const badgeMeta = buildGameStatusBadge(game.status);
-    badge.className = badgeMeta.className;
-    badge.textContent = badgeMeta.text;
-
-    row.appendChild(left);
-    row.appendChild(badge);
-
-    row.addEventListener('click', () => {
-      selectedGameId = game.gameId;
-      selectedGameIsMine = Boolean(game.myPlayerId);
-      Array.from(openGamesListEl.querySelectorAll('.game-list-item')).forEach(
-        (item) => {
-          item.classList.toggle('selected', item === row);
-        }
-      );
-      setLobbyMessage(
-        game.myPlayerId
-          ? `Selected ${game.gameId}. Rejoin to continue with your player.`
-          : `Selected ${game.gameId}. You can now enter the game.`,
-        'success'
-      );
-      updateJoinButtonState();
-    });
-
-    openGamesListEl.appendChild(row);
+  const selectedGame = renderLobbyGameList(openGamesListEl, games, {
+    selectedGameId,
+    onSelect: handleGameSelected,
   });
-
-  if (!selectedStillAvailable) {
-    selectedGameId = '';
-    selectedGameIsMine = false;
+  if (selectedGame) {
+    selectedGameIsMine = Boolean(selectedGame.myPlayerId);
+    selectedGameOpensAt = opensAtSecondsOf(selectedGame);
+  } else {
+    resetSelection();
   }
+  startScheduledCountdown(openGamesListEl, handleScheduledGameDue);
   updateJoinButtonState();
 }
 
-async function refreshOpenGames({ showSuccess = false } = {}) {
+/**
+ * Reload /games/active. `quiet` keeps the current lobby message (used after a
+ * join error whose explanation must stay visible).
+ */
+async function refreshOpenGames({ showSuccess = false, quiet = false } = {}) {
   let baseUrl;
   try {
     baseUrl = getBackendUrlOrThrow();
@@ -367,10 +372,17 @@ async function refreshOpenGames({ showSuccess = false } = {}) {
   try {
     const rawGames = await fetchOpenGames(baseUrl, { authToken });
     const joinableGames = rawGames.filter((game) => canJoinFromLobby(game));
-    renderOpenGames(joinableGames);
-    if (showSuccess || authState.isAuthenticated) {
+    // Scheduled rounds are listed (as Upcoming) but are not joinable yet.
+    const upcomingGames = rawGames.filter(
+      (game) => readGameStatus(game) === 'scheduled'
+    );
+    renderOpenGames([...joinableGames, ...upcomingGames]);
+    if (!quiet && (showSuccess || authState.isAuthenticated)) {
+      const upcomingNote = upcomingGames.length
+        ? ` ${upcomingGames.length} upcoming.`
+        : '';
       setLobbyMessage(
-        `Loaded ${joinableGames.length} open game${joinableGames.length === 1 ? '' : 's'}.`,
+        `Loaded ${joinableGames.length} open game${joinableGames.length === 1 ? '' : 's'}.${upcomingNote}`,
         'success'
       );
     }
@@ -394,7 +406,7 @@ function refreshOnPageVisible() {
 }
 
 function canJoinFromLobby(rawGame) {
-  const status = String(rawGame?.game_status || '').toLowerCase();
+  const status = readGameStatus(rawGame);
   if (status !== 'enrolling' && status !== 'running') {
     return false;
   }
@@ -433,6 +445,13 @@ async function handleJoinSelectedGame() {
   }
   if (!selectedGameId) {
     setLobbyMessage('Select an open game first.', 'error');
+    return;
+  }
+  if (selectedGameOpensAt !== null) {
+    setLobbyMessage(
+      `This round has not opened yet. It opens at ${formatLocalDateTime(selectedGameOpensAt)}.`,
+      'info'
+    );
     return;
   }
 
@@ -497,6 +516,20 @@ function handleJoinError(error) {
   if (error?.code === 'ACCOUNT_AUTH_INVALID') {
     expireStoredSession();
     setLobbyMessage('Please sign in again to join this game.', 'error');
+    return;
+  }
+  if (error?.code === JOIN_NOT_ALLOWED_SCHEDULED) {
+    // The list was stale (the round is still scheduled): explain and reload
+    // it so the row shows its countdown and the button its opening time.
+    const opensAt = normalizeUnixSeconds(error.opensAt);
+    setLobbyMessage(
+      opensAt === null
+        ? 'This round has not opened yet.'
+        : `This round has not opened yet. It opens at ${formatLocalDateTime(opensAt)}.`,
+      'info'
+    );
+    updateJoinButtonState();
+    void refreshOpenGames({ quiet: true });
     return;
   }
   const message =
@@ -701,7 +734,7 @@ async function handleChangePasswordSubmit(event) {
   setChangePasswordMessage('', 'info');
   changePasswordDialog?.close();
   clearAuthSessionData();
-  selectedGameId = '';
+  resetSelection();
   setAuthenticatedSession({ access_token: '' });
   setAuthMessage(
     'Password changed. Please sign in again with your new password.',
@@ -738,7 +771,7 @@ async function handleLogoutClick() {
   const authToken = String(authState.token || '').trim();
   if (!authToken) {
     clearAuthSessionData();
-    selectedGameId = '';
+    resetSelection();
     setAuthenticatedSession({ access_token: '' });
     setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
     setLobbyMessage(
@@ -765,13 +798,9 @@ async function handleLogoutClick() {
   }
 
   clearAuthSessionData();
-  selectedGameId = '';
+  resetSelection();
   setAuthenticatedSession({ access_token: '' });
-  Array.from(
-    openGamesListEl?.querySelectorAll('.game-list-item.selected') || []
-  ).forEach((item) => {
-    item.classList.remove('selected');
-  });
+  if (openGamesListEl) markSelectedRow(openGamesListEl, null);
   setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
   setLobbyMessage(
     'You are logged out. Open games keep auto-refreshing.',
@@ -827,19 +856,15 @@ function hydrateFromStorage() {
  */
 function handleAccountDeleted() {
   clearAuthSessionData();
-  selectedGameId = '';
+  resetSelection();
   setAuthenticatedSession({ access_token: '' });
-  Array.from(
-    openGamesListEl?.querySelectorAll('.game-list-item.selected') || []
-  ).forEach((item) => {
-    item.classList.remove('selected');
-  });
+  if (openGamesListEl) markSelectedRow(openGamesListEl, null);
   setAuthMessage(ACCOUNT_DELETED_MESSAGE, 'success');
 }
 
 function expireStoredSession() {
   clearAuthSessionData();
-  selectedGameId = '';
+  resetSelection();
   setAuthenticatedSession({ access_token: '' });
   setAuthMessage('Your session has expired. Please sign in again.', 'error');
 }
@@ -959,6 +984,7 @@ function bindEvents() {
       ).trim();
     }
   });
+  if (openGamesListEl) bindLobbyGameListKeyboard(openGamesListEl);
   joinSelectedBtn?.addEventListener('click', () => {
     void handleJoinSelectedGame();
   });

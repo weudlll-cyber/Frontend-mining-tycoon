@@ -108,6 +108,15 @@ function buildDom({
     <input id="admin-anchor-rate" type="number" value="" />
     <input id="admin-season-cycles" type="number" value="" />
 
+    <fieldset id="admin-schedule-fields">
+      <input id="admin-start-now" type="radio" name="admin-start-mode" value="now" checked />
+      <input id="admin-start-scheduled" type="radio" name="admin-start-mode" value="scheduled" />
+      <div id="admin-scheduled-start-row" hidden>
+        <input id="admin-scheduled-start" type="datetime-local" />
+        <p id="admin-scheduled-start-zone"></p>
+        <p id="admin-scheduled-start-hint"></p>
+      </div>
+    </fieldset>
     <div id="admin-sync-fields"></div>
     <div id="admin-async-fields" class="hidden-section"></div>
     <p id="admin-game-config-source"></p>
@@ -899,6 +908,136 @@ describe('farming options (Stage 1)', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(doc.getElementById('admin-result-box').textContent).toBe(
       '❌ Farming minimum duration (5m) must be shorter than the round/session duration (5m).'
+    );
+  });
+});
+
+// ── Scheduled sync rounds ("Start now" / "Schedule start") ──────────────────
+
+import { toDateTimeLocalValue } from '../utils/schedule-time.js';
+
+function chooseScheduledStart(doc, unixSeconds) {
+  doc.getElementById('admin-start-scheduled').checked = true;
+  doc.getElementById('admin-scheduled-start').value =
+    toDateTimeLocalValue(unixSeconds);
+  doc
+    .getElementById('admin-start-scheduled')
+    .dispatchEvent(new window.Event('change'));
+}
+
+describe('scheduled start (sync rounds)', () => {
+  // Whole minutes, because the datetime-local value has minute precision.
+  const inTwoHours = () => Math.floor(Date.now() / 60000) * 60 + 2 * 3600 + 900;
+
+  it('sends no scheduled_start_at for "Start now" and shows "Starts: Now"', () => {
+    buildDom({ roundType: 'sync' });
+    expect(buildGamePayload()).not.toHaveProperty('scheduled_start_at');
+    expect(Object.fromEntries(buildReviewSummary()).Starts).toMatch(/^Now/);
+  });
+
+  it('converts the local date-time to unix seconds and adds the review row', () => {
+    const dom = buildDom({ roundType: 'sync' });
+    init();
+    const doc = dom.window.document;
+    const start = inTwoHours();
+    chooseScheduledStart(doc, start);
+
+    expect(buildGamePayload().scheduled_start_at).toBe(start);
+    const starts = Object.fromEntries(buildReviewSummary()).Starts;
+    expect(starts).toMatch(/\(in 2 h 1\d min\)$/);
+    expect(doc.getElementById('admin-scheduled-start-row').hidden).toBe(false);
+    expect(
+      doc.getElementById('admin-scheduled-start-zone').textContent
+    ).toMatch(/Your time zone: .*UTC[+-]\d\d:\d\d/);
+    expect(doc.getElementById('admin-scheduled-start').min).not.toBe('');
+    // The review list in the DOM carries the same row.
+    expect(doc.getElementById('admin-review-dl').textContent).toContain(
+      'Starts'
+    );
+  });
+
+  it('rejects a start in the past or beyond max_days_ahead before sending', async () => {
+    const dom = buildDom({ roundType: 'sync' });
+    init();
+    const doc = dom.window.document;
+    chooseScheduledStart(doc, Math.floor(Date.now() / 1000) - 3600);
+    expect(() => buildGamePayload()).toThrow('at least 1 minute');
+    expect(doc.getElementById('admin-scheduled-start-hint').dataset.kind).toBe(
+      'error'
+    );
+    expect(Object.fromEntries(buildReviewSummary()).Starts).toContain('⚠');
+
+    chooseScheduledStart(doc, Math.floor(Date.now() / 1000) + 31 * 86400);
+    expect(() => buildGamePayload()).toThrow('at most 30 days ahead');
+
+    doc.getElementById('admin-scheduled-start').value = '';
+    globalThis.fetch = vi.fn();
+    await createRound();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(doc.getElementById('admin-result-box').textContent).toContain(
+      'Choose a date and time'
+    );
+  });
+
+  it('honours scheduling.max_days_ahead from the effective game config', () => {
+    const dom = buildDom({ roundType: 'sync' });
+    setGameConfigDocument({
+      version: 99,
+      config: { scheduling: { max_days_ahead: 2 } },
+    });
+    try {
+      init();
+      chooseScheduledStart(
+        dom.window.document,
+        Math.floor(Date.now() / 1000) + 3 * 86400
+      );
+      expect(() => buildGamePayload()).toThrow('at most 2 days ahead');
+    } finally {
+      setGameConfigDocument(null);
+    }
+  });
+
+  it('hides the start option and never sends it for async rounds', () => {
+    const dom = buildDom({ roundType: 'async' });
+    const doc = dom.window.document;
+    init();
+    doc.getElementById('admin-round-type-sync').checked = false;
+    doc.getElementById('admin-round-type-async').checked = true;
+    chooseScheduledStart(doc, inTwoHours());
+    doc
+      .getElementById('admin-round-type-async')
+      .dispatchEvent(new window.Event('change'));
+    expect(
+      doc
+        .getElementById('admin-schedule-fields')
+        .classList.contains('hidden-section')
+    ).toBe(true);
+    expect(buildGamePayload()).not.toHaveProperty('scheduled_start_at');
+    expect(Object.fromEntries(buildReviewSummary())).not.toHaveProperty(
+      'Starts'
+    );
+  });
+
+  it('posts scheduled_start_at and confirms the scheduled start', async () => {
+    const dom = buildDom({ roundType: 'sync' });
+    init();
+    const doc = dom.window.document;
+    const start = inTwoHours();
+    chooseScheduledStart(doc, start);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ game_id: 'g-1', scheduled_start_at: start }),
+    });
+
+    await createRound();
+
+    const [, request] = globalThis.fetch.mock.calls.find(([url]) =>
+      String(url).endsWith('/games')
+    );
+    expect(JSON.parse(request.body).scheduled_start_at).toBe(start);
+    expect(doc.getElementById('admin-result-box').textContent).toContain(
+      'Scheduled start:'
     );
   });
 });

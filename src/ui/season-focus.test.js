@@ -69,4 +69,52 @@ describe('season-focus', () => {
     expect(cards[0].classList.contains('season-card-focus-active')).toBe(false);
     expect(buttons[3].getAttribute('aria-selected')).toBe('true');
   });
+
+  it('moves between season tabs with ArrowLeft/ArrowRight/Home/End', () => {
+    const strip = document.createElement('div');
+    const buttons = ['spring', 'summer', 'autumn', 'winter'].map(makeButton);
+    buttons.forEach((button) => strip.appendChild(button));
+    document.body.appendChild(strip);
+    const cards = ['spring', 'summer', 'autumn', 'winter'].map(makeCard);
+    initSeasonFocus({
+      stripEl: strip,
+      buttons,
+      cards,
+      defaultSeason: 'spring',
+    });
+
+    // Roving tabindex: only the active tab is in the Tab order.
+    expect(buttons.map((button) => button.tabIndex)).toEqual([0, -1, -1, -1]);
+
+    const press = (target, key) => {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(event);
+      return event;
+    };
+
+    expect(press(buttons[0], 'ArrowRight').defaultPrevented).toBe(true);
+    expect(getFocusedSeason()).toBe('summer');
+    expect(document.activeElement).toBe(buttons[1]);
+    expect(buttons[1].getAttribute('aria-selected')).toBe('true');
+    expect(buttons.map((button) => button.tabIndex)).toEqual([-1, 0, -1, -1]);
+
+    press(buttons[1], 'End');
+    expect(getFocusedSeason()).toBe('winter');
+    press(buttons[3], 'ArrowRight');
+    expect(getFocusedSeason()).toBe('spring');
+    press(buttons[0], 'ArrowLeft');
+    expect(getFocusedSeason()).toBe('winter');
+    press(buttons[3], 'Home');
+    expect(getFocusedSeason()).toBe('spring');
+    expect(document.activeElement).toBe(buttons[0]);
+
+    // Other keys and events from outside the tabs are ignored.
+    expect(press(buttons[0], 'ArrowDown').defaultPrevented).toBe(false);
+    expect(press(strip, 'ArrowRight').defaultPrevented).toBe(false);
+    expect(getFocusedSeason()).toBe('spring');
+  });
 });

@@ -192,6 +192,42 @@ describe('player live board wiring', () => {
     expect(headerTag.textContent).toBe('Final');
   });
 
+  it('shows a scheduled round as "Scheduled — opens at" and keeps actions gated', async () => {
+    useMicrotaskAnimationFrames();
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    // 2026-10-08 18:30 local time; the labels below are local-time strings.
+    const opensAt = Math.floor(new Date(2026, 9, 8, 18, 30).getTime() / 1000);
+
+    deps.onData({
+      game_id: 7,
+      player_id: 3,
+      game_status: 'scheduled',
+      scheduled_start_at: opensAt,
+    });
+    await Promise.resolve();
+
+    const headerTag = document.getElementById('standings-status');
+    expect(headerTag.textContent).toBe('Scheduled');
+    expect(headerTag.dataset.standingsState).toBe('scheduled');
+    expect(
+      document.getElementById('leaderboard-standings-status').textContent
+    ).toMatch(/^Scheduled — opens at .*18:30/);
+    expect(document.getElementById('game-status').textContent).toMatch(
+      /^Scheduled — opens at (.* )?18:30$/
+    );
+    expect(document.getElementById('countdown-label').textContent).toBe(
+      'Round opens at'
+    );
+    expect(document.getElementById('countdown').textContent).toMatch(/18:30$/);
+    // Upgrades, trades and farming stay disabled until the round opens.
+    const lifecycle = await import('./ui/live-board-lifecycle.js');
+    expect(lifecycle.getPlayerActionAvailability()).toMatchObject({
+      allowed: false,
+      reason: 'The round has not opened yet.',
+    });
+  });
+
   it('keeps the ticking countdown out of screen-reader announcements', () => {
     const summary = document.querySelector('.game-summary-line');
     expect(summary.hasAttribute('aria-live')).toBe(false);

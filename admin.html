@@ -381,6 +381,22 @@ Security notes:
         margin-bottom: 1rem;
       }
 
+      .schedule-fieldset {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.75rem 1rem;
+        margin-top: 1rem;
+      }
+
+      .schedule-fieldset legend {
+        font-weight: 600;
+      }
+
+      #admin-scheduled-start-hint[data-kind='error'] {
+        color: var(--danger);
+        font-style: normal;
+      }
+
       .gc-fieldset legend {
         font-weight: 600;
         font-size: 0.9rem;
@@ -636,6 +652,55 @@ Security notes:
           </div>
         </div>
       </div>
+
+      <!-- Start option (sync only): start now or schedule the start.
+           Wired by src/admin/schedule-options.js. -->
+      <fieldset id="admin-schedule-fields" class="schedule-fieldset">
+        <legend>Start</legend>
+        <div class="radio-group" role="radiogroup" aria-label="Start">
+          <label class="radio-option" for="admin-start-now">
+            <input
+              id="admin-start-now"
+              name="admin-start-mode"
+              type="radio"
+              value="now"
+              checked
+            />
+            <span
+              ><strong>Start now</strong> — the enrollment window opens as soon
+              as the round is created.</span
+            >
+          </label>
+          <label class="radio-option" for="admin-start-scheduled">
+            <input
+              id="admin-start-scheduled"
+              name="admin-start-mode"
+              type="radio"
+              value="scheduled"
+            />
+            <span
+              ><strong>Schedule start</strong> — the round is listed as Upcoming
+              and its enrollment window opens at the chosen time.</span
+            >
+          </label>
+        </div>
+        <div id="admin-scheduled-start-row" class="form-group" hidden>
+          <label for="admin-scheduled-start"
+            >Scheduled start (your local time)</label
+          >
+          <input
+            id="admin-scheduled-start"
+            type="datetime-local"
+            aria-describedby="admin-scheduled-start-zone admin-scheduled-start-hint"
+          />
+          <p id="admin-scheduled-start-zone" class="derived-note"></p>
+          <p
+            id="admin-scheduled-start-hint"
+            class="derived-note"
+            aria-live="polite"
+          ></p>
+        </div>
+      </fieldset>
 
       <!-- Async controls -->
       <div id="admin-async-fields" class="form-grid hidden-section">
@@ -1307,6 +1372,26 @@ Security notes:
           <p class="derived-note">
             When ticked, the backend only lets signed-in accounts join a round
             (it answers ACCOUNT_REQUIRED otherwise).
+          </p>
+        </fieldset>
+
+        <fieldset class="gc-fieldset">
+          <legend>Scheduled rounds</legend>
+          <div class="form-group">
+            <label for="admin-gameconfig-scheduling-max-days"
+              >Max days ahead for scheduled rounds</label
+            >
+            <input
+              id="admin-gameconfig-scheduling-max-days"
+              type="number"
+              min="1"
+              max="365"
+              step="1"
+            />
+          </div>
+          <p class="derived-note">
+            How far ahead the create form's "Schedule start" may be set (sync
+            rounds only).
           </p>
         </fieldset>
 

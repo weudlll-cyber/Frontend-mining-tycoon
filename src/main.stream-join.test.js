@@ -155,4 +155,34 @@ describe('stream start join behavior', () => {
       })
     ).rejects.toThrow('Join failed: Enrollment closed');
   });
+
+  it('keeps the JOIN_NOT_ALLOWED_SCHEDULED code and opens_at on the error', async () => {
+    const module = await loadMainModule();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: async () => ({
+          code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+          detail: 'This round has not opened yet.',
+          opens_at: 1800000000,
+        }),
+      })
+    );
+
+    await expect(
+      module.ensurePlayerJoinedForStream({
+        baseUrl: 'http://127.0.0.1:8000',
+        gameId: 'game-8',
+        playerId: '',
+      })
+    ).rejects.toMatchObject({
+      message: 'Join failed: This round has not opened yet.',
+      status: 409,
+      code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+      opensAt: 1800000000,
+    });
+  });
 });

@@ -101,7 +101,9 @@ Synchronous live event rounds use a fixed host-scheduled start. In this format, 
 
 These round types change when players participate, not how the core economy behaves.
 
-Implementation note (2026-10-07): both formats are implemented. The admin console pre-selects **Sync** as the round type, so sync is the current default in practice. Sync rounds start automatically when the enrollment window ends; a host-scheduled start date/time does not exist yet.
+Implementation note (2026-10-07): both formats are implemented. The admin console pre-selects **Sync** as the round type, so sync is the current default in practice. Sync rounds start automatically when the enrollment window ends.
+
+Implementation note (2026-10-08): host-scheduled sync rounds are implemented in the frontend. The admin can choose "Schedule start" (date and time in the admin's local time zone, up to `scheduling.max_days_ahead` days ahead, default 30); until then the round is listed in the lobby as "Upcoming" with a live countdown and cannot be joined, and its enrollment window opens at the scheduled time (backend-authoritative; needs the matching backend).
 
 ## Determinism & Fairness Across Round Types
 
@@ -194,7 +196,7 @@ Each player runs an identical, time-limited session inside that round. Players m
 Two round formats are part of the agreed model:
 
 - asynchronous challenge rounds (intended main format; the admin console currently pre-selects sync)
-- synchronous live event rounds (host-scheduled; currently they start when the enrollment window ends)
+- synchronous live event rounds (start right away or at a host-scheduled date/time, then run after the enrollment window)
 
 Round conditions are defined at creation and do not change while the round is active.
 This fixed round definition includes `scoring_mode`, selected before round start and applied identically to all players.
@@ -336,4 +338,5 @@ Farming does not introduce player-to-player markets, real-world liquidity pools,
 - Farming is not started; the UI shows a placeholder tab and a status pill.
 - All four scoring modes are evaluated by the backend; the `mining_time` and `efficiency` formulas were confirmed by the owner on 2026-10-07 (see [SCORING_MODES.md](SCORING_MODES.md)).
 - Sync and async rounds, async sessions and best-of scoring are implemented.
+- Scheduled sync rounds (live events with a fixed start date/time) are implemented (2026-10-08): admin "Schedule start", lobby "Upcoming" list with countdown, scheduled status on the player board.
 - Structured playtests for mining pace, upgrade economy and halving behavior are still pending (checklist in [MANUAL_TEST_RUNBOOK.md](MANUAL_TEST_RUNBOOK.md)).

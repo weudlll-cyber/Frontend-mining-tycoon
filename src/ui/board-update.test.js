@@ -125,3 +125,26 @@ describe('cancelPendingUiRender', () => {
     cancelSpy.mockRestore();
   });
 });
+
+describe('showScheduledRoundStatus', () => {
+  it('shows the scheduled phase badge and gates actions without a payload', () => {
+    const gameStatusEl = document.createElement('span');
+    const updateSetupActionsState = vi.fn();
+    boardUpdate.initBoardUpdate({
+      ...deps,
+      gameStatusEl,
+      updateSetupActionsState,
+    });
+    const opensAt = Math.floor(new Date(2026, 9, 9, 9, 15).getTime() / 1000);
+
+    boardUpdate.showScheduledRoundStatus(opensAt);
+    expect(boardState.latestGameStatus).toBe('scheduled');
+    expect(gameStatusEl.textContent).toMatch(/^Scheduled — opens at .*09:15$/);
+    expect(lifecycle.refreshPanelStatus).toHaveBeenCalled();
+    expect(updateSetupActionsState).toHaveBeenCalled();
+
+    // Unknown opening time (no opens_at in the 409): plain "Scheduled".
+    boardUpdate.showScheduledRoundStatus();
+    expect(gameStatusEl.textContent).toBe('Scheduled');
+  });
+});

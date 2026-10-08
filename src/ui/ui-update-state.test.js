@@ -48,6 +48,9 @@ describe('ui-update-state helpers', () => {
     expect(
       resolveCountdownMode({ gameStatus: 'finished', hasActiveSession: false })
     ).toBe('finished');
+    expect(
+      resolveCountdownMode({ gameStatus: 'scheduled', hasActiveSession: false })
+    ).toBe('scheduled');
   });
 
   it('stamps incoming UI data and decides when a frame should schedule', () => {

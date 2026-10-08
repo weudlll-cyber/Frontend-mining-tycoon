@@ -8,7 +8,8 @@
  *          Re-renders the form when /meta loads or the admin saves new
  *          Game Settings (section 11). Per-round options (fee/spread
  *          overrides, chat) live in round-options.js, the Farming Stage 1
- *          options in farming-options.js.
+ *          options in farming-options.js, the sync "Start now / Schedule
+ *          start" option (`scheduled_start_at`) in schedule-options.js.
  *
  * No runtime dependencies on main.js or setup-shell.js; standalone module.
  * Security notes: backend values (game_id) and derived URLs are rendered via
@@ -51,6 +52,13 @@ import {
   buildFarmingReviewRows,
   collectFarmingPayload,
 } from './farming-options.js';
+import {
+  applyScheduleState,
+  bindScheduleInputs,
+  buildScheduleReviewRows,
+  collectSchedulePayload,
+} from './schedule-options.js';
+import { formatLocalDateTime } from '../utils/schedule-time.js';
 import { collectAdvancedOverridesFromInputs } from '../ui/setup-payload.js';
 import { fillPresetSelect } from '../ui/async-duration.js';
 import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
@@ -282,6 +290,8 @@ function applyRoundTypeVisibility() {
   const isAsync = _getSelectedRoundType() === 'async';
   el('admin-sync-fields').classList.toggle('hidden-section', isAsync);
   el('admin-async-fields').classList.toggle('hidden-section', !isAsync);
+  // The start option (now / scheduled) only exists for sync rounds.
+  applyScheduleState(_getSelectedRoundType());
   syncDefaultTradeCount();
   updateReview();
 }
@@ -348,6 +358,7 @@ export function buildReviewSummary() {
   rows.push(['Scoring mode', _scoringLabel(_getSelectedScoringMode())]);
   rows.push(['Duration', _formatSeconds(durationSeconds)]);
 
+  rows.push(...buildScheduleReviewRows(roundType));
   if (roundType === 'sync') {
     rows.push(['Enrollment window', `${_getEnrollmentWindow()}s`]);
   } else {
@@ -442,6 +453,10 @@ export function buildGamePayload() {
     })
   );
 
+  // Sync only: `scheduled_start_at` when "Schedule start" is chosen; throws
+  // when the chosen time is outside the allowed window.
+  Object.assign(payload, collectSchedulePayload(roundType));
+
   // Optional per-round options (fee/spread overrides, chat); throws on
   // invalid overrides, which createRound shows as the error message.
   Object.assign(payload, collectRoundOptionsPayload());
@@ -459,7 +474,10 @@ export function buildGamePayload() {
  * gameId comes from the backend response and joinUrl from window.location,
  * so neither may be interpolated into HTML.
  */
-export function renderCreateSuccess(resultBox, { gameId, joinUrl }) {
+export function renderCreateSuccess(
+  resultBox,
+  { gameId, joinUrl, scheduledStartAt = null }
+) {
   resultBox.className = 'result-box success';
 
   const okLine = document.createElement('div');
@@ -483,7 +501,14 @@ export function renderCreateSuccess(resultBox, { gameId, joinUrl }) {
     link.href = joinUrl;
   }
 
-  resultBox.replaceChildren(okLine, idLine, shareLine, link);
+  const lines = [okLine, idLine];
+  if (scheduledStartAt) {
+    // A scheduled round is listed as Upcoming until its window opens.
+    const scheduleLine = document.createElement('div');
+    scheduleLine.textContent = `Scheduled start: ${formatLocalDateTime(scheduledStartAt)} (your local time). The lobby lists it as Upcoming until then.`;
+    lines.push(scheduleLine);
+  }
+  resultBox.replaceChildren(...lines, shareLine, link);
 }
 
 export function initBackendUrlField() {
@@ -566,7 +591,10 @@ export async function createRound() {
     if (!gameId) throw new Error('Server did not return a game_id.');
 
     const joinUrl = `${window.location.origin}${window.location.pathname.replace('admin.html', 'index.html')}`;
-    renderCreateSuccess(resultBox, { gameId, joinUrl });
+    // Prefer the backend's echo of the scheduled start; fall back to the sent value.
+    const scheduledStartAt =
+      Number(data.scheduled_start_at) || payload.scheduled_start_at || null;
+    renderCreateSuccess(resultBox, { gameId, joinUrl, scheduledStartAt });
   } catch (err) {
     resultBox.className = 'result-box error';
     resultBox.textContent = `❌ ${err.message}`;
@@ -636,6 +664,7 @@ export function init() {
   );
   el('admin-chat-enabled').addEventListener('change', updateReview);
   bindFarmingInputs(updateReview);
+  bindScheduleInputs(_getSelectedRoundType, updateReview);
 
   el('admin-create-btn').addEventListener('click', createRound);
 
