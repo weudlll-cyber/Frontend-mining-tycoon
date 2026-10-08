@@ -206,8 +206,8 @@ Game configuration is strictly **admin-only** and is managed via a separate entr
 
 - Admin setup must remain in **separate modules** (`src/admin/admin-setup.js`, `src/admin/game-management.js`), not mixed into the player workflow.
 - Settings are **snapshot-locked** at round creation: once a round is created, no runtime override is possible (backend-enforced invariant from `LOCKED_DECISIONS.md`).
-- Admin link discoverability: the lobby shows a plain "Admin setup" link; on `player.html` the "+ New Game (Admin)" link is hidden unless `?admin=1` is in the URL. Neither is a security boundary.
-- Permission enforcement is **backend-authoritative**: frontend gating is convenience only; the backend validates the `X-Admin-Token` header (game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on, and the `/admin/*` routes).
+- Admin link discoverability: the lobby shows an "Admin setup" link (labelled "Admin setup (you are an administrator)" for an account with `is_admin`); on `player.html` the "+ New Game (Admin)" link is hidden unless `?admin=1` is in the URL. Neither is a security boundary.
+- Permission enforcement is **backend-authoritative**: frontend gating is convenience only; the backend validates the `X-Admin-Token` header or an administrator account session sent as `Authorization: Bearer` (game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on, and the `/admin/*` routes). The admin console sends the token when its field is filled, otherwise the signed-in administrator's session (`src/admin/admin-session.js`).
 - All admin-facing control data must be imported from `src/config/` (no hardcoded defaults in admin UI).
 
 ### Frontend Admin Controls

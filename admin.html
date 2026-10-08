@@ -7,8 +7,11 @@ Purpose: Admin-only round setup page. Allows operators to create new game rounds
          only) and view aggregated metrics. Create-form options and defaults
          come from the backend game config (GET /meta `game_config`).
 Security notes:
-  - Requires X-Admin-Token header on POST /games when REQUIRE_ADMIN_FOR_GAME_CREATE=true.
+  - Admin requests send X-Admin-Token (token field filled) or the session of a
+    signed-in administrator account as Authorization: Bearer (section 1).
   - Admin token is held in a session-scoped password input only; never persisted to storage.
+  - The administrator account session lives in sessionStorage (this tab only)
+    and is cleared on sign out, expiry or a non-admin answer.
   - This page must NOT be linked from the player-facing app (index.html).
 -->
 <!doctype html>
@@ -131,6 +134,7 @@ Security notes:
       input[type='text'],
       input[type='number'],
       input[type='password'],
+      input[type='search'],
       select {
         padding: 0.45rem 0.6rem;
         border: 1px solid var(--border);
@@ -324,8 +328,13 @@ Security notes:
         font-size: 0.875rem;
       }
 
-      .admin-secondary-btn:hover {
+      .admin-secondary-btn:hover:not(:disabled) {
         background: var(--primary-hover);
+      }
+
+      .admin-secondary-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
 
       .metrics-panel {
@@ -335,6 +344,26 @@ Security notes:
       .metrics-panel h3 {
         font-size: 0.9rem;
         margin-bottom: 0.4rem;
+      }
+
+      .admin-subheading {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin: 1rem 0 0.4rem;
+      }
+
+      .admin-users-search {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .admin-users-pager {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
       }
 
       .section-note {
@@ -435,21 +464,71 @@ Security notes:
     <section class="card" aria-labelledby="section-connection-title">
       <h2 id="section-connection-title">1 — Connection</h2>
       <div class="form-grid">
-        <div class="form-group">
+        <div class="form-group full-width">
           <label for="admin-backend-url">Backend URL</label>
           <input id="admin-backend-url" type="text" autocomplete="off" />
         </div>
+      </div>
+
+      <h3 class="admin-subheading">Sign in as administrator</h3>
+      <p id="admin-account-status" class="derived-note" aria-live="polite">
+        Not signed in as an administrator.
+      </p>
+      <form id="admin-login-form" class="form-grid" novalidate>
         <div class="form-group">
+          <label for="admin-login-username">Username</label>
+          <input
+            id="admin-login-username"
+            type="text"
+            autocomplete="username"
+          />
+        </div>
+        <div class="form-group">
+          <label for="admin-login-password">Password</label>
+          <input
+            id="admin-login-password"
+            type="password"
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="form-group full-width">
+          <button
+            id="admin-login-btn"
+            class="admin-secondary-btn"
+            type="submit"
+          >
+            Sign in
+          </button>
+        </div>
+      </form>
+      <button
+        id="admin-logout-btn"
+        class="admin-secondary-btn"
+        type="button"
+        hidden
+      >
+        Sign out
+      </button>
+      <div
+        id="admin-account-message"
+        class="result-box"
+        aria-live="polite"
+      ></div>
+
+      <h3 class="admin-subheading">or use the admin token</h3>
+      <div class="form-grid">
+        <div class="form-group full-width">
           <label for="admin-token"
             >Admin Token
             <span class="section-note"
-              >(required when REQUIRE_ADMIN_FOR_GAME_CREATE=true)</span
+              >(used instead of the sign-in when filled; required when
+              REQUIRE_ADMIN_FOR_GAME_CREATE=true and nobody is signed in)</span
             ></label
           >
           <input
             id="admin-token"
             type="password"
-            placeholder="Leave blank if server allows open creation"
+            placeholder="Leave blank when signed in or if the server allows open creation"
             autocomplete="off"
           />
         </div>
@@ -1274,6 +1353,73 @@ Security notes:
         class="result-box"
         aria-live="polite"
       ></div>
+    </section>
+
+    <!-- Section 12: Administrators -->
+    <section class="card" aria-labelledby="section-admins-title">
+      <h2 id="section-admins-title">12 — Administrators</h2>
+      <p class="section-note" style="margin-bottom: 0.75rem">
+        Search accounts and grant or remove administrator rights. The backend
+        refuses to remove the last administrator.
+      </p>
+      <p id="admin-users-gate" class="derived-note">
+        Sign in as an administrator or enter the admin token (section 1) to
+        manage administrators.
+      </p>
+      <form id="admin-users-search-form" class="admin-users-search">
+        <label for="admin-users-query" class="visually-hidden"
+          >Search accounts</label
+        >
+        <input
+          id="admin-users-query"
+          type="search"
+          placeholder="Username, display name or email"
+          autocomplete="off"
+        />
+        <button
+          id="admin-users-search-btn"
+          class="admin-secondary-btn"
+          type="submit"
+        >
+          Search
+        </button>
+      </form>
+      <div style="overflow-x: auto">
+        <table id="admin-users-table" class="gc-table" hidden>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Display name</th>
+              <th>Email</th>
+              <th>Admin</th>
+              <th>Active</th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="admin-users-tbody"></tbody>
+        </table>
+      </div>
+      <div class="admin-users-pager">
+        <button
+          id="admin-users-prev"
+          class="admin-secondary-btn"
+          type="button"
+          disabled
+        >
+          ← Previous
+        </button>
+        <span id="admin-users-page" aria-live="polite"></span>
+        <button
+          id="admin-users-next"
+          class="admin-secondary-btn"
+          type="button"
+          disabled
+        >
+          Next →
+        </button>
+      </div>
+      <div id="admin-users-result" class="result-box" aria-live="polite"></div>
     </section>
 
     <script type="module" src="/src/admin/admin-setup.js"></script>

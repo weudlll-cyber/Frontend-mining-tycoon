@@ -10,6 +10,20 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Account-based admin sign-in in the admin console (section 1 "Sign in as
+  administrator": `POST /auth/login`, only accounts with `is_admin` are kept,
+  Sign out via `POST /auth/logout`). Admin requests send `X-Admin-Token` when
+  the token field is filled, otherwise the administrator session as
+  `Authorization: Bearer`; token-only admin works exactly as before. The
+  session is kept in `sessionStorage` (this tab only), re-checked with
+  `/auth/me` on load, reused from the lobby when that account is an
+  administrator, and cleared on sign out, expiry, 401 `ACCOUNT_AUTH_INVALID`
+  and 403 `ADMIN_REQUIRED` with a clear message.
+- Admin console section 12 "Administrators": account search with paging
+  (`GET /admin/users`), "Make admin" / "Remove admin" with confirmation
+  (`PATCH /admin/users/{id}`) and an explanation for 409 `LAST_ADMIN`.
+- The lobby labels the link "Admin setup (you are an administrator)" for
+  administrator accounts.
 - Standings label for leaderboard values: the header (next to `Top`) and the
   Top 5 tab show `Live` while a sync round runs, `Provisional — the round is
   still open.` while an async round is open, and `Final` once the round is

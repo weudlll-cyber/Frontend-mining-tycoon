@@ -3,11 +3,17 @@
  * Purpose: Admin game list with per-row actions: Metrics (per-game counters),
  *          Reset (POST /admin/games/{id}/reset clones the game's settings into
  *          a new game) and Delete.
- * Role in system: Initialised from admin-setup.js; backend enforces admin access.
+ * Role in system: Initialised from admin-setup.js; backend enforces admin access
+ *          (admin token or administrator account session, see admin-session.js).
  * Security notes: backend values are rendered via textContent/createElement;
  *          game IDs are URL-encoded.
  */
 import { adminRequest } from './admin-api.js';
+import {
+  buildAdminAuthHeaders,
+  handleAdminAuthError,
+} from './admin-session.js';
+import { createApiError, readApiError } from '../utils/api-error.js';
 import { showGameMetrics } from './admin-metrics.js';
 
 function el(id) {
@@ -22,8 +28,19 @@ async function getBackendUrl() {
   return url;
 }
 
-async function getAdminToken() {
-  return (el('admin-token')?.value || '').trim();
+function adminHeaders() {
+  return { 'Content-Type': 'application/json', ...buildAdminAuthHeaders() };
+}
+
+/**
+ * Turn a failed admin response into an Error with the backend message; an
+ * expired or non-admin account session is signed out locally first.
+ */
+async function adminResponseError(response) {
+  const fallback = `${response.status} ${response.statusText}`;
+  return handleAdminAuthError(
+    createApiError(await readApiError(response, fallback))
+  );
 }
 
 function formatDuration(seconds) {
@@ -121,27 +138,14 @@ async function fetchAndDisplayGames() {
 
   try {
     const baseUrl = await getBackendUrl();
-    const adminToken = await getAdminToken();
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (adminToken) {
-      headers['X-Admin-Token'] = adminToken;
-    }
 
     const response = await fetch(`${baseUrl}/admin/games`, {
       method: 'GET',
-      headers,
+      headers: adminHeaders(),
     });
 
     if (!response.ok) {
-      let detail = `${response.status} ${response.statusText}`;
-      try {
-        const body = await response.json();
-        if (body.detail) detail = body.detail;
-      } catch {
-        // Ignore JSON parse errors, use fallback detail.
-      }
-      throw new Error(detail);
+      throw await adminResponseError(response);
     }
 
     const data = await response.json();
@@ -271,30 +275,16 @@ async function deleteGame(gameId, buttonEl) {
     buttonEl.textContent = '⏳ Deleting...';
 
     const baseUrl = await getBackendUrl();
-    const adminToken = await getAdminToken();
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (adminToken) {
-      headers['X-Admin-Token'] = adminToken;
-    }
 
     const response = await fetch(
       `${baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
       {
         method: 'DELETE',
-        headers,
+        headers: adminHeaders(),
       }
     );
     if (!response.ok) {
-      let detail = `${response.status} ${response.statusText}`;
-      try {
-        const body = await response.json();
-        if (body.detail) detail = body.detail;
-      } catch (parseErr) {
-        // Ignore JSON parse errors, use fallback detail.
-        void parseErr;
-      }
-      throw new Error(detail);
+      throw await adminResponseError(response);
     }
 
     await response.json();
@@ -358,6 +348,11 @@ export async function resetGame(gameId, buttonEl) {
     buttonEl.disabled = false;
     buttonEl.textContent = '♻ Reset';
   }
+}
+
+/** Reload the game list (e.g. after an administrator signed in). */
+export async function refreshGameList() {
+  await fetchAndDisplayGames();
 }
 
 export function initGameManagement() {

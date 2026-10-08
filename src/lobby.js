@@ -99,6 +99,7 @@ const changePasswordMessageEl = document.getElementById(
 const openResultsBtn = document.getElementById('open-results-dialog');
 const lastGameSummaryEl = document.getElementById('last-game-summary');
 const lastGameHighscoresEl = document.getElementById('last-game-highscores');
+const adminSetupLinkEl = document.getElementById('admin-setup-link');
 
 let lobbyRefreshTimer = null;
 let selectedGameId = '';
@@ -111,6 +112,7 @@ let authState = {
   token: '',
   username: '',
   displayName: '',
+  isAdmin: false,
 };
 
 function setAuthMessage(message, kind = 'info') {
@@ -204,6 +206,18 @@ function updateJoinButtonState() {
   setAccountDataEnabled(authState.isAuthenticated);
 }
 
+/**
+ * Make the "Admin setup" link stand out for an administrator account.
+ * Convenience only: the admin console and backend enforce admin access.
+ */
+function renderAdminSetupLink(isAdmin) {
+  if (!adminSetupLinkEl) return;
+  adminSetupLinkEl.textContent = isAdmin
+    ? 'Admin setup (you are an administrator)'
+    : 'Admin setup';
+  adminSetupLinkEl.classList.toggle('is-admin-link', isAdmin);
+}
+
 function setAuthenticatedSession(payload) {
   const token = String(
     payload?.access_token || payload?.token || payload?.session_token || ''
@@ -215,12 +229,19 @@ function setAuthenticatedSession(payload) {
     payload?.display_name || payload?.user?.display_name || username || 'Player'
   ).trim();
 
+  // `is_admin` comes from POST /auth/login (`user.is_admin`) or GET /auth/me;
+  // older backends omit it (= not an administrator).
+  const isAdmin =
+    Boolean(token) && (payload?.user?.is_admin ?? payload?.is_admin) === true;
+
   authState = {
     isAuthenticated: Boolean(token),
     token,
     username,
     displayName,
+    isAdmin,
   };
+  renderAdminSetupLink(isAdmin);
 
   setStorageItem(STORAGE_KEYS.authToken, token);
   setStorageItem(STORAGE_KEYS.authUsername, username);
@@ -849,6 +870,7 @@ async function validateStoredSession(token) {
       access_token: token,
       username,
       display_name: displayName,
+      is_admin: user?.is_admin,
     });
     void preferServerLastGame(token);
   } catch (error) {

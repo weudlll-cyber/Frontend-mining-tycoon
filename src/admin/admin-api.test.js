@@ -7,8 +7,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { adminRequest, readAdminConnection } from './admin-api.js';
+import {
+  ADMIN_SESSION_EXPIRED_MESSAGE,
+  getAdminSession,
+  setAdminSession,
+} from './admin-session.js';
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   document.body.innerHTML = `
     <input id="admin-backend-url" value="http://127.0.0.1:8000/" />
     <input id="admin-token" value=" secret " />
@@ -86,5 +92,41 @@ describe('adminRequest', () => {
       status: 400,
       message: 'oracle_spread must be >= 0',
     });
+  });
+
+  it('sends the administrator session as Bearer when no token is set', async () => {
+    document.getElementById('admin-token').value = '';
+    setAdminSession({ token: 'sess-1', name: 'Ada' });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await adminRequest('/admin/metrics');
+
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.headers.Authorization).toBe('Bearer sess-1');
+    expect(options.headers['X-Admin-Token']).toBeUndefined();
+  });
+
+  it('signs out an expired administrator session (401 ACCOUNT_AUTH_INVALID)', async () => {
+    document.getElementById('admin-token').value = '';
+    setAdminSession({ token: 'sess-1', name: 'Ada' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ code: 'ACCOUNT_AUTH_INVALID' }),
+      })
+    );
+
+    await expect(adminRequest('/admin/metrics')).rejects.toMatchObject({
+      status: 401,
+      message: ADMIN_SESSION_EXPIRED_MESSAGE,
+    });
+    expect(getAdminSession()).toBeNull();
   });
 });

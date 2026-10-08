@@ -3,16 +3,22 @@
  * Purpose: Shared request helper for admin console endpoints (economy, metrics,
  *          game reset). Reads the backend URL and admin token from the
  *          Connection section of admin.html.
- * Role in system: Used by economy-settings.js, admin-metrics.js and
- *          game-management.js; backend enforces admin access (X-Admin-Token).
+ * Role in system: Used by economy-settings.js, admin-metrics.js,
+ *          game-management.js, game-config-settings.js and admin-users.js;
+ *          backend enforces admin access (X-Admin-Token or an administrator
+ *          account session as `Authorization: Bearer`, see admin-session.js).
  * Security notes:
  *  - The admin token is read from the password input per request and never
- *    persisted or logged.
+ *    persisted or logged. The account session token is never logged.
  *  - Backend error payloads are normalized via utils/api-error.js; callers
  *    render the message with textContent only.
  */
 
 import { createApiError, readApiError } from '../utils/api-error.js';
+import {
+  buildAdminAuthHeaders,
+  handleAdminAuthError,
+} from './admin-session.js';
 
 function inputValue(id) {
   return String(document.getElementById(id)?.value || '').trim();
@@ -34,16 +40,17 @@ export function readAdminConnection() {
 /**
  * Call an admin endpoint and return the parsed JSON body.
  * Throws an Error carrying `status` and `code` on non-2xx responses so callers
- * can show the backend's own validation message (400/404/422).
+ * can show the backend's own validation message (400/404/409/422). An expired
+ * or non-admin account session is signed out locally (handleAdminAuthError).
  * @param {string} path - absolute API path, IDs already URL-encoded
  * @param {{ method?: string, body?: object }} [options]
  */
 export async function adminRequest(path, { method = 'GET', body } = {}) {
-  const { baseUrl, adminToken } = readAdminConnection();
-  const headers = { 'Content-Type': 'application/json' };
-  if (adminToken) {
-    headers['X-Admin-Token'] = adminToken;
-  }
+  const { baseUrl } = readAdminConnection();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...buildAdminAuthHeaders(),
+  };
 
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -53,7 +60,9 @@ export async function adminRequest(path, { method = 'GET', body } = {}) {
 
   if (!response.ok) {
     const fallback = `Request failed (${response.status})`;
-    throw createApiError(await readApiError(response, fallback));
+    throw handleAdminAuthError(
+      createApiError(await readApiError(response, fallback))
+    );
   }
   return await response.json();
 }
