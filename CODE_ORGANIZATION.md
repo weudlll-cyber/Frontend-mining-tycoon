@@ -12,9 +12,10 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 | `index.html` | `src/lobby.js` (+ `src/lobby.css`) | Lobby: register / login / logout, `/auth/me` check, forgot-password dialog, open-games list (auto-refresh every 10 s), join, last-game highscores |
 | `player.html` | `src/main.js` (+ `src/style.css`) | Player board for one joined round: SSE stream, season cards, inline upgrades, analytics, live tools window, game-over handling |
 | `how-to-play.html` | none (static, `src/how-to-play.css`) | Player guide: rules, upgrades, halvings, trading, round types, scoring modes, events, live tools; linked from the lobby and the player-board header |
+| `privacy.html`, `imprint.html` | none (static, `src/how-to-play.css`) | Legal page templates for the operator (template banner, `[PLACEHOLDER]` markers); linked from the lobby footer, the registration dialog and the how-to-play footer |
 | `admin.html` | `src/admin/admin-setup.js` (+ `game-management.js`, `economy-settings.js`, `admin-metrics.js`, `game-config-settings.js`, `round-options.js`) | Admin console: 11 sections (connection, round type, time, scoring, trading, advanced overrides, review & create, game management, global economy, metrics, game settings) |
 
-`vite.config.js` declares the four inputs. Static images live in
+`vite.config.js` declares the six inputs. Static images live in
 `public/assets/`.
 
 ## `src/` Layout
@@ -31,7 +32,7 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 | `src/ui/` | Rendering and UI state modules (see below). |
 | `src/utils/` | `api-error.js` (backend error normalization), `score-format.js` (per-mode score formatting), `dom-utils.js` (safe DOM helpers), `storage-utils.js` (localStorage keys, URL normalization), `token-utils.js` (token/pricing helpers), `debug-log.js`. |
 | `src/test-utils/` | Shared test fixtures (`main-test-helpers.js`). |
-| `src/*.test.js` | Cross-module and page-level tests (`main.*`, `lobby`, `how-to-play`, `player-live-board`, `async-session-flow`, `post-game-flow`, `security-rendering`, `layout-*`, `tooltip-parity`). |
+| `src/*.test.js` | Cross-module and page-level tests (`main.*`, `lobby`, `how-to-play`, `legal-pages`, `player-live-board`, `async-session-flow`, `post-game-flow`, `security-rendering`, `layout-*`, `tooltip-parity`). |
 
 ### `src/ui/` modules
 

@@ -645,3 +645,18 @@ dialog::backdrop {
     min-height: 280px;
   }
 }
+
+/* Legal links (privacy notice, imprint) below the lobby panels. */
+.lobby-footer {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--lobby-text-soft);
+}
+
+.lobby-footer a,
+#register-privacy-note a {
+  color: inherit;
+}

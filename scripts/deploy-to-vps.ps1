@@ -125,7 +125,7 @@ try {
     $env:VITE_API_BASE_URL = $ApiBaseUrl
     Invoke-Native "npm" @("run", "build")
 
-    foreach ($page in @("index.html", "player.html", "admin.html", "how-to-play.html")) {
+    foreach ($page in @("index.html", "player.html", "admin.html", "how-to-play.html", "privacy.html", "imprint.html")) {
         if (-not (Test-Path (Join-Path "dist" $page))) {
             throw "Build output is missing dist/$page"
         }

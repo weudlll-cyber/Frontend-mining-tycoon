@@ -57,5 +57,6 @@ seeded in the HTML.
 - [ ] Manual admin create + Game Settings edit + player join sanity pass (`MANUAL_TEST_RUNBOOK.md`)
 
 ## Release Gate
+- [ ] Complete the legal templates `privacy.html` and `imprint.html`: fill every `[PLACEHOLDER]`, check the privacy notice against the deployed configuration (log retention, `AUTH_AUDIT_RETENTION_DAYS`, off-server backups, Google Fonts in `src/lobby.css`), have them reviewed (ideally by a legal professional) and remove the template banners
 - [ ] Production values chosen and saved in Game Settings on the production backend
 - [ ] Final sign-off: defaults approved for production

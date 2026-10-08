@@ -1,7 +1,8 @@
 /*
 File: src/how-to-play.css
-Purpose: Styles for the static "How to play" guide (how-to-play.html).
-Role in system: Loaded only by how-to-play.html; mirrors the lobby palette
+Purpose: Styles for the static "How to play" guide (how-to-play.html) and the
+  legal page templates (privacy.html, imprint.html).
+Role in system: Loaded only by these static pages; mirrors the lobby palette
   (src/lobby.css) so the guide looks like part of the lobby.
 Constraints: No external fonts or CDNs (system font stack only). The guide is a
   normal scrolling document; the no-page-scroll rule applies to player.html only.
@@ -169,6 +170,27 @@ body.page-guide {
 .guide-footer {
   text-align: center;
   color: var(--guide-text-soft);
+}
+
+/* Legal page templates: the banner and placeholders must stay hard to miss
+   until the operator has completed the pages. */
+.legal-template-banner {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--guide-accent);
+  border-radius: 10px;
+  background: rgba(243, 180, 49, 0.14);
+}
+
+.legal-placeholder {
+  background: rgba(243, 180, 49, 0.28);
+  color: var(--guide-text);
+  padding: 0 0.2rem;
+  border-radius: 3px;
+}
+
+.legal-address {
+  font-style: normal;
 }
 
 @media (max-width: 640px) {
