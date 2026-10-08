@@ -1,6 +1,6 @@
 # Code Organization
 
-Current module map of the frontend (verified 2026-10-07). Each source file
+Current module map of the frontend (verified 2026-10-08). Each source file
 starts with a header comment that states its purpose; this page only gives the
 overview. The 2026-03-25 modularity audit that used to live here is archived at
 [docs/history/audits/CODE_ORGANIZATION_AUDIT_2026-03-25.md](docs/history/audits/CODE_ORGANIZATION_AUDIT_2026-03-25.md).
@@ -22,13 +22,13 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 
 | Path | Contents |
 |---|---|
-| `src/main.js` | Player-board orchestrator (about 2,400 lines): wires the modules below, owns stream/session/setup state. Largest file; splitting it is open code-health work. |
+| `src/main.js` | Player-board composition root (about 750 lines): looks up the DOM (`ui/board-dom.js`), initializes the player-board modules below with their elements and callbacks, lazily initializes the render modules, handles `DOMContentLoaded` and re-exports the symbols the page-level tests import. Shared board state lives in `ui/board-state.js`. |
 | `src/lobby.js` | Lobby page logic (auth, open games, join, stores `player_token`). |
 | `src/halving.js` | Pure halving-timeline helpers. |
 | `src/admin/` | `admin-setup.js` (round creation form built from the effective game config, payload, trade schedule preview), `game-management.js` (list / delete / reset active games via `/admin/games`), `economy-settings.js` (`/admin/economy`), `admin-metrics.js` (`/admin/metrics`), `game-config-settings.js` (Game Settings editor, `/admin/game-config`), `round-options.js` (per-round fee/spread overrides and chat option of the create form), `farming-options.js` (Farming Stage 1 options of the create form), `farming-config-fields.js` (farming defaults/limits editors of Game Settings), `admin-api.js` (shared admin request helper). |
 | `src/config/` | Control data. `game-config.js` (effective round-setup config: backend `/meta` `game_config`, else the fallback below; trade-count defaults, unlock schedule, clamp helpers), `game-control-data.js` (fallback duration presets, enrollment and async defaults, scoring modes), `trading-control-data.js` (fallback trade-count limits, default buckets and unlock fractions), `backend-url.js` (`VITE_API_BASE_URL` default), `index.js` (barrel). Tunables live only here. |
 | `src/meta/` | `meta-manager.js`: `/meta` and `/games/{id}/meta` fetch, ETag cache, contract-version support. |
-| `src/services/` | Network flows: `auth-client.js` (`/auth/*`, `/games/active`, join), `game-actions.js` (upgrade and trade requests, 409 handling), `session-actions.js` (async session start, SSE tickets), `stream-controller.js` (EventSource lifecycle, fresh ticket per reconnect, backoff). |
+| `src/services/` | Network flows: `auth-client.js` (`/auth/*`, `/games/active`, join), `game-actions.js` (upgrade and trade requests, 409 handling), `session-actions.js` (async session start, SSE tickets), `stream-controller.js` (EventSource lifecycle, fresh ticket per reconnect, backoff), `player-join.js` (player board: reuse the stored player or join the chosen game). |
 | `src/ui/` | Rendering and UI state modules (see below). |
 | `src/utils/` | `api-error.js` (backend error normalization), `score-format.js` (per-mode score formatting), `dom-utils.js` (safe DOM helpers), `storage-utils.js` (localStorage keys, URL normalization), `token-utils.js` (token/pricing helpers), `debug-log.js`. |
 | `src/test-utils/` | Shared test fixtures (`main-test-helpers.js`). |
@@ -38,9 +38,10 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 
 | Area | Modules |
 |---|---|
+| Player board core (wired by `main.js`) | `board-dom.js` (element lookup), `board-state.js` (shared mutable state: stream flags, game status, active session, game-over tracking), `board-update.js` (stream payload -> UI, frame coalescing, trade/farm results), `live-board-lifecycle.js` (play-window gate, session expiry, board reset), `session-clock.js` (Session Left / Round left timers), `game-over.js` (post-game overlay, last-game snapshot), `start-flow.js` (enter game, async session start, `?autostart=1`), `setup-controller.js` (base URL, round context, async diagnostics, setup-shell sync), `setup-settings.js` (localStorage persistence), `setup-host-controls.js` (hidden legacy host controls, trade schedule preview), `scoring-mode-ui.js`, `meta-debug.js`, `chat-preview.js` (chat dock and unread counters) |
 | Season board | `season-cards.js`, `season-focus.js` (mobile one-card focus), `upgrade-panel-inline.js` (3-lane inline upgrades), `halving-display.js`, `countdown.js` |
 | Analytics | `player-view.js`, `player-view-layout.js`, `player-view-score.js`, `live-summary.js` (header stats, action-bar score) |
-| Live tools window | `live-drawer.js` (floating window, tabs, drag, Escape/outside-click close), `trading-panel.js` + `trading-panel-formatters.js`, `farming-panel.js` + `farming-state.js` (Farm tab, Farming pill, holdings helpers), `chat-panel.js`, `leaderboard.js` (Top 5 tab) |
+| Live tools window | `live-drawer.js` (floating window, tabs, drag, Escape/outside-click close), `trading-panel.js` + `trading-panel-model.js` (pure view-model helpers) + `trading-panel-formatters.js`, `farming-panel.js` + `farming-state.js` (Farm tab, Farming pill, holdings helpers), `chat-panel.js`, `leaderboard.js` (Top 5 tab) |
 | Events | `event-display.js` (`active_events` banner and indicators) |
 | Setup / session | `setup-shell.js`, `setup-state.js`, `setup-payload.js` (shared with admin), `round-context.js`, `async-duration.js`, `async-session-state.js`, `async-diagnostics.js`, `setup-async-diagnostics.js`, `session-timers.js`, `debug-panel-manager.js` |
 | Lobby helpers | `lobby-games.js`, `last-game-highscores.js`, `lobby-results.js` (history/results formatters and DOM builders), `lobby-results-dialog.js` ("My results" dialog controller), `lobby-account-data.js` ("Download my data" and "Delete account" dialog controller) |
@@ -52,6 +53,10 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
   modules in `ui/`, `services/`, `meta/`, `utils/`, `config/` must not import
   them.
 - `utils/` and `config/` import nothing from `ui/` or `services/`.
+- Player-board modules do not import each other in cycles: `board-state.js`
+  imports nothing, and calls that would close a cycle (for example the
+  game-over acknowledgement resetting the board) are injected by `main.js`
+  through the modules' `init*` functions.
 - Network calls belong in `services/` (and `meta/`); `ui/` modules render
   data they are given. Exceptions: `ui/chat-panel.js` owns its WebSocket and
   chat-ticket request, and the admin modules call the admin API directly.

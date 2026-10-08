@@ -389,7 +389,7 @@ for the local gate, required CI checks and scheduled audits. In short:
 
 ```text
 index.html          lobby page            -> src/lobby.js
-player.html         player board          -> src/main.js
+player.html         player board          -> src/main.js (composition root; board modules in src/ui/)
 admin.html          admin console         -> src/admin/admin-setup.js, game-management.js
 how-to-play.html    player guide (static) -> src/how-to-play.css
 privacy.html        privacy notice template (static) -> src/how-to-play.css
