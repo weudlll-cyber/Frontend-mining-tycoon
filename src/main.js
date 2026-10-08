@@ -85,6 +85,7 @@ import { initEventDisplay } from './ui/event-display.js';
 import {
   initMetaManager,
   getGameMeta,
+  getGlobalMeta,
   isContractVersionSupported,
   isActiveContractSupported,
   getActiveUpgradeDefinitions,
@@ -169,6 +170,7 @@ import {
 import {
   initChatPreview,
   handleChatAvailabilityChange,
+  handleChatClearedPreview,
   handleChatMessagePreview,
   handleLiveDrawerStateChange,
   markChatAsRead,
@@ -426,6 +428,12 @@ function initLiveToolsWindow() {
     inputEl: dom.chatInputEl,
     statusEl: dom.chatStatusEl,
     disabledNoteEl: dom.chatDisabledNoteEl,
+    noticeEl: dom.chatNoticeEl,
+    emojiBtnEl: dom.chatEmojiBtnEl,
+    emojiPickerEl: dom.chatEmojiPickerEl,
+    // Curated `/meta` `chat_emoji`; older backends fall back to the built-in list.
+    getEmojiList: () => getGlobalMeta()?.chat_emoji,
+    onCleared: handleChatClearedPreview,
     // `chat_enabled` from the round's game meta (fetched before the stream
     // starts); missing = enabled, as with older backends.
     isChatEnabled: () => isChatEnabledForRound(getGameMeta(gameIdInput?.value)),

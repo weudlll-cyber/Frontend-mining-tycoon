@@ -9,8 +9,16 @@ Constraints:
     `chat_error` with code CHAT_DISABLED from the server) shows "Chat is
     disabled for this round." in the tab, opens no WebSocket and never
     reconnects for that game. A missing `chat_enabled` means enabled.
+  - Moderation: a `chat_error` with code CHAT_MUTED keeps the socket open,
+    shows "You are muted in this round's chat (until HH:MM)." and disables
+    the composer until `muted_until` (unix seconds; null = until the round
+    ends). `chat_cleared` empties the message list and shows a notice.
+  - Emoji picker: inline grid inside the panel (src/ui/chat-emoji-picker.js);
+    the list comes from `/meta` `chat_emoji` with a built-in fallback.
 Security notes: messages and server texts are rendered via textContent only.
 */
+
+import { initChatEmojiPicker } from './chat-emoji-picker.js';
 
 let _panelEl = null;
 let _toggleBtnEl = null;
@@ -19,6 +27,9 @@ let _formEl = null;
 let _inputEl = null;
 let _statusEl = null;
 let _disabledNoteEl = null;
+let _noticeEl = null;
+let _emojiBtnEl = null;
+let _emojiPicker = null;
 
 let _getBaseUrl = null;
 let _getGameId = null;
@@ -31,6 +42,7 @@ let _onPanelVisibilityChanged = null;
 let _manageToggleInternally = true;
 let _isChatEnabled = null;
 let _onAvailabilityChange = null;
+let _onCleared = null;
 
 let _chatSocket = null;
 let _reconnectTimer = null;
@@ -41,8 +53,31 @@ let _chatAuthenticated = false;
 // chat for (CHAT_DISABLED) so a later connectChat() does not try again.
 let _chatDisabled = false;
 let _serverDisabledGameId = '';
+// Moderation mute for the current game (CHAT_MUTED): the composer stays
+// disabled until the timer fires; the socket stays open.
+let _muted = false;
+let _mutedGameId = '';
+let _muteTimer = null;
 
 export const CHAT_DISABLED_TEXT = 'Chat is disabled for this round.';
+export const CHAT_CLEARED_TEXT = 'Chat was cleared by an administrator.';
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/**
+ * Notice text for a CHAT_MUTED error. `mutedUntil` is unix seconds or null
+ * (muted until the round ends).
+ */
+export function formatMuteNotice(mutedUntil) {
+  const seconds = Number(mutedUntil);
+  if (mutedUntil === null || mutedUntil === undefined || !seconds) {
+    return "You are muted in this round's chat (until the round ends).";
+  }
+  const time = new Date(seconds * 1000).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `You are muted in this round's chat (until ${time}).`;
+}
 
 const MAX_RENDERED_MESSAGES = 200;
 
@@ -160,7 +195,8 @@ function normalizeWsBase(baseUrl) {
   return parsed.toString().replace(/\/+$/, '');
 }
 
-function setComposerEnabled(enabled) {
+function setComposerEnabled(requested) {
+  const enabled = requested && !_muted;
   if (_inputEl) {
     _inputEl.disabled = !enabled;
   }
@@ -168,6 +204,77 @@ function setComposerEnabled(enabled) {
   if (submitBtn) {
     submitBtn.disabled = !enabled;
   }
+  if (_emojiBtnEl) {
+    _emojiBtnEl.disabled = !enabled;
+  }
+  if (!enabled) {
+    _emojiPicker?.close();
+  }
+}
+
+function setNotice(text) {
+  if (!_noticeEl) return;
+  _noticeEl.textContent = text;
+  _noticeEl.hidden = !text;
+}
+
+function isSocketReady() {
+  return Boolean(
+    _chatSocket &&
+    _chatSocket.readyState === WebSocket.OPEN &&
+    _chatAuthenticated
+  );
+}
+
+function clearMuteState() {
+  if (_muteTimer) {
+    clearTimeout(_muteTimer);
+    _muteTimer = null;
+  }
+  if (_muted) {
+    _muted = false;
+    _mutedGameId = '';
+    setNotice('');
+  }
+}
+
+function endMute() {
+  clearMuteState();
+  setComposerEnabled(isSocketReady());
+}
+
+/**
+ * CHAT_MUTED: show the notice and disable the composer until `muted_until`.
+ * No reconnect: the server keeps the socket open.
+ */
+function applyMute(payload) {
+  clearMuteState();
+  _muted = true;
+  _mutedGameId = String(_getGameId?.() || '').trim();
+  const mutedUntil = payload?.muted_until ?? null;
+  setNotice(formatMuteNotice(mutedUntil));
+  setComposerEnabled(false);
+  const seconds = Number(mutedUntil);
+  if (mutedUntil !== null && seconds) {
+    const delay = Math.max(0, seconds * 1000 - Date.now());
+    _muteTimer = setTimeout(endMute, Math.min(delay, MAX_TIMER_DELAY_MS));
+  }
+}
+
+function appendSystemNotice(messagesEl, text) {
+  const row = document.createElement('li');
+  row.className = 'chat-message-row chat-message-system';
+  row.setAttribute('role', 'status');
+  row.textContent = text;
+  messagesEl.appendChild(row);
+}
+
+/** chat_cleared: empty the list and tell the player why. */
+function applyChatCleared() {
+  if (!_messagesEl) return;
+  _messagesEl.replaceChildren();
+  appendSystemNotice(_messagesEl, CHAT_CLEARED_TEXT);
+  _onCleared?.();
 }
 
 async function buildChatConnectionInfo() {
@@ -271,6 +378,7 @@ export function disconnectChat() {
   _shouldStayConnected = false;
   _chatAuthenticated = false;
   clearReconnectTimer();
+  clearMuteState();
   closeSocket();
   setComposerEnabled(false);
   setStatus(_chatDisabled ? 'Disabled' : 'Offline', 'idle');
@@ -299,6 +407,9 @@ export async function connectChat() {
   }
   if (_chatDisabled) {
     applyChatDisabledState(false);
+  }
+  if (_muted && gameId !== _mutedGameId) {
+    clearMuteState();
   }
 
   if (_chatSocket && _chatSocket.readyState <= 1) return;
@@ -368,6 +479,16 @@ export async function connectChat() {
       return;
     }
 
+    if (payload?.type === 'chat_error' && payload?.code === 'CHAT_MUTED') {
+      applyMute(payload);
+      return;
+    }
+
+    if (payload?.type === 'chat_cleared') {
+      applyChatCleared();
+      return;
+    }
+
     if (payload?.type === 'chat_error') {
       setStatus('Rate limited', 'warning');
     }
@@ -389,14 +510,11 @@ export async function connectChat() {
 }
 
 function submitCurrentInput() {
-  if (
-    !_chatSocket ||
-    _chatSocket.readyState !== WebSocket.OPEN ||
-    !_chatAuthenticated
-  ) {
+  if (!isSocketReady()) {
     _showToast?.('Chat is offline.', 'info');
     return;
   }
+  if (_muted) return;
 
   const text = String(_inputEl?.value || '').trim();
   if (!text) return;
@@ -419,6 +537,9 @@ export function initChatPanel(deps) {
   _inputEl = deps.inputEl || null;
   _statusEl = deps.statusEl || null;
   _disabledNoteEl = deps.disabledNoteEl || null;
+  _noticeEl = deps.noticeEl || null;
+  _emojiBtnEl = deps.emojiBtnEl || null;
+  _emojiPicker = null;
 
   _getBaseUrl = deps.getBaseUrl;
   _getGameId = deps.getGameId;
@@ -432,12 +553,21 @@ export function initChatPanel(deps) {
   _isChatEnabled =
     typeof deps.isChatEnabled === 'function' ? deps.isChatEnabled : null;
   _onAvailabilityChange = deps.onAvailabilityChange || null;
+  _onCleared = deps.onCleared || null;
   _chatDisabled = false;
   _serverDisabledGameId = '';
+  clearMuteState();
 
   if (!_panelEl || !_toggleBtnEl || !_messagesEl || !_formEl || !_inputEl) {
     return;
   }
+
+  _emojiPicker = initChatEmojiPicker({
+    buttonEl: _emojiBtnEl,
+    pickerEl: deps.emojiPickerEl || null,
+    inputEl: _inputEl,
+    getEmojiList: deps.getEmojiList,
+  });
 
   applyPanelOpenState(false);
   setComposerEnabled(false);

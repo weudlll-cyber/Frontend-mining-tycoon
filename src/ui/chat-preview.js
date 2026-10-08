@@ -2,9 +2,9 @@
 File: src/ui/chat-preview.js
 Purpose: Compact chat preview dock and unread counters of the player board.
 Role in system:
-- Upstream: chat messages from chat-panel.js (`onMessage`), the round's chat
-  option (`onAvailabilityChange`) and live tools window state changes
-  (live-drawer.js `onStateChanged`).
+- Upstream: chat messages from chat-panel.js (`onMessage`), moderation clears
+  (`onCleared`), the round's chat option (`onAvailabilityChange`) and live
+  tools window state changes (live-drawer.js `onStateChanged`).
 - Downstream: the unread badge on the chat button, the dock unread counter
   and the one-line dock preview text.
 Constraints:
@@ -14,6 +14,7 @@ Security notes: message text is rendered via textContent only.
 */
 
 import {
+  CHAT_CLEARED_TEXT,
   CHAT_DISABLED_TEXT,
   resolveChatUserLabel,
   setChatPanelOpen,
@@ -74,6 +75,14 @@ export function handleChatMessagePreview(message) {
     chatUnreadCount += 1;
   }
 
+  renderChatPreviewState();
+}
+
+// Moderation: an administrator cleared the chat, so the dock must not keep
+// showing a removed message or count it as unread.
+export function handleChatClearedPreview() {
+  lastChatPreview = CHAT_CLEARED_TEXT;
+  chatUnreadCount = 0;
   renderChatPreviewState();
 }
 

@@ -1,6 +1,7 @@
 /**
  * File: src/admin/game-management.js
  * Purpose: Admin game list with per-row actions: Metrics (per-game counters),
+ *          Chat (moderation panel in section 13, see chat-moderation.js),
  *          Reset (POST /admin/games/{id}/reset clones the game's settings into
  *          a new game) and Delete.
  * Role in system: Initialised from admin-setup.js; backend enforces admin access
@@ -15,6 +16,7 @@ import {
 } from './admin-session.js';
 import { createApiError, readApiError } from '../utils/api-error.js';
 import { showGameMetrics } from './admin-metrics.js';
+import { initChatModeration, showChatModeration } from './chat-moderation.js';
 
 function el(id) {
   return document.getElementById(id);
@@ -230,11 +232,15 @@ async function fetchAndDisplayGames() {
       const metricsBtn = createRowButton('📊 Metrics', 'var(--primary)', () =>
         showGameMetrics(game.game_id)
       );
+      const chatBtn = createRowButton('💬 Chat', '#0f766e', () =>
+        showChatModeration(game.game_id)
+      );
       const resetBtn = createRowButton('♻ Reset', '#d97706', () =>
         resetGame(game.game_id, resetBtn)
       );
 
       actionCell.appendChild(metricsBtn);
+      actionCell.appendChild(chatBtn);
       actionCell.appendChild(resetBtn);
       actionCell.appendChild(deleteBtn);
 
@@ -356,6 +362,7 @@ export async function refreshGameList() {
 }
 
 export function initGameManagement() {
+  initChatModeration();
   const refreshBtn = el('admin-refresh-games-btn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', fetchAndDisplayGames);

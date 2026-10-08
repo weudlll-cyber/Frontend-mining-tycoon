@@ -10,6 +10,22 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Chat emoji picker: an emoji button next to the chat input opens a small
+  inline, keyboard-operable picker inside the Chat tab (arrow keys / Home /
+  End, Escape closes only the picker, emoji names as aria-labels) and inserts
+  the emoji at the cursor. The list comes from `/meta` `chat_emoji`, with a
+  built-in fallback for backends without it (`src/ui/chat-emoji-picker.js`).
+- Chat moderation for players: `chat_error` `CHAT_MUTED` shows "You are muted
+  in this round's chat (until HH:MM)." and disables the composer until
+  `muted_until` (socket stays open, no reconnect); `chat_cleared` empties the
+  message list and shows "Chat was cleared by an administrator.", also in the
+  preview dock.
+- Admin console section 13 "Chat Moderation", opened per game with the new
+  "💬 Chat" action in Game Management: active mutes with Unmute, mute a player
+  (picker from the game's leaderboard, player ID fallback) for 15 min / 1 h /
+  24 h / until the round ends, and "Clear chat" with confirmation
+  (`/admin/games/{id}/chat/mute|mutes|clear`, `src/admin/chat-moderation.js`).
+
 - Account-based admin sign-in in the admin console (section 1 "Sign in as
   administrator": `POST /auth/login`, only accounts with `is_admin` are kept,
   Sign out via `POST /auth/logout`). Admin requests send `X-Admin-Token` when
