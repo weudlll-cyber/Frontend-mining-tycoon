@@ -309,8 +309,11 @@ describe('editing and saving', () => {
     $('scheduling-max-days').value = '0';
     await saveGameConfigSettings();
     expect(resultText()).toContain(
-      'Max days ahead for scheduled rounds must be at least 1.'
+      'Max days ahead for scheduled rounds must be between 1 and 365.'
     );
+    $('scheduling-max-days').value = '366';
+    await saveGameConfigSettings();
+    expect(resultText()).toContain('between 1 and 365');
 
     $('scheduling-max-days').value = 'abc';
     await saveGameConfigSettings();

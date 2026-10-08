@@ -983,7 +983,7 @@ describe('lobby scheduled rounds (Upcoming)', () => {
   const NOW_MS = Date.now();
   const SCHEDULED_GAME = {
     game_id: 'sched-1',
-    status: 'scheduled',
+    game_status: 'scheduled',
     round_type: 'synchronous',
     scoring_mode: 'stockpile',
     trade_count: 2,

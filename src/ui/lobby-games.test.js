@@ -112,6 +112,19 @@ describe('lobby-games helpers', () => {
     });
   });
 
+  it('treats an opened round as joinable although scheduled_start_at stays set', () => {
+    const opened = normalizeGameItem({
+      game_id: 'o1',
+      game_status: 'enrolling',
+      scheduled_start_at: 1_800_000_000,
+      opens_in_seconds: null,
+      enrollment_remaining_seconds: 30,
+    });
+    expect(opened.isScheduled).toBe(false);
+    expect(opened.opensAtMs).toBeNull();
+    expect(opened.remainingLabel).toContain('Starts in');
+  });
+
   it('reads game_status first and falls back to status', () => {
     expect(
       readGameStatus({ game_status: 'running', status: 'scheduled' })

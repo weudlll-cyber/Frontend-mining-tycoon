@@ -249,8 +249,12 @@ export function validateGameConfigDraft(config) {
     const value = config.trade_unlock[key];
     if (value <= 0 || value > 1) errors.push(`${label} must be > 0 and <= 1.`);
   });
-  if (config.scheduling && config.scheduling.max_days_ahead < 1) {
-    errors.push('Max days ahead for scheduled rounds must be at least 1.');
+  // Backend range for `scheduling.max_days_ahead` is 1..365.
+  const maxDaysAhead = config.scheduling?.max_days_ahead;
+  if (maxDaysAhead !== undefined && (maxDaysAhead < 1 || maxDaysAhead > 365)) {
+    errors.push(
+      'Max days ahead for scheduled rounds must be between 1 and 365.'
+    );
   }
   errors.push(...validateFarmingConfig(config));
   return errors;

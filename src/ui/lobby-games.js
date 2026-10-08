@@ -4,8 +4,10 @@ Purpose: Shared helpers for formatting and normalizing open game records in the 
 Backend contract: GET /games/active items; with an account token each item may
 carry `my_player_id` (the caller's linked player in that game, or null). Older
 backends omit it, which reads as "not joined yet".
-Scheduled sync rounds: items with status `scheduled` (in `game_status` or
-`status`) carry `scheduled_start_at` (unix seconds) and `opens_in_seconds`.
+Scheduled sync rounds: items with `game_status: "scheduled"` (a `status` key
+is accepted as a fallback) carry `scheduled_start_at` (unix seconds) and
+`opens_in_seconds` (null once open). "Upcoming" is decided by the status only:
+`scheduled_start_at` stays set after the round opens.
 They are listed as "Upcoming" but cannot be joined until they open; older
 backends never send them.
 */
