@@ -105,10 +105,12 @@ body.page-admin .page-banner-icon {
   --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   --radius: 8px;
 
-  --status-green: #10b981;
-  --status-yellow: #f59e0b;
-  --status-gray: #9ca3af;
-  --status-blue: #3b82f6;
+  /* Status colors are used as text and as button backgrounds, so they are
+     tuned for WCAG AA (>= 4.5:1 against white and their badge tints). */
+  --status-green: #047857;
+  --status-yellow: #92400e;
+  --status-gray: #4b5563;
+  --status-blue: #2563eb;
 
   /* Right player-status panel fixed width — keeps 2×2 seasons grid from overflowing */
   --player-panel-width: clamp(332px, 26vw, 376px);
@@ -466,7 +468,7 @@ body {
 .async-session-warning {
   display: block;
   font-size: 0.72rem;
-  color: #c8960c; /* amber — readable on both light and dark themes */
+  color: #a16207; /* amber, AA contrast on the light setup panel */
   margin-top: 0.2rem;
 }
 
@@ -800,7 +802,7 @@ body {
 }
 
 .season-halving.season-halving--warning {
-  color: #d97706;
+  color: #b45309;
 }
 
 .season-halving.season-halving--critical {
@@ -1051,7 +1053,7 @@ body {
 }
 
 .upgrade-row-breakeven {
-  color: #f59e0b;
+  color: #b45309;
 }
 
 .upgrade-row-action {
@@ -1108,7 +1110,7 @@ body {
 }
 
 .season-upgrades .btn-upgrade-inline:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #1d4ed8;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
@@ -1133,7 +1135,7 @@ body {
 }
 
 .btn-upgrade-inline:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #1d4ed8;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
@@ -1378,7 +1380,7 @@ body {
 }
 
 .chat-toggle-btn:hover {
-  background-color: #2563eb;
+  background-color: #1d4ed8;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
@@ -1388,7 +1390,7 @@ body {
   min-width: 1.15rem;
   height: 1.15rem;
   border-radius: 999px;
-  background: #ef4444;
+  background: #dc2626;
   color: #fff;
   align-items: center;
   justify-content: center;
@@ -1433,7 +1435,7 @@ body {
   min-width: 1.1rem;
   height: 1.1rem;
   border-radius: 999px;
-  background: #ef4444;
+  background: #dc2626;
   color: #fff;
   align-items: center;
   justify-content: center;
@@ -1466,9 +1468,11 @@ body {
   transform: translateX(-50%);
   z-index: 200;
   width: clamp(340px, 38vw, 560px);
-  min-width: 280px;
+  min-width: min(280px, calc(100vw - 16px));
   min-height: 200px;
-  max-height: 82vh;
+  /* Fit the viewport on phones and after a manual resize. */
+  max-width: calc(100vw - 16px);
+  max-height: min(82vh, calc(100dvh - 16px));
   /* Window chrome — moved here from .live-drawer-surface */
   background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
   border-radius: 10px;
@@ -1825,7 +1829,7 @@ button {
 }
 
 .btn-primary:hover {
-  background-color: #059669;
+  background-color: #065f46;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
@@ -1904,7 +1908,7 @@ button {
 
 .badge-blue {
   background-color: #dbeafe;
-  color: var(--status-blue);
+  color: #1d4ed8;
 }
 
 /* Countdown */
@@ -2606,7 +2610,7 @@ button {
 }
 
 .upgrade-roi {
-  color: #f59e0b;
+  color: #b45309;
   font-weight: 600;
 }
 
@@ -2645,7 +2649,7 @@ button {
 }
 
 .btn-upgrade:hover {
-  background-color: #2563eb;
+  background-color: #1d4ed8;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
@@ -2681,6 +2685,8 @@ button {
   body {
     min-height: auto;
     overflow: auto;
+    /* Vertical page scroll is fine on phones; horizontal scroll is not. */
+    overflow-x: hidden;
   }
 
   #app {
@@ -2851,6 +2857,16 @@ button {
     max-height: 78vh;
   }
 
+  /* 375px phones: tabs and Close wrap instead of overflowing the window. */
+  .live-drawer-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .live-drawer-tabs {
+    flex-wrap: wrap;
+  }
+
   .panel-inline-actions {
     flex-direction: column;
     align-items: stretch;
@@ -2944,5 +2960,176 @@ button {
 
   .player-panel-split {
     min-height: 240px;
+  }
+}
+
+/* ── Standings label (Live / Provisional / Final) ─────────────────────────
+   Rendered by src/ui/standings-status.js. The header tag has a fixed
+   minimum width and is only made invisible (not removed) while empty, so
+   the summary line never shifts when the label appears or changes. */
+.standings-tag {
+  display: inline-block;
+  min-width: 6.25rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.standings-tag[data-standings-state='none'] {
+  visibility: hidden;
+}
+
+.standings-tag[data-standings-state='live'] {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #065f46;
+}
+
+.standings-tag[data-standings-state='provisional'] {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.standings-tag[data-standings-state='final'] {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.standings-note {
+  /* Reserve one line so the Top 5 table does not jump. */
+  min-height: 1.3em;
+  margin: -0.25rem 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.standings-note[data-standings-state='provisional'] {
+  color: #92400e;
+  font-weight: 600;
+}
+
+.standings-note[data-standings-state='final'] {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* ── Toasts (src/ui/toast.js) ──────────────────────────────────────────────
+   Non-blocking: no backdrop, pointer events pass through to the board. */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.toast-region-assertive {
+  bottom: auto;
+  top: 1rem;
+}
+
+.toast {
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius);
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.88rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+  overflow-wrap: anywhere;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
+
+.toast-success {
+  background: #065f46;
+}
+
+.toast-error {
+  background: #991b1b;
+}
+
+/* ── Accessibility ─────────────────────────────────────────────────────────
+   Screen-reader-only text (e.g. the "Time" label next to the ⏱ icon). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visible keyboard focus for every interactive element. Placed last so it
+   wins over the older `outline: none` focus styles on form fields. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role='tab']:focus-visible,
+[role='tabpanel']:focus-visible,
+[tabindex]:focus-visible,
+.form-group input:focus-visible,
+.form-group select:focus-visible,
+.duration-selector select:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+/* Dark post-game card: light focus ring for contrast. */
+.game-over-overlay:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: -6px;
+}
+
+.game-over-results-link:focus-visible {
+  outline: 3px solid #93c5fd;
+}
+
+/* Respect the OS "reduce motion" setting: no fades, slides or hover lifts. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .toast,
+  .btn-primary:hover,
+  .btn-upgrade:hover,
+  .chat-toggle-btn:hover,
+  .btn-upgrade-inline:hover:not(:disabled),
+  .season-upgrades .btn-upgrade-inline:hover:not(:disabled) {
+    transform: none;
   }
 }

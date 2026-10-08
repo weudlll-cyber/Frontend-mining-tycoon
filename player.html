@@ -18,7 +18,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
       <main class="app-layout">
         <header class="card game-header" aria-label="Game header">
           <div class="game-header-top">
-            <h1>⛏️ Mining Tycoon</h1>
+            <h1><span aria-hidden="true">⛏️</span> Mining Tycoon</h1>
             <div class="header-actions">
               <button
                 id="setup-toggle-btn"
@@ -59,12 +59,26 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             </div>
           </div>
 
-          <div class="game-summary-line" aria-live="polite">
+          <!-- No aria-live on the whole line: the countdown ticks every second
+               and must not be announced. Only the phase badge is a polite
+               live region (it changes rarely). -->
+          <div class="game-summary-line">
             <span class="summary-item"
-              >⏱ <span id="countdown" class="summary-value">—</span></span
+              ><span aria-hidden="true">⏱</span
+              ><span class="visually-hidden">Time</span>
+              <span id="countdown" class="summary-value" aria-live="off"
+                >—</span
+              ></span
             >
             <span class="summary-item">
-              Phase: <span id="game-status" class="badge badge-gray">—</span>
+              Phase:
+              <span
+                id="game-status"
+                class="badge badge-gray"
+                role="status"
+                aria-live="polite"
+                >—</span
+              >
             </span>
             <span class="summary-item"
               >Score: <span id="my-score" class="summary-value">—</span></span
@@ -75,6 +89,14 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             <span class="summary-item"
               >Top <span id="top-score" class="summary-value">—</span></span
             >
+            <!-- Live / Provisional / Final label for the rank and score values
+                 (src/ui/standings-status.js). Fixed width, so it never shifts
+                 the summary line. -->
+            <span
+              id="standings-status"
+              class="standings-tag"
+              data-standings-state="none"
+            ></span>
             <span class="summary-item">
               Scoring:
               <span id="scoring-mode-status" class="badge badge-gray"
@@ -107,7 +129,9 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               hidden
             >
               Round left:
-              <span id="round-remaining" class="summary-value">—</span>
+              <span id="round-remaining" class="summary-value" aria-live="off"
+                >—</span
+              >
             </span>
           </div>
 
@@ -604,7 +628,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   data-season="spring"
                 >
                   <div class="season-header">
-                    <h3>🌱 Spring</h3>
+                    <h3><span aria-hidden="true">🌱</span> Spring</h3>
                   </div>
                   <div class="season-body">
                     <div class="season-meta">
@@ -635,7 +659,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   data-season="summer"
                 >
                   <div class="season-header">
-                    <h3>☀️ Summer</h3>
+                    <h3><span aria-hidden="true">☀️</span> Summer</h3>
                   </div>
                   <div class="season-body">
                     <div class="season-meta">
@@ -666,7 +690,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   data-season="autumn"
                 >
                   <div class="season-header">
-                    <h3>🍂 Autumn</h3>
+                    <h3><span aria-hidden="true">🍂</span> Autumn</h3>
                   </div>
                   <div class="season-body">
                     <div class="season-meta">
@@ -697,7 +721,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   data-season="winter"
                 >
                   <div class="season-header">
-                    <h3>❄️ Winter</h3>
+                    <h3><span aria-hidden="true">❄️</span> Winter</h3>
                   </div>
                   <div class="season-body">
                     <div class="season-meta">
@@ -774,7 +798,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                 aria-controls="live-drawer"
                 data-live-tab="chat"
               >
-                💬 Chat
+                <span aria-hidden="true">💬</span> Chat
                 <span id="chat-unread-badge" class="chat-unread-badge" hidden
                   >0</span
                 >
@@ -788,7 +812,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                 aria-controls="live-drawer"
                 data-live-tab="leaderboard"
               >
-                🏆 Top 5
+                <span aria-hidden="true">🏆</span> Top 5
               </button>
             </div>
             <div class="bottom-bar-item trading-status status-pill">
@@ -826,7 +850,12 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
             aria-label="Live board tools"
           >
             <div id="live-drawer-backdrop" class="live-drawer-backdrop"></div>
-            <div class="live-drawer-surface" role="dialog" aria-modal="false">
+            <div
+              class="live-drawer-surface"
+              role="dialog"
+              aria-modal="false"
+              aria-label="Live tools"
+            >
               <div class="live-drawer-header">
                 <div class="live-drawer-tabs" role="tablist" aria-label="Tools">
                   <button
@@ -889,6 +918,8 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   id="live-panel-trade"
                   class="live-drawer-panel"
                   role="tabpanel"
+                  aria-labelledby="live-tab-trade"
+                  tabindex="0"
                   data-live-panel="trade"
                 >
                   <div id="trading-panel" class="trading-panel">
@@ -900,6 +931,8 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   id="live-panel-farm"
                   class="live-drawer-panel"
                   role="tabpanel"
+                  aria-labelledby="live-tab-farm"
+                  tabindex="0"
                   data-live-panel="farm"
                   hidden
                 >
@@ -920,6 +953,8 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   id="live-panel-chat"
                   class="live-drawer-panel"
                   role="tabpanel"
+                  aria-labelledby="live-tab-chat"
+                  tabindex="0"
                   data-live-panel="chat"
                   hidden
                 >
@@ -965,13 +1000,21 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   id="live-panel-leaderboard"
                   class="live-drawer-panel"
                   role="tabpanel"
+                  aria-labelledby="live-tab-leaderboard"
+                  tabindex="0"
                   data-live-panel="leaderboard"
                   hidden
                 >
                   <div class="card leaderboard-card">
                     <h2>Top 5</h2>
-                    <!-- Filled from SSE leaderboard_top_5 by src/ui/leaderboard.js -->
-                    <div id="leaderboard" aria-live="polite">
+                    <p
+                      id="leaderboard-standings-status"
+                      class="standings-note"
+                      data-standings-state="none"
+                    ></p>
+                    <!-- Filled from SSE leaderboard_top_5 by src/ui/leaderboard.js.
+                         Not a live region: scores change on every tick. -->
+                    <div id="leaderboard">
                       <p class="placeholder">Waiting for game data...</p>
                     </div>
                   </div>
