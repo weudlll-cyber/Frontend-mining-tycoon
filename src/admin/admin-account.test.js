@@ -119,6 +119,21 @@ describe('handleAdminLoginSubmit', () => {
     expect(document.getElementById('admin-login-btn').disabled).toBe(false);
   });
 
+  it('reads the backend user_id field', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          user: { user_id: 9, username: 'zoe', is_admin: true },
+          session_token: 'sess-9',
+          expires_at: '2999-01-01T00:00:00Z',
+        })
+      )
+    );
+    await handleAdminLoginSubmit({ preventDefault: vi.fn() });
+    expect(getAdminSession()).toMatchObject({ token: 'sess-9', userId: '9' });
+  });
+
   it('falls back to access_token and the username', async () => {
     vi.stubGlobal(
       'fetch',

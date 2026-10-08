@@ -111,7 +111,7 @@ export async function handleAdminLoginSubmit(event) {
     setAdminSession({
       token,
       name: displayNameOf(payload.user),
-      userId: payload.user.id,
+      userId: payload.user.id ?? payload.user.user_id,
       source: 'admin',
       expiresAt: payload.expires_at,
     });
@@ -178,7 +178,7 @@ export async function restoreAdminSession() {
       setAdminSession({
         token: lobbyToken,
         name: displayNameOf(user),
-        userId: user.id,
+        userId: user.id ?? user.user_id,
         source: 'lobby',
       });
     }
