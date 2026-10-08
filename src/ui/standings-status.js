@@ -8,6 +8,9 @@ Invariants:
 - Async rounds: values are "Provisional" while the round is still open and
   "Final" once the backend reports the round as finished.
 - Sync rounds: values are "Live" while running and "Final" when finished.
+- Scheduled sync rounds (status `scheduled`, before the enrollment window
+  opens) read "Scheduled" with "Scheduled — opens at <time>" as the full
+  sentence (local time from `scheduled_start_at`).
 - The header tag keeps its box (visibility only) so the summary line does not
   shift when the label appears, changes or clears.
 Security notes:
@@ -15,6 +18,10 @@ Security notes:
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
+import {
+  formatLocalDateTime,
+  normalizeUnixSeconds,
+} from '../utils/schedule-time.js';
 
 const STANDINGS_STATES = {
   final: {
@@ -42,11 +49,26 @@ let _refs = { headerTagEl: null, panelNoteEl: null };
  * Async rounds stay provisional for every non-finished status (the round
  * window is still open, other players can still finish their sessions).
  */
-export function resolveStandingsStatus({ roundMode, gameStatus } = {}) {
+export function resolveStandingsStatus({
+  roundMode,
+  gameStatus,
+  scheduledStartAt = null,
+} = {}) {
   const status = String(gameStatus || '')
     .trim()
     .toLowerCase();
   if (!status) return STANDINGS_STATES.none;
+  if (status === 'scheduled') {
+    const opensAt = normalizeUnixSeconds(scheduledStartAt);
+    return {
+      state: 'scheduled',
+      label: 'Scheduled',
+      description:
+        opensAt === null
+          ? 'Scheduled — the round has not opened yet.'
+          : `Scheduled — opens at ${formatLocalDateTime(opensAt)}.`,
+    };
+  }
   if (status === 'finished') return STANDINGS_STATES.final;
   if (roundMode === 'async') return STANDINGS_STATES.provisional;
   if (status === 'running') return STANDINGS_STATES.live;

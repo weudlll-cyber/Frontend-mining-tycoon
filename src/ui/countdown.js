@@ -6,6 +6,10 @@ Call init() once with the display elements before using the other exports.
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
+import {
+  formatOpensAtShort,
+  normalizeUnixSeconds,
+} from '../utils/schedule-time.js';
 
 let _countdownEl = null;
 let _countdownLabelEl = null;
@@ -79,6 +83,23 @@ export function stopCountdownTimer() {
   if (_countdownLabelEl)
     setElementTextValue(_countdownLabelEl, 'Time Remaining');
   if (_countdownEl) setElementTextValue(_countdownEl, '-');
+}
+
+/**
+ * Scheduled sync round (before the enrollment window opens): no ticking
+ * countdown, the header shows when the round opens in local time instead.
+ */
+export function showScheduledOpening(opensAt) {
+  clearCountdownInterval();
+  const opensAtSeconds = normalizeUnixSeconds(opensAt);
+  if (_countdownLabelEl)
+    setElementTextValue(_countdownLabelEl, 'Round opens at');
+  if (_countdownEl) {
+    setElementTextValue(
+      _countdownEl,
+      opensAtSeconds === null ? '-' : formatOpensAtShort(opensAtSeconds)
+    );
+  }
 }
 
 /** Returns the raw interval ID (used by stream-level tear-down). */

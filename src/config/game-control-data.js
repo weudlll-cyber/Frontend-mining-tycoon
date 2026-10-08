@@ -93,6 +93,16 @@ export const ACCOUNT_POLICY_DEFAULTS = Object.freeze({
   require_account_to_join: false,
 });
 
+// ── Scheduled sync rounds ───────────────────────────────────────────────────
+// Fallback for `scheduling.max_days_ahead` when the backend sends no
+// game_config (older backend): how far ahead the admin create form lets a
+// sync round's start be scheduled. The backend validates POST /games.
+export const SCHEDULING_DEFAULTS = Object.freeze({
+  max_days_ahead: 30,
+});
+// The backend rejects a scheduled start sooner than this (seconds from now).
+export const SCHEDULED_START_MIN_LEAD_SECONDS = 60;
+
 // ── Chat ────────────────────────────────────────────────────────────────────
 // Fallback for `defaults.chat_enabled`: an older backend without the key keeps
 // chat on for every round (today's behavior).

@@ -51,6 +51,7 @@ export function deriveStreamSessionState({ activeSession, streamSession }) {
 
 export function resolveCountdownMode({ gameStatus, hasActiveSession }) {
   if (hasActiveSession) return 'session';
+  if (gameStatus === 'scheduled') return 'scheduled';
   if (gameStatus === 'enrolling') return 'enrolling';
   if (gameStatus === 'running') return 'running';
   if (gameStatus === 'finished') return 'finished';

@@ -9,6 +9,8 @@ Role in system:
   - `{ "detail": { "code": "X", "message": "text" } }`
   - `{ "detail": [{ "loc": [...], "msg": "text" }] }` (422 validation errors)
   - `{ "code": "X", "message": "text" }` (top-level error envelope)
+  - `opens_at` (unix seconds) on 409 JOIN_NOT_ALLOWED_SCHEDULED, top-level or
+    inside `detail`, is passed through as `opensAt` (scheduled sync rounds)
 Security notes:
 - Returns plain strings only; callers must render them with textContent.
 - Never includes request bodies, tokens or headers in the message.
@@ -62,6 +64,15 @@ export function extractApiError(payload, fallback) {
   return { message, code: codeFromPayload(payload) };
 }
 
+// Opening time of a scheduled round sent with JOIN_NOT_ALLOWED_SCHEDULED.
+function opensAtFromPayload(payload) {
+  const raw = payload?.opens_at ?? payload?.detail?.opens_at;
+  const value = Number(raw);
+  return raw !== null && raw !== undefined && Number.isFinite(value)
+    ? value
+    : null;
+}
+
 /**
  * Read and normalize an error response body.
  * @param {Response} response
@@ -72,7 +83,13 @@ export async function readApiError(response, fallback) {
   const status = Number(response?.status) || 0;
   try {
     const payload = await response.json();
-    return { ...extractApiError(payload, fallback), status };
+    const opensAt = opensAtFromPayload(payload);
+    // `opensAt` is only added when present so other error shapes stay as-is.
+    return {
+      ...extractApiError(payload, fallback),
+      status,
+      ...(opensAt === null ? {} : { opensAt }),
+    };
   } catch {
     return { message: fallback, code: null, status };
   }
@@ -82,9 +99,15 @@ export async function readApiError(response, fallback) {
  * Build an Error carrying the backend status and code so callers can branch
  * on specific contract responses (e.g. 403 PASSWORD_RESET_DISABLED, 409, 422).
  */
-export function createApiError({ message, code = null, status = 0 }) {
+export function createApiError({
+  message,
+  code = null,
+  status = 0,
+  opensAt = null,
+}) {
   const error = new Error(message);
   error.status = status;
   error.code = code;
+  if (opensAt !== null) error.opensAt = opensAt;
   return error;
 }

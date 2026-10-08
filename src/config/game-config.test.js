@@ -54,6 +54,7 @@ const BACKEND_CONFIG = {
   ],
   trade_unlock: { first_unlock_fraction: 0.5, remaining_window_fraction: 0.5 },
   account_policy: { require_account_to_join: true },
+  scheduling: { max_days_ahead: 14 },
   farming_min_duration_limits: { min_seconds: 30, max_seconds: 3600 },
   farming_reward_rate_limits: { min: 0.01, max: 0.5 },
 };
@@ -164,11 +165,20 @@ describe('normalizeGameConfig', () => {
         remaining_window_fraction: 0.5,
       },
       account_policy: { require_account_to_join: 'yes' },
+      scheduling: { max_days_ahead: 2.5 },
       farming_min_duration_limits: { min_seconds: 'x', max_seconds: 5 },
       farming_reward_rate_limits: { min: 0.5, max: 0.1 },
     });
     expect(config).toEqual(fallback);
     expect(fallback.account_policy).toEqual({ require_account_to_join: false });
+    // No/invalid `scheduling` (older backend) keeps the 30-day seed.
+    expect(fallback.scheduling).toEqual({ max_days_ahead: 30 });
+    expect(normalizeGameConfig({ scheduling: 'x' }).scheduling).toEqual({
+      max_days_ahead: 30,
+    });
+    expect(
+      normalizeGameConfig({ scheduling: { max_days_ahead: 0 } }).scheduling
+    ).toEqual({ max_days_ahead: 30 });
     expect(normalizeGameConfig(null)).toEqual(fallback);
     // Invalid farming defaults fall back to the seed values (off, 300 s, 5 %).
     expect(

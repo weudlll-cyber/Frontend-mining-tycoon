@@ -15,12 +15,18 @@ Constraints:
   dropped when the backend explicitly reports it ended or replaced.
 - The game-over overlay only appears for a running -> finished transition of
   the viewed round (an enrolling round that is cancelled shows nothing).
+- A scheduled sync round (`game_status: scheduled`, before its enrollment
+  window opens) shows "Scheduled — opens at <time>" in the phase badge and
+  standings label; the action gate keeps upgrades/trades/farming disabled.
+  `showScheduledRoundStatus` does the same when the join itself is refused
+  with 409 JOIN_NOT_ALLOWED_SCHEDULED (no payload to render yet).
 Security notes: renderers use safe DOM APIs (textContent/createElement).
 */
 
 import { setBadgeStatus } from './badge.js';
 import { boardState } from './board-state.js';
 import {
+  showScheduledOpening,
   startCountdownTimer,
   startEnrollmentCountdown,
   stopCountdownTimer,
@@ -40,6 +46,7 @@ import {
   refreshPanelStatus,
   setLiveSessionActive,
 } from './live-board-lifecycle.js';
+import { normalizeUnixSeconds } from '../utils/schedule-time.js';
 import { mergeFarmUpdatedState } from './farming-state.js';
 import { renderPlayerState } from './player-view.js';
 import { updateScoringModeUi } from './scoring-mode-ui.js';
@@ -170,9 +177,36 @@ function applySessionState(data) {
   return hasActiveSession;
 }
 
+/** Opening time (unix seconds) of a scheduled round from a payload, or null. */
+function readScheduledStartAt(data) {
+  return normalizeUnixSeconds(data?.scheduled_start_at);
+}
+
+/**
+ * Show a scheduled round without a state payload (the join was refused with
+ * 409 JOIN_NOT_ALLOWED_SCHEDULED, e.g. on `?autostart=1`): phase badge,
+ * standings label and the action gate ("The round has not opened yet.").
+ */
+export function showScheduledRoundStatus(opensAt = null) {
+  boardState.latestGameStatus = 'scheduled';
+  setBadgeStatus(_deps.gameStatusEl, 'scheduled', { opensAt });
+  showScheduledOpening(opensAt);
+  renderStandingsStatus(
+    resolveStandingsStatus({
+      roundMode: getCurrentRoundContext().roundMode,
+      gameStatus: 'scheduled',
+      scheduledStartAt: opensAt,
+    })
+  );
+  refreshPanelStatus();
+  _deps.updateSetupActionsState?.();
+}
+
 function applyGameStatus(data, hasActiveSession, previousGameStatus) {
   const { countdownLabelEl } = _deps;
-  setBadgeStatus(_deps.gameStatusEl, data.game_status);
+  setBadgeStatus(_deps.gameStatusEl, data.game_status, {
+    opensAt: readScheduledStartAt(data),
+  });
   _deps.autoCollapseSetupForLiveState(data.game_status);
 
   const countdownMode = resolveCountdownMode({
@@ -180,7 +214,10 @@ function applyGameStatus(data, hasActiveSession, previousGameStatus) {
     hasActiveSession,
   });
 
-  if (countdownMode === 'session') {
+  if (countdownMode === 'scheduled') {
+    // Before the enrollment window opens: show the local opening time.
+    showScheduledOpening(readScheduledStartAt(data));
+  } else if (countdownMode === 'session') {
     // Session timer is already updated above (using payload elapsed when available).
     // Avoid starting a second interval here, which can cause visible header jitter.
   } else if (countdownMode === 'enrolling') {
@@ -241,6 +278,7 @@ function applyUIUpdate(data) {
     resolveStandingsStatus({
       roundMode: getCurrentRoundContext().roundMode,
       gameStatus: data?.game_status || boardState.latestGameStatus,
+      scheduledStartAt: readScheduledStartAt(data),
     })
   );
   _deps.renderQuickStats(data);

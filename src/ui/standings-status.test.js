@@ -14,6 +14,21 @@ import {
 } from './standings-status.js';
 
 describe('resolveStandingsStatus', () => {
+  it('labels a scheduled round with its local opening time', () => {
+    const opensAt = Math.floor(new Date(2026, 9, 9, 18, 30).getTime() / 1000);
+    const status = resolveStandingsStatus({
+      roundMode: 'sync',
+      gameStatus: 'scheduled',
+      scheduledStartAt: opensAt,
+    });
+    expect(status.state).toBe('scheduled');
+    expect(status.label).toBe('Scheduled');
+    expect(status.description).toMatch(/^Scheduled — opens at .*18:30\.$/);
+    expect(
+      resolveStandingsStatus({ gameStatus: 'scheduled' }).description
+    ).toBe('Scheduled — the round has not opened yet.');
+  });
+
   it('marks async rounds provisional until the round is finished', () => {
     expect(
       resolveStandingsStatus({ roundMode: 'async', gameStatus: 'running' })

@@ -36,6 +36,15 @@ export function resolvePlayerActionAvailability({
     .trim()
     .toLowerCase();
 
+  // Scheduled sync round: the enrollment window has not even opened yet.
+  if (status === 'scheduled') {
+    return {
+      allowed: false,
+      code: ACTION_BLOCK_CODES.GAME_NOT_RUNNING,
+      reason: 'The round has not opened yet.',
+      farmReason: 'The round has not opened yet. Farming opens when it starts.',
+    };
+  }
   if (status === 'enrolling') {
     return {
       allowed: false,

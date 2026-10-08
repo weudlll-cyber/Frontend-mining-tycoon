@@ -73,4 +73,18 @@ describe('resolvePlayerActionAvailability', () => {
         .allowed
     ).toBe(true);
   });
+
+  it('blocks actions while a scheduled round has not opened yet', () => {
+    expect(
+      resolvePlayerActionAvailability({
+        gameStatus: 'scheduled',
+        roundMode: 'sync',
+      })
+    ).toEqual({
+      allowed: false,
+      code: 'ACTION_NOT_ALLOWED_GAME_NOT_RUNNING',
+      reason: 'The round has not opened yet.',
+      farmReason: 'The round has not opened yet. Farming opens when it starts.',
+    });
+  });
 });

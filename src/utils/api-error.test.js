@@ -110,3 +110,47 @@ describe('readApiError / createApiError', () => {
     expect(error.code).toBe('X');
   });
 });
+
+describe('opens_at on JOIN_NOT_ALLOWED_SCHEDULED', () => {
+  it('passes opens_at through as opensAt (top level or inside detail)', async () => {
+    const top = await readApiError(
+      {
+        status: 409,
+        json: async () => ({
+          code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+          detail: 'This round has not opened yet.',
+          opens_at: 1800000000,
+        }),
+      },
+      'fallback'
+    );
+    expect(top).toEqual({
+      message: 'This round has not opened yet.',
+      code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+      status: 409,
+      opensAt: 1800000000,
+    });
+    const nested = await readApiError(
+      {
+        status: 409,
+        json: async () => ({
+          detail: {
+            code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+            message: 'Not open',
+            opens_at: '1800000060',
+          },
+        }),
+      },
+      'fallback'
+    );
+    expect(nested.opensAt).toBe(1800000060);
+    expect(createApiError(nested).opensAt).toBe(1800000060);
+    // Other errors keep their shape (no opensAt key).
+    const other = await readApiError(
+      { status: 400, json: async () => ({ detail: 'x', opens_at: 'soon' }) },
+      'fallback'
+    );
+    expect(other).not.toHaveProperty('opensAt');
+    expect(createApiError(other)).not.toHaveProperty('opensAt');
+  });
+});

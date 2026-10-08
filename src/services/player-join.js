@@ -16,7 +16,7 @@ Constraints:
 Security notes: ids are URL-encoded; tokens are stored, never shown or logged.
 */
 
-import { readApiError } from '../utils/api-error.js';
+import { createApiError, readApiError } from '../utils/api-error.js';
 import {
   STORAGE_KEYS,
   getPlayerTokenStorageKey,
@@ -117,16 +117,20 @@ export async function ensurePlayerJoinedForStream({
   );
 
   if (!joinResponse.ok) {
-    const { message, status } = await readApiError(
+    const apiError = await readApiError(
       joinResponse,
       `${joinResponse.status} ${joinResponse.statusText}`.trim()
     );
     // 422: backend rejected the player name (1-24 chars, letters/digits/space/_-.).
-    throw new Error(
-      status === 422
-        ? `Invalid player name: ${message}`
-        : `Join failed: ${message}`
-    );
+    // The code (and `opensAt` for 409 JOIN_NOT_ALLOWED_SCHEDULED) is kept so
+    // the start flow can show a scheduled round instead of a plain failure.
+    throw createApiError({
+      ...apiError,
+      message:
+        apiError.status === 422
+          ? `Invalid player name: ${apiError.message}`
+          : `Join failed: ${apiError.message}`,
+    });
   }
 
   const joinData = await joinResponse.json();

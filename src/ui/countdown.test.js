@@ -9,6 +9,7 @@ import {
   formatCountdown,
   getCountdownInterval,
   initCountdown,
+  showScheduledOpening,
   startCountdownTimer,
   startEnrollmentCountdown,
   stopCountdownTimer,
@@ -137,5 +138,24 @@ describe('countdown runtime behavior', () => {
     clearCountdownInterval();
     expect(getCountdownInterval()).toBeNull();
     expect(els.countdownEl.textContent).toBe(snapshot);
+  });
+
+  describe('showScheduledOpening', () => {
+    it('stops the ticking countdown and shows the local opening time', () => {
+      const refs = createDomRefs();
+      initCountdown(refs, {
+        get: () => ({ seconds_remaining: 100, timestamp: Date.now() }),
+      });
+      startCountdownTimer();
+      const opensAt = Math.floor(new Date(2026, 2, 25, 18, 5).getTime() / 1000);
+
+      showScheduledOpening(opensAt);
+      expect(getCountdownInterval()).toBeNull();
+      expect(refs.countdownLabelEl.textContent).toBe('Round opens at');
+      expect(refs.countdownEl.textContent).toMatch(/18:05$/);
+
+      showScheduledOpening(null);
+      expect(refs.countdownEl.textContent).toBe('-');
+    });
   });
 });

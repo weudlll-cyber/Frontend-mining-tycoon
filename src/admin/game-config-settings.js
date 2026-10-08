@@ -5,7 +5,8 @@
  *          tunables (duration presets, presets offered per round type,
  *          create-form defaults, limits, default trade counts by round length,
  *          trade unlock fractions, account policy "Require sign-in to join",
- *          "Chat enabled by default", farming defaults and limits via
+ *          "Chat enabled by default", "Max days ahead for scheduled rounds"
+ *          (`scheduling.max_days_ahead`), farming defaults and limits via
  *          farming-config-fields.js)
  *          and saves edits via PATCH /admin/game-config sending only the
  *          changed top-level keys (`defaults` as a partial).
@@ -248,6 +249,9 @@ export function validateGameConfigDraft(config) {
     const value = config.trade_unlock[key];
     if (value <= 0 || value > 1) errors.push(`${label} must be > 0 and <= 1.`);
   });
+  if (config.scheduling && config.scheduling.max_days_ahead < 1) {
+    errors.push('Max days ahead for scheduled rounds must be at least 1.');
+  }
   errors.push(...validateFarmingConfig(config));
   return errors;
 }
@@ -293,6 +297,15 @@ export function buildGameConfigPatch(draft, baseline) {
     Boolean(baseline?.account_policy?.require_account_to_join)
   ) {
     patch.account_policy = { require_account_to_join: requireAccount };
+  }
+  // WHY: diffed against the NORMALIZED baseline (30 when an older backend
+  // has no `scheduling` section), so the key is only sent when changed.
+  const maxDaysAhead = draft.scheduling?.max_days_ahead;
+  if (
+    Number.isInteger(maxDaysAhead) &&
+    maxDaysAhead !== normalizeGameConfig(baseline).scheduling.max_days_ahead
+  ) {
+    patch.scheduling = { max_days_ahead: maxDaysAhead };
   }
   return patch;
 }
@@ -443,6 +456,9 @@ function renderDocument(doc) {
   });
   el(`${PREFIX}-require-account`).checked =
     config.account_policy.require_account_to_join;
+  el(`${PREFIX}-scheduling-max-days`).value = String(
+    config.scheduling.max_days_ahead
+  );
   renderFarmingConfig(config);
 
   const hash = String(doc?.config_hash || '').slice(0, 12);
@@ -549,6 +565,14 @@ export function readGameConfigDraft() {
 
   config.account_policy = {
     require_account_to_join: el(`${PREFIX}-require-account`).checked,
+  };
+
+  config.scheduling = {
+    max_days_ahead: parseNumber(
+      el(`${PREFIX}-scheduling-max-days`).value,
+      'Max days ahead for scheduled rounds',
+      errors
+    ),
   };
 
   const farming = readFarmingConfigDraft(errors);

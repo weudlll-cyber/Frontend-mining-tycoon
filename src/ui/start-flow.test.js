@@ -23,6 +23,7 @@ vi.mock('./setup-controller.js', () => ({
 }));
 vi.mock('./toast.js', () => ({ showToast: vi.fn() }));
 vi.mock('./game-over.js', () => ({ hideGameOverOverlay: vi.fn() }));
+vi.mock('./board-update.js', () => ({ showScheduledRoundStatus: vi.fn() }));
 
 let flow;
 let boardState;
@@ -32,6 +33,7 @@ let stream;
 let meta;
 let setup;
 let toast;
+let boardUpdate;
 let deps;
 
 beforeEach(async () => {
@@ -51,6 +53,7 @@ beforeEach(async () => {
   meta = await import('../meta/meta-manager.js');
   setup = await import('./setup-controller.js');
   toast = await import('./toast.js');
+  boardUpdate = await import('./board-update.js');
   deps = {
     gameIdInput: document.getElementById('game-id'),
     playerIdInput: document.getElementById('player-id'),
@@ -135,6 +138,32 @@ describe('runStartGameFlowSafely', () => {
     await flow.runStartGameFlowSafely();
     expect(toast.showToast).toHaveBeenCalledWith('Join failed: full', 'error');
     expect(stream.startStream).not.toHaveBeenCalled();
+  });
+
+  it('shows a scheduled round when the join is refused as not opened yet', async () => {
+    const refusal = Object.assign(new Error('Join failed: not open'), {
+      status: 409,
+      code: 'JOIN_NOT_ALLOWED_SCHEDULED',
+      opensAt: 1_800_000_000,
+    });
+    join.ensurePlayerJoinedForStream.mockRejectedValueOnce(refusal);
+    await flow.runStartGameFlowSafely({ source: 'autostart' });
+    expect(boardUpdate.showScheduledRoundStatus).toHaveBeenCalledWith(
+      1_800_000_000
+    );
+    expect(toast.showToast).toHaveBeenCalledWith(
+      'This round has not opened yet.',
+      'info'
+    );
+    expect(stream.startStream).not.toHaveBeenCalled();
+
+    // The async-session button path handles it the same way (no opens_at).
+    join.ensurePlayerJoinedForStream.mockRejectedValueOnce(
+      Object.assign(new Error('x'), { code: 'JOIN_NOT_ALLOWED_SCHEDULED' })
+    );
+    await flow.handleStartAsyncSession();
+    expect(boardUpdate.showScheduledRoundStatus).toHaveBeenLastCalledWith(null);
+    expect(setup.setStartSessionStatus).not.toHaveBeenCalledWith('x', 'error');
   });
 
   it('catches unexpected errors and releases the busy state', async () => {
