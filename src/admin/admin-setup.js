@@ -3,7 +3,8 @@
  * Purpose: Admin-only round creation UI. Populates form controls from the
  *          effective game config (backend GET /meta `game_config`, falling
  *          back to the src/config constants), handles live previews, and
- *          submits POST /games with an optional X-Admin-Token header.
+ *          submits POST /games with the admin credentials (X-Admin-Token or
+ *          an administrator account session, see admin-session.js).
  *          Re-renders the form when /meta loads or the admin saves new
  *          Game Settings (section 11). Per-round options (fee/spread
  *          overrides, chat) live in round-options.js, the Farming Stage 1
@@ -26,10 +27,18 @@ import {
   computeTradeUnlockOffsetsSeconds,
 } from '../config/index.js';
 import { fetchMetaSnapshot } from '../meta/meta-manager.js';
-import { initGameManagement } from './game-management.js';
+import { initGameManagement, refreshGameList } from './game-management.js';
 import { initEconomySettings } from './economy-settings.js';
 import { initAdminMetrics } from './admin-metrics.js';
 import { initGameConfigSettings } from './game-config-settings.js';
+import { initAdminAccount } from './admin-account.js';
+import { initAdminUsers } from './admin-users.js';
+import {
+  buildAdminAuthHeaders,
+  handleAdminAuthError,
+  onAdminSessionChange,
+} from './admin-session.js';
+import { createApiError } from '../utils/api-error.js';
 import {
   applyChatDefault,
   buildRoundOptionsReviewRows,
@@ -511,14 +520,14 @@ export async function createRound() {
       );
     }
 
-    const adminToken = (el('admin-token').value || '').trim();
-
     const payload = buildGamePayload();
 
-    const headers = { 'Content-Type': 'application/json' };
-    if (adminToken) {
-      headers['X-Admin-Token'] = adminToken;
-    }
+    // X-Admin-Token when the field is filled, else the administrator account
+    // session as Bearer, else no credentials (open game creation).
+    const headers = {
+      'Content-Type': 'application/json',
+      ...buildAdminAuthHeaders(),
+    };
 
     const response = await fetch(`${baseUrl}/games`, {
       method: 'POST',
@@ -528,11 +537,21 @@ export async function createRound() {
 
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
+      let code = null;
       try {
         const body = await response.json();
         if (body.detail) detail = formatApiDetail(body.detail);
+        code = body.code ?? body.detail?.code ?? null;
       } catch {
         // ignore JSON parse error
+      }
+      // An expired / non-admin account session is signed out locally and
+      // explained (the message replaces the raw backend detail).
+      const authError = handleAdminAuthError(
+        createApiError({ message: detail, code, status: response.status })
+      );
+      if (authError.adminSessionEnded) {
+        throw authError;
       }
       if (response.status === 403) {
         throw new Error(
@@ -562,6 +581,11 @@ export async function createRound() {
 export function init() {
   initBackendUrlField();
   populateScoringModes();
+
+  // Section 1 account sign-in first so the restored/reused administrator
+  // session is known before sections 8-12 load their data.
+  initAdminAccount();
+  initAdminUsers();
 
   // Event listeners
   el('admin-round-type-sync').addEventListener(
@@ -619,6 +643,11 @@ export function init() {
   // /meta (re-fetched when the backend URL changes).
   applyGameConfigToForm();
   initGameManagement();
+  // The game list loads on page open; a sign-in (or a reused lobby session
+  // confirmed later by /auth/me) reloads it with the new credentials.
+  onAdminSessionChange((_session, reason) => {
+    if (reason === 'signed-in') void refreshGameList();
+  });
   initEconomySettings({
     onLoaded() {
       refreshRateOverrideHints();

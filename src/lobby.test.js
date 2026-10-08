@@ -305,6 +305,23 @@ describe('lobby stored-session validation', () => {
     expect(document.getElementById('account-summary').textContent).toBe(
       'Signed in as Weudl Prime'
     );
+    expect(document.getElementById('admin-setup-link').textContent).toBe(
+      'Admin setup'
+    );
+  });
+
+  it('highlights the admin setup link for an administrator account', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.fetchCurrentUser).mockResolvedValue({
+      username: 'weudl',
+      is_admin: true,
+    });
+
+    await bootLobbySignedIn();
+
+    const link = document.getElementById('admin-setup-link');
+    expect(link.textContent).toBe('Admin setup (you are an administrator)');
+    expect(link.classList.contains('is-admin-link')).toBe(true);
   });
 });
 
@@ -857,6 +874,27 @@ describe('lobby results and history', () => {
     );
     expect(document.getElementById('last-game-summary').textContent).toContain(
       '5 •'
+    );
+  });
+
+  it('marks the admin setup link after an administrator login', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.login).mockResolvedValue({
+      access_token: 'fresh',
+      user: { username: 'boss', is_admin: true },
+    });
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    const form = document.getElementById('login-form');
+    form.querySelector('#login-username').value = 'boss';
+    form.querySelector('#login-password').value = 'pw';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushDeep();
+
+    expect(document.getElementById('admin-setup-link').textContent).toBe(
+      'Admin setup (you are an administrator)'
     );
   });
 

@@ -6,7 +6,17 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { initGameManagement, resetGame } from './game-management.js';
+import {
+  initGameManagement,
+  refreshGameList,
+  resetGame,
+} from './game-management.js';
+import {
+  ADMIN_SESSION_EXPIRED_MESSAGE,
+  clearAdminSession,
+  getAdminSession,
+  setAdminSession,
+} from './admin-session.js';
 
 const GAMES = {
   games: [
@@ -203,5 +213,80 @@ describe('resetGame', () => {
     await resetGame(7, document.createElement('button'));
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('account session credentials', () => {
+  afterEach(() => {
+    clearAdminSession();
+  });
+
+  it('lists games with the administrator session as Bearer', async () => {
+    document.getElementById('admin-token').value = '';
+    setAdminSession({ token: 'sess-1' });
+    const fetchMock = vi.fn().mockResolvedValue(okResponse(GAMES));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await refreshGameList();
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/admin/games');
+    expect(options.headers.Authorization).toBe('Bearer sess-1');
+    expect(options.headers['X-Admin-Token']).toBeUndefined();
+  });
+
+  it('signs out an expired session when listing games', async () => {
+    document.getElementById('admin-token').value = '';
+    setAdminSession({ token: 'sess-1' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: async () => ({ code: 'ACCOUNT_AUTH_INVALID' }),
+      })
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await refreshGameList();
+
+    expect(getAdminSession()).toBeNull();
+    expect(document.getElementById('admin-games-error').textContent).toBe(
+      `❌ Error loading games: ${ADMIN_SESSION_EXPIRED_MESSAGE}`
+    );
+  });
+
+  it('shows delete errors from the backend', async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse(GAMES))
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        json: async () => {
+          throw new Error('no json');
+        },
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    await refreshGameList();
+
+    const deleteBtn = Array.from(
+      document.querySelectorAll('#admin-games-tbody button')
+    ).find((b) => b.textContent === '🗑 Delete');
+    deleteBtn.click();
+    await flush();
+
+    expect(fetchMock.mock.calls[1][1].method).toBe('DELETE');
+    expect(fetchMock.mock.calls[1][1].headers['X-Admin-Token']).toBe('tok');
+    expect(document.getElementById('admin-delete-result').textContent).toBe(
+      '❌ Failed to delete game: 403 Forbidden.'
+    );
   });
 });

@@ -139,6 +139,12 @@ import {
   syncDefaultTradeCount,
   updateReview,
 } from './admin-setup.js';
+import {
+  NOT_ADMIN_MESSAGE,
+  clearAdminSession,
+  getAdminSession,
+  setAdminSession,
+} from './admin-session.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -513,6 +519,80 @@ describe('createRound', () => {
     expect(document.getElementById('admin-result-box').textContent).toContain(
       'Admin permission required to create rounds. Admin token required'
     );
+  });
+});
+
+describe('createRound with an administrator account session', () => {
+  it('sends the session as Bearer when the token field is empty', async () => {
+    buildDom({ roundType: 'sync' });
+    setAdminSession({ token: 'sess-1' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ game_id: 'g1' }),
+    });
+
+    await createRound();
+
+    const [, options] = globalThis.fetch.mock.calls[0];
+    expect(options.headers.Authorization).toBe('Bearer sess-1');
+    expect(options.headers['X-Admin-Token']).toBeUndefined();
+    clearAdminSession();
+  });
+
+  it('signs out a non-admin session on 403 ADMIN_REQUIRED', async () => {
+    buildDom({ roundType: 'sync' });
+    setAdminSession({ token: 'sess-1' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => ({
+        code: 'ADMIN_REQUIRED',
+        detail: 'Administrator account required.',
+      }),
+    });
+
+    await createRound();
+
+    expect(getAdminSession()).toBeNull();
+    expect(document.getElementById('admin-result-box').textContent).toBe(
+      `❌ ${NOT_ADMIN_MESSAGE}`
+    );
+  });
+
+  it('reloads the game list after a sign-in', async () => {
+    buildDom({ roundType: 'sync' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ games: [] }),
+    });
+    // The game-list elements are not part of the shared scaffold.
+    for (const id of [
+      'admin-games-loading',
+      'admin-games-error',
+      'admin-games-list-container',
+      'admin-games-empty',
+      'admin-games-tbody',
+    ]) {
+      const node = document.createElement('div');
+      node.id = id;
+      document.body.appendChild(node);
+    }
+    init();
+    globalThis.fetch.mockClear();
+
+    setAdminSession({ token: 'sess-1' });
+
+    await vi.waitFor(() =>
+      expect(
+        globalThis.fetch.mock.calls.some(([url]) =>
+          String(url).endsWith('/admin/games')
+        )
+      ).toBe(true)
+    );
+    clearAdminSession();
   });
 });
 
