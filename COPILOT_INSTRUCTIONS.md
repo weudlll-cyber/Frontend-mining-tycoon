@@ -189,7 +189,7 @@ Additional output policy for this repository:
 - Round-setup tunables (duration presets, offered presets, defaults, limits, trade-count defaults, unlock fractions) are admin-editable in the backend (`/admin/game-config`, exposed as `game_config` in `GET /meta`). `src/config/game-config.js` is the single resolver: read them via `getEffectiveGameConfig()` and its helpers.
 - The built-in fallback values (used when the backend sends no `game_config`) live in `src/config/game-control-data.js` (setup) and `src/config/trading-control-data.js` (trade scheduling).
 - `src/config/index.js` is the barrel export; external modules may import from either the barrel or the individual files.
-- Never hardcode tunable values inline in UI modules, service modules, or `main.js`. Import from `src/config` instead.
+- Never hardcode tunable values inline in UI modules, service modules, `main.js` or the player-board modules it wires. Import from `src/config` instead.
 - Equivalent backend policy constants must live in `app/policy/control_data.py`. Do not duplicate them in `game_service.py` or `schemas.py`.
 
 ## 11) Admin Setup (Separate Entrypoint)
@@ -199,7 +199,7 @@ Additional output policy for this repository:
 Game configuration is strictly **admin-only** and is managed via a separate entrypoint:
 
 - **Lobby** (`index.html`, `src/lobby.js`): register / login / logout, account data download and deletion, open-games list, join / rejoin (account-linked players), "My results" history and full results, last-game highscores.
-- **Player board** (`player.html`, `src/main.js`): the live game for one joined round (season cards, upgrades, analytics, live tools window).
+- **Player board** (`player.html`, `src/main.js`): the live game for one joined round (season cards, upgrades, analytics, live tools window). `src/main.js` is only the composition root; the board logic lives in `src/ui/` modules (`board-update.js`, `start-flow.js`, `setup-*.js`, `game-over.js`, ...) listed in `CODE_ORGANIZATION.md`.
 - **Admin console** (`admin.html`, `src/admin/`): creates and configures new rounds with snapshot-locked settings and manages/deletes active games.
 
 ### Key Rules

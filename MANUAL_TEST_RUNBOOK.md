@@ -101,9 +101,27 @@ Join an enrolling sync round from the lobby.
    - **Farm:** in a round without farming (or with an older backend) the tab says "Farming is not enabled for this round." and the Farming pill "Not enabled". In a round created with farming (for example 1 minute, 10 %): the pill reads "Enabled (10% / 1m)", the tab shows the rule summary and one row per token (Balance, Farmed, Cycles, Next reward). During enrolling (or async without a session) the buttons are disabled with "Farming opens when the round starts." / "Start a session to deposit or withdraw.". While running: deposit 10 Spring -> balance -10, Farmed 10, Next reward counts down from 1m every second; after the cycle the backend adds 10 % (Cycles 1, Farmed 11) and the next cycle starts. A second deposit restarts the countdown. "Withdraw" with an amount above the farmed amount stays disabled; "Withdraw all" before the cycle ends returns the farmed amount without the unfinished reward. The Player State panel shows "Farmed (not spendable): SPR ..." and the action-bar holdings value includes farmed tokens. Errors from the backend (for example 400 insufficient balance) appear as a toast with the backend message.
    - **Chat:** send a message from two accounts; both see it with server-assigned user and time. The list scrolls internally; the preview dock and unread badge update while the window is closed. In a round created with "Chat enabled" unticked, the Chat tab stays visible but shows "Chat is disabled for this round.", the status reads "Disabled", the preview dock shows the same text and the browser opens no `/ws/chat` connection (DevTools Network -> WS); no reconnect attempts appear.
    - **Round fee/spread:** in a round with overrides (see the admin round options check) the Trade tab's cost note shows the round's fee and spread, and the Trading pill shows the round fee (a 0 % override reads `0.0% fee`).
-   - **Top 5:** live ranking with scores; in Efficiency rounds scores look like `1.2345×`, otherwise integers.
+   - **Top 5:** live ranking with scores; in Efficiency rounds scores look like `1.2345×`, otherwise integers. A line above the table reads "Live — standings update while the round runs." in a running sync round and "Final — the round is finished." after it ends; in an async round it reads "Provisional — the round is still open." until the round ends. The header shows the same short label (`Live` / `Provisional` / `Final`) next to `Top`; the header line does not shift when it appears or changes.
 10. **Layout:** at 1440x900 the page does not scroll; only the setup panel, season list and window contents scroll internally. Below 768 px a season strip shows one season card at a time.
 11. **Reconnect:** stop and restart the backend briefly; the connection badge shows the reconnect and the stream resumes with a fresh ticket (no manual reload).
+
+---
+
+## 3a. Accessibility and Mobile Checks
+
+Run on the player board (`player.html`), the lobby and the how-to-play,
+privacy and imprint pages.
+
+1. **Keyboard focus:** Tab through each page. Every button, link, input, select and tab shows a clearly visible focus ring (blue on the board, amber on the lobby/guide pages); nothing is focused invisibly.
+2. **Live tools window by keyboard:** focus `Trade` in the action bar and press Enter: the window opens and focus lands on the active tab. Arrow Right/Left, Home and End move between Trade / Farm / Chat / Top 5 and switch the panel; Tab moves from the active tab into the panel (other tabs are skipped). Escape closes the window and focus returns to the `Trade` button.
+3. **Reduced motion:** enable "reduce motion" (Windows: Settings -> Accessibility -> Visual effects -> Animation effects off; macOS: Accessibility -> Display -> Reduce motion; or DevTools -> Rendering -> Emulate `prefers-reduced-motion: reduce`). Toasts appear and disappear without fading/sliding, buttons do not lift on hover, lobby list rows do not slide, and "Jump to Live Board" jumps without smooth scrolling.
+4. **Screen reader (NVDA / VoiceOver):** a toast such as a join error is read immediately (assertive), info toasts are read politely; the header countdown and the Top 5 table are NOT read every second; the Phase badge is read when it changes. Emoji in headings and buttons (⛏️, 🌱, 💬, 🏆, ⏱) are not read out; the ⏱ countdown is announced as "Time".
+5. **Contrast spot check:** badges (Phase, Conn, Scoring), green/amber upgrade metrics and the blue upgrade buttons are readable; DevTools -> Inspect -> contrast shows >= 4.5 for text.
+6. **Mobile (375 px, DevTools device toolbar, e.g. iPhone SE):**
+   - player board: no horizontal page scroll; the page scrolls vertically; one season card at a time.
+   - open the live tools window: it fits the screen width (8 px margin each side), tabs and Close wrap instead of overflowing; dragging it far to a corner keeps the header on screen.
+   - lobby: panels stack, the open-games header buttons wrap, dialogs fit the screen, no horizontal scroll.
+   - desktop (1440x900) still has no page scroll (section 3, step 10).
 
 ---
 
@@ -198,6 +216,8 @@ Use this to validate mining balance (moved here from `README.md`).
 - [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join, rejoin (same player), My results + Load more, Full results highlight, require sign-in, download my data, delete account
 - [ ] Player board: autostart, no host controls, season cards + upgrades, analytics, halving, events banner
 - [ ] Live tools window: Trade / Farm / Chat / Top 5, drag, Escape and outside-click close, board stays usable; a chat-disabled round shows the disabled note and opens no WebSocket
+- [ ] Standings label: Live (sync running) / Provisional (async open) / Final (finished) in header and Top 5
+- [ ] Accessibility and mobile (section 3a): focus rings, keyboard tabs, reduced motion, screen-reader announcements, 375 px without horizontal scroll
 - [ ] Async: session start, session countdown, This session / Best this round, Session Finished -> lobby
 - [ ] Game Over overlay -> lobby -> Last Game Highscores; View full results -> lobby results dialog
 - [ ] Safe rendering of hostile names/messages

@@ -79,6 +79,16 @@ body.page-guide {
   color: var(--guide-accent-strong);
 }
 
+/* Visible keyboard focus (guide, privacy notice and imprint pages). */
+.page-guide a:focus-visible,
+.page-guide button:focus-visible,
+.page-guide summary:focus-visible,
+.page-guide [tabindex]:focus-visible {
+  outline: 2px solid var(--guide-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .guide-toc,
 .guide-section {
   background: var(--guide-card);
@@ -201,5 +211,18 @@ body.page-guide {
   .guide-toc,
   .guide-section {
     padding: 0.85rem 0.9rem;
+  }
+}
+
+/* Respect the OS "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
 }
