@@ -50,6 +50,8 @@ Player identity is created and maintained server-side. The backend is the author
 ## 2. Player Profile Persistence
 
 > **Status: Partial.** Account records persist in the backend database across rounds, and players are linked to accounts, so finished-round results are attributed to the account (see Section 7). There is no profile page beyond the lobby's "My results" list.
+>
+> **Account data export and deletion: Implemented (frontend; needs the matching backend).** Signed in, the lobby offers **Download my data** (`GET /auth/me/export`, saved as `mining-tycoon-account-export.json`) and **Delete account** (`DELETE /auth/me` with the password; `204` on success, `403 PASSWORD_INCORRECT`, `429` when rate limited). Deletion removes the account, its sessions and login history; past results keep their rows but show "Deleted player" as the name. Older backends without these endpoints show their error message in the lobby.
 
 ### Why Persistence Is Required
 

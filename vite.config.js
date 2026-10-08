@@ -5,6 +5,8 @@
  *   - player → player.html (live player dashboard)
  *   - admin  → admin.html  (admin-only round setup)
  *   - howToPlay → how-to-play.html (static player guide, no script)
+ *   - privacy / imprint → privacy.html, imprint.html (static legal page
+ *     templates for the operator, no script)
  */
 
 import { fileURLToPath } from 'url';
@@ -37,6 +39,8 @@ export default defineConfig({
         player: resolve(__dirname, 'player.html'),
         admin: resolve(__dirname, 'admin.html'),
         howToPlay: resolve(__dirname, 'how-to-play.html'),
+        privacy: resolve(__dirname, 'privacy.html'),
+        imprint: resolve(__dirname, 'imprint.html'),
       },
     },
   },

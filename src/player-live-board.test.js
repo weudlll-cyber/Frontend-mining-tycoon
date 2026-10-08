@@ -269,6 +269,8 @@ describe('static guardrails', () => {
       'player.html',
       'admin.html',
       'how-to-play.html',
+      'privacy.html',
+      'imprint.html',
     ]) {
       expect(readRepoFile(file)).not.toContain('127.0.0.1:8000');
     }

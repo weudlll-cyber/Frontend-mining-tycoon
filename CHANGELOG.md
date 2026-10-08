@@ -32,6 +32,17 @@ No versions have been released yet; `package.json` is still `0.0.0`.
   block for the defaults and limits (fallbacks: off, 300 s, 5 %; limits
   10 s..7 d and 0.01 %..100 %).
 
+- Legal page templates `privacy.html` (GDPR-oriented privacy notice that
+  describes what the software actually processes) and `imprint.html` (legal
+  notice), with a "Template" banner and highlighted `[PLACEHOLDER]` markers for
+  every operator-specific fact. Linked from a new lobby footer, the how-to-play
+  footer and the Create account dialog ("By creating an account you agree to
+  the privacy notice"); built by Vite and served by the deploy scripts. Not
+  legal advice: operators must complete and review them before going live.
+- Lobby account data protection: **Download my data** saves the
+  `GET /auth/me/export` JSON as `mining-tycoon-account-export.json`, and
+  **Delete account** opens a dialog (warning, password, confirmation checkbox)
+  that calls `DELETE /auth/me` and clears the local session on success.
 - Per-round options in the admin create form: optional "Conversion fee
   override (%)" and "Oracle spread override (%)" in section 5 (empty = global
   economy, current values as placeholders; sent as `conversion_fee_rate` /
@@ -67,6 +78,11 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Privacy: the lobby fonts (Sora, Space Grotesk) are self-hosted via
+  `@fontsource` (OFL-1.1) instead of Google Fonts, so no visitor IP reaches
+  Google; the privacy template no longer needs a Google Fonts section.
+- Privacy: the nginx frontend template logs the path without query string or
+  referrer (`mining_frontend_noquery` log format).
 - `main` is protected by the "Protect main" ruleset: pull request plus a green
   `CI Summary (Manual Merge Gate)` check (#31).
 - Join names are mapped to the backend rules (1-24 letters, digits, spaces,

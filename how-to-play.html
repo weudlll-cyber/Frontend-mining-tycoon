@@ -1,7 +1,7 @@
 <!--
 File: how-to-play.html
 Purpose: Static player-facing "How to play" guide for Mining Tycoon.
-Role in system: Linked from the lobby (index.html) and the player board (player.html). It has no script and does not talk to the backend.
+Role in system: Linked from the lobby (index.html) and the player board (player.html); its footer links the legal pages (privacy.html, imprint.html). It has no script and does not talk to the backend.
 Invariants: Content must match the current backend rules (backend README, app/policy/control_data.py, app/services/scoring_service.py). No features that do not exist.
 Security notes: Static HTML only; no script, no external fonts or CDNs.
 -->
@@ -443,6 +443,13 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
             is used.
           </li>
           <li>You can change your password from the lobby while signed in.</li>
+          <li>
+            You can download or delete your account data from the lobby (<strong
+              >Download my data</strong
+            >
+            and <strong>Delete account</strong>). Deleting is permanent; your
+            name in past results then shows as "Deleted player".
+          </li>
         </ul>
       </section>
 
@@ -489,7 +496,11 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
       </section>
 
       <footer class="guide-footer">
-        <p><a href="#top">Back to top</a> &middot; <a href="/">Lobby</a></p>
+        <p>
+          <a href="#top">Back to top</a> &middot; <a href="/">Lobby</a> &middot;
+          <a href="/privacy.html">Privacy</a> &middot;
+          <a href="/imprint.html">Imprint</a>
+        </p>
       </footer>
     </main>
   </body>

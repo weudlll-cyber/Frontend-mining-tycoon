@@ -78,8 +78,10 @@ the backend deploy script).
    4. The installer publishes `dist/` to `/var/www/mining-tycoon` with
       `rsync --delete --delay-updates`, writes the nginx site on the first
       deploy, runs certbot when `-LetsEncryptEmail` is given, and fetches the
-      four pages (`index.html`, `player.html`, `admin.html`,
-      `how-to-play.html`) through nginx.
+      six pages (`index.html`, `player.html`, `admin.html`,
+      `how-to-play.html`, `privacy.html`, `imprint.html`) through nginx.
+      `privacy.html` and `imprint.html` are templates: complete them before
+      a public launch (see `PRODUCTION_DEFAULTS_CHECKLIST.md`).
 
 4. Open `https://game.example.com/`.
 
@@ -101,6 +103,13 @@ the backend deploy script).
 Template: `deploy/nginx/mining-frontend.conf` (placeholders
 `__FRONTEND_DOMAIN__`, `__WEB_ROOT__`), installed as
 `/etc/nginx/sites-available/mining-frontend.conf`:
+
+Access logs go to `/var/log/nginx/mining-frontend.access.log` in the
+`mining_frontend_noquery` format: client IP, time, method, path **without the
+query string**, status, size and user agent (no referrer). Retention follows the
+system logrotate policy for `/var/log/nginx/*.log`; state it in the privacy
+notice. The excerpt below omits the log lines; see the template for the full
+file.
 
 ```nginx
 server {

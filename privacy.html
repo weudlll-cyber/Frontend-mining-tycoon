@@ -1,0 +1,496 @@
+<!--
+File: privacy.html
+Purpose: Privacy notice TEMPLATE for operators of a Mining Tycoon server.
+Role in system: Static page linked from the lobby footer, the registration dialog and the
+  how-to-play footer. No script; does not talk to the backend.
+Invariants: Describes only what the software actually processes (verified against the
+  backend: app/db/database.py, app/services/account_service.py, retention_service.py,
+  app/middleware/request_logging.py, app/core/chat_ws.py, BACKEND_DEPLOY.md; and the
+  frontend: src/utils/storage-utils.js, src/lobby.css). Every operator-specific fact is a
+  visible [PLACEHOLDER]. The template banner stays until the operator has completed it.
+  Update this page whenever data processing changes.
+Security notes: Static HTML only; no script, no external resources.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Mining Tycoon | Privacy notice</title>
+    <link rel="stylesheet" href="/src/how-to-play.css" />
+  </head>
+  <body class="page-guide">
+    <main class="guide-shell">
+      <header id="top" class="guide-header">
+        <p class="guide-back"><a href="/">&larr; Back to the lobby</a></p>
+        <p id="legal-template-banner" class="legal-template-banner" role="note">
+          <strong>Template</strong> &mdash; must be completed and reviewed
+          (ideally by a legal professional) before going live. Replace every
+          <mark class="legal-placeholder">[PLACEHOLDER]</mark>, delete what does
+          not apply, then remove this banner. This template is not legal advice.
+        </p>
+        <h1>Privacy notice</h1>
+        <p class="guide-lead">
+          This notice explains which personal data the Mining Tycoon game
+          processes when you visit this site, create an account and play, why,
+          for how long, and which rights you have.
+        </p>
+        <p class="guide-note">
+          Last updated:
+          <mark class="legal-placeholder">[LAST UPDATED DATE]</mark>
+        </p>
+      </header>
+
+      <nav class="guide-toc" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#controller">Who is responsible</a></li>
+          <li><a href="#summary">Summary</a></li>
+          <li><a href="#data">What data is processed</a></li>
+          <li><a href="#browser-storage">Browser storage and cookies</a></li>
+          <li><a href="#third-parties">Third-party content</a></li>
+          <li><a href="#legal-bases">Purposes and legal bases</a></li>
+          <li><a href="#recipients">Recipients</a></li>
+          <li><a href="#retention">How long data is kept</a></li>
+          <li><a href="#rights">Your rights</a></li>
+          <li><a href="#security">Security</a></li>
+          <li><a href="#changes">Changes to this notice</a></li>
+        </ol>
+      </nav>
+
+      <section id="controller" class="guide-section">
+        <h2>Who is responsible</h2>
+        <p>The controller responsible for the processing described here is:</p>
+        <address class="legal-address">
+          <mark class="legal-placeholder">[OPERATOR NAME]</mark><br />
+          <mark class="legal-placeholder">[POSTAL ADDRESS]</mark><br />
+          Email: <mark class="legal-placeholder">[CONTACT EMAIL]</mark>
+        </address>
+        <p>
+          Data protection officer (only if one is appointed):
+          <mark class="legal-placeholder"
+            >[DATA PROTECTION OFFICER CONTACT]</mark
+          >
+        </p>
+        <p>
+          For any question about your data, or to exercise your rights, write to
+          <mark class="legal-placeholder">[CONTACT EMAIL]</mark>.
+        </p>
+      </section>
+
+      <section id="summary" class="guide-section">
+        <h2>Summary</h2>
+        <ul>
+          <li>
+            You need an account to sign in. It stores your username, email,
+            display name, Discord handle, an optional Telegram handle and a
+            password hash.
+          </li>
+          <li>
+            Sign-ins and security events are logged with IP address and browser
+            (user agent).
+          </li>
+          <li>
+            Your player name, scores and rankings are visible to other players.
+          </li>
+          <li>Chat messages are not stored.</li>
+          <li>
+            There is no analytics, no advertising, no tracking and no tracking
+            cookies.
+          </li>
+          <li>
+            You can download all account data (<strong>Download my data</strong
+            >) and delete your account (<strong>Delete account</strong>) in the
+            lobby yourself.
+          </li>
+        </ul>
+      </section>
+
+      <section id="data" class="guide-section">
+        <h2>What data is processed</h2>
+
+        <h3 id="data-visit">Visiting the website</h3>
+        <p>
+          When you open the site, your browser connects to the web server(s) for
+          the pages and for the game server (API). The web server
+          (<code>nginx</code>) and the game server write technical logs:
+        </p>
+        <ul>
+          <li>
+            Game server log: one line per request with method, path (without
+            query string), response status, duration, your IP address, time and
+            a request id. Request headers, bodies, passwords and tokens are not
+            logged.
+          </li>
+          <li>
+            Web server access log:
+            <mark class="legal-placeholder"
+              >[DESCRIBE THE WEB SERVER ACCESS LOG CONFIGURATION, e.g. "IP
+              address, time, requested URL, status, referrer and user agent" for
+              the nginx default format, or "disabled"]</mark
+            >.
+          </li>
+        </ul>
+
+        <h3 id="data-account">Your account</h3>
+        <p>When you create an account, the following is stored:</p>
+        <ul>
+          <li>username, email address and display name,</li>
+          <li>Discord handle (required) and Telegram handle (optional),</li>
+          <li>
+            your password as a one-way hash (the password itself is never
+            stored),
+          </li>
+          <li>creation and last-change timestamps, account status flags.</li>
+        </ul>
+        <p>
+          The game does not send emails. The email address
+          <mark class="legal-placeholder"
+            >[STATE WHAT THE EMAIL, DISCORD AND TELEGRAM HANDLES ARE USED FOR,
+            e.g. "to identify you and to contact you about your account or
+            prizes"]</mark
+          >.
+        </p>
+
+        <h3 id="data-sessions">Sign-in sessions</h3>
+        <p>
+          Each sign-in creates a session that is valid for 24 hours. For each
+          session the server stores a random session token, creation and expiry
+          time, your IP address and your browser's user agent.
+        </p>
+
+        <h3 id="data-audit">Security log</h3>
+        <p>
+          Registration, sign-in, sign-out, password changes and account deletion
+          are recorded in a security log with the event type, success or failure
+          (and a short reason such as "invalid credentials"), time, IP address
+          and user agent. Failed attempts that cannot be matched to an account
+          are logged without an account reference.
+        </p>
+
+        <h3 id="data-game">Gameplay and results</h3>
+        <ul>
+          <li>
+            When you join a round, a player entry is created with your player
+            name (your display name), a link to your account, the time you
+            joined and your game state (balances, upgrades, trades, scores).
+          </li>
+          <li>
+            When a round ends, the final standings (player name, rank, score,
+            scoring mode, round type, number of participants and finish time)
+            are copied into a results archive. You see them under
+            <strong>My results</strong>.
+          </li>
+        </ul>
+
+        <h3 id="data-chat">Chat</h3>
+        <p>
+          If chat is enabled for a round, your messages are delivered to the
+          players currently connected to the same round, together with your
+          player name and the time. Chat messages are held in memory only for
+          delivery; they are not written to the database or to the logs and
+          there is no chat history.
+        </p>
+
+        <h3 id="data-backups">Backups</h3>
+        <p>
+          The game database is backed up nightly. Backups contain all data
+          described above and are kept for 14 days on the server
+          <mark class="legal-placeholder"
+            >[ADD OFF-SERVER BACKUP LOCATION AND RETENTION, IF ANY]</mark
+          >. Data you deleted can therefore remain in backups until they expire.
+        </p>
+      </section>
+
+      <section id="browser-storage" class="guide-section">
+        <h2>Browser storage and cookies</h2>
+        <p>
+          The game uses your browser's local storage (keys beginning with
+          <code>mining-tycoon:</code>) only for things it needs to work:
+        </p>
+        <ul>
+          <li>your sign-in token, username and display name,</li>
+          <li>the game server address,</li>
+          <li>
+            the round and player you are in, and a per-round player token so you
+            can rejoin,
+          </li>
+          <li>
+            a snapshot of your last finished round (shown under
+            <strong>Last Game Highscores</strong>),
+          </li>
+          <li>
+            interface preferences and a cache of game settings (cache entries
+            expire after 7 days).
+          </li>
+        </ul>
+        <p>
+          On sign-in the game server also sets one cookie,
+          <code>app-auth-session</code> (HttpOnly, SameSite=Strict, valid for 24
+          hours), which holds your session token. It is technically necessary
+          and is removed when you sign out.
+        </p>
+        <p>
+          No analytics, advertising or tracking cookies or similar technologies
+          are used, so no consent banner is shown. Signing out clears the
+          sign-in entries; you can remove everything at any time through your
+          browser settings.
+        </p>
+      </section>
+
+      <section id="third-parties" class="guide-section">
+        <h2>Third-party content</h2>
+        <p>
+          All fonts, scripts and styles are served from this website itself; the
+          pages do not load anything from Google Fonts or other external content
+          delivery networks.
+        </p>
+        <p>No third-party content, scripts or trackers are embedded.</p>
+      </section>
+
+      <section id="legal-bases" class="guide-section">
+        <h2>Purposes and legal bases</h2>
+        <p class="guide-note">
+          The legal bases below are typical options under the GDPR. The operator
+          must choose and confirm the correct basis for each purpose.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Purpose</th>
+                <th>Data</th>
+                <th>Legal basis</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Providing the account and the game</td>
+                <td>
+                  account, sessions, gameplay, results, chat, browser storage
+                </td>
+                <td>
+                  <mark class="legal-placeholder"
+                    >[e.g. Art. 6(1)(b) GDPR (contract)]</mark
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Security, abuse prevention, troubleshooting</td>
+                <td>security log, server logs, sessions</td>
+                <td>
+                  <mark class="legal-placeholder"
+                    >[e.g. Art. 6(1)(f) GDPR (legitimate interest in a secure
+                    service)]</mark
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Showing rankings and results to other players</td>
+                <td>player name, scores, ranks</td>
+                <td>
+                  <mark class="legal-placeholder"
+                    >[e.g. Art. 6(1)(b) GDPR (contract)]</mark
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Backups and recovery</td>
+                <td>all stored data</td>
+                <td>
+                  <mark class="legal-placeholder"
+                    >[e.g. Art. 6(1)(f) GDPR (legitimate interest in
+                    availability)]</mark
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Providing account data is necessary to create an account; without it
+          you cannot play. Minimum age to use the game:
+          <mark class="legal-placeholder">[MINIMUM AGE]</mark>.
+        </p>
+      </section>
+
+      <section id="recipients" class="guide-section">
+        <h2>Recipients</h2>
+        <ul>
+          <li>
+            The servers are operated by
+            <mark class="legal-placeholder">[HOSTING PROVIDER]</mark>
+            (<mark class="legal-placeholder">[HOSTING LOCATION]</mark>), which
+            processes data on our behalf under a data processing agreement.
+          </li>
+          <li>
+            Other players see your player name, scores, ranks and chat messages
+            in rounds you play. Your email address and social handles are never
+            shown to other players.
+          </li>
+          <li>
+            <mark class="legal-placeholder"
+              >[OTHER RECIPIENTS, e.g. off-site backup storage, or "none"]</mark
+            >
+          </li>
+        </ul>
+        <p>
+          Data is not sold and not used for advertising. Transfers outside the
+          EU/EEA:
+          <mark class="legal-placeholder"
+            >[NONE, OR DESCRIBE THE TRANSFER AND SAFEGUARD]</mark
+          >.
+        </p>
+      </section>
+
+      <section id="retention" class="guide-section">
+        <h2>How long data is kept</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Kept until</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Account</td>
+                <td>you delete it (there is no automatic deletion)</td>
+              </tr>
+              <tr>
+                <td>Sign-in sessions</td>
+                <td>
+                  sign-out or expiry after 24 hours; expired sessions are
+                  removed by an hourly cleanup
+                </td>
+              </tr>
+              <tr>
+                <td>Security log</td>
+                <td>
+                  <mark class="legal-placeholder">[90]</mark> days (setting
+                  <code>AUTH_AUDIT_RETENTION_DAYS</code>, default 90)
+                </td>
+              </tr>
+              <tr>
+                <td>Player entries and game state</td>
+                <td>
+                  the round is deleted by an administrator
+                  <mark class="legal-placeholder"
+                    >[DESCRIBE WHEN OLD ROUNDS ARE DELETED]</mark
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Results archive</td>
+                <td>
+                  no automatic deletion; anonymised when you delete your account
+                </td>
+              </tr>
+              <tr>
+                <td>Chat messages</td>
+                <td>not stored</td>
+              </tr>
+              <tr>
+                <td>Game server and web server logs</td>
+                <td>
+                  <mark class="legal-placeholder">[LOG RETENTION PERIOD]</mark>
+                </td>
+              </tr>
+              <tr>
+                <td>Backups</td>
+                <td>
+                  14 days on the server;
+                  <mark class="legal-placeholder"
+                    >[OFF-SERVER COPIES: RETENTION]</mark
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Browser storage</td>
+                <td>sign-out (sign-in entries) or until you clear it</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          When you delete your account, your account, all your sessions and your
+          security log entries are deleted at once. Your player name in rounds
+          and in the results archive is replaced with "Deleted player" and the
+          link to your account is removed. The deletion itself is recorded in
+          the security log (time, IP address, user agent, without an account
+          reference) and kept for the security log period.
+        </p>
+      </section>
+
+      <section id="rights" class="guide-section">
+        <h2>Your rights</h2>
+        <p>Under the GDPR you have the right to:</p>
+        <ul>
+          <li>
+            <strong>access</strong> your data and receive a copy &mdash; use
+            <strong>Download my data</strong> in the lobby (JSON file with your
+            account, sessions, security log entries, player entries and results)
+            or write to us;
+          </li>
+          <li>
+            <strong>rectification</strong> of incorrect data &mdash; write to
+            <mark class="legal-placeholder">[CONTACT EMAIL]</mark>;
+          </li>
+          <li>
+            <strong>erasure</strong> &mdash; use <strong>Delete account</strong>
+            in the lobby or write to us;
+          </li>
+          <li><strong>restriction</strong> of processing;</li>
+          <li>
+            <strong>data portability</strong> (the download is a JSON file);
+          </li>
+          <li>
+            <strong>object</strong> to processing based on legitimate interests,
+            for reasons arising from your particular situation;
+          </li>
+          <li>
+            <strong>withdraw consent</strong> at any time where processing is
+            based on consent, without affecting earlier processing;
+          </li>
+          <li>
+            <strong>lodge a complaint</strong> with a supervisory authority, for
+            example
+            <mark class="legal-placeholder">[SUPERVISORY AUTHORITY]</mark>.
+          </li>
+        </ul>
+        <p>
+          There is no automated decision-making or profiling with legal or
+          similarly significant effects.
+        </p>
+      </section>
+
+      <section id="security" class="guide-section">
+        <h2>Security</h2>
+        <p>
+          Passwords are stored only as hashes. Connections are encrypted with
+          TLS
+          <mark class="legal-placeholder">[CONFIRM THAT HTTPS IS ENABLED]</mark
+          >. Access to the servers and backups is restricted to
+          <mark class="legal-placeholder">[WHO HAS ACCESS]</mark>.
+        </p>
+      </section>
+
+      <section id="changes" class="guide-section">
+        <h2>Changes to this notice</h2>
+        <p>
+          This notice is updated when the processing changes. The date at the
+          top shows the current version.
+        </p>
+      </section>
+
+      <footer class="guide-footer">
+        <p>
+          <a href="#top">Back to top</a> &middot; <a href="/">Lobby</a> &middot;
+          <a href="/imprint.html">Imprint</a>
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
