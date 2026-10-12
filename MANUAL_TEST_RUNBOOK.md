@@ -67,7 +67,7 @@ window to play with two accounts.
 
 ## 2. Lobby (`index.html`)
 
-1. **Register:** "Create account" opens a dialog with username, display name, email, Discord handle (required), Telegram handle (optional), password and confirmation. Passwords need at least 12 characters with upper and lower case, a digit and a special character. A weak password or duplicate username shows the backend message in the dialog. Success signs you in.
+1. **Register:** "Create account" opens a dialog with username, display name, email, Discord handle (optional), Telegram handle (optional), password and confirmation. Passwords need at least 12 characters with upper and lower case, a digit and a special character. A weak password or duplicate username shows the backend message in the dialog. Success signs you in.
 2. **Login / logout:** sign in; the account summary shows your name and "Logout" becomes enabled. Logout clears the local session even if the backend is unreachable.
 3. **Change password:** signed in, "Change password" opens a dialog. A mismatched confirmation is rejected locally; a weak new password shows the backend rule; a valid change signs you out and asks you to sign in with the new password.
 4. **Session check:** reload the page while signed in. The lobby calls `GET /auth/me`; a valid token keeps you signed in. Invalidate the token (log out in another tab or restart the backend with a fresh DB) and reload: the lobby clears the session and asks you to sign in.
