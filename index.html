@@ -91,6 +91,7 @@
               <span class="account-data-label">Your data:</span>
               <button
                 id="download-account-data"
+                aria-describedby="account-data-hint"
                 class="logout-btn"
                 type="button"
                 disabled
@@ -99,6 +100,7 @@
               </button>
               <button
                 id="open-delete-account"
+                aria-describedby="account-data-hint"
                 class="logout-btn danger-btn"
                 type="button"
                 disabled
@@ -106,6 +108,14 @@
                 Delete account
               </button>
             </div>
+            <p id="account-data-hint" class="account-data-hint">
+              <strong>Download my data</strong> saves a file with everything
+              stored about your account: profile, sign-ins and the login history
+              of the last 90 days, the rounds you played and your results. No
+              passwords are included. <strong>Delete account</strong> removes
+              your account for good; your name in past results is replaced by
+              "Deleted player".
+            </p>
           </section>
 
           <div class="auth-links">

@@ -266,6 +266,13 @@ summary:focus-visible,
   font-size: 0.85rem;
 }
 
+.account-data-hint {
+  margin: 0;
+  color: var(--lobby-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .danger-btn {
   border-color: rgba(255, 120, 120, 0.55);
   color: var(--lobby-danger);
