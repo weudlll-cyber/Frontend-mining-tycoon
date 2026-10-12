@@ -3,7 +3,7 @@
 Starts the frontend Vite dev server in a detached process with PID/log tracking.
 
 .DESCRIPTION
-Runs `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort` from the project root,
+Runs `npm run dev -- --host 127.0.0.1 --port 5273 --strictPort` from the project root,
 records process metadata to `data/frontend_dev_process.json`, and writes stdout/stderr logs.
 
 .PARAMETER StateFile
@@ -13,7 +13,7 @@ Optional path to the process state file. Defaults to data\frontend_dev_process.j
 Frontend host binding. Defaults to 127.0.0.1.
 
 .PARAMETER Port
-Frontend port. Defaults to 5173.
+Frontend port. Defaults to 5273.
 
 .EXAMPLE
 ./scripts/dev_frontend_start.ps1
@@ -22,7 +22,7 @@ Frontend port. Defaults to 5173.
 param(
     [string]$StateFile = "",
     [string]$BindHost = "127.0.0.1",
-    [int]$Port = 5173
+    [int]$Port = 5273
 )
 
 $ErrorActionPreference = "Stop"

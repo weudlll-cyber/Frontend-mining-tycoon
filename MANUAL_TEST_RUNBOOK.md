@@ -33,7 +33,7 @@ Set-Location "..\frontend mining tycoon"
 & .\scripts\dev_frontend_start.ps1   # or: npm run dev
 ```
 
-Pages: `http://127.0.0.1:5173/` (lobby), `/player.html` (player board, opened
+Pages: `http://127.0.0.1:5273/` (lobby), `/player.html` (player board, opened
 from the lobby), `/admin.html` (admin console). Use two browsers or a private
 window to play with two accounts.
 
