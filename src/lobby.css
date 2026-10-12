@@ -210,6 +210,47 @@ summary:focus-visible,
   cursor: not-allowed;
 }
 
+/* Signed-in account panel: replaces the login form while signed in. */
+.account-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(43, 193, 147, 0.45);
+  border-radius: 12px;
+  background: rgba(8, 16, 30, 0.6);
+}
+
+.account-panel[hidden],
+.auth-form[hidden] {
+  display: none;
+}
+
+.account-signed-in {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--lobby-text);
+}
+
+.account-signed-in strong {
+  color: #6ee7b7;
+}
+
+.account-username {
+  color: var(--lobby-text-soft);
+  font-size: 0.9rem;
+}
+
+.account-panel .auth-helpers {
+  margin-top: 0;
+}
+
+.auth-links {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+
 /* Account data-protection row (download / delete), below the account
    buttons so the main row stays short. */
 .account-data-actions {

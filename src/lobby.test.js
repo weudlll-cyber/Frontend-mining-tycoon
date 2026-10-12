@@ -211,6 +211,48 @@ async function bootLobbySignedIn({ games = [OPEN_SYNC_GAME] } = {}) {
   return authClient;
 }
 
+describe('lobby signed-in view', () => {
+  it('shows the sign-in form and hides the account panel when signed out', async () => {
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    expect(document.getElementById('login-form').hidden).toBe(false);
+    expect(document.getElementById('account-panel').hidden).toBe(true);
+  });
+
+  it('replaces the sign-in form with the account panel and the name', async () => {
+    await bootLobbySignedIn();
+
+    expect(document.getElementById('login-form').hidden).toBe(true);
+    expect(document.getElementById('account-panel').hidden).toBe(false);
+    expect(document.getElementById('account-display-name').textContent).toBe(
+      'Weudl'
+    );
+    expect(document.getElementById('account-username').textContent).toBe(
+      '(@weudl)'
+    );
+    expect(
+      document.getElementById('open-register-dialog').closest('[hidden]')
+    ).not.toBeNull();
+  });
+
+  it('shows the sign-in form again after logout', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.logout).mockResolvedValue(null);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    document.getElementById('logout-btn').click();
+    await flushPromises();
+
+    expect(document.getElementById('login-form').hidden).toBe(false);
+    expect(document.getElementById('account-panel').hidden).toBe(true);
+    expect(document.getElementById('account-display-name').textContent).toBe(
+      ''
+    );
+  });
+});
+
 describe('lobby join flow', () => {
   it('stores the returned player_token under the per-game player key', async () => {
     const authClient = await bootLobbySignedIn();
