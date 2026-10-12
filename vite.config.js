@@ -16,9 +16,11 @@ import { defineConfig } from 'vite';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // Fixed, non-default ports so this project can run next to other Vite
+  // projects on the same machine (Vite's defaults are 5173 / 4173).
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: 5273,
     strictPort: true,
     watch: {
       // Exclude dirs that have no source to watch — watcher overload is the
@@ -31,6 +33,11 @@ export default defineConfig({
         '**/.git/**',
       ],
     },
+  },
+  preview: {
+    host: '127.0.0.1',
+    port: 4273,
+    strictPort: true,
   },
   build: {
     rollupOptions: {

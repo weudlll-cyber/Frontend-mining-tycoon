@@ -144,6 +144,9 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Local dev ports moved off Vite's defaults: dev server 5273 (was 5173),
+  `npm run preview` 4273 (was 4173), both `strictPort`, so the project can run
+  next to other Vite projects. The backend stays on 8000.
 - Refactor, no behavior change: `src/main.js` (2,590 lines) is now a thin
   composition root (~750 lines). Its responsibilities moved into player-board
   modules: `src/ui/board-dom.js`, `board-state.js`, `board-update.js`,

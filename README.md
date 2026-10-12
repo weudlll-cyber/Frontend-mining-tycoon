@@ -57,22 +57,28 @@ the sibling backend repo docs in the same workstream.
    ```powershell
    Set-Location "..\frontend mining tycoon"
    npm ci
-   & .\scripts\dev_frontend_start.ps1   # detached, fixed port 5173
+   & .\scripts\dev_frontend_start.ps1   # detached, fixed port 5273
    # or interactively: npm run dev
    ```
 
-   The detached script enforces port 5173 (`--strictPort`) and tracks the
+   The detached script enforces port 5273 (`--strictPort`) and tracks the
    process in `data/frontend_dev_process.json` (logs in
    `data/frontend_dev_stdout.log` and `data/frontend_dev_stderr.log`). Stop it
    with `& .\scripts\dev_frontend_stop.ps1`.
 
-3. Create a round: open `http://127.0.0.1:5173/admin.html`, choose Sync or
+   Ports: the dev server uses **5273** and `npm run preview` uses **4273**
+   (both `strictPort`, set in `vite.config.js`). They deliberately differ from
+   Vite's defaults (5173 / 4173) so this project can run next to other Vite
+   projects on the same machine. The backend stays on 8000; its dev-mode CORS
+   and chat origin checks accept any `localhost` / `127.0.0.1` port.
+
+3. Create a round: open `http://127.0.0.1:5273/admin.html`, choose Sync or
    Async, durations, scoring mode and trades, then click **Create Round**. If
    the backend enforces admin auth (`REQUIRE_ADMIN_FOR_GAME_CREATE=true`),
    sign in with an administrator account in section 1 or enter the admin
    token there.
 
-4. Play: open `http://127.0.0.1:5173/`, create an account or sign in, select
+4. Play: open `http://127.0.0.1:5273/`, create an account or sign in, select
    the game in **Open Games** and click **Enter game**. The player board opens
    and connects automatically; async rounds start your session automatically.
 
@@ -441,7 +447,7 @@ PowerShell scripts (`scripts/`):
 
 | Script | Purpose |
 |---|---|
-| `dev_frontend_start.ps1` / `dev_frontend_stop.ps1` | start/stop the detached dev server on port 5173 |
+| `dev_frontend_start.ps1` / `dev_frontend_stop.ps1` | start/stop the detached dev server on port 5273 |
 | `enable_git_hooks.ps1` | activate the tracked pre-push hook (`.githooks/`) |
 | `pre_push_gate.ps1` | local quality gate (`-Profile fast` or `full`) |
 | `push_with_audit.ps1` | summarize outgoing changes, run the gate, push |
