@@ -48,8 +48,28 @@
               >
                 Create account
               </button>
-              <button id="logout-btn" class="logout-btn" type="button" disabled>
-                Logout
+            </div>
+          </form>
+
+          <section
+            id="account-panel"
+            class="account-panel"
+            aria-label="Your account"
+            hidden
+          >
+            <p class="account-signed-in">
+              Signed in as
+              <strong id="account-display-name"></strong>
+              <span id="account-username" class="account-username"></span>
+            </p>
+            <div class="auth-helpers">
+              <button
+                id="open-results-dialog"
+                class="logout-btn"
+                type="button"
+                disabled
+              >
+                My results
               </button>
               <button
                 id="open-change-password"
@@ -59,23 +79,9 @@
               >
                 Change password
               </button>
-              <button
-                id="open-results-dialog"
-                class="logout-btn"
-                type="button"
-                disabled
-              >
-                My results
+              <button id="logout-btn" class="logout-btn" type="button" disabled>
+                Logout
               </button>
-              <a
-                id="how-to-play-link"
-                class="link-button"
-                href="/how-to-play.html"
-                >How to play</a
-              >
-              <a id="admin-setup-link" class="link-button" href="/admin.html"
-                >Admin setup</a
-              >
             </div>
             <div
               class="account-data-actions"
@@ -100,7 +106,19 @@
                 Delete account
               </button>
             </div>
-          </form>
+          </section>
+
+          <div class="auth-links">
+            <a
+              id="how-to-play-link"
+              class="link-button"
+              href="/how-to-play.html"
+              >How to play</a
+            >
+            <a id="admin-setup-link" class="link-button" href="/admin.html"
+              >Admin setup</a
+            >
+          </div>
 
           <p
             id="auth-message"

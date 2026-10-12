@@ -147,6 +147,10 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Lobby: while signed in, the sign-in form and "Create account" are hidden
+  and a "Your account" panel shows "Signed in as <display name>
+  (@username)" with My results, Change password, Logout and the "Your data"
+  row; How to play and Admin setup moved below as plain links.
 - Create account: the Discord handle is optional like the Telegram handle
   (field no longer `required`, labelled "(optional)"); blank handles are sent
   as `null`. Needs backend support (Mining-tycoon PR "optional Discord

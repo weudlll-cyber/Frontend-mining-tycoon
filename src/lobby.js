@@ -94,6 +94,10 @@ const accountSummaryEl = document.getElementById('account-summary');
 const openGamesListEl = document.getElementById('open-games-list');
 const joinSelectedBtn = document.getElementById('join-selected-btn');
 const loginForm = document.getElementById('login-form');
+const accountPanelEl = document.getElementById('account-panel');
+const accountDisplayNameEl = document.getElementById('account-display-name');
+const accountUsernameEl = document.getElementById('account-username');
+const brandSubtitleEl = document.querySelector('.brand-subtitle');
 const registerForm = document.getElementById('register-form');
 const registerMessageEl = document.getElementById('register-message');
 const registerUsernameInput = document.getElementById('register-username');
@@ -236,6 +240,37 @@ function updateJoinButtonState() {
 
   // "Download my data" / "Delete account" also need the bearer token.
   setAccountDataEnabled(authState.isAuthenticated);
+
+  renderAuthView();
+}
+
+/**
+ * Show either the sign-in form (signed out) or the account panel with the
+ * signed-in name (signed in), so it is obvious whether you are logged in.
+ */
+function renderAuthView() {
+  const signedIn = authState.isAuthenticated;
+  if (loginForm) loginForm.hidden = signedIn;
+  if (accountPanelEl) accountPanelEl.hidden = !signedIn;
+  if (accountDisplayNameEl) {
+    accountDisplayNameEl.textContent = signedIn
+      ? authState.displayName || authState.username
+      : '';
+  }
+  if (accountUsernameEl) {
+    const showUsername =
+      signedIn &&
+      authState.username &&
+      authState.username !== authState.displayName;
+    accountUsernameEl.textContent = showUsername
+      ? `(@${authState.username})`
+      : '';
+  }
+  if (brandSubtitleEl) {
+    brandSubtitleEl.textContent = signedIn
+      ? 'Choose one of the open games to enter the live board.'
+      : 'Sign in first, then choose one of the open games to enter the live board.';
+  }
 }
 
 /**
