@@ -23,3 +23,7 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Local dev server state and logs (scripts/dev_frontend_start.ps1)
+data/frontend_dev_process.json
+data/frontend_dev_*.log

@@ -132,6 +132,7 @@ $proc = Start-Process `
     -FilePath "cmd.exe" `
     -ArgumentList "/c", $npmCommand `
     -WorkingDirectory $projectRoot `
+    -WindowStyle Hidden `
     -RedirectStandardOutput $outLog `
     -RedirectStandardError $errLog `
     -PassThru

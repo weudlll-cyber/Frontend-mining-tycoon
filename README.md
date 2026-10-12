@@ -44,6 +44,20 @@ the sibling backend repo docs in the same workstream.
 
 ## Quick Start
 
+**Fastest way (both servers in the background, no windows to keep open):**
+
+```powershell
+Set-Location "C:\path\to\frontend mining tycoon"
+& .\scripts\dev_all_start.ps1   # backend :8000 + frontend :5273, hidden
+& .\scripts\dev_all_stop.ps1    # stop both
+```
+
+`dev_all_start.ps1` runs the sibling backend's `scripts/dev_start.ps1` and this
+repo's `scripts/dev_frontend_start.ps1`, waits until both answer, and reuses
+servers that are already running. Logs: `<backend>/data/api_*.log` and
+`data/frontend_dev_*.log`. Use `-BackendPath` if the backend repo is not the
+sibling folder `Mining tycoon`. The step-by-step setup follows.
+
 1. Start the backend (sibling repo):
 
    ```powershell
@@ -447,7 +461,8 @@ PowerShell scripts (`scripts/`):
 
 | Script | Purpose |
 |---|---|
-| `dev_frontend_start.ps1` / `dev_frontend_stop.ps1` | start/stop the detached dev server on port 5273 |
+| `dev_all_start.ps1` / `dev_all_stop.ps1` | start/stop backend (:8000) and frontend (:5273) together, hidden in the background |
+| `dev_frontend_start.ps1` / `dev_frontend_stop.ps1` | start/stop the detached dev server on port 5273 (hidden, logs in `data/`) |
 | `enable_git_hooks.ps1` | activate the tracked pre-push hook (`.githooks/`) |
 | `pre_push_gate.ps1` | local quality gate (`-Profile fast` or `full`) |
 | `push_with_audit.ps1` | summarize outgoing changes, run the gate, push |

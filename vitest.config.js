@@ -8,6 +8,12 @@ export default defineConfig({
     // which permanently blocked the pre-push gate. Threads run the same suite
     // green in half the time.
     pool: 'threads',
+    // Tests that freshly import src/main.js (after vi.resetModules) load the
+    // whole board module graph; on a loaded machine that exceeded the default
+    // 5 s and failed the pre-push gate at random. Generous limits only matter
+    // when something is slow; passing tests are not slowed down.
+    testTimeout: 30000,
+    hookTimeout: 30000,
     exclude: ['.stryker-tmp/**', 'coverage/**', 'dist/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
