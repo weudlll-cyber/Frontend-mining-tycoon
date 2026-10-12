@@ -201,6 +201,9 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- Random pre-push failures under CPU load: tests that freshly import
+  `src/main.js` hit Vitest's 5 s default timeout; `testTimeout`/`hookTimeout`
+  are now 30 s (`vitest.config.js`).
 - `dev_frontend_stop.ps1` refused to stop a server started by
   `dev_frontend_start.ps1` (the tracked `cmd.exe /c npm run dev` wrapper did
   not match its `vite` check) and only terminated the wrapper, leaving vite on
