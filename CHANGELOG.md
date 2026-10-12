@@ -10,6 +10,9 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- `scripts/dev_all_start.ps1` / `scripts/dev_all_stop.ps1`: start and stop
+  the local backend (:8000) and frontend dev server (:5273) together, hidden in
+  the background with log files, reusing servers that already run.
 - Scheduled sync rounds (live events). Admin create form section 3: "Start
   now" (default) or "Schedule start" with a local date-time picker (time zone
   shown), client check >= now + 60 s and <= `scheduling.max_days_ahead` days
@@ -198,6 +201,12 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- `dev_frontend_stop.ps1` refused to stop a server started by
+  `dev_frontend_start.ps1` (the tracked `cmd.exe /c npm run dev` wrapper did
+  not match its `vite` check) and only terminated the wrapper, leaving vite on
+  the port; it now accepts the wrapper, kills the whole process tree and stops
+  a leftover vite listener of this project. `dev_frontend_start.ps1` starts the
+  server hidden.
 - The trading panel no longer replaces a 0 % round fee with the 2 % fallback.
 
 - Admin "Advanced overrides" were silently ignored (wrong field names) (#19).

@@ -56,19 +56,21 @@ catch {
     $cmdLine = ""
 }
 
-if ($cmdLine -and ($cmdLine -notlike "*vite*" -or ($expectedPort -gt 0 -and $cmdLine -notlike "*--port $expectedPort*"))) {
+# dev_frontend_start.ps1 tracks the `cmd.exe /c npm run dev ...` wrapper; an
+# adopted listener is the vite node process itself. Accept both.
+$looksLikeDevServer = ($cmdLine -like "*vite*") -or ($cmdLine -like "*npm run dev*")
+if ($cmdLine -and (-not $looksLikeDevServer -or ($expectedPort -gt 0 -and $cmdLine -notlike "*--port $expectedPort*"))) {
     Write-Warning "PID $procId command line no longer matches expected vite command/port."
     Write-Warning "Skipping terminate for safety; keeping state file."
     exit 1
 }
 
-try {
-    if ($procCim) {
-        $null = Invoke-CimMethod -InputObject $procCim -MethodName Terminate
-    }
-}
-catch {
-    Write-Warning "Failed to terminate PID $procId via CIM."
+# The tracked PID is the cmd.exe wrapper; vite runs as its child node process.
+# Terminating only the wrapper would leave vite running and holding the port,
+# so stop the whole process tree.
+& taskkill.exe /PID $procId /T /F *> $null
+if ($LASTEXITCODE -ne 0 -and (Get-Process -Id $procId -ErrorAction SilentlyContinue)) {
+    Write-Warning "Failed to terminate process tree of PID $procId."
     exit 1
 }
 
@@ -76,6 +78,18 @@ Start-Sleep -Seconds 2
 if (Get-Process -Id $procId -ErrorAction SilentlyContinue) {
     Write-Warning "Frontend PID $procId is still running."
     exit 1
+}
+
+# Safety net: if a vite process of THIS project still listens on the port
+# (for example because the wrapper tree was broken), stop it as well.
+if ($expectedPort -gt 0) {
+    $projectRoot = Split-Path -Parent $PSScriptRoot
+    Get-NetTCPConnection -LocalPort $expectedPort -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
+        $listenerCmd = [string](Get-CimInstance Win32_Process -Filter "ProcessId = $($_.OwningProcess)").CommandLine
+        if ($listenerCmd -like "*vite*" -and $listenerCmd -like "*$projectRoot*") {
+            & taskkill.exe /PID $_.OwningProcess /T /F *> $null
+        }
+    }
 }
 
 Remove-Item -Path $StateFile -Force
