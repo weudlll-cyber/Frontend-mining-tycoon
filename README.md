@@ -114,7 +114,7 @@ console all use this default; the Backend URL fields on `player.html` and
 
 ### Lobby (`index.html`, `src/lobby.js`)
 
-- Sign in, **Create account** (username, display name, email, Discord handle, optional Telegram handle, password with at least 12 characters incl. upper/lower case, digit and special character) and **Logout**.
+- Sign in, **Create account** (username, display name, email, optional Discord and Telegram handles, password with at least 12 characters incl. upper/lower case, digit and special character) and **Logout**.
 - A stored login is re-validated with `GET /auth/me` on load; an invalid token signs you out.
 - **Change password** (signed in only) opens a dialog for current/new password. The backend ends all sessions after a change, so the lobby signs you out and asks you to sign in again.
 - **Download my data** (signed in only) fetches `GET /auth/me/export` with your token and saves it as `mining-tycoon-account-export.json`.

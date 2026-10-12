@@ -59,7 +59,7 @@ export async function register(baseUrl, payload) {
         email: safeTrim(payload?.email),
         password: String(payload?.password || ''),
         display_name: safeTrim(payload?.displayName),
-        discord_handle: safeTrim(payload?.discord),
+        discord_handle: safeTrim(payload?.discord) || null,
         telegram_handle: safeTrim(payload?.telegram) || null,
       },
     });

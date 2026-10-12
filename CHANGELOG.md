@@ -147,6 +147,10 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Create account: the Discord handle is optional like the Telegram handle
+  (field no longer `required`, labelled "(optional)"); blank handles are sent
+  as `null`. Needs backend support (Mining-tycoon PR "optional Discord
+  handle"); older backends still require it.
 - Local dev ports moved off Vite's defaults: dev server 5273 (was 5173),
   `npm run preview` 4273 (was 4173), both `strictPort`, so the project can run
   next to other Vite projects. The backend stays on 8000.

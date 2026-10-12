@@ -55,6 +55,28 @@ describe('auth-client', () => {
     expect(options.body).toContain('discord_handle');
   });
 
+  it('sends null for blank optional Discord and Telegram handles', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 2 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await register('http://127.0.0.1:8000', {
+      username: 'bob',
+      email: 'b@example.com',
+      password: 'secret',
+      displayName: 'Bob',
+      discord: '   ',
+      telegram: '',
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.discord_handle).toBeNull();
+    expect(body.telegram_handle).toBeNull();
+  });
+
   it('maps duplicate registration error to friendly guidance', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
