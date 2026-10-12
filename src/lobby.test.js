@@ -237,6 +237,20 @@ describe('lobby signed-in view', () => {
     ).not.toBeNull();
   });
 
+  it('explains the account data buttons', async () => {
+    await bootLobbySignedIn();
+    const hint = document
+      .getElementById('account-data-hint')
+      .textContent.replace(/\s+/g, ' ');
+    expect(hint).toContain('Download my data');
+    expect(hint).toContain('No passwords are included');
+    expect(
+      document
+        .getElementById('download-account-data')
+        .getAttribute('aria-describedby')
+    ).toBe('account-data-hint');
+  });
+
   it('shows the sign-in form again after logout', async () => {
     const authClient = await bootLobbySignedIn();
     vi.mocked(authClient.logout).mockResolvedValue(null);

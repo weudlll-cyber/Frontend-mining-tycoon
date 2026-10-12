@@ -147,6 +147,9 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Lobby "Your data": a short explanation under Download my data / Delete
+  account says what the export contains (profile, sign-ins and 90-day login
+  history, rounds played, results; no passwords) and what deletion does.
 - Lobby: while signed in, the sign-in form and "Create account" are hidden
   and a "Your account" panel shows "Signed in as <display name>
   (@username)" with My results, Change password, Logout and the "Your data"
