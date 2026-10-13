@@ -16,6 +16,30 @@ function readStyleCss() {
 }
 
 describe('dashboard layout css guardrails', () => {
+  it('binds the desktop player page to the window height (no page scroll)', () => {
+    const css = readStyleCss();
+    const block = css.slice(css.indexOf('@media (min-width: 769px) {'));
+    expect(block).toContain('.page-player .app-layout');
+    expect(block).toMatch(/height:\s*100dvh/);
+  });
+
+  it('has a compact mode for low windows (1366x768, 150 % scaling)', () => {
+    const css = readStyleCss();
+    const start = css.indexOf(
+      '@media (min-width: 769px) and (max-height: 760px)'
+    );
+    expect(start).toBeGreaterThan(-1);
+    const block = css.slice(start, start + 2500);
+    for (const selector of [
+      '.page-player .game-header',
+      '.page-player .event-banner',
+      '.page-player .season-card',
+      '.page-player .bottom-bar',
+    ]) {
+      expect(block).toContain(selector);
+    }
+  });
+
   it('keeps page scrolling disabled at html/body level', () => {
     const css = readStyleCss();
 

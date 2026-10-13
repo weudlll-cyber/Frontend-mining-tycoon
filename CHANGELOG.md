@@ -220,6 +220,13 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- Player board scrolled on low windows (1366x768 laptops, 1920x1080 at
+  150 % Windows scaling = about 1280x630 CSS px): the bottom upgrade rows were
+  cut and the action bar (Trade/Farm/Chat/Top 5) was off screen. The desktop
+  board is now bound to the window height and a compact mode for windows up
+  to 760 px high reduces spacing (not font sizes). Verified in Chrome at
+  1920x947, 1600x767, 1536x731 (125 %), 1366x635 and 1280x630 (150 %), with
+  and without the event banner: no page scroll and nothing hidden.
 - Event banner: it added another line on almost every live update (the
   banner tooltip lives in the shared tooltip layer; when that bubble was
   detached, the banner was rebuilt by appending a second content line). The
