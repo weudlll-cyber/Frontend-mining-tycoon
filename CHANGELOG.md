@@ -147,6 +147,12 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Event banner with several concurrent events: it stays one line high (the
+  board must not grow and scroll) and shows one event at a time in full,
+  with a counter ("Event 1/2"), rotating every 4 s; the rotation pauses while
+  the pointer or keyboard focus is on the banner, and the tooltip still lists
+  all events. Previously all events were joined on one line and everything
+  after the first was cut off.
 - Tooling: vite 7 → 8, jsdom 28 → 30, knip 6.40 → 6.41 (combines Dependabot
   #51-#53; no code changes needed). jsdom 30 requires Node >= 24.15.
 - Lobby "Your data": a short explanation under Download my data / Delete

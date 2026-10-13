@@ -5,7 +5,7 @@ Role in system: Regression coverage for event indicators in display-only fronten
 Invariants/Security: Keeps event UX non-blocking and safely rendered via controlled DOM APIs.
 */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getActiveEvents,
   initEventDisplay,
@@ -14,6 +14,7 @@ import {
   clearEventIndicators,
   getEventTooltipElement,
   getEventTooltipId,
+  stopEventRotation,
 } from './event-display.js';
 
 function buildFixture() {
@@ -49,6 +50,11 @@ function buildFixture() {
 beforeEach(() => {
   clearEventIndicators();
   buildFixture();
+});
+
+afterEach(() => {
+  stopEventRotation();
+  vi.useRealTimers();
 });
 
 describe('event display', () => {
@@ -598,7 +604,7 @@ describe('event display', () => {
       );
     });
 
-    it('lists multiple concurrent events in the banner and tooltip', () => {
+    it('shows one event at a time on a single line and lists all in the tooltip', () => {
       renderEventBanner({
         game_id: 42,
         current_sim_month: 5,
@@ -606,13 +612,69 @@ describe('event display', () => {
       });
 
       const content = document.querySelector('.event-banner-content');
-      expect(content.textContent).toContain('⚡ 2 events:');
-      expect(content.textContent).toContain('Demand Surge');
-      expect(content.textContent).toContain(
-        'Liquidity Crunch (Spread +4.0% (all tokens))'
-      );
+      expect(content.textContent).toContain('⚡ Event 1/2: Demand Surge');
+      expect(content.textContent).not.toContain('Liquidity Crunch');
       const tooltip = getEventTooltipElement();
       expect(tooltip.textContent.split('\n')).toHaveLength(2);
+    });
+
+    it('rotates through concurrent events every 4 seconds', () => {
+      vi.useFakeTimers();
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [demandSurge(), liquidityCrunch()],
+      });
+      const content = () =>
+        document.querySelector('.event-banner-content').textContent;
+
+      expect(content()).toContain('Event 1/2: Demand Surge');
+      vi.advanceTimersByTime(4000);
+      expect(content()).toContain(
+        'Event 2/2: Liquidity Crunch (Spread +4.0% (all tokens))'
+      );
+      vi.advanceTimersByTime(4000);
+      expect(content()).toContain('Event 1/2: Demand Surge');
+    });
+
+    it('pauses the rotation while the pointer is on the banner', () => {
+      vi.useFakeTimers();
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [demandSurge(), liquidityCrunch()],
+      });
+      const banner = document.querySelector('.event-banner');
+      const content = () =>
+        document.querySelector('.event-banner-content').textContent;
+
+      banner.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(12000);
+      expect(content()).toContain('Event 1/2: Demand Surge');
+
+      banner.dispatchEvent(new Event('mouseleave'));
+      vi.advanceTimersByTime(4000);
+      expect(content()).toContain('Event 2/2: Liquidity Crunch');
+    });
+
+    it('shows a single event without a counter and stops rotating', () => {
+      vi.useFakeTimers();
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [demandSurge(), liquidityCrunch()],
+      });
+      renderEventBanner({
+        game_id: 42,
+        current_sim_month: 5,
+        active_events: [liquidityCrunch()],
+      });
+      const content = () =>
+        document.querySelector('.event-banner-content').textContent;
+      expect(content()).toContain('⚡ Event: Liquidity Crunch');
+      vi.advanceTimersByTime(8000);
+      expect(content()).toContain('⚡ Event: Liquidity Crunch');
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it('falls back to remaining sim-months when no rate is known', () => {
