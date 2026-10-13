@@ -49,6 +49,12 @@ describe('toast notifications', () => {
     expect(error.textContent).toBe('<b>Join failed</b>');
   });
 
+  it('keeps at most two toasts per region so quick actions do not stack', () => {
+    for (let i = 1; i <= 5; i += 1) showToast(`Upgrade ${i}`, 'success');
+    const shown = [...document.querySelectorAll('.toast-region-polite .toast')];
+    expect(shown.map((t) => t.textContent)).toEqual(['Upgrade 4', 'Upgrade 5']);
+  });
+
   it('shows, hides and removes a toast on its timers', () => {
     const toast = showToast('Saved', 'success');
     expect(toast.classList.contains('show')).toBe(false);

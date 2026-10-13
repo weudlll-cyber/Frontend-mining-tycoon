@@ -18,6 +18,9 @@ Security notes:
 const TOAST_VISIBLE_MS = 3000;
 const TOAST_FADE_MS = 300;
 const TOAST_SHOW_DELAY_MS = 10;
+// Rapid actions (for example several quick upgrades) must not stack toasts
+// over the board: keep only the newest few per region.
+const MAX_VISIBLE_TOASTS = 2;
 
 let _regions = null;
 
@@ -60,6 +63,10 @@ export function showToast(message, type = 'info') {
   // Errors interrupt (assertive); everything else waits its turn (polite).
   const region = type === 'error' ? regions.assertive : regions.polite;
   region.appendChild(toast);
+  const visible = region.querySelectorAll('.toast');
+  for (let i = 0; i < visible.length - MAX_VISIBLE_TOASTS; i += 1) {
+    visible[i].remove();
+  }
 
   setTimeout(() => toast.classList.add('show'), TOAST_SHOW_DELAY_MS);
   setTimeout(() => {

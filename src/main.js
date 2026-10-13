@@ -163,6 +163,7 @@ import {
   initBoardUpdate,
   applyFarmUpdated,
   applyTradeExecuted,
+  applyUpgradeApplied,
   cancelPendingUiRender,
   showSessionFinishedOverlay,
   updateUI,
@@ -539,6 +540,7 @@ function initNetworkServices() {
     getStorageItem,
     getPlayerTokenStorageKey,
     onTradeExecuted: applyTradeExecuted,
+    onUpgradeApplied: applyUpgradeApplied,
     onFarmUpdated: applyFarmUpdated,
   });
   initSessionActions({

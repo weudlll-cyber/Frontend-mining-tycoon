@@ -172,6 +172,50 @@ describe('player live board wiring', () => {
     expect(tooltip.textContent).toContain('Market Rally');
   });
 
+  it('applies an upgrade response to the season cards before the next tick', async () => {
+    useMicrotaskAnimationFrames();
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    const state = (level) => ({
+      balances: { spring: 900, summer: 900, autumn: 900, winter: 900 },
+      upgrades_by_token: {
+        spring: { hashrate: 0, efficiency: 0, cooling: 0 },
+        summer: { hashrate: 0, efficiency: 0, cooling: 0 },
+        autumn: { hashrate: 0, efficiency: 0, cooling: 0 },
+        winter: { hashrate: level, efficiency: 0, cooling: 0 },
+      },
+    });
+    deps.onData({
+      game_id: 7,
+      player_id: 3,
+      game_status: 'running',
+      player_state: state(0),
+      upgrade_metrics: {
+        winter: {
+          upgrades: {
+            hashrate: {
+              cost_to_next_level: 88,
+              output_per_second: 5,
+              output_after: 5.5,
+              delta_output: 0.5,
+              breakeven_seconds: 176,
+            },
+          },
+        },
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const { applyUpgradeApplied } = await import('./ui/board-update.js');
+    applyUpgradeApplied({ updated_state: state(4) });
+
+    const levels = [
+      ...document.querySelectorAll('.btn-upgrade-inline[data-level]'),
+    ].map((b) => b.dataset.level);
+    expect(levels).toContain('4');
+  });
+
   it('labels sync standings Live while running and Final when finished', async () => {
     useMicrotaskAnimationFrames();
     const { getStreamDeps } = await bootMainWithCapturedStream();

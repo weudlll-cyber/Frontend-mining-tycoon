@@ -315,6 +315,23 @@ export function applyTradeExecuted(payload) {
   renderAfterActionResult();
 }
 
+/**
+ * `onUpgradeApplied` of game-actions.js: merge the returned player state and
+ * re-render the season cards too, so levels, balances and the next click use
+ * the new values before the next stream tick.
+ */
+export function applyUpgradeApplied(payload) {
+  const updatedState = payload?.updated_state;
+  if (!updatedState || typeof updatedState !== 'object') return;
+  boardState.lastGameData = {
+    ...(boardState.lastGameData || {}),
+    player_state: updatedState,
+  };
+  _deps.renderSeasonData(boardState.lastGameData);
+  _deps.renderUpgradeMetrics(boardState.lastGameData);
+  renderAfterActionResult();
+}
+
 /** `onFarmUpdated` of game-actions.js (deposit/withdraw). */
 export function applyFarmUpdated(payload) {
   // Same flow as trades: the backend returns the new state, the board
