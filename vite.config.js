@@ -4,7 +4,8 @@
  *   - main   → index.html  (auth + lobby start screen)
  *   - player → player.html (live player dashboard)
  *   - admin  → admin.html  (admin-only round setup)
- *   - howToPlay → how-to-play.html (static player guide, no script)
+ *   - howToPlay → how-to-play.html (static player guide, no script); one
+ *     more page per extra language in src/config/guide-languages.js
  *   - privacy / imprint → privacy.html, imprint.html (static legal page
  *     templates for the operator, no script)
  */
@@ -12,6 +13,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { defineConfig } from 'vite';
+import { GUIDE_LANGUAGES } from './src/config/guide-languages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +50,12 @@ export default defineConfig({
         howToPlay: resolve(__dirname, 'how-to-play.html'),
         privacy: resolve(__dirname, 'privacy.html'),
         imprint: resolve(__dirname, 'imprint.html'),
+        ...Object.fromEntries(
+          GUIDE_LANGUAGES.filter((lang) => lang.code !== 'en').map((lang) => [
+            `howToPlay_${lang.code}`,
+            resolve(__dirname, lang.file),
+          ])
+        ),
       },
     },
   },

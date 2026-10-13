@@ -9,7 +9,7 @@ Six pages:
 - **Lobby** (`index.html`): register, log in/out, pick an open game, join or rejoin it, see your result history, full final leaderboards and the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
 - **Admin console** (`admin.html`): create rounds with snapshot-locked settings, list and delete active games.
-- **How to play** (`how-to-play.html`): static player guide (rules, upgrades, halvings, trading, round types, scoring modes, events). Linked from the lobby and from the player-board header (opens in a new tab).
+- **How to play** (`how-to-play.html`): static player guide (the game in one minute, rules, upgrades, halvings, trading, round types, scoring modes, events, and a "What's coming" roadmap). Linked from the "New to Mining Tycoon?" box on the lobby start screen and from the player-board header (opens in a new tab). English is the default; translations are separate pages (see below).
 - **Privacy notice** (`privacy.html`) and **Imprint** (`imprint.html`): static legal page **templates** for the operator, with a "Template" banner and `[PLACEHOLDER]` markers. They must be completed and reviewed before going live (see `PRODUCTION_DEFAULTS_CHECKLIST.md`). Linked from the lobby footer, the registration dialog (privacy notice) and the how-to-play footer.
 
 ## Status
@@ -127,7 +127,7 @@ console all use this default; the Backend URL fields on `player.html` and
 - **Enter game** (requires sign-in and a selected game) joins with your account token, stores the game ID, player ID and `player_token`, and opens `player.html?autostart=1`. For a game you already joined the button reads **Rejoin**: the backend links players to accounts and returns your existing player (same player ID and token), so you continue instead of creating a second leaderboard row. A stale account token (`ACCOUNT_AUTH_INVALID`) signs you out; a round that requires sign-in (`ACCOUNT_REQUIRED`) shows the backend message.
 - **My results** (signed in only) opens a dialog with your finished rounds, newest first: date, round type, scoring mode, rank / participants, score and the name you played under, 20 per page with **Load more**, or "No finished rounds yet.". **Full results** shows the round's complete final leaderboard with your row highlighted. `index.html?results=<gameId>&player=<playerId>` (linked from the player board's Game Over overlay) opens that view directly, also signed out.
 - **Last Game Highscores** shows the Top 5 of your last finished round. Signed in, it uses the server (your newest history entry and its full results); signed out, or when the backend has no history endpoint, it shows the snapshot stored in this browser.
-- A **How to play** link opens the player guide (`how-to-play.html`) in the same tab; an **Admin setup** link leads to `admin.html`.
+- A **New to Mining Tycoon?** box at the top of the first panel (always visible, signed in or not) sums up the game in two sentences and links **How to play** (`how-to-play.html`, same tab) and **What's coming** (`how-to-play.html#roadmap`); an **Admin setup** link leads to `admin.html`.
 - A footer links the **Privacy** notice and the **Imprint**; the **Create account** dialog notes "By creating an account you agree to the privacy notice" with a link (new tab, no checkbox).
 
 ### Player board (`player.html`, `src/main.js`)
@@ -158,12 +158,32 @@ meet WCAG AA (4.5:1). Checks: `MANUAL_TEST_RUNBOOK.md` section 3a.
 
 ### How to play (`how-to-play.html`, `src/how-to-play.css`)
 
-A static guide without script: quick start, goal and tokens, mining, upgrades,
-halvings, oracle prices, trading, sync/async rounds, scoring modes, events, the
-live tools window, accounts and farming (Stage 1 rules), with a table of
-contents and section anchors (for example `/how-to-play.html#scoring`). It
-describes the current backend rules; update it in the same change when a game
-rule changes. `src/how-to-play.test.js` guards the anchors and both links.
+A static guide without script: the game in one minute, quick start, goal and
+tokens, mining, upgrades, halvings, oracle prices, trading, sync/async rounds,
+scoring modes, events, the live tools window, accounts, farming (Stage 1 rules)
+and "What's coming", with a table of contents and section anchors (for example
+`/how-to-play.html#scoring`). Every section except "What's coming" (`#roadmap`,
+the last one) describes the current backend rules; update it in the same change
+when a game rule changes, and move a roadmap item up into the rules once it
+ships. `src/how-to-play.test.js` guards the anchors, the language pages and the
+links.
+
+**Languages.** English (`how-to-play.html`) is the default. The languages are
+listed in `src/config/guide-languages.js`, and every guide page shows a
+language switch (`nav.guide-lang`) with all of them. To add one:
+
+1. Copy `how-to-play.html` to `how-to-play.<code>.html` (for example
+   `how-to-play.de.html`), set `<html lang="<code>">` and translate the text.
+   Keep every section `id` unchanged so anchors work in all languages.
+2. Add `{ code, label, file }` to `GUIDE_LANGUAGES` (Vite then builds the page).
+3. Add the new link to the language switch of every guide page, with
+   `aria-current="page"` only on each page's own language, and drop the
+   "More languages are coming." note.
+4. Add the file to the `format`, `format:fix` and `format:check` scripts in
+   `package.json`.
+
+The tests fail until the switch, the sections and the format scripts match the
+list.
 
 ### Legal page templates (`privacy.html`, `imprint.html`)
 
@@ -491,7 +511,7 @@ for the local gate, required CI checks and scheduled audits. In short:
 index.html          lobby page            -> src/lobby.js
 player.html         player board          -> src/main.js (composition root; board modules in src/ui/)
 admin.html          admin console         -> src/admin/admin-setup.js, game-management.js
-how-to-play.html    player guide (static) -> src/how-to-play.css
+how-to-play.html    player guide (static, English default; translations listed in src/config/guide-languages.js) -> src/how-to-play.css
 privacy.html        privacy notice template (static) -> src/how-to-play.css
 imprint.html        imprint template (static)        -> src/how-to-play.css
 src/config/         control data and backend URL default

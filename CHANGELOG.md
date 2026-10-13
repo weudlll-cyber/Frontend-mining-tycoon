@@ -10,6 +10,14 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Help for new players on the start screen: a "New to Mining Tycoon?" box at
+  the top of the lobby sums up the game and links the guide and its roadmap.
+  The how-to-play guide gains "The game in one minute" (the game principle in
+  five steps) and "What's coming" (planned features, and what is not planned
+  by design). The guide gets a language switch; English stays the default, and
+  translations are added as separate pages listed in
+  `src/config/guide-languages.js`.
+
 - `scripts/dev_all_start.ps1` / `scripts/dev_all_stop.ps1`: start and stop
   the local backend (:8000) and frontend dev server (:5273) together, hidden in
   the background with log files, reusing servers that already run.

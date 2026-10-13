@@ -96,6 +96,56 @@ body::after {
   line-height: 1.5;
 }
 
+/* "New to Mining Tycoon?" intro: always visible on the start screen, links
+   the how-to-play guide and its roadmap section. */
+.lobby-intro {
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(243, 180, 49, 0.45);
+  border-radius: 12px;
+  background: rgba(243, 180, 49, 0.1);
+}
+
+.lobby-intro h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  color: var(--lobby-accent);
+}
+
+.lobby-intro p {
+  margin: 0 0 0.7rem;
+  color: var(--lobby-text-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.lobby-intro-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.lobby-intro-button {
+  display: inline-block;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  background: var(--lobby-accent);
+  color: #10202f;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lobby-intro-button:hover,
+.lobby-intro-button:focus-visible {
+  background: var(--lobby-accent-strong);
+}
+
+.lobby-intro-link {
+  color: var(--lobby-text);
+  font-size: 0.92rem;
+}
+
 .backend-row {
   display: grid;
   gap: 0.35rem;
