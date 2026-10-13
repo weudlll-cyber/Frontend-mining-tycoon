@@ -174,9 +174,44 @@ function getRemaining(activeEvent, data) {
   const monthsLeft = Math.max(0, endMonth - currentMonth);
   const rate = getSimMonthsPerRealSecond(data);
   if (rate) {
+    // Events end when the clock reaches end_sim_month (end exclusive). Using
+    // the elapsed real seconds gives a per-second countdown; the whole-month
+    // difference only changed once per sim month (e.g. every 8 s).
+    const elapsed = getElapsedClockSeconds(data);
+    if (elapsed !== null) {
+      return { seconds: Math.max(0, endMonth / rate - elapsed) };
+    }
     return { seconds: monthsLeft / rate };
   }
   return { simMonths: monthsLeft };
+}
+
+/**
+ * Real seconds elapsed on the clock that drives sim months: the session clock
+ * for async sessions, otherwise the round run clock (duration - remaining).
+ * Returns null when the payload does not allow an exact value.
+ */
+function getElapsedClockSeconds(data) {
+  const sessionElapsed = Number(data?.session_elapsed_seconds);
+  if (Number.isFinite(sessionElapsed) && sessionElapsed >= 0) {
+    return sessionElapsed;
+  }
+  const meta = _getActiveGameMeta
+    ? _getActiveGameMeta(String(data?.game_id || ''))
+    : null;
+  const duration = Number(
+    meta?.game_duration_seconds ?? data?.game_duration_seconds
+  );
+  const remaining = Number(data?.run_remaining_seconds);
+  if (
+    Number.isFinite(duration) &&
+    duration > 0 &&
+    Number.isFinite(remaining) &&
+    remaining >= 0
+  ) {
+    return Math.max(0, duration - remaining);
+  }
+  return null;
 }
 
 function formatRemaining(activeEvent, data) {
@@ -329,15 +364,17 @@ function ensureEventBannerUi() {
     return false;
   }
 
-  _eventBannerContentEl = null;
-  _eventBannerTrigger = null;
-  _eventBannerBubble = null;
+  // Rebuild from scratch. Other board modules rebuild the shared
+  // #tooltip-layer, which detaches the banner bubble; without clearing the
+  // banner first, every rebuild appended another content line.
+  const tooltipId = 'event-banner-tip-current';
+  _eventBannerEl.replaceChildren();
+  document.getElementById(tooltipId)?.remove();
 
   _eventBannerContentEl = document.createElement('span');
   _eventBannerContentEl.className = 'event-banner-content selectable';
   _eventBannerEl.appendChild(_eventBannerContentEl);
 
-  const tooltipId = 'event-banner-tip-current';
   _eventBannerBubble = mountTooltipBubble({
     tooltipId,
     tooltipText: '',

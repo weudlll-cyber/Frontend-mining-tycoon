@@ -102,6 +102,106 @@ describe('event display', () => {
       expect(banner.textContent).toContain('−20% Cooling Efficiency');
     });
 
+    it('keeps exactly one banner line when the shared tooltip layer is rebuilt between updates', () => {
+      const data = {
+        active_events: [
+          {
+            event_id: 1,
+            event_type: 'cooling_breakthrough',
+            domain: 'output',
+            magnitude: 0.16,
+            label: 'Cooling Breakthrough',
+            start_sim_month: 1,
+            end_sim_month: 3,
+          },
+        ],
+        current_sim_month: 2,
+      };
+
+      for (let tick = 0; tick < 7; tick += 1) {
+        renderEventBanner(data);
+        // Other board modules rebuild #tooltip-layer; this detaches the
+        // banner's tooltip bubble and used to make the banner append a new
+        // line on every update.
+        document.getElementById('tooltip-layer').replaceChildren();
+      }
+      renderEventBanner(data);
+
+      const banner = document.querySelector('.event-banner');
+      expect(banner.querySelectorAll('.event-banner-content')).toHaveLength(1);
+      expect(banner.querySelectorAll('.event-banner-trigger')).toHaveLength(1);
+      expect(
+        document.querySelectorAll('#event-banner-tip-current')
+      ).toHaveLength(1);
+    });
+
+    it('counts the remaining time down per second from the real clock', () => {
+      initEventDisplay({
+        seasonScrollEl: document.querySelector('.seasons-scroll'),
+        // 0.125 sim months per second = 8 real seconds per sim month.
+        getActiveGameMeta: () => ({
+          sim_months_per_real_second: 0.125,
+          game_duration_seconds: 300,
+        }),
+      });
+      const event = {
+        event_id: 2,
+        event_type: 'firmware_vulnerability',
+        domain: 'output',
+        magnitude: -0.24,
+        label: 'Firmware Vulnerability',
+        start_sim_month: 0,
+        end_sim_month: 3, // ends when the clock reaches month 3 = 24 s
+      };
+      const banner = () => document.querySelector('.event-banner').textContent;
+
+      renderEventBanner({
+        game_id: 1,
+        active_events: [event],
+        current_sim_month: 1,
+        run_remaining_seconds: 290, // 10 s elapsed
+      });
+      expect(banner()).toContain('00:14 remaining');
+
+      renderEventBanner({
+        game_id: 1,
+        active_events: [event],
+        current_sim_month: 1,
+        run_remaining_seconds: 289, // one second later, same sim month
+      });
+      expect(banner()).toContain('00:13 remaining');
+    });
+
+    it('uses the session clock for async sessions', () => {
+      initEventDisplay({
+        seasonScrollEl: document.querySelector('.seasons-scroll'),
+        getActiveGameMeta: () => ({
+          sim_months_per_real_second: 0.125,
+          game_duration_seconds: 3600,
+        }),
+      });
+      renderEventBanner({
+        game_id: 1,
+        active_events: [
+          {
+            event_id: 3,
+            event_type: 'market_rally',
+            domain: 'oracle_price',
+            magnitude: 0.12,
+            label: 'Market Rally',
+            start_sim_month: 0,
+            end_sim_month: 2, // 16 s on the session clock
+          },
+        ],
+        current_sim_month: 0,
+        session_elapsed_seconds: 5,
+        run_remaining_seconds: 1000, // round clock must be ignored
+      });
+      expect(document.querySelector('.event-banner').textContent).toContain(
+        '00:11 remaining'
+      );
+    });
+
     it('includes countdown timer in banner', () => {
       const endUnix = Date.now() / 1000 + 125; // ~2:05
       const data = {

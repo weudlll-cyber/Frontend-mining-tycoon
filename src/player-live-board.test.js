@@ -131,6 +131,43 @@ describe('player live board wiring', () => {
     expect(banner.textContent).toContain('Spread +3.0% (all tokens)');
   });
 
+  it('keeps a single event banner line across many stream updates', async () => {
+    useMicrotaskAnimationFrames();
+    const { getStreamDeps } = await bootMainWithCapturedStream();
+    const deps = getStreamDeps();
+    const event = (id, label, start, end) => ({
+      event_id: id,
+      event_type: label.toLowerCase().replace(/ /g, '_'),
+      domain: 'output',
+      token: null,
+      magnitude: 0.16,
+      label,
+      start_sim_month: start,
+      end_sim_month: end,
+    });
+
+    for (let tick = 0; tick < 8; tick += 1) {
+      const events = [event(1, 'Cooling Breakthrough', 0, 4)];
+      if (tick >= 4) events.push(event(2, 'Market Rally', 2, 6));
+      deps.onData({
+        game_id: 7,
+        player_id: 3,
+        game_status: 'running',
+        current_sim_month: Math.floor(tick / 2),
+        run_remaining_seconds: 280 - tick,
+        active_events: events,
+      });
+      // Let the coalesced render frame run, like a browser between SSE ticks.
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    const banner = document.querySelector('.event-banner');
+    expect(banner.querySelectorAll('.event-banner-content')).toHaveLength(1);
+    expect(banner.textContent.match(/Cooling Breakthrough/g)).toHaveLength(1);
+    expect(banner.textContent.match(/Market Rally/g)).toHaveLength(1);
+  });
+
   it('labels sync standings Live while running and Final when finished', async () => {
     useMicrotaskAnimationFrames();
     const { getStreamDeps } = await bootMainWithCapturedStream();

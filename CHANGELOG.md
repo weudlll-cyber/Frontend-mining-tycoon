@@ -212,6 +212,14 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- Event banner: it added another line on almost every live update (the
+  banner tooltip lives in the shared tooltip layer; when that bubble was
+  detached, the banner was rebuilt by appending a second content line). The
+  rebuild now clears the banner first.
+- Event banner countdown jumped once per sim month (e.g. every 8 s). The
+  remaining time is now computed from the round's own clock (round duration
+  minus remaining run time, or the session clock for async sessions) and the
+  round's sim-month rate, so it counts down per second for any round length.
 - Random pre-push failures under CPU load: tests that freshly import
   `src/main.js` hit Vitest's 5 s default timeout; `testTimeout`/`hookTimeout`
   are now 30 s (`vitest.config.js`).
