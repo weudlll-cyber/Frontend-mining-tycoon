@@ -147,6 +147,8 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Changed
 
+- Tooling: vite 7 → 8, jsdom 28 → 30, knip 6.40 → 6.41 (combines Dependabot
+  #51-#53; no code changes needed). jsdom 30 requires Node >= 24.15.
 - Lobby "Your data": a short explanation under Download my data / Delete
   account says what the export contains (profile, sign-ins and 90-day login
   history, rounds played, results; no passwords) and what deletion does.
