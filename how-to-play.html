@@ -2,7 +2,8 @@
 File: how-to-play.html
 Purpose: Static player-facing "How to play" guide for Mining Tycoon.
 Role in system: Linked from the lobby (index.html) and the player board (player.html); its footer links the legal pages (privacy.html, imprint.html). It has no script and does not talk to the backend.
-Invariants: Content must match the current backend rules (backend README, app/policy/control_data.py, app/services/scoring_service.py). No features that do not exist.
+Invariants: Content must match the current backend rules (backend README, app/policy/control_data.py, app/services/scoring_service.py). No features that do not exist, except in the clearly marked "What's coming" section (#roadmap).
+Languages: English is the default page. Translations are separate static pages listed in src/config/guide-languages.js; every page carries the same language switch (.guide-lang).
 Security notes: Static HTML only; no script, no external fonts or CDNs.
 -->
 <!doctype html>
@@ -16,18 +17,37 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
   <body class="page-guide">
     <main class="guide-shell">
       <header id="top" class="guide-header">
-        <p class="guide-back"><a href="/">&larr; Back to the lobby</a></p>
+        <div class="guide-topbar">
+          <p class="guide-back"><a href="/">&larr; Back to the lobby</a></p>
+          <nav class="guide-lang" aria-label="Language">
+            <span class="guide-lang-label">Language:</span>
+            <ul>
+              <li>
+                <a
+                  href="/how-to-play.html"
+                  hreflang="en"
+                  lang="en"
+                  aria-current="page"
+                  >English</a
+                >
+              </li>
+            </ul>
+            <span class="guide-lang-note">More languages are coming.</span>
+          </nav>
+        </div>
         <h1>How to play Mining Tycoon</h1>
         <p class="guide-lead">
           Mine the four seasonal tokens, upgrade your rigs, time your trades and
           finish the round with the best score. Everything below describes the
-          game as it works today.
+          game as it works today; <a href="#roadmap">What's coming</a> shows
+          what is planned.
         </p>
       </header>
 
       <nav class="guide-toc" aria-label="Table of contents">
         <h2>Contents</h2>
         <ol>
+          <li><a href="#principle">The game in one minute</a></li>
           <li><a href="#quick-start">Quick start</a></li>
           <li><a href="#goal">The goal and the four tokens</a></li>
           <li><a href="#mining">Mining</a></li>
@@ -41,8 +61,46 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           <li><a href="#live-tools">Live tools window and tooltips</a></li>
           <li><a href="#accounts">Accounts and your name</a></li>
           <li><a href="#farming">Farming</a></li>
+          <li><a href="#roadmap">What's coming</a></li>
         </ol>
       </nav>
+
+      <section id="principle" class="guide-section">
+        <h2>The game in one minute</h2>
+        <p>
+          Mining Tycoon is a fair competition. Everyone in a round starts with
+          exactly the same tokens under exactly the same conditions; the only
+          difference is the decisions you make.
+        </p>
+        <ol class="guide-steps">
+          <li>
+            <strong>Mine.</strong> Four seasonal tokens mine for you
+            automatically, every second.
+          </li>
+          <li>
+            <strong>Invest.</strong> Spend tokens on upgrades to mine faster. An
+            early upgrade has more time to pay for itself than a late one.
+          </li>
+          <li>
+            <strong>Read the market.</strong> Halvings, oracle prices and events
+            change which token is worth the most at any moment.
+          </li>
+          <li>
+            <strong>Time your moves.</strong> You only get a few trades and they
+            unlock at fixed times. Farming lets tokens you do not need right now
+            earn a reward.
+          </li>
+          <li>
+            <strong>Win.</strong> When the round ends, the best score wins,
+            counted by the round's scoring mode.
+          </li>
+        </ol>
+        <p class="guide-note">
+          The admin chooses the round's length and settings before it starts;
+          they never change during the round. There is no real money in the game
+          and nothing to buy.
+        </p>
+      </section>
 
       <section id="quick-start" class="guide-section">
         <h2>Quick start</h2>
@@ -511,6 +569,59 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           Stage 2 (rotating farming, where the most rewarding token changes over
           time) will come later.
         </p>
+      </section>
+
+      <section id="roadmap" class="guide-section guide-roadmap">
+        <h2>What's coming</h2>
+        <p>
+          Mining Tycoon is still being built. Everything above this section
+          works today. The features below are planned; their details may still
+          change before they arrive.
+        </p>
+        <h3>Planned</h3>
+        <ul>
+          <li>
+            <strong>More languages:</strong> this guide, and later the game
+            itself, in other languages. You will pick yours with the language
+            switch at the top of this page.
+          </li>
+          <li>
+            <strong>Rotating farming (Stage 2):</strong> the token that pays the
+            best farming reward changes during the round, so farming becomes a
+            timing decision as well.
+          </li>
+          <li>
+            <strong>Balanced economy:</strong> playtests tune mining speed,
+            upgrade costs, trades and round lengths so that every strategy has a
+            fair chance.
+          </li>
+          <li>
+            <strong>Safer accounts:</strong> resetting a forgotten password by
+            email and confirming your email address when you sign up.
+          </li>
+          <li>
+            <strong>Public rounds online:</strong> the game moves to a public
+            server, with open rounds and scheduled live events for everyone.
+          </li>
+          <li>
+            <strong>A fresh look:</strong> season artwork and a game icon.
+          </li>
+        </ul>
+        <h3>Not planned, by design</h3>
+        <ul>
+          <li>
+            <strong>No real money and no pay-to-win.</strong> Nothing in the
+            game can be bought.
+          </li>
+          <li>
+            <strong>No trading between players.</strong> You always trade with
+            the game, at the same prices as everyone else.
+          </li>
+          <li>
+            <strong>No progress carried between rounds.</strong> Every round
+            starts from the same fair baseline.
+          </li>
+        </ul>
       </section>
 
       <footer class="guide-footer">
