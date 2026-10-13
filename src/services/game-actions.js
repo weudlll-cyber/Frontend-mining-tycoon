@@ -87,11 +87,22 @@ export async function performUpgrade(
       );
     }
 
-    await response.json();
+    const payload = await response.json();
+    // WHY: `nextLevel` comes from the rendered board, which only refreshes on
+    // the next stream tick; quick repeated clicks all reported the same level.
+    // The response carries the authoritative new level.
+    const confirmedLevel = readUpgradeLevel(
+      payload?.updated_state,
+      actualTargetToken,
+      upgradeType
+    );
     _deps.showToast(
-      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${nextLevel}`,
+      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${confirmedLevel ?? nextLevel}`,
       'success'
     );
+    if (typeof _deps.onUpgradeApplied === 'function') {
+      _deps.onUpgradeApplied(payload);
+    }
   } catch (error) {
     if (error?.status === 409) {
       // WHY: 409 means the round/session is not active (e.g. enrolling or
@@ -102,6 +113,19 @@ export async function performUpgrade(
     console.error('Upgrade error:', error);
     _deps.showToast(`Upgrade failed: ${error.message}`, 'error');
   }
+}
+
+/**
+ * Level of one upgrade lane in a player state from the backend
+ * (`upgrades_by_token[token][type]`, legacy `upgrade_levels[type]`).
+ * Returns null when the state does not contain it.
+ */
+export function readUpgradeLevel(playerState, token, upgradeType) {
+  const byToken = playerState?.upgrades_by_token?.[token];
+  const raw =
+    byToken?.[upgradeType] ?? playerState?.upgrade_levels?.[upgradeType];
+  const level = Number(raw);
+  return Number.isFinite(level) ? level : null;
 }
 
 export async function performTrade(fromToken, toToken, amount) {

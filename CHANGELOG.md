@@ -220,6 +220,12 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- Quick repeated upgrades no longer report the same level in every toast: the
+  toast now shows the level confirmed in the upgrade response, and the response
+  state is applied to the season cards right away instead of on the next stream
+  tick. At most two toasts are visible per region, so they no longer pile up
+  over the board.
+
 - Player board scrolled on low windows (1366x768 laptops, 1920x1080 at
   150 % Windows scaling = about 1280x630 CSS px): the bottom upgrade rows were
   cut and the action bar (Trade/Farm/Chat/Top 5) was off screen. The desktop

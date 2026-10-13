@@ -57,6 +57,55 @@ describe('performUpgrade pay-token wiring', () => {
     expect(requestBody.pay_token).toBe('winter');
   });
 
+  it('reports the level confirmed by the backend, not the stale board level', async () => {
+    const onUpgradeApplied = vi.fn();
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+      onUpgradeApplied,
+    });
+    initGameActions(deps);
+    const payload = {
+      player_id: 1,
+      game_id: 1,
+      upgrade_result: 'ok',
+      updated_state: { upgrades_by_token: { winter: { hashrate: 4 } } },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => payload,
+    });
+
+    // The board still showed level 0 (next = 1) because the stream had not
+    // refreshed yet after earlier quick clicks.
+    await performUpgrade('hashrate', 1, 'winter', 'winter');
+
+    expect(deps.showToast).toHaveBeenCalledWith(
+      'Upgraded Hashrate to level 4',
+      'success'
+    );
+    expect(onUpgradeApplied).toHaveBeenCalledWith(payload);
+  });
+
+  it('falls back to the requested level when the response has no levels', async () => {
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+    });
+    initGameActions(deps);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await performUpgrade('cooling', 3, 'autumn');
+
+    expect(deps.showToast).toHaveBeenCalledWith(
+      'Upgraded Cooling to level 3',
+      'success'
+    );
+  });
+
   it('defaults pay_token to the target token when none is given', async () => {
     initGameActions(
       buildDeps({
