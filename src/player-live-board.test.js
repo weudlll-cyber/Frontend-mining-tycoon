@@ -164,8 +164,12 @@ describe('player live board wiring', () => {
 
     const banner = document.querySelector('.event-banner');
     expect(banner.querySelectorAll('.event-banner-content')).toHaveLength(1);
-    expect(banner.textContent.match(/Cooling Breakthrough/g)).toHaveLength(1);
-    expect(banner.textContent.match(/Market Rally/g)).toHaveLength(1);
+    // Two concurrent events share the single line (rotating, with a counter);
+    // the tooltip lists both.
+    expect(banner.textContent).toMatch(/Event [12]\/2: /);
+    const tooltip = document.getElementById('event-banner-tip-current');
+    expect(tooltip.textContent).toContain('Cooling Breakthrough');
+    expect(tooltip.textContent).toContain('Market Rally');
   });
 
   it('labels sync standings Live while running and Final when finished', async () => {

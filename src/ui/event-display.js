@@ -37,6 +37,14 @@ let _eventBannerBubble = null;
 let _eventBannerTrigger = null;
 let _eventBannerContentEl = null;
 
+// Several concurrent events share ONE banner line (the desktop board must not
+// grow and scroll): the banner shows one event at a time and rotates.
+const EVENT_ROTATION_INTERVAL_MS = 4000;
+let _rotationIndex = 0;
+let _rotationTimer = null;
+let _rotationPaused = false;
+let _lastBannerData = null;
+
 function nextTooltipId(prefix) {
   _tooltipCounter += 1;
   return `${prefix}-${_tooltipCounter}`;
@@ -427,7 +435,24 @@ export function initEventDisplay(opts = {}) {
     document.body.appendChild(_eventBannerEl);
   }
 
+  bindRotationPause(_eventBannerEl);
   ensureTooltipLayer();
+}
+
+/** Pause the event rotation while the pointer or keyboard focus is on it. */
+function bindRotationPause(bannerEl) {
+  if (!bannerEl || bannerEl.dataset.rotationPauseBound === '1') return;
+  bannerEl.dataset.rotationPauseBound = '1';
+  const pause = () => {
+    _rotationPaused = true;
+  };
+  const resume = () => {
+    _rotationPaused = false;
+  };
+  bannerEl.addEventListener('mouseenter', pause);
+  bannerEl.addEventListener('mouseleave', resume);
+  bannerEl.addEventListener('focusin', pause);
+  bannerEl.addEventListener('focusout', resume);
 }
 
 /**
@@ -441,6 +466,8 @@ export function renderEventBanner(data) {
   const events = getActiveEvents(data);
 
   if (!events.length) {
+    _lastBannerData = null;
+    syncRotationTimer(0);
     _eventBannerEl.classList.add('event-banner-hidden');
     clearEventTooltipBubbles();
     setElementTextValue(_eventBannerContentEl, '');
@@ -452,12 +479,13 @@ export function renderEventBanner(data) {
     return;
   }
 
-  const segments = events.map(
-    (event) =>
-      `${getEventName(event)} (${getEffectDescription(event)}) — ${formatRemaining(event, data)} remaining`
-  );
-  const prefix =
-    events.length === 1 ? '⚡ Event:' : `⚡ ${events.length} events:`;
+  _lastBannerData = data;
+  const count = events.length;
+  const index = _rotationIndex % count;
+  const shown = events[index];
+  const label = count === 1 ? 'Event' : `Event ${index + 1}/${count}`;
+  const line = `⚡ ${label}: ${getEventName(shown)} (${getEffectDescription(shown)}) — ${formatRemaining(shown, data)} remaining`;
+  syncRotationTimer(count);
   const ariaName =
     events.length === 1 ? getEventName(events[0]) : `${events.length} active`;
 
@@ -465,15 +493,41 @@ export function renderEventBanner(data) {
   _eventBannerEl.classList.remove('event-banner-hidden');
   _eventBannerEl.hidden = false;
   setElementTextValue(_eventBannerTrigger, 'ⓘ');
-  setElementTextValue(
-    _eventBannerContentEl,
-    `${prefix} ${segments.join(' · ')}`
-  );
+  setElementTextValue(_eventBannerContentEl, line);
   setElementTextValue(_eventBannerBubble, getEventsTooltipText(events, data));
   _eventBannerTrigger.setAttribute('aria-label', `${ariaName} event details`);
   _eventBannerTrigger.hidden = false;
   // Only rebind the banner tooltip when the DOM structure was freshly created
   if (bannerRebuilt || !_disposeTooltips) refreshTooltips();
+}
+
+/**
+ * Run the rotation timer only while more than one event is active. The timer
+ * re-renders from the latest payload, so remaining times stay current.
+ */
+function syncRotationTimer(eventCount) {
+  if (eventCount > 1) {
+    if (_rotationTimer === null) {
+      _rotationTimer = setInterval(() => {
+        if (_rotationPaused || !_lastBannerData) return;
+        _rotationIndex += 1;
+        renderEventBanner(_lastBannerData);
+      }, EVENT_ROTATION_INTERVAL_MS);
+    }
+    return;
+  }
+  if (_rotationTimer !== null) {
+    clearInterval(_rotationTimer);
+    _rotationTimer = null;
+  }
+  _rotationIndex = 0;
+}
+
+/** Stop the event rotation (board reset / tests). */
+export function stopEventRotation() {
+  syncRotationTimer(0);
+  _lastBannerData = null;
+  _rotationPaused = false;
 }
 
 function tokenScopedSelector(selector, token, tokenSelector) {
