@@ -17,11 +17,16 @@ import {
 
 const CONFIG = {
   base_mining_rate: 1,
-  upgrade_base_cost: 10,
-  upgrade_cost_growth: 1.5,
   hashrate_increment: 0.1,
+  hashrate_base_cost: 50,
+  hashrate_cost_growth: 1.2,
   efficiency_increment: 0.05,
+  efficiency_base_cost: 25,
+  efficiency_cost_growth: 1.5,
   cooling_increment: 0.02,
+  cooling_base_cost: 60,
+  cooling_cost_growth: 1.3,
+  shuffle_upgrade_profiles: true,
   conversion_fee_rate: 0.02,
   oracle_spread: 0.01,
   rotation_period_months: 3,
@@ -84,6 +89,29 @@ describe('buildEconomyPatch', () => {
     expect(patch).toEqual({ oracle_spread: 0.03, rotation_period_months: 6 });
   });
 
+  it('sends the shuffle switch as a boolean only when it changed', () => {
+    expect(
+      buildEconomyPatch({ ...raw, shuffle_upgrade_profiles: true }, CONFIG)
+        .patch
+    ).toEqual({});
+    const { patch, errors } = buildEconomyPatch(
+      { ...raw, shuffle_upgrade_profiles: false },
+      CONFIG
+    );
+    expect(errors).toEqual([]);
+    expect(patch).toEqual({ shuffle_upgrade_profiles: false });
+  });
+
+  it('has increment, base cost and cost growth for every upgrade', () => {
+    const keys = ECONOMY_FIELDS.map((field) => field.key);
+    for (const stat of ['hashrate', 'efficiency', 'cooling']) {
+      for (const suffix of ['increment', 'base_cost', 'cost_growth']) {
+        expect(keys).toContain(`${stat}_${suffix}`);
+      }
+    }
+    expect(keys).not.toContain('upgrade_base_cost');
+  });
+
   it('reports empty, non-numeric and non-integer input', () => {
     const { errors } = buildEconomyPatch(
       {
@@ -124,7 +152,9 @@ describe('economy settings section', () => {
       'http://127.0.0.1:8000/admin/economy'
     );
     expect(fetchMock.mock.calls[0][1].headers['X-Admin-Token']).toBe('tok');
-    expect(input('upgrade_cost_growth').value).toBe('1.5');
+    expect(input('efficiency_cost_growth').value).toBe('1.5');
+    expect(input('shuffle_upgrade_profiles').type).toBe('checkbox');
+    expect(input('shuffle_upgrade_profiles').checked).toBe(true);
     expect(document.getElementById('admin-economy-version').textContent).toBe(
       'Version 4 · snapshot abcdef012345'
     );
@@ -163,6 +193,25 @@ describe('economy settings section', () => {
       '❌ Could not load economy settings: Invalid admin token'
     );
     expect(result.className).toBe('result-box error');
+  });
+
+  it('saves a cleared shuffle checkbox as false', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse(settings()))
+      .mockResolvedValueOnce(
+        okResponse(settings({ shuffle_upgrade_profiles: false }, 5))
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    await loadEconomySettings();
+
+    input('shuffle_upgrade_profiles').checked = false;
+    await saveEconomySettings();
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      shuffle_upgrade_profiles: false,
+    });
+    expect(input('shuffle_upgrade_profiles').checked).toBe(false);
   });
 
   it('asks to load before saving', async () => {

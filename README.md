@@ -210,7 +210,7 @@ conversion fee / oracle spread overrides and the Farming Stage 1 options),
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
 per-row Metrics, Chat (opens section 13 for that game), Reset (clones the game) and Delete), 9 Global Economy
-(`GET`/`PATCH /admin/economy`; changes apply to newly created games only),
+(`GET`/`PATCH /admin/economy`; base mining rate, one profile per upgrade (increment per level, base cost, cost growth for Hashrate, Efficiency and Cooling), the "Shuffle upgrade profiles per round" switch, conversion fee, oracle spread and rotation period; changes apply to newly created games only),
 10 Metrics (`GET /admin/metrics` summary), 11 Game Settings
 (`GET`/`PATCH /admin/game-config`: duration presets, which presets are offered
 for sync rounds / async rounds / async sessions, create-form defaults,

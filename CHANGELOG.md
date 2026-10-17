@@ -10,6 +10,13 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Admin Global Economy (section 9): one profile per upgrade (increment per
+  level, base cost, cost growth for Hashrate, Efficiency and Cooling) instead of
+  one shared cost curve, plus a "Shuffle upgrade profiles per round" switch
+  (backend per-upgrade profiles). The how-to-play guide (English and German)
+  explains the three default profiles and that they are dealt out at random
+  per round.
+
 - German translation of the how-to-play guide (`how-to-play.de.html`),
   reachable through the guide's language switch (English / Deutsch). English
   stays the default page; labels of the game UI stay in English in both
