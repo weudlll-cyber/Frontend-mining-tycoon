@@ -9,7 +9,7 @@ Six pages:
 - **Lobby** (`index.html`): register, log in/out, pick an open game, join or rejoin it, see your result history, full final leaderboards and the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
 - **Admin console** (`admin.html`): create rounds with snapshot-locked settings, list and delete active games.
-- **How to play** (`how-to-play.html`): static player guide (the game in one minute, rules, upgrades, halvings, trading, round types, scoring modes, events, and a "What's coming" roadmap). Linked from the "New to Mining Tycoon?" box on the lobby start screen and from the player-board header (opens in a new tab). English is the default; translations are separate pages (see below).
+- **How to play** (`how-to-play.html`): static player guide (the game in one minute, rules, upgrades, halvings, trading, round types, scoring modes, events, and a "What's coming" roadmap). Linked from the "New to Mining Tycoon?" box on the lobby start screen and from the player-board header (opens in a new tab). English is the default; a German translation is `how-to-play.de.html`, reachable through the language switch (see below).
 - **Privacy notice** (`privacy.html`) and **Imprint** (`imprint.html`): static legal page **templates** for the operator, with a "Template" banner and `[PLACEHOLDER]` markers. They must be completed and reviewed before going live (see `PRODUCTION_DEFAULTS_CHECKLIST.md`). Linked from the lobby footer, the registration dialog (privacy notice) and the how-to-play footer.
 
 ## Status
@@ -177,8 +177,7 @@ language switch (`nav.guide-lang`) with all of them. To add one:
    Keep every section `id` unchanged so anchors work in all languages.
 2. Add `{ code, label, file }` to `GUIDE_LANGUAGES` (Vite then builds the page).
 3. Add the new link to the language switch of every guide page, with
-   `aria-current="page"` only on each page's own language, and drop the
-   "More languages are coming." note.
+   `aria-current="page"` only on each page's own language.
 4. Add the file to the `format`, `format:fix` and `format:check` scripts in
    `package.json`.
 

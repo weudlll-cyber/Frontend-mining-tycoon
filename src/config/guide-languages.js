@@ -12,4 +12,5 @@ Invariants: English (`how-to-play.html`) is the default page and stays first.
 
 export const GUIDE_LANGUAGES = [
   { code: 'en', label: 'English', file: 'how-to-play.html' },
+  { code: 'de', label: 'Deutsch', file: 'how-to-play.de.html' },
 ];

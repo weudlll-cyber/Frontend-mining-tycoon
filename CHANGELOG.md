@@ -10,6 +10,11 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- German translation of the how-to-play guide (`how-to-play.de.html`),
+  reachable through the guide's language switch (English / Deutsch). English
+  stays the default page; labels of the game UI stay in English in both
+  versions because the game itself is in English.
+
 - Help for new players on the start screen: a "New to Mining Tycoon?" box at
   the top of the lobby sums up the game and links the guide and its roadmap.
   The how-to-play guide gains "The game in one minute" (the game principle in
