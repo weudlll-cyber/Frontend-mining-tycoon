@@ -28,7 +28,56 @@ const _inlineStateByContainer = new WeakMap();
 const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
 
 const UPGRADE_LANES_LEGEND =
-  'Upgrade: name | Lvl: level | Cost: target-token | Pay: spend-token (auto-converts) | Out/s: per-second gain | BEP: break-even time';
+  "Upgrade: name | Lvl: level | Cost: target-token | Pay: spend-token (auto-converts) | Out/s: per-second gain | BEP: break-even time | Dots after the name: this round's profile (● small steps, ●● steady, ●●● big step; dealt out at random per round)";
+
+// Profile names by rank of the per-level increment within this round
+// (1 = smallest). Names match the how-to-play guide.
+const PROFILE_LABELS = Object.freeze({
+  1: 'Small steps',
+  2: 'Steady',
+  3: 'Big step',
+});
+
+function formatProfileNumber(value) {
+  return Number(value.toFixed(4)).toString();
+}
+
+/**
+ * Rank the upgrades of this round by their per-level increment so players can
+ * tell the (randomly dealt) profiles apart. Values come from the game-scoped
+ * meta, never from hardcoded defaults. Returns null when the increments are
+ * missing or not all different (no meaningful ranking).
+ * @param {Record<string, {increment?: number, base_cost?: number, cost_scaling?: number}>|null} definitions
+ * @returns {Record<string, {rank: number, label: string, detail: string}>|null}
+ */
+export function describeUpgradeProfiles(definitions) {
+  if (!definitions || typeof definitions !== 'object') return null;
+  const entries = Object.entries(definitions).filter(([, def]) =>
+    Number.isFinite(def?.increment)
+  );
+  if (entries.length !== 3) return null;
+  const increments = new Set(entries.map(([, def]) => def.increment));
+  if (increments.size !== entries.length) return null;
+
+  const sorted = [...entries].sort((a, b) => a[1].increment - b[1].increment);
+  const result = {};
+  sorted.forEach(([type, def], index) => {
+    const rank = index + 1;
+    const parts = [`+${formatProfileNumber(def.increment)} per level`];
+    if (Number.isFinite(def.base_cost)) {
+      parts.push(`first level ${formatProfileNumber(def.base_cost)}`);
+    }
+    if (Number.isFinite(def.cost_scaling)) {
+      parts.push(`cost ×${formatProfileNumber(def.cost_scaling)} per level`);
+    }
+    result[type] = {
+      rank,
+      label: PROFILE_LABELS[rank],
+      detail: `${PROFILE_LABELS[rank]} this round: ${parts.join(', ')}.`,
+    };
+  });
+  return result;
+}
 
 function formatInlineLevel(value) {
   const { display, full } = formatCompactNumber(value, {
@@ -146,6 +195,13 @@ function buildLaneRow(type, seasonToken) {
   const nameCell = document.createElement('span');
   nameCell.className = 'upgrade-row-cell upgrade-row-type';
   nameCell.dataset.col = 'upgrade';
+  const nameText = document.createElement('span');
+  nameText.className = 'upgrade-row-name';
+  const profilePips = document.createElement('span');
+  profilePips.className = 'upgrade-profile-pips';
+  profilePips.setAttribute('aria-hidden', 'true');
+  profilePips.hidden = true;
+  nameCell.append(nameText, profilePips);
 
   const levelCell = document.createElement('span');
   levelCell.className = 'upgrade-row-cell upgrade-row-level tabular-num';
@@ -196,6 +252,8 @@ function buildLaneRow(type, seasonToken) {
   return {
     row,
     nameCell,
+    nameText,
+    profilePips,
     levelCell,
     costCell,
     paySelect,
@@ -317,6 +375,7 @@ export function renderInlineSeasonUpgrades(
   // Play-window gate (enrolling/finished round, async without session); the
   // backend still rejects with 409 if the client view is stale.
   const actionAvailability = _getActionAvailability?.() ?? { allowed: true };
+  const profiles = describeUpgradeProfiles(activeUpgradeDefinitions);
 
   const activeGameMeta =
     _getActiveGameMeta?.(String(data?.game_id || '')) || null;
@@ -362,7 +421,23 @@ export function renderInlineSeasonUpgrades(
     const formattedLevel = formatInlineLevel(level);
     const formattedCost = formatInlineCost(info?.cost_to_next);
 
-    setElementTextValue(rowRefs.nameCell, title);
+    setElementTextValue(rowRefs.nameText, title);
+    const profile = profiles?.[type] || null;
+    if (profile) {
+      setElementTextValue(rowRefs.profilePips, '●'.repeat(profile.rank));
+      rowRefs.profilePips.hidden = false;
+      rowRefs.row.dataset.profileRank = String(profile.rank);
+      rowRefs.nameCell.title = `${title} — ${profile.detail}`;
+      rowRefs.button.setAttribute(
+        'aria-label',
+        `Upgrade ${type} (${profile.label})`
+      );
+    } else {
+      rowRefs.profilePips.hidden = true;
+      delete rowRefs.row.dataset.profileRank;
+      rowRefs.nameCell.title = title;
+      rowRefs.button.setAttribute('aria-label', `Upgrade ${type}`);
+    }
     setElementTextValue(rowRefs.levelCell, formattedLevel.display);
     rowRefs.levelCell.title = formattedLevel.full;
     setElementTextValue(rowRefs.costCell, formattedCost.display);
