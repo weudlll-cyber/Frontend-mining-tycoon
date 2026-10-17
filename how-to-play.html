@@ -184,48 +184,66 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
       <section id="upgrades" class="guide-section">
         <h2>Upgrades</h2>
         <p>
-          Every season card has three upgrade lanes. An upgrade only improves
-          the token of that card, and each lane has its own level per season.
+          Every season card has three upgrade lanes: Hashrate, Efficiency and
+          Cooling. An upgrade only improves the token of that card, and each
+          lane has its own level per season. Every level adds a little to that
+          lane's output multiplier.
+        </p>
+        <p>
+          Each upgrade has a <strong>profile</strong>: how much one level adds,
+          what the first level costs and how fast the cost rises. With the
+          default economy there are three profiles:
         </p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th scope="col">Upgrade</th>
-                <th scope="col">What it does (default economy)</th>
+                <th scope="col">Profile</th>
+                <th scope="col">Per level</th>
+                <th scope="col">First level</th>
+                <th scope="col">Cost rise per level</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Hashrate</td>
-                <td>
-                  Raises the hashrate multiplier by 0.1 per level (starts at
-                  1.0).
-                </td>
+                <td>Steady</td>
+                <td>+0.1</td>
+                <td>50</td>
+                <td>&times;1.2</td>
               </tr>
               <tr>
-                <td>Efficiency</td>
-                <td>
-                  Raises the efficiency multiplier by 0.05 per level (starts at
-                  1.0).
-                </td>
+                <td>Small steps</td>
+                <td>+0.05</td>
+                <td>25</td>
+                <td>&times;1.2</td>
               </tr>
               <tr>
-                <td>Cooling</td>
-                <td>
-                  Adds 0.1 per level to the cooling bonus; output is multiplied
-                  by (1 + cooling).
-                </td>
+                <td>Big step</td>
+                <td>+0.15</td>
+                <td>60</td>
+                <td>&times;1.3</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p>
+          <strong
+            >Which upgrade gets which profile changes from round to
+            round.</strong
+          >
+          Unless the admin has turned it off, the three profiles are dealt out
+          at random between Hashrate, Efficiency and Cooling when a round is
+          created. The deal is the same for every player and stays fixed for the
+          whole round. Compare <strong>Cost</strong> and
+          <strong>Out/s</strong> in the lanes to see which upgrade is which in
+          your round.
+        </p>
         <ul>
           <li>
-            <strong>Costs rise with every level.</strong> With the default
-            economy a level costs 50 &times; 1.2<sup>level</sup> of the card's
-            token (50, 60, 72, ...). Upgrade-cost events can make upgrades
-            cheaper or more expensive for a while.
+            <strong>Costs rise with every level.</strong> A level costs the
+            first-level cost &times; the cost rise<sup>level</sup> in the card's
+            token (Steady: 50, 60, 72, ...). Upgrade-cost events can make
+            upgrades cheaper or more expensive for a while.
           </li>
           <li>
             <strong>Pay with any token.</strong> The <strong>Pay</strong> column
@@ -248,7 +266,7 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           </li>
         </ul>
         <p class="guide-note">
-          The admin can tune the economy for new rounds. A round's values are
+          The admin can tune every profile for new rounds. A round's values are
           locked when it is created, so the numbers on your board are the ones
           that count.
         </p>

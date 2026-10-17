@@ -9,39 +9,50 @@
  *    economy snapshot taken at creation (LOCKED_DECISIONS: snapshot-locked).
  *  - Backend is authoritative for validation; client checks only reject
  *    non-numeric input. Backend 400/422 messages are shown verbatim.
+ *  - Each upgrade has its own profile (increment, base cost, cost growth);
+ *    with "shuffle" on, the backend swaps the three profiles at random
+ *    between the upgrades for every new round.
  * Security notes: all values are rendered via textContent / input.value.
  */
 
 import { adminRequest } from './admin-api.js';
 
+const UPGRADE_PROFILES = [
+  ['hashrate', 'Hashrate', '> 0'],
+  ['efficiency', 'Efficiency', '> 0'],
+  ['cooling', 'Cooling', '>= 0'],
+];
+
+function upgradeProfileFields([stat, name, incrementRule]) {
+  return [
+    {
+      key: `${stat}_increment`,
+      label: `${name}: increment per level`,
+      hint: `Added to the output multiplier per level (0.1 = +10 %); must be ${incrementRule}.`,
+    },
+    {
+      key: `${stat}_base_cost`,
+      label: `${name}: base cost`,
+      hint: 'Cost of the first level, in the card token; must be >= 0.',
+    },
+    {
+      key: `${stat}_cost_growth`,
+      label: `${name}: cost growth`,
+      hint: 'Cost multiplier per level (1.2 = +20 % per level); must be > 0.',
+    },
+  ];
+}
+
 // Field list mirrors EconomySettingsPatchRequest in the backend schemas.
 // `hint` repeats the backend constraint so admins know the valid range.
 export const ECONOMY_FIELDS = Object.freeze([
   { key: 'base_mining_rate', label: 'Base mining rate', hint: 'Must be > 0.' },
+  ...UPGRADE_PROFILES.flatMap(upgradeProfileFields),
   {
-    key: 'upgrade_base_cost',
-    label: 'Upgrade base cost',
-    hint: 'Must be >= 0.',
-  },
-  {
-    key: 'upgrade_cost_growth',
-    label: 'Upgrade cost growth',
-    hint: 'Multiplier per level; must be > 0.',
-  },
-  {
-    key: 'hashrate_increment',
-    label: 'Hashrate increment',
-    hint: 'Must be > 0.',
-  },
-  {
-    key: 'efficiency_increment',
-    label: 'Efficiency increment',
-    hint: 'Must be > 0.',
-  },
-  {
-    key: 'cooling_increment',
-    label: 'Cooling increment',
-    hint: 'Must be >= 0.',
+    key: 'shuffle_upgrade_profiles',
+    label: 'Shuffle upgrade profiles per round',
+    hint: 'On: every new round swaps the three upgrade profiles above at random between Hashrate, Efficiency and Cooling (the same for all players). Off: each upgrade keeps its own profile.',
+    boolean: true,
   },
   {
     key: 'conversion_fee_rate',
@@ -96,7 +107,12 @@ function setResult(message, kind) {
 export function buildEconomyPatch(rawValues, baseline) {
   const patch = {};
   const errors = [];
-  ECONOMY_FIELDS.forEach(({ key, label, integer }) => {
+  ECONOMY_FIELDS.forEach(({ key, label, integer, boolean }) => {
+    if (boolean) {
+      const checked = rawValues?.[key] === true || rawValues?.[key] === 'true';
+      if (checked !== Boolean(baseline?.[key])) patch[key] = checked;
+      return;
+    }
     const raw = String(rawValues?.[key] ?? '').trim();
     if (!raw) {
       errors.push(`${label} is required.`);
@@ -120,7 +136,7 @@ export function buildEconomyPatch(rawValues, baseline) {
 }
 
 function renderFields(container) {
-  ECONOMY_FIELDS.forEach(({ key, label, hint, integer }) => {
+  ECONOMY_FIELDS.forEach(({ key, label, hint, integer, boolean }) => {
     const group = document.createElement('div');
     group.className = 'form-group';
 
@@ -130,8 +146,12 @@ function renderFields(container) {
 
     const input = document.createElement('input');
     input.id = fieldInputId(key);
-    input.type = 'number';
-    input.step = integer ? '1' : 'any';
+    if (boolean) {
+      input.type = 'checkbox';
+    } else {
+      input.type = 'number';
+      input.step = integer ? '1' : 'any';
+    }
     input.dataset.economyField = key;
 
     const note = document.createElement('p');
@@ -145,10 +165,13 @@ function renderFields(container) {
 
 function renderSettings(settings) {
   loadedConfig = { ...(settings?.config || {}) };
-  ECONOMY_FIELDS.forEach(({ key }) => {
+  ECONOMY_FIELDS.forEach(({ key, boolean }) => {
     const input = el(fieldInputId(key));
-    if (input) {
-      const value = loadedConfig[key];
+    if (!input) return;
+    const value = loadedConfig[key];
+    if (boolean) {
+      input.checked = Boolean(value);
+    } else {
       input.value = value === undefined || value === null ? '' : String(value);
     }
   });
@@ -165,8 +188,9 @@ function renderSettings(settings) {
 
 function readRawValues() {
   const values = {};
-  ECONOMY_FIELDS.forEach(({ key }) => {
-    values[key] = el(fieldInputId(key))?.value ?? '';
+  ECONOMY_FIELDS.forEach(({ key, boolean }) => {
+    const input = el(fieldInputId(key));
+    values[key] = boolean ? Boolean(input?.checked) : (input?.value ?? '');
   });
   return values;
 }

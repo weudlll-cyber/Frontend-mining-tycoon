@@ -188,49 +188,69 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
       <section id="upgrades" class="guide-section">
         <h2>Upgrades</h2>
         <p>
-          Jede Saison-Karte hat drei Upgrade-Bahnen. Ein Upgrade verbessert nur
-          den Token dieser Karte, und jede Bahn hat pro Saison ihre eigene
-          Stufe.
+          Jede Saison-Karte hat drei Upgrade-Bahnen: Hashrate, Efficiency und
+          Cooling. Ein Upgrade verbessert nur den Token dieser Karte, und jede
+          Bahn hat pro Saison ihre eigene Stufe. Jede Stufe erhöht den
+          Output-Multiplikator dieser Bahn ein Stück.
+        </p>
+        <p>
+          Jedes Upgrade hat ein <strong>Profil</strong>: wie viel eine Stufe
+          bringt, was die erste Stufe kostet und wie schnell die Kosten steigen.
+          In der Standard-Ökonomie gibt es drei Profile:
         </p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th scope="col">Upgrade</th>
-                <th scope="col">Wirkung (Standard-Ökonomie)</th>
+                <th scope="col">Profil</th>
+                <th scope="col">Pro Stufe</th>
+                <th scope="col">Erste Stufe</th>
+                <th scope="col">Kostenanstieg pro Stufe</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Hashrate</td>
-                <td>
-                  Erhöht den Hashrate-Multiplikator um 0,1 pro Stufe (Start bei
-                  1,0).
-                </td>
+                <td>Gleichmäßig</td>
+                <td>+0,1</td>
+                <td>50</td>
+                <td>&times;1,2</td>
               </tr>
               <tr>
-                <td>Efficiency</td>
-                <td>
-                  Erhöht den Efficiency-Multiplikator um 0,05 pro Stufe (Start
-                  bei 1,0).
-                </td>
+                <td>Kleine Schritte</td>
+                <td>+0,05</td>
+                <td>25</td>
+                <td>&times;1,2</td>
               </tr>
               <tr>
-                <td>Cooling</td>
-                <td>
-                  Erhöht den Cooling-Bonus um 0,1 pro Stufe; der Output wird mit
-                  (1 + Cooling) multipliziert.
-                </td>
+                <td>Großer Sprung</td>
+                <td>+0,15</td>
+                <td>60</td>
+                <td>&times;1,3</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p>
+          <strong
+            >Welches Upgrade welches Profil bekommt, ändert sich von Runde zu
+            Runde.</strong
+          >
+          Sofern der Admin das nicht abgeschaltet hat, werden die drei Profile
+          beim Erstellen einer Runde zufällig auf Hashrate, Efficiency und
+          Cooling verteilt. Die Verteilung ist für alle Spieler gleich und
+          bleibt die ganze Runde über fest. Vergleiche <strong>Cost</strong> und
+          <strong>Out/s</strong> in den Bahnen, um zu sehen, welches Upgrade in
+          deiner Runde welches ist.
+        </p>
         <ul>
           <li>
-            <strong>Die Kosten steigen mit jeder Stufe.</strong> In der
-            Standard-Ökonomie kostet eine Stufe 50 &times; 1,2<sup>Stufe</sup>
-            des Tokens der Karte (50, 60, 72, ...). Upgrade-Kosten-Events können
-            Upgrades eine Zeit lang billiger oder teurer machen.
+            <strong>Die Kosten steigen mit jeder Stufe.</strong> Eine Stufe
+            kostet die Kosten der ersten Stufe &times; den Kostenanstieg<sup
+              >Stufe</sup
+            >
+            im Token der Karte (Gleichmäßig: 50, 60, 72, ...).
+            Upgrade-Kosten-Events können Upgrades eine Zeit lang billiger oder
+            teurer machen.
           </li>
           <li>
             <strong>Mit jedem Token bezahlen.</strong> Die Spalte
@@ -255,7 +275,7 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
           </li>
         </ul>
         <p class="guide-note">
-          Der Admin kann die Ökonomie für neue Runden anpassen. Die Werte einer
+          Der Admin kann jedes Profil für neue Runden anpassen. Die Werte einer
           Runde werden beim Erstellen festgeschrieben; es zählen also die Zahlen
           auf deinem Spielbrett.
         </p>
