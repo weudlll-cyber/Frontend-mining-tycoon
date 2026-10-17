@@ -10,6 +10,13 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Player board: 1-3 small dots under each upgrade name show that upgrade's
+  profile in the current round (small steps, steady, big step), ranked by the
+  per-level increment from the game's own meta; the name's tooltip gives the
+  exact values and the upgrade button's label names the profile for screen
+  readers. The lanes legend and the guide (English and German) explain the
+  dots.
+
 - Admin Global Economy (section 9): one profile per upgrade (increment per
   level, base cost, cost growth for Hashrate, Efficiency and Cooling) instead of
   one shared cost curve, plus a "Shuffle upgrade profiles per round" switch

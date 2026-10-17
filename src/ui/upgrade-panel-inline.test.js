@@ -8,6 +8,7 @@ Invariants/Security: Ensures backend-authoritative submit intent while using saf
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  describeUpgradeProfiles,
   initInlineUpgrades,
   renderInlineSeasonUpgrades,
 } from './upgrade-panel-inline.js';
@@ -505,5 +506,70 @@ describe('inline upgrade lanes play-window gate', () => {
     renderInlineSeasonUpgrades(container, 'spring', createData());
 
     expect(container.querySelector('.btn-upgrade-inline').disabled).toBe(false);
+  });
+});
+
+describe('upgrade profiles of the round', () => {
+  const SHUFFLED = {
+    hashrate: { increment: 0.15, base_cost: 60, cost_scaling: 1.3 },
+    efficiency: { increment: 0.1, base_cost: 50, cost_scaling: 1.2 },
+    cooling: { increment: 0.05, base_cost: 25, cost_scaling: 1.2 },
+  };
+
+  it('ranks the upgrades by their per-level increment', () => {
+    const profiles = describeUpgradeProfiles(SHUFFLED);
+    expect(profiles.hashrate.rank).toBe(3);
+    expect(profiles.hashrate.label).toBe('Big step');
+    expect(profiles.efficiency.label).toBe('Steady');
+    expect(profiles.cooling.label).toBe('Small steps');
+    expect(profiles.hashrate.detail).toBe(
+      'Big step this round: +0.15 per level, first level 60, cost ×1.3 per level.'
+    );
+  });
+
+  it('gives no ranking for equal or missing increments', () => {
+    expect(describeUpgradeProfiles(null)).toBeNull();
+    expect(
+      describeUpgradeProfiles({
+        hashrate: { increment: 0.1 },
+        efficiency: { increment: 0.1 },
+        cooling: { increment: 0.05 },
+      })
+    ).toBeNull();
+    expect(describeUpgradeProfiles({ hashrate: { base_cost: 50 } })).toBeNull();
+  });
+
+  it('shows dots after the name, details in the title and the label for screen readers', () => {
+    let definitions = SHUFFLED;
+    initInlineUpgrades({
+      getActiveGameMeta: () => createMeta(),
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => definitions,
+      performUpgrade: vi.fn(),
+    });
+    const container = document.querySelector('.season-upgrades');
+    renderInlineSeasonUpgrades(container, 'spring', createData(50));
+
+    const row = container.querySelector('[data-upgrade-type="hashrate"]');
+    expect(row.querySelector('.upgrade-row-name').textContent).toBe('Hashrate');
+    const pips = row.querySelector('.upgrade-profile-pips');
+    expect(pips.textContent).toBe('●●●');
+    expect(pips.hidden).toBe(false);
+    expect(pips.getAttribute('aria-hidden')).toBe('true');
+    expect(row.querySelector('.upgrade-row-type').title).toContain(
+      'Big step this round'
+    );
+    expect(
+      row.querySelector('.btn-upgrade-inline').getAttribute('aria-label')
+    ).toBe('Upgrade hashrate (Big step)');
+
+    // Without a ranking the dots disappear again.
+    definitions = { hashrate: {}, efficiency: {}, cooling: {} };
+    renderInlineSeasonUpgrades(container, 'spring', createData(50));
+    expect(pips.hidden).toBe(true);
+    expect(row.dataset.profileRank).toBeUndefined();
+    expect(
+      row.querySelector('.btn-upgrade-inline').getAttribute('aria-label')
+    ).toBe('Upgrade hashrate');
   });
 });
