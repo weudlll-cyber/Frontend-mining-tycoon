@@ -1,0 +1,671 @@
+<!--
+File: how-to-play.de.html
+Purpose: German translation of the static "How to play" guide (how-to-play.html).
+Role in system: Reached through the language switch of the guide pages. Its footer links the legal pages (privacy.html, imprint.html). It has no script and does not talk to the backend.
+Invariants: Same sections and section ids as how-to-play.html, in the same order; update both pages in the same change. Labels of the game UI (buttons, tabs, badges) stay in English because the game itself is in English. No features that do not exist, except in the clearly marked "What's coming" section (#roadmap).
+Security notes: Static HTML only; no script, no external fonts or CDNs.
+-->
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mining Tycoon | Spielanleitung</title>
+    <link rel="stylesheet" href="/src/how-to-play.css" />
+  </head>
+  <body class="page-guide">
+    <main class="guide-shell">
+      <header id="top" class="guide-header">
+        <div class="guide-topbar">
+          <p class="guide-back"><a href="/">&larr; Zurück zur Lobby</a></p>
+          <nav class="guide-lang" aria-label="Sprache">
+            <span class="guide-lang-label">Sprache:</span>
+            <ul>
+              <li>
+                <a href="/how-to-play.html" hreflang="en" lang="en">English</a>
+              </li>
+              <li>
+                <a
+                  href="/how-to-play.de.html"
+                  hreflang="de"
+                  lang="de"
+                  aria-current="page"
+                  >Deutsch</a
+                >
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <h1>So spielst du Mining Tycoon</h1>
+        <p class="guide-lead">
+          Baue die vier saisonalen Tokens ab, verbessere deine Rigs, wähle den
+          richtigen Moment für deine Trades und beende die Runde mit der besten
+          Punktzahl. Alles auf dieser Seite beschreibt das Spiel so, wie es
+          heute funktioniert; <a href="#roadmap">Was noch kommt</a> zeigt, was
+          geplant ist.
+        </p>
+        <p class="guide-note">
+          Das Spiel selbst ist noch auf Englisch. Bezeichnungen von Buttons und
+          Anzeigen stehen deshalb hier so, wie du sie im Spiel siehst (zum
+          Beispiel <strong>Enter game</strong>).
+        </p>
+      </header>
+
+      <nav class="guide-toc" aria-label="Inhaltsverzeichnis">
+        <h2>Inhalt</h2>
+        <ol>
+          <li><a href="#principle">Das Spiel in einer Minute</a></li>
+          <li><a href="#quick-start">Schnellstart</a></li>
+          <li><a href="#goal">Das Ziel und die vier Tokens</a></li>
+          <li><a href="#mining">Mining</a></li>
+          <li><a href="#upgrades">Upgrades</a></li>
+          <li><a href="#halvings">Halvings</a></li>
+          <li><a href="#oracle-prices">Oracle-Preise</a></li>
+          <li><a href="#trading">Trading</a></li>
+          <li><a href="#round-types">Rundentypen: sync und async</a></li>
+          <li><a href="#scoring">Wertungsarten</a></li>
+          <li><a href="#events">Events</a></li>
+          <li><a href="#live-tools">Live-Tools-Fenster und Tooltips</a></li>
+          <li><a href="#accounts">Konto und dein Name</a></li>
+          <li><a href="#farming">Farming</a></li>
+          <li><a href="#roadmap">Was noch kommt</a></li>
+        </ol>
+      </nav>
+
+      <section id="principle" class="guide-section">
+        <h2>Das Spiel in einer Minute</h2>
+        <p>
+          Mining Tycoon ist ein fairer Wettbewerb. Alle Spieler einer Runde
+          starten mit genau denselben Tokens unter genau denselben Bedingungen;
+          den Unterschied machen nur deine Entscheidungen.
+        </p>
+        <ol class="guide-steps">
+          <li>
+            <strong>Abbauen.</strong> Vier saisonale Tokens werden automatisch
+            für dich abgebaut, jede Sekunde.
+          </li>
+          <li>
+            <strong>Investieren.</strong> Gib Tokens für Upgrades aus, damit du
+            schneller abbaust. Ein frühes Upgrade hat mehr Zeit, sich bezahlt zu
+            machen, als ein spätes.
+          </li>
+          <li>
+            <strong>Den Markt lesen.</strong> Halvings, Oracle-Preise und Events
+            verändern, welcher Token gerade am meisten wert ist.
+          </li>
+          <li>
+            <strong>Den richtigen Moment wählen.</strong> Du hast nur wenige
+            Trades, und sie werden zu festen Zeiten freigeschaltet. Mit Farming
+            bringen Tokens, die du gerade nicht brauchst, eine Belohnung ein.
+          </li>
+          <li>
+            <strong>Gewinnen.</strong> Wenn die Runde endet, gewinnt die beste
+            Punktzahl, gezählt nach der Wertungsart der Runde.
+          </li>
+        </ol>
+        <p class="guide-note">
+          Der Admin legt Länge und Einstellungen der Runde vor dem Start fest;
+          während der Runde ändern sie sich nie. Im Spiel gibt es kein echtes
+          Geld und nichts zu kaufen.
+        </p>
+      </section>
+
+      <section id="quick-start" class="guide-section">
+        <h2>Schnellstart</h2>
+        <ol>
+          <li>Erstelle auf der Lobby-Seite ein Konto oder melde dich an.</li>
+          <li>
+            Wähle unter <strong>Open Games</strong> ein Spiel und klicke auf
+            <strong>Enter game</strong>. Das Spielbrett öffnet sich und
+            verbindet sich von selbst.
+          </li>
+          <li>
+            Deine vier Tokens werden sofort abgebaut. Kaufe Upgrades in den
+            Saison-Karten, um schneller abzubauen.
+          </li>
+          <li>
+            Sobald ein Trade freigeschaltet ist, öffne <strong>Trade</strong>,
+            um Tokens in die Saison zu tauschen, die du halten willst.
+          </li>
+          <li>
+            Wenn die Runde (oder deine Session) endet, erscheint ein
+            <strong>Game Over</strong>-Bildschirm. Klicke darauf, um zur Lobby
+            zurückzukehren; dort zeigt <strong>Last Game Highscores</strong> die
+            Top 5.
+          </li>
+        </ol>
+      </section>
+
+      <section id="goal" class="guide-section">
+        <h2>Das Ziel und die vier Tokens</h2>
+        <p>
+          Es gibt vier saisonale Tokens: <strong>Spring</strong> (Frühling),
+          <strong>Summer</strong> (Sommer), <strong>Autumn</strong> (Herbst) und
+          <strong>Winter</strong>. Alle Spieler einer Runde starten an derselben
+          Stelle: 1.000 von jedem Token und keine Upgrades. Die Bedingungen der
+          Runde (Preise, Halvings und Events) werden beim Erstellen der Runde
+          festgelegt und sind für alle gleich.
+        </p>
+        <p>
+          Dein Ziel ist die beste Punktzahl am Ende der Runde. Wie gezählt wird,
+          hängt von der <a href="#scoring">Wertungsart</a> der Runde ab. Im
+          Spiel gibt es kein echtes Geld, und du handelst nie mit anderen
+          Spielern.
+        </p>
+        <p>
+          Das Spiel läuft auf einem simulierten Kalender aus
+          <em>Sim-Monaten</em>, der in die echte Rundenlänge gestaucht wird. Ein
+          Saison-Zyklus dauert 36 Sim-Monate; längere Runden spielen mehr
+          Zyklen. Die Uhr im Kopfbereich (⏱) zeigt die echte verbleibende Zeit.
+        </p>
+      </section>
+
+      <section id="mining" class="guide-section">
+        <h2>Mining</h2>
+        <ul>
+          <li>
+            Du baust alle vier Tokens gleichzeitig ab, jede Sekunde. Dafür musst
+            du nichts anklicken.
+          </li>
+          <li>
+            Jede Saison-Karte zeigt das <strong>Balance</strong> (Guthaben) des
+            Tokens, seinen <strong>Output</strong> pro Sekunde und die Zeit bis
+            zum nächsten <strong>Halving</strong>.
+          </li>
+          <li>
+            Output pro Token = Basisrate &times; Hashrate &times; Efficiency
+            &times; (1 + Cooling), verringert durch Halvings und verändert durch
+            aktive <a href="#events">Output-Events</a>.
+          </li>
+          <li>
+            Das Panel <strong>Player State</strong> zeigt den Output pro Token
+            und insgesamt, deine Guthaben, die Oracle-Preise, die insgesamt
+            abgebauten Tokens sowie Umtauschgebühr und Spread.
+          </li>
+        </ul>
+      </section>
+
+      <section id="upgrades" class="guide-section">
+        <h2>Upgrades</h2>
+        <p>
+          Jede Saison-Karte hat drei Upgrade-Bahnen. Ein Upgrade verbessert nur
+          den Token dieser Karte, und jede Bahn hat pro Saison ihre eigene
+          Stufe.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Upgrade</th>
+                <th scope="col">Wirkung (Standard-Ökonomie)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Hashrate</td>
+                <td>
+                  Erhöht den Hashrate-Multiplikator um 0,1 pro Stufe (Start bei
+                  1,0).
+                </td>
+              </tr>
+              <tr>
+                <td>Efficiency</td>
+                <td>
+                  Erhöht den Efficiency-Multiplikator um 0,05 pro Stufe (Start
+                  bei 1,0).
+                </td>
+              </tr>
+              <tr>
+                <td>Cooling</td>
+                <td>
+                  Erhöht den Cooling-Bonus um 0,1 pro Stufe; der Output wird mit
+                  (1 + Cooling) multipliziert.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>
+            <strong>Die Kosten steigen mit jeder Stufe.</strong> In der
+            Standard-Ökonomie kostet eine Stufe 50 &times; 1,2<sup>Stufe</sup>
+            des Tokens der Karte (50, 60, 72, ...). Upgrade-Kosten-Events können
+            Upgrades eine Zeit lang billiger oder teurer machen.
+          </li>
+          <li>
+            <strong>Mit jedem Token bezahlen.</strong> Die Spalte
+            <strong>Pay</strong> legt fest, mit welchem Guthaben du bezahlst.
+            Bezahlst du mit einem anderen Token, werden die Kosten zu den
+            aktuellen Oracle-Preisen plus Umtauschgebühr und Spread umgerechnet
+            und auf ganze Tokens aufgerundet. Das verbraucht keinen deiner
+            Trades.
+          </li>
+          <li>
+            Die Tabelle einer Bahn zeigt <strong>Lvl</strong> (aktuelle Stufe),
+            <strong>Cost</strong> (Kosten im Token der Karte),
+            <strong>Out/s</strong> (zusätzlicher Output pro Sekunde) und
+            <strong>BEP</strong> (Break-even-Zeit: wie lange das Upgrade
+            braucht, um sich bezahlt zu machen).
+          </li>
+          <li>
+            Den endgültigen Preis legt der Server fest. Upgrades werden nur
+            angenommen, solange die Runde läuft (sync) oder deine Session aktiv
+            ist (async); außerhalb dieses Zeitraums sind die Buttons mit einer
+            kurzen Begründung deaktiviert.
+          </li>
+        </ul>
+        <p class="guide-note">
+          Der Admin kann die Ökonomie für neue Runden anpassen. Die Werte einer
+          Runde werden beim Erstellen festgeschrieben; es zählen also die Zahlen
+          auf deinem Spielbrett.
+        </p>
+      </section>
+
+      <section id="halvings" class="guide-section">
+        <h2>Halvings</h2>
+        <ul>
+          <li>
+            Ein Halving halbiert den Mining-Output eines Tokens. Jeder Token
+            halbiert sich einmal pro Zyklus von 36 Sim-Monaten.
+          </li>
+          <li>
+            Die Halvings sind um 9 Sim-Monate versetzt: Spring gleich zu Beginn
+            jedes Zyklus, dann Summer (Monat 9), Autumn (Monat 18) und Winter
+            (Monat 27).
+          </li>
+          <li>
+            Ein Halving macht den Token außerdem knapper, was seinen
+            <a href="#oracle-prices">Oracle-Preis</a> steigen lässt.
+          </li>
+          <li>
+            Die Zeile <strong>Halving</strong> auf jeder Saison-Karte zählt die
+            echte Zeit bis zum nächsten Halving dieses Tokens herunter und
+            wechselt die Farbe, wenn es knapp wird. Auch Player State zeigt das
+            nächste Halving.
+          </li>
+        </ul>
+      </section>
+
+      <section id="oracle-prices" class="guide-section">
+        <h2>Oracle-Preise</h2>
+        <p>
+          Jeder Token hat einen Oracle-Preis, den der Server für alle gleich
+          berechnet. Die Preise ändern sich im Lauf der Runde:
+        </p>
+        <ul>
+          <li>
+            Immer ist eine Saison gefragt und hat einen höheren Preis; die
+            gefragte Saison wechselt alle paar Sim-Monate.
+          </li>
+          <li>
+            Halvings erhöhen den Preis eines Tokens, weil er knapper wird.
+          </li>
+          <li>
+            Preis-Events treiben einen Token oder alle Tokens eine Zeit lang
+            nach oben oder unten.
+          </li>
+        </ul>
+        <p>
+          Die Preise bestimmen, was du bei einem Trade bekommst, was ein Upgrade
+          kostet, wenn du mit einem anderen Token bezahlst, und deine Punktzahl
+          im Modus Power. Die aktuellen Preise stehen im Panel Player State.
+        </p>
+      </section>
+
+      <section id="trading" class="guide-section">
+        <h2>Trading</h2>
+        <ul>
+          <li>
+            Ein Trade tauscht einen Teil eines Token-Guthabens zu den
+            Oracle-Preisen in einen anderen Token, abzüglich Umtauschgebühr und
+            Spread. Beides legt der Admin pro Runde fest (standardmäßig die
+            Werte der globalen Ökonomie, 2 % Gebühr + 1 % Spread); die Werte der
+            Runde stehen in Player State und im Tab Trade. Du handelst mit dem
+            Spiel, nicht mit anderen Spielern.
+          </li>
+          <li>
+            Jede Runde hat eine <strong>begrenzte Anzahl an Trades</strong>. Der
+            Admin legt die Anzahl beim Erstellen der Runde fest (0 heißt: kein
+            Trading); der Standardwert hängt von der Rundenlänge ab (in
+            async-Runden von der Session-Länge).
+          </li>
+          <li>
+            Trades werden <strong>zu festen Zeiten freigeschaltet</strong>.
+            Standardmäßig wird der erste Trade nach 20 % der Runde (oder
+            Session) frei, die übrigen verteilen sich gleichmäßig über den Rest.
+            In async-Runden zählen die Zeiten ab dem Start deiner Session. Ein
+            Trade, den du nicht nutzt, bleibt für später verfügbar.
+          </li>
+          <li>
+            Der Tab <strong>Trade</strong> zeigt die genutzten Trades, wann der
+            nächste Trade frei wird, und den ganzen Zeitplan. Der Status
+            <strong>Trading</strong> in der Aktionsleiste ist immer sichtbar.
+          </li>
+        </ul>
+      </section>
+
+      <section id="round-types" class="guide-section">
+        <h2>Rundentypen: sync und async</h2>
+        <h3>Sync-Runde (alle spielen gemeinsam)</h3>
+        <ul>
+          <li>
+            Während eines kurzen Anmeldefensters kann man dem Spiel beitreten.
+          </li>
+          <li>
+            Wenn das Fenster schließt, startet die Runde für alle gleichzeitig
+            und läuft ihre festgelegte Länge. Nach dem Start kannst du nicht
+            mehr beitreten.
+          </li>
+        </ul>
+        <h3>Geplante Live-Events</h3>
+        <ul>
+          <li>
+            Eine Sync-Runde kann für ein festes Datum und eine feste Uhrzeit
+            geplant werden. Bis dahin steht sie in der Lobby unter
+            <strong>Upcoming</strong>, mit der Startzeit in deiner Ortszeit und
+            einem Countdown wie &bdquo;opens in 1 h 05 min&ldquo;.
+          </li>
+          <li>
+            Früher beitreten geht nicht: Der Button zeigt
+            <strong>Opens at HH:MM</strong>. Wenn der Countdown null erreicht,
+            lädt die Liste neu, das Anmeldefenster öffnet sich und du kannst wie
+            gewohnt beitreten.
+          </li>
+        </ul>
+        <h3>Async-Runde (spielen, wann du willst)</h3>
+        <ul>
+          <li>
+            Die Runde bleibt länger offen. Du kannst jederzeit einsteigen,
+            solange sie offen ist und eine ganze Session noch in die restliche
+            Rundenzeit passt.
+          </li>
+          <li>
+            Mit dem Einstieg startet deine <strong>Session</strong>, die eine
+            feste Länge hat. Du baust nur ab, solange deine Session läuft.
+          </li>
+          <li>
+            Jede Session startet von derselben Ausgangslage (1.000 von jedem
+            Token, keine Upgrades). Es zählt deine beste abgeschlossene Session.
+            Dein Konto hat einen Spieler pro Runde: Mit
+            <strong>Rejoin</strong> in der Lobby spielst du eine weitere
+            Session, und deine beste bleibt in der Rangliste.
+          </li>
+          <li>
+            Der Kopfbereich zeigt deine Session-Zeit und die verbleibende
+            Rundenzeit; Player State zeigt <strong>This session</strong> und
+            <strong>Best this round</strong>.
+          </li>
+        </ul>
+      </section>
+
+      <section id="scoring" class="guide-section">
+        <h2>Wertungsarten</h2>
+        <p>
+          Der Admin wählt beim Erstellen der Runde eine Wertungsart. Sie ändert
+          sich während der Runde nie, und das Abzeichen
+          <strong>Scoring</strong> im Kopfbereich zeigt, welche gilt.
+        </p>
+        <dl class="guide-defs">
+          <dt>Stockpile (Standard)</dt>
+          <dd>
+            Deine Punktzahl ist die Gesamtzahl deiner Tokens, alle vier Saisons
+            zusammengezählt.
+          </dd>
+          <dt>Power</dt>
+          <dd>
+            Jedes Guthaben wird am Ende mit seinem Oracle-Preis multipliziert
+            und die Ergebnisse werden addiert; es lohnt sich also, die
+            wertvollen Tokens zu halten.
+          </dd>
+          <dt>Mining Time</dt>
+          <dd>
+            Deine Guthaben werden in Sekunden Mining auf Startniveau pro Token
+            umgerechnet und addiert; Tokens, die langsam abgebaut werden, zählen
+            also mehr pro Token.
+          </dd>
+          <dt>Efficiency</dt>
+          <dd>
+            Wie viel du abgebaut hast im Vergleich zu einem Spieler, der in
+            derselben Zeit nie ein Upgrade gekauft hat (1.0000&times; = keine
+            Upgrades); Trades und Startguthaben zählen nicht.
+          </dd>
+        </dl>
+      </section>
+
+      <section id="events" class="guide-section">
+        <h2>Events</h2>
+        <p>
+          Globale Events werden beim Erstellen der Runde eingeplant; alle
+          Spieler sehen also dieselben Events im selben Sim-Monat. Ein Event
+          dauert ein paar Sim-Monate und betrifft entweder einen Token oder alle
+          Tokens. Mehrere Events können gleichzeitig aktiv sein.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Art</th>
+                <th scope="col">Wirkung</th>
+                <th scope="col">Beispiele</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Output</td>
+                <td>
+                  Mining-Output höher oder niedriger (zwischen &times;0,5 und
+                  &times;1,5)
+                </td>
+                <td>Hashrate Festival, Energy Shock</td>
+              </tr>
+              <tr>
+                <td>Upgrade-Kosten</td>
+                <td>Upgrades billiger oder teurer</td>
+                <td>Component Discount, Mining Tax</td>
+              </tr>
+              <tr>
+                <td>Oracle-Preis</td>
+                <td>Token-Preise höher oder niedriger</td>
+                <td>Demand Surge, Market Crash</td>
+              </tr>
+              <tr>
+                <td>Spread</td>
+                <td>
+                  Umtausch (Trades und Zahlung mit anderem Token) wird teurer
+                </td>
+                <td>Liquidity Crunch</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Das Event-Banner über den Saison-Karten zeigt die aktiven Events und
+          wie lange sie noch dauern; &#9889; markiert die Werte, die sie
+          beeinflussen.
+        </p>
+      </section>
+
+      <section id="live-tools" class="guide-section">
+        <h2>Live-Tools-Fenster und Tooltips</h2>
+        <p>
+          Die Buttons <strong>Trade</strong>, <strong>Farm</strong>,
+          <strong>Chat</strong> und <strong>Top 5</strong> in der Aktionsleiste
+          öffnen ein kleines schwebendes Fenster. Es blockiert das Spielbrett
+          nicht: Du kannst es an seiner Kopfzeile verschieben, in der Größe
+          ändern und mit dem Schließen-Button, mit Escape oder mit einem Klick
+          daneben schließen.
+        </p>
+        <ul>
+          <li>
+            <strong>Trade:</strong> Tokens tauschen (siehe
+            <a href="#trading">Trading</a>).
+          </li>
+          <li>
+            <strong>Farm:</strong> Tokens ins Farming einzahlen und wieder
+            abheben (siehe <a href="#farming">Farming</a>). Hat die Runde kein
+            Farming, steht im Tab &bdquo;Farming is not enabled for this
+            round.&ldquo;
+          </li>
+          <li>
+            <strong>Chat:</strong> mit den anderen Spielern der Runde schreiben.
+            Der Chat ist nur zum Austausch da, hat keinen Einfluss auf das Spiel
+            und wird nicht gespeichert. Eine kleine Vorschau mit Zähler für
+            ungelesene Nachrichten bleibt auf dem Spielbrett sichtbar. Der
+            Button 😀 neben dem Eingabefeld öffnet eine kleine Emoji-Auswahl
+            (auch per Tastatur: Pfeiltasten zum Bewegen, Enter zum Einfügen,
+            Escape zum Schließen). Der Admin kann den Chat für eine Runde
+            abschalten; im Tab Chat steht dann &bdquo;Chat is disabled for this
+            round.&ldquo; Moderatoren können einen Spieler im Chat einer Runde
+            stummschalten (er kann weiterspielen) und den Chat leeren.
+          </li>
+          <li><strong>Top 5:</strong> die aktuelle Rangliste.</li>
+        </ul>
+        <p>
+          <strong>Tooltips:</strong> Fahre mit der Maus über ein kleines
+          <em>i</em>-Symbol oder einen Wert (oder fokussiere es per Tastatur),
+          um eine Erklärung oder die genaue Zahl zu sehen (große Zahlen werden
+          mit k, M und B abgekürzt). Bewege die Maus weg oder drücke Escape, um
+          ihn zu schließen.
+        </p>
+      </section>
+
+      <section id="accounts" class="guide-section">
+        <h2>Konto und dein Name</h2>
+        <ul>
+          <li>
+            Um einem Spiel beizutreten, brauchst du ein Konto. Lege es in der
+            Lobby mit <strong>Create account</strong> an (Benutzername,
+            Anzeigename, E-Mail, optional Discord- und Telegram-Name sowie ein
+            Passwort mit mindestens 12 Zeichen, Groß- und Kleinbuchstaben, einer
+            Ziffer und einem Sonderzeichen).
+          </li>
+          <li>
+            Dein <strong>Anzeigename</strong> ist dein Name im Spiel und in der
+            Rangliste. Namen im Spiel dürfen nur Buchstaben, Ziffern,
+            Leerzeichen und <code>_ - .</code> enthalten und höchstens 24
+            Zeichen lang sein; andere Zeichen werden ersetzt, und wenn nichts
+            Brauchbares übrig bleibt, wird dein Benutzername verwendet.
+          </li>
+          <li>
+            Solange du angemeldet bist, kannst du in der Lobby dein Passwort
+            ändern.
+          </li>
+          <li>
+            Du kannst deine Kontodaten in der Lobby herunterladen oder löschen
+            (<strong>Download my data</strong> und
+            <strong>Delete account</strong>). Das Löschen ist endgültig; dein
+            Name in früheren Ergebnissen erscheint dann als &bdquo;Deleted
+            player&ldquo;.
+          </li>
+        </ul>
+      </section>
+
+      <section id="farming" class="guide-section">
+        <h2>Farming</h2>
+        <p>
+          Mit Farming (Stufe 1, passives Farming) lässt du Tokens für dich
+          arbeiten. Der Admin entscheidet pro Runde, ob Farming an ist, wie lang
+          ein Belohnungszyklus (die <em>Mindestdauer</em>) dauert und wie hoch
+          die Belohnung ist. Der Status <strong>Farming</strong> in der
+          Aktionsleiste zeigt das an, zum Beispiel &bdquo;Enabled (5% /
+          5m)&ldquo;.
+        </p>
+        <ul>
+          <li>
+            Öffne den Tab <strong>Farm</strong>, gib für einen Token einen
+            Betrag ein und drücke <strong>Deposit</strong>.
+            <strong>Withdraw</strong> holt einen Betrag wieder heraus,
+            <strong>Withdraw all</strong> alles von diesem Token.
+          </li>
+          <li>
+            Nach jeder vollen Mindestdauer bekommt der Token seine Belohnung,
+            zum Beispiel 5 % des gefarmten Betrags. Belohnungen werden zum
+            gefarmten Betrag addiert, verzinsen sich also mit.
+          </li>
+          <li>
+            Eine neue Einzahlung startet den Zyklus-Timer dieses Tokens neu. Wer
+            vor Ende eines Zyklus abhebt, bekommt für diesen Zyklus nichts.
+          </li>
+          <li>
+            Gefarmte Tokens kannst du erst für Upgrades oder Trades ausgeben,
+            wenn du sie abgehoben hast; sie zählen aber für die Wertungen
+            Stockpile, Power und Mining Time. Das Panel Player State zeigt sie
+            in einer eigenen Zeile &bdquo;Farmed&ldquo;.
+          </li>
+          <li>
+            Wie Upgrades und Trades funktioniert Farming nur, solange die Runde
+            läuft (und in async-Runden während deiner Session).
+          </li>
+        </ul>
+        <p>
+          Stufe 2 (rotierendes Farming, bei dem sich der lohnendste Token im
+          Lauf der Zeit ändert) kommt später.
+        </p>
+      </section>
+
+      <section id="roadmap" class="guide-section guide-roadmap">
+        <h2>Was noch kommt</h2>
+        <p>
+          Mining Tycoon ist noch in Entwicklung. Alles über diesem Abschnitt
+          funktioniert schon heute. Die Funktionen unten sind geplant; Details
+          können sich bis dahin noch ändern.
+        </p>
+        <h3>Geplant</h3>
+        <ul>
+          <li>
+            <strong>Weitere Sprachen:</strong> das Spiel selbst in anderen
+            Sprachen; diese Anleitung gibt es schon auf Englisch und Deutsch.
+            Weitere Sprachen erscheinen im Sprachumschalter oben auf dieser
+            Seite.
+          </li>
+          <li>
+            <strong>Rotierendes Farming (Stufe 2):</strong> Der Token mit der
+            besten Farming-Belohnung wechselt während der Runde, sodass auch
+            Farming zu einer Frage des richtigen Zeitpunkts wird.
+          </li>
+          <li>
+            <strong>Ausbalancierte Ökonomie:</strong> Playtests stimmen
+            Mining-Tempo, Upgrade-Kosten, Trades und Rundenlängen so ab, dass
+            jede Strategie eine faire Chance hat.
+          </li>
+          <li>
+            <strong>Sicherere Konten:</strong> ein vergessenes Passwort per
+            E-Mail zurücksetzen und die E-Mail-Adresse bei der Anmeldung
+            bestätigen.
+          </li>
+          <li>
+            <strong>Öffentliche Runden online:</strong> Das Spiel zieht auf
+            einen öffentlichen Server um, mit offenen Runden und geplanten
+            Live-Events für alle.
+          </li>
+          <li>
+            <strong>Ein neuer Look:</strong> Saison-Artwork und ein Spiel-Icon.
+          </li>
+        </ul>
+        <h3>Bewusst nicht geplant</h3>
+        <ul>
+          <li>
+            <strong>Kein echtes Geld und kein Pay-to-win.</strong> Im Spiel kann
+            man nichts kaufen.
+          </li>
+          <li>
+            <strong>Kein Handel zwischen Spielern.</strong> Du handelst immer
+            mit dem Spiel, zu denselben Preisen wie alle anderen.
+          </li>
+          <li>
+            <strong>Kein Fortschritt über Runden hinweg.</strong> Jede Runde
+            startet von derselben fairen Ausgangslage.
+          </li>
+        </ul>
+      </section>
+
+      <footer class="guide-footer">
+        <p>
+          <a href="#top">Nach oben</a> &middot; <a href="/">Lobby</a> &middot;
+          <a href="/privacy.html" hreflang="en">Privacy</a> &middot;
+          <a href="/imprint.html" hreflang="en">Imprint</a>
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
