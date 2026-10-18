@@ -295,6 +295,64 @@ describe('trading-panel', () => {
       });
     });
 
+    it('does not lose the Execute click when the amount field blurs (change) during the press', async () => {
+      vi.useFakeTimers();
+      try {
+        const executeTrade = vi.fn().mockResolvedValue({});
+        const api = initTradingPanel({
+          getGameMeta: () => ({
+            conversion_fee_rate: 0.02,
+            scoring_mode: 'stockpile',
+            game_duration_seconds: 600,
+            trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+          }),
+          getLastGameData: () => ({
+            player_state: {
+              balances: { spring: 1000, summer: 500, autumn: 250, winter: 125 },
+            },
+            seconds_remaining: 520,
+            trades_used: 0,
+            trading_rules: {
+              trade_count: 2,
+              unlock_offsets_seconds: [60, 180],
+            },
+          }),
+          executeTrade,
+          tradingPanelRef: panelEl,
+          tradingStatusRef: statusEl,
+        });
+        api.renderTradingStatus();
+
+        const amountInput = panelEl.querySelector('input[data-field="amount"]');
+        amountInput.focus();
+        amountInput.value = '40';
+        amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        const executeBtn = panelEl.querySelector('.trading-execute-btn');
+
+        // Real browser order: pointerdown, blur -> change, a live tick, click.
+        executeBtn.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        amountInput.blur();
+        amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+        api.renderTradingStatus();
+        expect(executeBtn.isConnected).toBe(true);
+        document.dispatchEvent(new Event('pointerup', { bubbles: true }));
+        executeBtn.click();
+        await Promise.resolve();
+        expect(executeTrade).toHaveBeenCalledWith({
+          fromToken: 'spring',
+          toToken: 'summer',
+          amount: 40,
+        });
+
+        // After the press, live ticks may rebuild the panel again.
+        vi.runAllTimers();
+        api.renderTradingStatus();
+        expect(executeBtn.isConnected).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('disables execute with the play-window reason when actions are blocked', () => {
       const getMeta = () => ({
         conversion_fee_rate: 0.02,
