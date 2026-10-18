@@ -7,8 +7,9 @@ Role in system: entry point before the player board. Stores the backend URL,
   account session and per-game player credentials for player.html.
 Backend contract notes:
 - Join sends the account token; the backend links the player to the account
-  and answers a repeated join with the same player_id/player_token
-  (`rejoined: true`). 401 ACCOUNT_AUTH_INVALID = stale account token (treated
+  and answers a repeated join with the same player_id and a NEW player_token
+  (`rejoined: true`; the backend stores tokens hashed, so the previous token
+  stops working and the stored one is replaced). 401 ACCOUNT_AUTH_INVALID = stale account token (treated
   like an expired session), 401 ACCOUNT_REQUIRED = round needs a sign-in.
 - /games/active with the token marks the caller's games via `my_player_id`.
 - Scheduled sync rounds (`status: "scheduled"`, `scheduled_start_at`,
