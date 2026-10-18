@@ -4,7 +4,7 @@ Browser frontend for Mining Tycoon (Seasonal Tycoon), built with Vite. The
 backend lives in the sibling repo `Mining-tycoon` and is authoritative for all
 gameplay outcomes; this frontend only displays state and sends player intent.
 
-Six pages:
+Seven pages (the German guide counts as its own page):
 
 - **Lobby** (`index.html`): register, log in/out, pick an open game, join or rejoin it, see your result history, full final leaderboards and the last game's highscores.
 - **Player board** (`player.html`): the live game. Four season cards with inline upgrades, read-only analytics, halving countdowns, event banner, and a floating live tools window with Trade, Farm, Chat and Top 5.
@@ -17,9 +17,11 @@ Six pages:
 The current implementation state, recent changes and open work are tracked in
 [PROJECT_BASELINE.md](PROJECT_BASELINE.md) (section 10). In short: mining,
 upgrades, halvings, events, trading, sync and async rounds, best-of scoring,
-chat, accounts (linked to players, with result history), Farming Stage 1
-(passive farming, UI side; needs the matching backend) and the admin console
-work end to end. Farming Stage 2 and production hardening are open.
+chat with admin moderation, accounts (linked to players, with result history,
+email verification and email password reset), scheduled sync rounds, Farming
+Stage 1 and Stage 2 (favored season pays more), bot opponents and the admin
+console work end to end. Production hardening, playtests and release
+preparation are open.
 
 ## Documentation
 
@@ -205,7 +207,8 @@ the admin token, see below),
 "Start now" / "Schedule start", enrollment window, duration; async: round and
 session duration),
 4 Scoring Mode, 5 Trading & Farming Rules (count, unlock preview, optional
-conversion fee / oracle spread overrides and the Farming Stage 1 options),
+conversion fee / oracle spread overrides and the farming options, including
+the Stage 2 "Favored season bonus"),
 6 Advanced Overrides (anchor token,
 anchor tokens/sec, season cycles), 7 Review & Create, 8 Game Management
 (active games with sync/async label, status-aware time remaining, player count;
@@ -219,6 +222,7 @@ length, trade unlock fractions, "Chat enabled by default"
 (`defaults.chat_enabled`, fallback on, sent only when changed), the
 "Farming (Stage 1)" defaults and limits (`defaults.farming_enabled`,
 `defaults.farming_min_duration_seconds`, `defaults.farming_reward_rate`,
+`defaults.farming_favored_multiplier` (1-5, fallback 2),
 `farming_min_duration_limits`, `farming_reward_rate_limits`; fallbacks off,
 300 s, 5 %, 10 s..7 d, 0.01 %..100 %; rewards edited in percent; sent only
 when changed) and the account
@@ -407,7 +411,7 @@ The trading panel's cost note shows the round's effective fee and, when the
 game meta carries it, the oracle spread (`conversion_fee_rate`,
 `oracle_spread` from `/games/{id}/meta`). A 0 % fee override is shown as 0 %.
 
-## Farming (Stage 1)
+## Farming (Stages 1 and 2)
 
 Passive farming, per round. Contract (backend authoritative):
 
@@ -430,9 +434,17 @@ play-window gate (`src/ui/action-availability.js`); backend errors
 shown verbatim as toasts. Without a `farming` block (older backend) the tab
 says "Farming is not enabled for this round." and the pill "Not enabled".
 
+Stage 2 (rotating): the optional round option `farming_favored_multiplier`
+(1-5; 1 = off; default from Game Settings) makes a cycle that completes while
+its token is the favored season (it rotates with the oracle prices) earn that
+multiple of the reward. `farming` then also carries `favored_multiplier`,
+`favored_token` and `favored_changes_in_seconds`; the Farm tab adds the rule
+to its summary and shows "Favored now: <season> earns ×N per cycle · changes
+in ...". Without these fields the tab behaves as in Stage 1.
+
 ## Visual Assets
 
-- `public/assets/backgrounds/`: lobby backgrounds (the lobby uses `Seasonal Enterteinment.png`)
+- `public/assets/backgrounds/`: lobby backgrounds (the lobby uses `seasonal-entertainment.webp`)
 - `public/assets/seasons/`: season images (present, not used yet)
 - `public/assets/ui/`: other UI artwork
 
@@ -458,11 +470,11 @@ npm scripts (`package.json`):
 | Script | Purpose |
 |---|---|
 | `npm run dev` / `dev:fixed` | Vite dev server (both identical) |
-| `npm run build` | production build into `dist/` (all six pages) |
+| `npm run build` | production build into `dist/` (all seven pages) |
 | `npm run preview` | serve the production build locally |
 | `npm run lint` | ESLint on `src/` |
 | `npm run clean:audit` | ESLint with zero warnings + knip (unused files/deps/unresolved imports) |
-| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the six HTML files) |
+| `npm run format` / `format:fix` | Prettier write (JS/CSS in `src/` and the seven HTML files) |
 | `npm run format:check` | Prettier check (same files) |
 | `npm run test` | all Vitest tests once (jsdom) |
 | `npm run test:fast` | `test:services` + `test:ui` |
@@ -528,3 +540,9 @@ Module responsibilities: [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 
 For full-stack work in one VS Code window, open the umbrella workspace file
 (`mining-tycoon-umbrella.code-workspace`) if you keep one next to both repos.
+
+## License
+
+All rights reserved. The repository is public for reading and review only; no
+license to copy, modify, distribute, host or otherwise use the code is granted.
+See [LICENSE](LICENSE).

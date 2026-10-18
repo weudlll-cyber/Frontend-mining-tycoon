@@ -4,26 +4,25 @@ Purpose: Shared DOM and formatting helpers for frontend rendering code.
 Role in system: Utility layer consumed by all UI modules; no upstream data-flow dependencies.
 Key responsibilities:
 - Safe text-node updates that preserve selection anchors during live SSE refreshes.
-- clearElementChildren / clearNode for subtree teardown without innerHTML.
-- formatCost for the legacy upgrade panel cost display.
+- clearNode for subtree teardown without innerHTML.
+- byId: document.getElementById shorthand for the admin modules.
 Entry points / public functions:
-- clearElementChildren, clearNode, setTextNodeValue, setElementTextValue, formatCost.
+- clearNode, byId, setTextNodeValue, setElementTextValue.
 Dependencies: Browser DOM APIs only.
 Security notes: textContent / createTextNode only — never innerHTML with untrusted input.
 */
 
-export function clearElementChildren(el) {
-  if (!el) return;
-  while (el.firstChild) {
-    el.removeChild(el.firstChild);
-  }
-}
-
+/** Remove all children of a node (no innerHTML). */
 export function clearNode(node) {
   if (!node) return;
   while (node.firstChild) {
     node.removeChild(node.firstChild);
   }
+}
+
+/** Shorthand for document.getElementById. */
+export function byId(id) {
+  return document.getElementById(id);
 }
 
 export function setTextNodeValue(textNode, value) {
@@ -53,19 +52,4 @@ export function setElementTextValue(element, value) {
 
   clearNode(element);
   element.appendChild(document.createTextNode(nextValue));
-}
-
-export function formatCost(cost) {
-  if (cost == null) return '-';
-  if (typeof cost === 'object') {
-    const parts = [];
-    for (const [k, v] of Object.entries(cost)) {
-      parts.push(`${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`);
-    }
-    return parts.join(', ');
-  }
-  if (typeof cost === 'number') {
-    return cost.toString();
-  }
-  return String(cost);
 }

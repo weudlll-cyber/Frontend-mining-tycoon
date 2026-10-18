@@ -17,10 +17,7 @@ import {
 import { createApiError, readApiError } from '../utils/api-error.js';
 import { showGameMetrics } from './admin-metrics.js';
 import { initChatModeration, showChatModeration } from './chat-moderation.js';
-
-function el(id) {
-  return document.getElementById(id);
-}
+import { byId as el } from '../utils/dom-utils.js';
 
 async function getBackendUrl() {
   const url = (el('admin-backend-url')?.value || '').trim();

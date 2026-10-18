@@ -22,6 +22,7 @@ import {
   hasAdminCredentials,
   onAdminSessionChange,
 } from './admin-session.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 export const ADMIN_USERS_PAGE_SIZE = 20;
 
@@ -32,10 +33,6 @@ export const USER_NOT_FOUND_MESSAGE =
   'This account no longer exists. Refresh the list.';
 
 const state = { query: '', offset: 0, total: 0 };
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 function setResult(message, kind = 'info') {
   const box = el('admin-users-result');

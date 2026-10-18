@@ -9,6 +9,21 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Changed
+
+- Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
+  rules of the old upgrade panel and status bar, admin theme rules that
+  admin.html never loads, the Vite template `javascript.svg`); one shared
+  `byId` / `clearNode` in `dom-utils.js` instead of 13 copies; knip now uses
+  the Vite page entries.
+- Lobby background: `seasonal-entertainment.webp` (49 KB) replaces the 636 KB
+  PNG with the misspelled name.
+- Accessibility: setup inputs have linked labels; the BOT badge is darker
+  (AAA contrast) and announces its level to screen readers.
+- CI: pushes run on `main` only (feature branches run once, as pull requests).
+- `LICENSE`: all rights reserved (the repository is public for reading only);
+  `.editorconfig`; docs refreshed to the current feature set.
+
 ### Security
 
 - Logging out, changing the password, deleting the account or an expired

@@ -10,7 +10,7 @@ This folder stores static visual assets used by the frontend.
 
 ## Recommended naming
 
-- Start/lobby background: `backgrounds/lobby-bg-desktop.webp`
+- Start/lobby background: `backgrounds/seasonal-entertainment.webp` (in use)
 - Optional mobile variant: `backgrounds/lobby-bg-mobile.webp`
 - Season images:
   - `seasons/spring.webp`
@@ -22,4 +22,7 @@ This folder stores static visual assets used by the frontend.
 
 - Prefer `webp` for performance.
 - Keep source filenames stable once referenced by UI code.
-- Season images are planned for later integration.
+- Season images exist (`seasons/Spring.png`, `Summer.png`, `Autumn.png`,
+  `Winter.png`) but are not used by the UI yet; they are planned for later
+  integration (convert them to the `webp` names above when wiring them in).
+- The lobby background is `backgrounds/seasonal-entertainment.webp`.

@@ -27,7 +27,7 @@ import {
   verifyEmail,
 } from '../services/auth-client.js';
 
-export const RESET_DISABLED_MESSAGE =
+const RESET_DISABLED_MESSAGE =
   'Password reset is not available. Please contact an administrator.';
 
 let els = null;

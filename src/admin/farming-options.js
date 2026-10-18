@@ -22,6 +22,7 @@
 
 import { formatFarmDuration } from '../ui/farming-state.js';
 import { formatRateAsPercent } from './round-options.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const IDS = Object.freeze({
   enabled: 'admin-farming-enabled',
@@ -57,10 +58,6 @@ let current = {
   durationLimits: FALLBACK.durationLimits,
   rewardLimits: FALLBACK.rewardLimits,
 };
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 /** Largest unit that divides the seconds evenly: 300 -> 5 minutes. */
 export function splitDuration(seconds) {

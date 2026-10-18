@@ -20,15 +20,12 @@
  */
 
 import { adminRequest } from './admin-api.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const ROUND_END = 'round';
 
 let _gameId = null;
 let _loadToken = 0;
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 function showResult(message, kind = '') {
   const resultEl = el('admin-chat-result');

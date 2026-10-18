@@ -19,23 +19,18 @@ body {
   overflow: hidden;
 }
 
-/* Admin-only controls: hidden in the player UI (index.html).
-     These elements are visible only in admin.html. */
+/* Legacy host controls in player.html: always hidden (rounds are created in
+   admin.html). */
 .admin-only {
   display: none !important;
 }
 
-/* Page theme variables — distinguish player vs admin visually */
+/* Page theme variables (admin.html has its own inline styles) */
 :root {
   /* Player page accent: subtle blue-green */
   --accent-player: #0891b2;
   --banner-bg-player: #ecf0f1;
   --banner-border-player: #bdc3c7;
-
-  /* Admin page accent: amber/warning to suggest elevated action */
-  --accent-admin: #d97706;
-  --banner-bg-admin: #fef3c7;
-  --banner-border-admin: #f59e0b;
 }
 
 /* Player page styling */
@@ -65,22 +60,6 @@ body.page-player #setup-panel .setup-grid .form-group.player-core-field {
 body.page-player #setup-panel #async-diagnostics-help,
 body.page-player #setup-panel #round-mode-badge {
   display: none;
-}
-
-/* Admin page styling */
-body.page-admin {
-  --current-accent: var(--accent-admin);
-}
-
-body.page-admin .page-banner {
-  background: var(--banner-bg-admin);
-  border: 2px solid var(--banner-border-admin);
-  color: #92400e;
-  font-weight: 600;
-}
-
-body.page-admin .page-banner-icon {
-  color: var(--accent-admin);
 }
 
 /* Shared page banner styles */
@@ -596,32 +575,6 @@ body {
   position: relative;
 }
 
-/* Status Bar (top of dashboard) */
-.status-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  box-shadow: var(--card-shadow);
-  align-items: center;
-}
-
-.status-bar-left,
-.status-bar-center,
-.status-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 0.9rem;
-}
-
-.status-bar-right {
-  justify-content: flex-end;
-}
-
 /* Main Dashboard Grid — left column takes remaining space; right panel is fixed width */
 .dashboard-main {
   display: grid;
@@ -868,26 +821,6 @@ body {
   font-size: 0.8rem;
 }
 
-/* Event Tooltip in tooltip-layer */
-.event-tip-bubble {
-  position: absolute;
-  background-color: #1f2937;
-  color: white;
-  padding: 0.6rem 0.8rem;
-  border-radius: calc(var(--radius) / 2);
-  font-size: 0.8rem;
-  line-height: 1.4;
-  max-width: 220px;
-  pointer-events: none;
-  z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.event-tip-bubble strong {
-  display: block;
-  margin-bottom: 0.3rem;
-}
-
 @media (max-width: 980px) {
   .season-meta {
     flex-wrap: wrap;
@@ -906,11 +839,6 @@ body {
 
 .season-upgrades.hidden {
   display: none;
-}
-
-.upgrade-lane-layout {
-  display: grid;
-  gap: 0.2rem;
 }
 
 /* Table container: header + rows share one grid context for pixel-exact column alignment */
@@ -1232,28 +1160,6 @@ body {
   gap: 0.35rem;
   font-size: 0.85rem;
   padding: 0;
-}
-
-.quick-join-panel,
-.last-game-panel {
-  overflow: hidden;
-}
-
-.panel-field {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.panel-inline-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.panel-inline-actions select {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .last-game-score-list {
@@ -1818,33 +1724,6 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* P2.4: Duration selector and overrides */
-.duration-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.duration-selector select {
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border-light);
-  border-radius: calc(var(--radius) / 2);
-  font-size: 0.95rem;
-  font-family: inherit;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.duration-selector select:focus {
-  outline: none;
-  border-color: var(--status-blue);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
 .duration-custom-input {
   display: flex;
   gap: 0.5rem;
@@ -1967,25 +1846,6 @@ button {
   transform: translateY(0);
 }
 
-/* Status */
-.status-row {
-  display: flex;
-  gap: 1.25rem;
-  margin-bottom: 0.85rem;
-  flex-wrap: wrap;
-}
-
-.status-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.status-item .label {
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
 .meta-debug {
   font-size: 0.78rem;
   color: var(--text-secondary);
@@ -2089,10 +1949,6 @@ button {
   text-align: right;
 }
 
-.ps-head-sigma {
-  color: #1d4ed8;
-}
-
 .ps-label-cell {
   display: flex;
   align-items: center;
@@ -2121,10 +1977,6 @@ button {
   justify-content: center;
 }
 
-.ps-head-icon {
-  text-align: center;
-}
-
 .ps-value {
   text-align: right;
   font-family: Consolas, 'Lucida Console', monospace;
@@ -2136,10 +1988,6 @@ button {
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
-}
-
-.ps-cell-total {
-  color: var(--status-blue);
 }
 
 .ps-row-price-label,
@@ -2302,21 +2150,6 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   padding: 0.25rem 0 0;
-}
-
-.upgrade-section {
-  margin-bottom: 0;
-  padding: 0.85rem;
-  background-color: var(--bg-primary);
-  border-radius: var(--radius);
-  border: 1px solid var(--border-light);
-}
-
-.upgrade-section h3 {
-  font-size: 1rem;
-  margin-bottom: 0.55rem;
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 /* Trading Panel */
@@ -2724,88 +2557,9 @@ button {
   font-weight: 600;
 }
 
-.upgrade-stat {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.35rem 0;
-  font-size: 0.84rem;
-}
-
 .upgrade-cost {
   color: #dc2626;
   font-weight: 600;
-}
-
-.upgrade-benefit {
-  color: var(--status-green);
-  font-weight: 600;
-}
-
-.upgrade-current {
-  color: var(--status-blue);
-  font-weight: 600;
-}
-
-.upgrade-roi {
-  color: #b45309;
-  font-weight: 600;
-}
-
-.upgrade-level {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.2rem 0.6rem;
-  background-color: var(--status-blue);
-  color: white;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.upgrade-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 0.75rem;
-  align-items: center;
-  margin-bottom: 1rem;
-  grid-column: 1 / -1;
-}
-
-.upgrade-select {
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--border-light);
-  border-radius: calc(var(--radius) / 2);
-  background-color: #fff;
-}
-
-.btn-upgrade {
-  background-color: var(--status-blue);
-  color: white;
-  margin-top: 0.55rem;
-  width: 100%;
-}
-
-.btn-upgrade:hover {
-  background-color: #1d4ed8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.btn-upgrade:active {
-  transform: translateY(0);
-}
-
-.btn-upgrade:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-/* Highlight for important stats */
-.state-stat-value.highlight {
-  color: var(--status-green);
-  font-size: 1.1em;
 }
 
 /* Placeholder */
@@ -3376,7 +3130,7 @@ summary:focus-visible,
   line-height: 1.5;
   vertical-align: middle;
   color: #fff;
-  background: #6b7280;
+  background: #4b5563;
 }
 
 /* The class rule above would otherwise override the hidden attribute. */

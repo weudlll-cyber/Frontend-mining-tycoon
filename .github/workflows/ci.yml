@@ -1,7 +1,9 @@
 name: ci
 
+# Feature branches run once, as a pull request; pushes run on main only.
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Read-only by default; only the PR comment job below may write.

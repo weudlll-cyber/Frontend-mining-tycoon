@@ -16,6 +16,7 @@
  */
 
 import { adminRequest } from './admin-api.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const UPGRADE_PROFILES = [
   ['hashrate', 'Hashrate', '> 0'],
@@ -81,10 +82,6 @@ let onLoadedCallback = null;
  */
 export function getLoadedEconomyConfig() {
   return loadedConfig ? { ...loadedConfig } : null;
-}
-
-function el(id) {
-  return document.getElementById(id);
 }
 
 function fieldInputId(key) {

@@ -15,7 +15,7 @@ Author/Owner: Frontend Team
 */
 
 export const HALVING_INTERVAL_MONTHS = 36;
-export const HALVING_DISPLAY_WINDOW_MONTHS = 1;
+const HALVING_DISPLAY_WINDOW_MONTHS = 1;
 export const HALVING_BASE_OFFSETS = {
   spring: 0,
   summer: 9,

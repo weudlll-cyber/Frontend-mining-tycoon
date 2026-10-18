@@ -9,7 +9,7 @@ All systems in this document are governed by the same project invariants defined
 - Fairness is preserved unconditionally.
 
 This is an intent document. Each section carries an implementation status
-marker (verified against both repos on 2026-10-07): **Implemented**,
+marker (verified against both repos on 2026-10-07, updated 2026-10-18): **Implemented**,
 **Partial** or **Not started**. For the full factual state see
 [PROJECT_BASELINE.md](PROJECT_BASELINE.md).
 
@@ -17,7 +17,7 @@ marker (verified against both repos on 2026-10-07): **Implemented**,
 
 ## 1. Player Creation & Player Profiles
 
-> **Status: Partial.** Accounts exist (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/change-password`). Registration in the lobby collects username, display name, email, an optional **Discord handle**, an optional **Telegram handle** and a password (min. 12 characters with upper/lowercase, digit and special character). The Discord/Telegram handles are stored as contact fields only; there is no Discord or Telegram integration (see Section 9). Accounts are **linked** to in-game players: the lobby joins with the account token, the backend stores the account on the player, and joining the same game again returns the same player and `player_token` ("Rejoin" in the lobby). Admins can require a signed-in account to join (Game Settings, `account_policy.require_account_to_join`). No avatars or cosmetic metadata.
+> **Status: Partial.** Accounts exist (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/change-password`). Registration in the lobby collects username, display name, email, an optional **Discord handle**, an optional **Telegram handle** and a password (min. 12 characters with upper/lowercase, digit and special character). Email addresses are confirmed through an emailed link, and a forgotten password is reset through a single-use emailed link (backend `MAIL_BACKEND`: `smtp`, `log` or `disabled`). The Discord/Telegram handles are stored as contact fields only; there is no Discord or Telegram integration (see Section 9). Accounts are **linked** to in-game players: the lobby joins with the account token, the backend stores the account on the player, and joining the same game again returns the same player and `player_token` ("Rejoin" in the lobby). Admins can require a signed-in account to join (Game Settings, `account_policy.require_account_to_join`). No avatars or cosmetic metadata.
 
 ### What a Player Profile Represents
 
@@ -51,7 +51,7 @@ Player identity is created and maintained server-side. The backend is the author
 
 > **Status: Partial.** Account records persist in the backend database across rounds, and players are linked to accounts, so finished-round results are attributed to the account (see Section 7). There is no profile page beyond the lobby's "My results" list.
 >
-> **Account data export and deletion: Implemented (frontend; needs the matching backend).** Signed in, the lobby offers **Download my data** (`GET /auth/me/export`, saved as `mining-tycoon-account-export.json`) and **Delete account** (`DELETE /auth/me` with the password; `204` on success, `403 PASSWORD_INCORRECT`, `429` when rate limited). Deletion removes the account, its sessions and login history; past results keep their rows but show "Deleted player" as the name. Older backends without these endpoints show their error message in the lobby.
+> **Account data export and deletion: Implemented.** Signed in, the lobby offers **Download my data** (`GET /auth/me/export`, saved as `mining-tycoon-account-export.json`) and **Delete account** (`DELETE /auth/me` with the password; `204` on success, `403 PASSWORD_INCORRECT`, `429` when rate limited). Deletion removes the account, its sessions and login history; past results keep their rows but show "Deleted player" as the name. Older backends without these endpoints show their error message in the lobby.
 
 ### Why Persistence Is Required
 
@@ -77,7 +77,7 @@ The minimum viable player profile stores only what is needed to identify a consi
 
 ## 3. Admin Roles & Permissions
 
-> **Status: Partial.** Admin rights are a shared admin token (`X-Admin-Token`, backend `ADMIN_TOKEN`), enforced server-side for game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on and for the `/admin/*` routes (without `ADMIN_TOKEN` the admin routes are localhost-only). Accounts have an `is_admin` field, but no role-based admin login exists yet. Rounds start automatically after the enrollment window; there is no manual "start round" control.
+> **Status: Partial.** Admin rights are a shared admin token (`X-Admin-Token`, backend `ADMIN_TOKEN`), enforced server-side for game creation when `REQUIRE_ADMIN_FOR_GAME_CREATE` is on and for the `/admin/*` routes (without `ADMIN_TOKEN` the admin routes are localhost-only). Accounts with `is_admin` can also sign in to the admin console ("Sign in as administrator"), and administrators can grant or remove admin rights in the console's Administrators section. Rounds start automatically after the enrollment window; there is no manual "start round" control.
 
 ### Not All Users Are Equal
 
@@ -106,7 +106,7 @@ Admin permissions do not affect gameplay fairness. Admins configure the game env
 
 ## 4. Admin-Only Game Setup (Separation of Concerns)
 
-> **Status: Implemented** for scoring mode, round type, durations, enrollment window, trade count and advanced emission overrides (`admin.html`). Farming rules and a per-round chat opt-out do not exist yet. Players cannot create games.
+> **Status: Implemented** for scoring mode, round type, durations, enrollment window, trade count, advanced emission overrides, per-round fee/spread overrides, farming rules (Stages 1 and 2), the per-round chat opt-out, a scheduled start and bot opponents for sync rounds (`admin.html`). Players cannot create games.
 
 ### Setup vs. Play
 
@@ -134,7 +134,7 @@ All parameters set in the admin workflow become snapshot-locked at round creatio
 
 ## 5. Highscores & Leaderboards (Sync & Async)
 
-> **Status: Partial.** All four scoring modes are evaluated by the backend. Players see a live Top 5 (SSE `leaderboard_top_5`) in the "Top 5" tab of the live tools window, plus rank and top score in the header. Missing: a full leaderboard view and a "provisional vs. final" marker for async rounds.
+> **Status: Partial.** All four scoring modes are evaluated by the backend. Players see a live Top 5 (SSE `leaderboard_top_5`) in the "Top 5" tab of the live tools window, plus rank and top score in the header, with a standings label (Live / Provisional / Final / Scheduled). After a round finishes, the lobby shows the full final leaderboard ("My results").
 
 ### Leaderboard Scope
 
@@ -227,7 +227,7 @@ Result history is a non-gameplay, read-only system. It does not affect simulatio
 
 ## 8. Chat System (Social, Non-Gameplay)
 
-> **Status: Implemented (frontend).** Round-scoped, non-persistent WebSocket chat with server-side rate limits and server-derived `user`/`ts`; in the UI it is the Chat tab of the floating live tools window plus a preview dock. The per-round opt-out (`chat_enabled`) is implemented. The frontend also has an inline emoji picker (curated list from `/meta` `chat_emoji`, built-in fallback for older backends) and admin moderation (section 13 of `admin.html`: mute for 15 min / 1 h / 24 h / until the round ends, unmute, clear chat; players see a muted note and a "cleared by an administrator" notice). Emoji curation and mute/clear enforcement are backend work in the `Mining-tycoon` repository.
+> **Status: Implemented (frontend and backend).** Round-scoped, non-persistent WebSocket chat with server-side rate limits and server-derived `user`/`ts`; in the UI it is the Chat tab of the floating live tools window plus a preview dock. The per-round opt-out (`chat_enabled`) is implemented. The frontend also has an inline emoji picker (curated list from `/meta` `chat_emoji`, built-in fallback for older backends) and admin moderation (section 13 of `admin.html`: mute for 15 min / 1 h / 24 h / until the round ends, unmute, clear chat; players see a muted note and a "cleared by an administrator" notice). Emoji curation and mute/clear enforcement live in the backend (`Mining-tycoon` repository).
 
 ### Chat Is Social-Only
 
@@ -239,11 +239,11 @@ This boundary is a locked project invariant (see [LOCKED_DECISIONS.md](LOCKED_DE
 
 Chat is scoped per round. A chat thread is associated with a specific active game. There is no cross-round or cross-game persistent chat history. When a round ends, its chat record may be discarded; persistence of chat history is not a product requirement.
 
-### Planned Extensions
+### Extensions (Implemented)
 
-The following extensions to chat are planned and remain within scope:
+The following extensions to chat are implemented and remain within scope:
 
-- **Basic emoji support** — A small, fixed set of emoji reactions or expressions may be made available within the chat input. This set is curated and maintained server-side. Players cannot upload, add, or define custom emoji.
+- **Basic emoji support** — A small, fixed set of emoji is available in the chat input (inline emoji picker). This set is curated and maintained server-side. Players cannot upload, add, or define custom emoji.
 - **No gameplay signals via chat** — Even with emoji or reaction features, chat interactions carry no gameplay meaning and affect no simulation state.
 
 The following is confirmed out of scope for chat:
@@ -254,7 +254,7 @@ The following is confirmed out of scope for chat:
 
 ### Moderation & Rate Limiting
 
-Chat rate limiting and content moderation are enforced server-side. The backend applies message rate limits to prevent flooding and abuse. Moderation controls (muting, clearing) are admin operations.
+Chat rate limiting and content moderation are enforced server-side. The backend applies message rate limits to prevent flooding and abuse. Moderation controls (muting, unmuting, clearing) are admin operations, available in the admin console's Chat Moderation section (`src/admin/chat-moderation.js`).
 
 ### Per-Round Opt-Out
 
@@ -275,7 +275,7 @@ The following items are explicitly outside the current product scope. They are l
 - Monetization systems, payment flows, in-game purchase mechanics, or any real-world asset claims.
 - Cross-round carry-over of token balances, upgrade levels, or any gameplay state that persists from one round into the next.
 - Experience points, leveling systems, or any progression mechanic that grants gameplay advantages across rounds.
-- External chat or notification integrations (Discord, email, push notifications).
+- External chat or notification integrations (Discord, email, push notifications). Account emails (address confirmation, password reset) are transactional and not a notification channel.
 - Player-generated content (custom emoji, avatars from external uploads, theme customization).
 - Public API or third-party data access to game state.
 - Live spectator features beyond standard leaderboard visibility.

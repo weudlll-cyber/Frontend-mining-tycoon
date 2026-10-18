@@ -21,6 +21,7 @@
 
 import { getGlobalMeta } from '../meta/meta-manager.js';
 import { getLoadedEconomyConfig } from './economy-settings.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 // Overrides are entered in percent; the API takes a rate (0.02 = 2 %).
 const RATE_FIELDS = Object.freeze([
@@ -41,10 +42,6 @@ const RATE_FIELDS = Object.freeze([
 // Chat default the form was last reset to; `chat_enabled` is only sent when
 // the admin changes the checkbox away from it.
 let chatDefault = true;
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);

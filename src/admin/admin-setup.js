@@ -73,6 +73,7 @@ import {
   getStorageItem,
   setStorageItem,
 } from '../utils/storage-utils.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 // ── Label maps ───────────────────────────────────────────────────────────────
 
@@ -89,10 +90,6 @@ const SCORING_LABELS = {
 const SCORING_ALIAS_MAP = SCORING_CONTROL.CANONICAL_MODES;
 
 // ── DOM helpers ──────────────────────────────────────────────────────────────
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 // ── Populate the form from the effective game config ───────────────────────
 

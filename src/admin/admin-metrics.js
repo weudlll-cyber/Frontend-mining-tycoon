@@ -12,10 +12,7 @@
  */
 
 import { adminRequest } from './admin-api.js';
-
-function el(id) {
-  return document.getElementById(id);
-}
+import { byId as el } from '../utils/dom-utils.js';
 
 function humanizeKey(key) {
   const text = String(key).replaceAll('_', ' ');

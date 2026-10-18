@@ -29,10 +29,7 @@ import {
   onAdminSessionChange,
   setAdminSession,
 } from './admin-session.js';
-
-function el(id) {
-  return document.getElementById(id);
-}
+import { byId as el } from '../utils/dom-utils.js';
 
 function displayNameOf(user) {
   return String(user?.display_name || user?.username || 'administrator');
