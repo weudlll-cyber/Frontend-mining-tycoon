@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Mining Tycoon</title>
+  <!-- Season gem: one facet per season token (spring, summer, autumn, winter). -->
+  <polygon points="32,4 60,32 32,32" fill="#e0b324"/>
+  <polygon points="60,32 32,60 32,32" fill="#cf6a2a"/>
+  <polygon points="32,60 4,32 32,32" fill="#3f7fc4"/>
+  <polygon points="4,32 32,4 32,32" fill="#4f9d4a"/>
+  <polygon points="32,4 60,32 32,60 4,32" fill="none" stroke="#1d2733" stroke-width="3" stroke-linejoin="round"/>
+</svg>
