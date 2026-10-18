@@ -1,11 +1,10 @@
 /**
 File: src/ui/meta-debug.js
-Purpose: Meta debug line and derived-emission preview of the player board.
+Purpose: Meta debug line of the player board.
 Role in system:
 - Upstream: active contract version / meta hash and the round's game meta
   (src/meta/meta-manager.js).
-- Downstream: the `#meta-debug` line ("contract v… | meta_hash … | Duration …")
-  and the hidden `#derived-emission-preview` of the legacy host controls.
+- Downstream: the `#meta-debug` line ("contract v… | meta_hash … | Duration …").
 Constraints:
 - Display only; missing meta fields are skipped instead of guessed.
 Security notes: text is written via textContent only.
@@ -23,8 +22,7 @@ import { formatDuration } from '../utils/duration-format.js';
 let _deps = {};
 
 /**
- * @param {{ metaDebugEl, derivedEmissionPreviewEl, gameIdInput,
- *   tokens: string[] }} deps
+ * @param {{ metaDebugEl, gameIdInput }} deps
  */
 export function initMetaDebug(deps) {
   _deps = deps || {};
@@ -63,39 +61,4 @@ export function renderMetaDebugLine() {
   }
 
   metaDebugEl.textContent = text;
-}
-
-export function renderDerivedEmissionPreview() {
-  const { derivedEmissionPreviewEl, gameIdInput, tokens = [] } = _deps;
-  if (!derivedEmissionPreviewEl) return;
-
-  const gameId = gameIdInput?.value;
-  if (!gameId) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const gameMeta = getGameMeta(gameId);
-  if (!gameMeta || !gameMeta.derived_emission_rates_per_second) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const rates = gameMeta.derived_emission_rates_per_second;
-  const hasAllTokens = tokens.every((token) => token in rates);
-
-  if (!hasAllTokens) {
-    derivedEmissionPreviewEl.style.display = 'none';
-    return;
-  }
-
-  const ratesList = tokens
-    .map((token) => {
-      const rate = Number(rates[token]).toFixed(2);
-      return `${token} ${rate}`;
-    })
-    .join(', ');
-
-  derivedEmissionPreviewEl.textContent = `Derived Rates: ${ratesList} /s`;
-  derivedEmissionPreviewEl.style.display = 'block';
 }

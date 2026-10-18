@@ -25,10 +25,9 @@ Status as of 2026-10-07:
 - Async session default: 5 minutes
 - Trade count limits 0-10; default trade counts by round length as in `SEASONAL_TYCOON_CONCEPT.md`
 
-Hidden legacy host controls in `player.html` (`.admin-only`, never shown to
-players) are now filled from the effective game config on load and after
-`/meta`; only the enrollment window (`600` s) and trade count (`0`) are still
-seeded in the HTML.
+The hidden legacy host controls were removed from `player.html`; round
+settings exist only on `admin.html` and the board reads them from the round's
+game meta.
 
 ## Decision Checklist (Admin, in Game Settings)
 - [ ] Choose the production enrollment window default (seconds)
@@ -37,7 +36,7 @@ seeded in the HTML.
 - [ ] Choose the production async session default preset
 - [ ] Decide which short test presets stay offered for sync / async round / async session
 - [ ] Confirm async/session guard behavior remains valid (session < round)
-- [ ] Decide what to do with the hidden `player.html` host controls: remove them, or keep them filled from the game config
+- [x] Hidden `player.html` host controls removed (rounds are created on `admin.html` only)
 
 ## Frontend Checklist
 - [x] Defaults, presets, limits and trade defaults come from the backend game config (`src/config/game-config.js`), with the old constants as fallback

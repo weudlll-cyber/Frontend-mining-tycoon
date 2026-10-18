@@ -19,12 +19,6 @@ body {
   overflow: hidden;
 }
 
-/* Legacy host controls in player.html: always hidden (rounds are created in
-   admin.html). */
-.admin-only {
-  display: none !important;
-}
-
 /* Page theme variables (admin.html has its own inline styles) */
 :root {
   /* Player page accent: subtle blue-green */
@@ -372,83 +366,6 @@ body {
 
 .form-span-3 {
   grid-column: span 3;
-}
-
-.form-span-4 {
-  grid-column: span 4;
-}
-
-.host-round-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
-.host-round-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--border-light);
-  border-radius: 999px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
-.host-round-option:has(input:checked) {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.async-host-controls {
-  min-width: 0;
-}
-
-.async-host-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem 0.65rem;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.async-host-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
-.async-host-field > input,
-.async-host-field > select {
-  width: auto;
-  min-width: 5.5rem;
-  max-width: 8rem;
-}
-
-.async-host-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.77rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-/*
-  Inline warning shown below the Session Duration dropdown when
-  syncSessionDurationOptions() auto-clamps the selected value because
-  it exceeded the Round Duration.  Uses an amber/warning tone so it
-  stands out without being alarming.
-*/
-.async-session-warning {
-  display: block;
-  font-size: 0.72rem;
-  color: #a16207; /* amber, AA contrast on the light setup panel */
-  margin-top: 0.2rem;
 }
 
 /*
@@ -1724,51 +1641,6 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.duration-custom-input {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.duration-custom-input input {
-  flex: 1;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border-light);
-  border-radius: calc(var(--radius) / 2);
-  font-size: 0.95rem;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.duration-custom-input select {
-  flex: 0 0 auto;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border-light);
-  border-radius: calc(var(--radius) / 2);
-  font-size: 0.95rem;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.advanced-overrides {
-  border-left: 3px solid var(--border-light);
-  padding-left: 1rem;
-  margin: 0.5rem 0 1rem 0;
-}
-
-.advanced-overrides-help {
-  margin: 0 0 0.75rem 0;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.field-help {
-  margin: 0.45rem 0 0 0;
-  font-size: 0.82rem;
-  line-height: 1.35;
-  color: var(--text-secondary);
-}
-
 .form-group select {
   padding: 0.65rem 0.85rem;
   border: 1px solid var(--border-light);
@@ -1787,14 +1659,6 @@ body {
   outline: none;
   border-color: var(--status-blue);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.derived-emission-preview {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-style: italic;
-  padding: 0.5rem 0;
-  margin-top: 0.5rem;
 }
 
 /* Buttons */

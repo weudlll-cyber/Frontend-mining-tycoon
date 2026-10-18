@@ -135,7 +135,7 @@ console all use this default; the Backend URL fields on `player.html` and
 ### Player board (`player.html`, `src/main.js`)
 
 - **Header:** countdown, phase, score, rank, top score, a standings label (`Live` in a running sync round, `Provisional` while an async round is still open, `Final` once the round is finished, `Scheduled` before a scheduled round opens), scoring mode, connection status, async session badge; an inline **Debug** disclosure shows meta and IDs; a **How to play** link opens the guide in a new tab so the running game stays open.
-- **Join Round panel:** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async rounds), `Stop Stream`. It collapses once the stream runs. Players cannot create games here; the legacy host controls in the HTML are always hidden (`.admin-only`).
+- **Join Round panel:** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async rounds), `Stop Stream`. It collapses once the stream runs. Players cannot create games here (rounds are created on `admin.html`).
 - **Season cards (2x2):** Balance, Output and Halving per season, plus three inline upgrade lanes (Hashrate, Efficiency, Cooling) as a table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. `Pay` chooses the token you pay with; the backend decides the final cost.
 - **Player State (right):** read-only matrix of output, balances (spendable) and oracle prices per token and in total, plus next halving, cumulative mined and fee/spread. Tokens in farming are listed on a separate "Farmed (not spendable)" line when there are any. Large numbers use k/M/B; tooltips show exact values.
 - **Event banner:** one line above the season grid listing all active events; ⚡ marks affected values.

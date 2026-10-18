@@ -192,7 +192,7 @@ Session-mode behavior:
 Player board layout (desktop target 1440x900, no page scroll):
 
 - **Header:** countdown, phase, score, rank, top score, standings label (Live / Provisional / Final / Scheduled), scoring mode, connection badge, async badge; inline Debug disclosure (meta hash, backend URL, IDs).
-- **Setup panel ("Join Round"):** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async only), `Stop Stream`. It collapses after the stream starts. Legacy host controls (round type, scoring, trade count, durations, overrides) remain in the HTML with `.admin-only` and are always hidden.
+- **Setup panel ("Join Round"):** Backend URL, player name, game ID, player ID, `Start Game`, `Start Session (Async)` (async only), `Stop Stream`. It collapses after the stream starts. Round settings (type, scoring, trades, durations) are chosen on `admin.html` only.
 - **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
 - **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, spendable balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values; a "Farmed (not spendable)" line lists tokens in farming when there are any.
 - **Action bar:** score context value (holdings value includes farmed tokens), Trading and Farming status pills (always visible; Farming "Enabled (5% / 5m)" or "Not enabled"), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.

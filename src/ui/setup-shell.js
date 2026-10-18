@@ -38,8 +38,6 @@ let _state = {
   userOpenedSetup: false,
   didAutoCloseAtPlayStart: false,
   previousGameStatus: null,
-  hostRoundType: 'sync',
-  asyncHostAutoStart: true,
 };
 
 export function initSetupShell(deps) {
@@ -89,22 +87,6 @@ function renderAsyncAvailabilityChips() {
 
 export function updateSetupActionsState() {
   if (!_refs) return;
-
-  const hostRoundType = _state.hostRoundType === 'async' ? 'async' : 'sync';
-  const showAsyncHostControls = hostRoundType === 'async';
-  const showSyncHostControls = !showAsyncHostControls;
-
-  if (_refs.syncHostControlsEl) {
-    _refs.syncHostControlsEl.hidden = !showSyncHostControls;
-  }
-
-  if (_refs.asyncHostControlsEl) {
-    _refs.asyncHostControlsEl.hidden = !showAsyncHostControls;
-  }
-  if (_refs.asyncHostAutoStartCheckbox) {
-    _refs.asyncHostAutoStartCheckbox.checked =
-      _state.asyncHostAutoStart !== false;
-  }
 
   const gameRunning = _state.latestGameStatus === 'running';
   const gameFinished = _state.latestGameStatus === 'finished';
@@ -344,28 +326,6 @@ export function initializeHeaderInteractions() {
   _refs.startSessionBtn?.addEventListener('click', () => {
     if (_refs.startSessionBtn.disabled) return;
     _refs.onStartAsyncSession?.();
-  });
-  _refs.roundTypeSyncInput?.addEventListener('change', () => {
-    if (!_refs.roundTypeSyncInput.checked) return;
-    // WHY: Keep host round-type selection explicit in setup so create payload stays user-driven.
-    _refs.onHostRoundTypeChanged?.('sync');
-  });
-  _refs.roundTypeAsyncInput?.addEventListener('change', () => {
-    if (!_refs.roundTypeAsyncInput.checked) return;
-    _refs.onHostRoundTypeChanged?.('async');
-  });
-  _refs.asyncHostDurationPresetInput?.addEventListener('change', () => {
-    _refs.onHostAsyncDurationChanged?.(
-      _refs.asyncHostDurationPresetInput.value || '5m'
-    );
-  });
-  _refs.asyncSessionDurationPresetInput?.addEventListener('change', () => {
-    _refs.onHostAsyncDurationChanged?.('custom');
-  });
-  _refs.asyncHostAutoStartCheckbox?.addEventListener('change', () => {
-    _refs.onHostAutoStartChanged?.(
-      Boolean(_refs.asyncHostAutoStartCheckbox.checked)
-    );
   });
   _refs.debugToggleBtnEl?.addEventListener('click', () =>
     toggleDebugPanelManaged(_refs, _state)

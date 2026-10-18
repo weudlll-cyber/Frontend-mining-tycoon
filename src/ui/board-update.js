@@ -60,7 +60,6 @@ import {
   refreshAsyncDiagnostics,
   setStartSessionStatus,
 } from './setup-controller.js';
-import { renderTradeSchedulePreview } from './setup-host-controls.js';
 import {
   renderStandingsStatus,
   resolveStandingsStatus,
@@ -286,7 +285,6 @@ function applyUIUpdate(data) {
   renderEventBanner(data);
   annotateAffectedValues(data);
   updateScoringModeUi(data);
-  renderTradeSchedulePreview();
   refreshPanelStatus();
   _deps.updateSetupActionsState();
 }

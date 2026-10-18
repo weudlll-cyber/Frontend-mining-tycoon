@@ -13,8 +13,6 @@ export function buildSetupShellState({
   asyncWindowOpen,
   requirePlayerAuth,
   activeSession,
-  hostRoundType,
-  asyncHostAutoStart,
 }) {
   return {
     isStreamActive,
@@ -27,8 +25,6 @@ export function buildSetupShellState({
     requirePlayerAuth,
     sessionActive: Boolean(activeSession?.sessionId),
     sessionId: activeSession?.sessionId || null,
-    hostRoundType,
-    asyncHostAutoStart,
   };
 }
 
