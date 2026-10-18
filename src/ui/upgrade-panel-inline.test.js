@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   describeUpgradeProfiles,
+  resolveMaxLevelsPerAction,
   initInlineUpgrades,
   renderInlineSeasonUpgrades,
 } from './upgrade-panel-inline.js';
@@ -571,5 +572,77 @@ describe('upgrade profiles of the round', () => {
     expect(
       row.querySelector('.btn-upgrade-inline').getAttribute('aria-label')
     ).toBe('Upgrade hashrate');
+  });
+});
+
+describe('buy several levels button', () => {
+  function boot(meta, availability = { allowed: true }) {
+    const performUpgrade = vi.fn();
+    initInlineUpgrades({
+      getActiveGameMeta: () => meta,
+      isActiveContractSupported: () => true,
+      getActiveUpgradeDefinitions: () => ({
+        hashrate: {},
+        efficiency: {},
+        cooling: {},
+      }),
+      getActionAvailability: () => availability,
+      performUpgrade,
+    });
+    const container = document.querySelector('.season-upgrades');
+    renderInlineSeasonUpgrades(container, 'spring', createData(50));
+    return { container, performUpgrade };
+  }
+
+  it('reads the limit from the game meta', () => {
+    expect(
+      resolveMaxLevelsPerAction({ max_upgrade_levels_per_action: 5 })
+    ).toBe(5);
+    expect(resolveMaxLevelsPerAction({})).toBe(1);
+    expect(resolveMaxLevelsPerAction(null)).toBe(1);
+    expect(
+      resolveMaxLevelsPerAction({ max_upgrade_levels_per_action: 1 })
+    ).toBe(1);
+  });
+
+  it('buys up to the limit with the lane pay token', () => {
+    const { container, performUpgrade } = boot({
+      ...createMeta(),
+      max_upgrade_levels_per_action: 5,
+    });
+    const row = container.querySelector('[data-upgrade-type="cooling"]');
+    const multi = row.querySelector('.btn-upgrade-multi');
+    expect(multi.hidden).toBe(false);
+    expect(multi.textContent).toBe('×5');
+    expect(multi.getAttribute('aria-label')).toBe(
+      'Upgrade cooling up to 5 levels'
+    );
+    multi.click();
+    expect(performUpgrade).toHaveBeenCalledWith(
+      'cooling',
+      1,
+      'spring',
+      'spring',
+      5
+    );
+  });
+
+  it('is hidden without a limit and disabled with the Upgrade button', () => {
+    const hidden = boot(createMeta());
+    expect(hidden.container.querySelector('.btn-upgrade-multi').hidden).toBe(
+      true
+    );
+
+    document.body.innerHTML = `
+      <div id="tooltip-layer" class="tooltip-layer"></div>
+      <div class="season-upgrades"></div>
+    `;
+    const blocked = boot(
+      { ...createMeta(), max_upgrade_levels_per_action: 5 },
+      { allowed: false, reason: 'Round over' }
+    );
+    const multi = blocked.container.querySelector('.btn-upgrade-multi');
+    expect(multi.disabled).toBe(true);
+    expect(multi.title).toBe('Round over');
   });
 });

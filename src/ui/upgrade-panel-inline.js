@@ -28,7 +28,7 @@ const _inlineStateByContainer = new WeakMap();
 const DEFAULT_UPGRADE_ORDER = ['hashrate', 'efficiency', 'cooling'];
 
 const UPGRADE_LANES_LEGEND =
-  "Upgrade: name | Lvl: level | Cost: target-token | Pay: spend-token (auto-converts) | Out/s: per-second gain | BEP: break-even time | Dots after the name: this round's profile (● small steps, ●● steady, ●●● big step; dealt out at random per round)";
+  "Upgrade: name | Lvl: level | Cost: target-token | Pay: spend-token (auto-converts) | Out/s: per-second gain | BEP: break-even time | Dots after the name: this round's profile (● small steps, ●● steady, ●●● big step; dealt out at random per round) | ×N: buy several levels at once (as many as you can afford)";
 
 // Profile names by rank of the per-level increment within this round
 // (1 = smallest). Names match the how-to-play guide.
@@ -187,6 +187,30 @@ function createHeader() {
   return header;
 }
 
+/**
+ * Most levels one upgrade request may buy, from the game meta
+ * (`max_upgrade_levels_per_action`); 1 (no extra button) when unknown.
+ */
+export function resolveMaxLevelsPerAction(gameMeta) {
+  const value = Number(gameMeta?.max_upgrade_levels_per_action);
+  return Number.isInteger(value) && value > 1 ? value : 1;
+}
+
+function renderMultiButton(rowRefs, type, maxLevels) {
+  const multi = rowRefs.multiButton;
+  if (!multi) return;
+  multi.hidden = maxLevels < 2;
+  if (multi.hidden) return;
+  const label = `×${maxLevels}`;
+  if (multi.textContent !== label) multi.textContent = label;
+  multi.dataset.levels = String(maxLevels);
+  multi.disabled = rowRefs.button.disabled;
+  multi.setAttribute('aria-label', `Upgrade ${type} up to ${maxLevels} levels`);
+  multi.title = rowRefs.button.disabled
+    ? rowRefs.button.title
+    : `Buy up to ${maxLevels} levels at once (as many as you can afford)`;
+}
+
 function buildLaneRow(type, seasonToken) {
   const row = document.createElement('div');
   row.className = 'upgrade-lane-row';
@@ -237,7 +261,14 @@ function buildLaneRow(type, seasonToken) {
   button.dataset.token = seasonToken;
   button.setAttribute('aria-label', `Upgrade ${type}`);
   button.appendChild(document.createTextNode('Upgrade'));
-  actionCell.appendChild(button);
+  // "Buy several levels": shown when the backend publishes a limit > 1.
+  const multiButton = document.createElement('button');
+  multiButton.className = 'btn-upgrade-multi';
+  multiButton.type = 'button';
+  multiButton.dataset.upgrade = type;
+  multiButton.dataset.token = seasonToken;
+  multiButton.hidden = true;
+  actionCell.append(button, multiButton);
 
   row.append(
     nameCell,
@@ -260,6 +291,7 @@ function buildLaneRow(type, seasonToken) {
     outputCell,
     breakevenCell,
     button,
+    multiButton,
   };
 }
 
@@ -322,6 +354,12 @@ function ensureLaneRow(type, seasonToken, state) {
     // accidentally reuse stale panel selections from another token lane.
     _performUpgrade?.(type, nextLevel, seasonToken, payToken);
   });
+  rowRefs.multiButton.addEventListener('click', () => {
+    const nextLevel = parseInt(rowRefs.button.dataset.level, 10) + 1;
+    const payToken = rowRefs.paySelect.value || seasonToken;
+    const levels = parseInt(rowRefs.multiButton.dataset.levels, 10) || 1;
+    _performUpgrade?.(type, nextLevel, seasonToken, payToken, levels);
+  });
 
   state.laneList.appendChild(rowRefs.row);
   state.rowsByType.set(type, rowRefs);
@@ -379,6 +417,7 @@ export function renderInlineSeasonUpgrades(
 
   const activeGameMeta =
     _getActiveGameMeta?.(String(data?.game_id || '')) || null;
+  const maxLevelsPerAction = resolveMaxLevelsPerAction(activeGameMeta);
   const tokenNames = normalizeTokenNames(
     Array.isArray(data?.token_names)
       ? data.token_names
@@ -478,6 +517,7 @@ export function renderInlineSeasonUpgrades(
       rowRefs.button.disabled = false;
       rowRefs.button.title = '';
     }
+    renderMultiButton(rowRefs, type, maxLevelsPerAction);
   });
 
   state.rowsByType.forEach((rowRefs, type) => {

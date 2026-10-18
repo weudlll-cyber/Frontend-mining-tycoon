@@ -27,7 +27,8 @@ export async function performUpgrade(
   upgradeType,
   nextLevel,
   targetToken,
-  payToken
+  payToken,
+  levels = 1
 ) {
   if (!_deps.isActiveContractSupported()) {
     _deps.showToast(
@@ -74,6 +75,8 @@ export async function performUpgrade(
           upgrade_type: upgradeType,
           target_token: actualTargetToken,
           pay_token: actualPayToken,
+          // "Buy several levels": the backend buys as many as affordable.
+          ...(levels > 1 ? { levels } : {}),
         }),
       }
     );
@@ -96,8 +99,9 @@ export async function performUpgrade(
       actualTargetToken,
       upgradeType
     );
+    const bought = Number(payload?.levels_bought) || 1;
     _deps.showToast(
-      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${confirmedLevel ?? nextLevel}`,
+      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${confirmedLevel ?? nextLevel}${bought > 1 ? ` (+${bought})` : ''}`,
       'success'
     );
     if (typeof _deps.onUpgradeApplied === 'function') {
