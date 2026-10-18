@@ -7,12 +7,11 @@ Invariants/Security: Reads CSS files only; no DOM injection.
 */
 
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
+import { readCssBundle } from './test-utils/repo-files.js';
 
+// Page stylesheets with their @imports inlined (src/style.css is a hub).
 function readCss(name) {
-  return fs.readFileSync(path.resolve(process.cwd(), 'src', name), 'utf8');
+  return readCssBundle(`src/${name}`);
 }
 
 const PAGE_STYLESHEETS = ['style.css', 'lobby.css', 'how-to-play.css'];

@@ -6,13 +6,10 @@ Invariants/Security: Verifies CSS contract only; no runtime DOM injection or beh
 */
 
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
+import { readCssBundle } from './test-utils/repo-files.js';
 
 function readStyleCss() {
-  const cssPath = path.resolve(process.cwd(), 'src', 'style.css');
-  return fs.readFileSync(cssPath, 'utf8');
+  return readCssBundle('src/style.css');
 }
 
 describe('dashboard layout css guardrails', () => {

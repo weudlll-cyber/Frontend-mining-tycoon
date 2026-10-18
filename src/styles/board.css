@@ -1,0 +1,562 @@
+/*
+File: src/styles/board.css
+Purpose: Dashboard grid, season cards, event banner/indicator and inline upgrades.
+Role in system: part of the player board stylesheet; imported in order by
+  src/style.css, so the cascade is the same as the former single file.
+*/
+
+/* Main Dashboard Grid — left column takes remaining space; right panel is fixed width */
+.dashboard-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--player-panel-width);
+  gap: 0.5rem;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.dashboard-main > * {
+  min-height: 0;
+}
+
+.seasons-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.25rem;
+}
+
+.season-focus-strip {
+  display: none;
+  align-items: center;
+  gap: 0.42rem;
+  margin-bottom: 0.5rem;
+}
+
+.season-focus-btn {
+  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.season-focus-btn.season-focus-btn-active {
+  border-color: #38bdf8;
+  color: #0f172a;
+  box-shadow: 0 1px 5px rgba(56, 189, 248, 0.28);
+}
+
+.seasons-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.seasons-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.seasons-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+
+.seasons-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--border-dark);
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.player-panel-split {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-height: 280px;
+  max-height: 360px;
+}
+
+/* 2x2 Season Grid */
+.seasons-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-height: 0;
+  align-content: start;
+}
+
+/* Season Card */
+.season-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.season-header {
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom: 0.35rem;
+}
+
+.season-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.season-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.season-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  position: relative;
+  padding-right: 1.2rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow-x: hidden;
+  padding-top: 0.05rem;
+  padding-bottom: 0.05rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.meta-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.meta-sep {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.season-balance,
+.season-output,
+.season-halving {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.season-meta-tip-trigger.ps-tip-trigger {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.66rem;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.season-halving {
+  user-select: text;
+}
+
+.season-halving.season-halving--warning {
+  color: #b45309;
+}
+
+.season-halving.season-halving--critical {
+  color: #dc2626;
+}
+
+/* Event Banner */
+.event-banner {
+  padding: 0.6rem 0.85rem;
+  background-color: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: calc(var(--radius) / 2);
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.event-banner-hidden {
+  display: none;
+}
+
+.event-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-banner-content strong {
+  font-weight: 700;
+}
+
+/* Event Indicator */
+.event-indicator {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.85rem;
+  cursor: help;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.event-indicator:hover {
+  opacity: 1;
+}
+
+.event-indicator.ps-tip-trigger,
+.event-banner-trigger.ps-tip-trigger {
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  box-shadow: none;
+}
+
+.event-banner-trigger.ps-tip-trigger {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 980px) {
+  .season-meta {
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow-x: visible;
+  }
+}
+
+/* Inline Upgrades (compact row-based layout per season) */
+.season-upgrades {
+  border-top: 1px dashed var(--border-light);
+  padding-top: 0.3rem;
+  margin-top: 0.2rem;
+  overflow-x: hidden;
+}
+
+.season-upgrades.hidden {
+  display: none;
+}
+
+/* Table container: header + rows share one grid context for pixel-exact column alignment */
+.upgrade-table {
+  display: grid;
+  grid-template-columns: var(--upgrade-cols);
+  grid-auto-rows: minmax(28px, auto);
+  row-gap: 4px;
+  column-gap: 7px; /* inherited by subgrids below */
+  min-width: 0;
+  width: 100%;
+}
+
+/* Subgrid: header and rows inherit the exact same column tracks and gap from
+   .upgrade-table, ensuring pixel-perfect alignment regardless of cell content size. */
+.upgrade-lane-header,
+.upgrade-lane-row,
+.upgrade-header-grid {
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.upgrade-lane-header {
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.upgrade-header-grid {
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* Lane list: display:contents so rows become direct grid items of .upgrade-table */
+.upgrade-lane-list,
+.upgrade-compact-grid {
+  display: contents;
+}
+
+.upgrade-header-cell {
+  display: block;
+  width: 100%;
+  text-align: right;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.upgrade-header-cell:first-child {
+  text-align: left;
+}
+
+/* data-col alignment — robust alternative to nth-child position-based rules */
+[data-col='lvl'],
+[data-col='cost'],
+[data-col='output'],
+[data-col='bep'] {
+  text-align: right;
+}
+
+[data-col='upgrade'],
+[data-col='pay'] {
+  text-align: left;
+}
+
+/* Remove obsolete nth-child overrides — now handled by data-col above */
+
+.upgrade-header-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upgrade-header-info-trigger.ps-tip-trigger {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.66rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.upgrade-row-cell {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upgrade-row-type {
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* This round's upgrade profile as 1-3 small dots under the name (absolute,
+   so the name keeps its full column width); details live in the name cell's
+   title. */
+.upgrade-row-type {
+  position: relative;
+}
+
+.upgrade-profile-pips {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-size: 0.42rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--current-accent);
+}
+
+.upgrade-row-level,
+.upgrade-row-cost,
+.upgrade-row-benefit,
+.upgrade-row-breakeven {
+  width: 100%;
+  text-align: right;
+  justify-self: stretch;
+}
+
+/* Alignment now handled by [data-col] attribute selectors above; these nth-child
+   fallbacks kept only for any cells that lack data-col attributes */
+.upgrade-lane-header > :nth-child(2),
+.upgrade-lane-header > :nth-child(3),
+.upgrade-lane-header > :nth-child(5),
+.upgrade-lane-header > :nth-child(6),
+.upgrade-lane-row > :nth-child(2),
+.upgrade-lane-row > :nth-child(3),
+.upgrade-lane-row > :nth-child(5),
+.upgrade-lane-row > :nth-child(6) {
+  text-align: right;
+}
+
+.upgrade-row-cost {
+  color: #dc2626;
+}
+
+.upgrade-row-benefit {
+  color: var(--status-green);
+}
+
+.upgrade-row-breakeven {
+  color: #b45309;
+}
+
+.upgrade-row-action {
+  justify-self: end;
+  min-width: 0;
+}
+
+.upgrade-row-pay {
+  font-family: inherit;
+  width: 100%;
+  justify-self: stretch;
+  overflow: visible;
+  padding-left: 0.18rem;
+}
+
+.upgrade-pay-select {
+  /* Remove native OS arrow so we control the full text width */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  /* Right padding only needs to cover our tiny custom arrow */
+  padding: 0.1rem 1rem 0.1rem 0.25rem;
+  border-radius: calc(var(--radius) / 2);
+  border: 1px solid var(--border-light);
+  /* Custom SVG down-chevron */
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.28rem center;
+  background-size: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Arial, sans-serif;
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.season-upgrades .btn-upgrade-inline {
+  background-color: var(--status-blue);
+  color: white;
+  padding: 0.3rem 0.45rem;
+  border: none;
+  border-radius: calc(var(--radius) / 2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.season-upgrades .btn-upgrade-inline:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.season-upgrades .btn-upgrade-inline:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* "Buy several levels" (×5) next to Upgrade: same look, outlined so the
+   single-level button stays the primary action. */
+.season-upgrades span.upgrade-row-action {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  /* Buttons keep their full label; the auto track grows to fit both. */
+  overflow: visible;
+  width: auto;
+}
+
+.season-upgrades span.upgrade-row-action > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.season-upgrades .btn-upgrade-multi {
+  background: transparent;
+  color: var(--status-blue);
+  border: 1px solid var(--status-blue);
+  border-radius: calc(var(--radius) / 2);
+  padding: 0.25rem 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.season-upgrades .btn-upgrade-multi:hover:not(:disabled) {
+  background: var(--status-blue);
+  color: white;
+}
+
+.season-upgrades .btn-upgrade-multi:disabled {
+  border-color: #9ca3af;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-upgrade-inline {
+  background-color: var(--status-blue);
+  color: white;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: calc(var(--radius) / 2);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.3rem;
+}
+
+.btn-upgrade-inline:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-upgrade-inline:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}

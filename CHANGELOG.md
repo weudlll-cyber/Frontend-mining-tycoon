@@ -26,7 +26,9 @@ pre-1.0 playtest builds.
   `admin.html` to `src/admin.css` (imported by `admin-setup.js`); every
   `style=""` attribute of `admin.html` and `player.html` became a class or
   id rule. The BOT badge and last-game name rules live once in
-  `src/shared.css` (board and lobby).
+  `src/shared.css` (board and lobby). `src/style.css` (about 3000 lines) is
+  split by area into `src/styles/*.css` and imports them in the old order;
+  the built CSS is byte-identical.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

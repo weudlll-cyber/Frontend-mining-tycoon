@@ -1,0 +1,291 @@
+/*
+File: src/styles/chat.css
+Purpose: Live tools window and the chat panel (emoji picker, moderation notices).
+Role in system: part of the player board stylesheet; imported in order by
+  src/style.css, so the cascade is the same as the former single file.
+*/
+
+/* Chat Panel (inside drawer) */
+.chat-card {
+  width: 100%;
+  min-height: 260px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.chat-card.chat-panel-open {
+  display: flex;
+}
+
+.live-drawer {
+  /* Free-floating resizable window. Default position centres it near
+     the top; JS drag updates left/top at runtime and clears transform.
+     display:flex is on :not([hidden]) only to avoid overriding [hidden]. */
+  position: fixed;
+  left: 50%;
+  top: 10vh;
+  transform: translateX(-50%);
+  z-index: 200;
+  width: clamp(340px, 38vw, 560px);
+  min-width: min(280px, calc(100vw - 16px));
+  min-height: 200px;
+  /* Fit the viewport on phones and after a manual resize. */
+  max-width: calc(100vw - 16px);
+  max-height: min(82vh, calc(100dvh - 16px));
+  /* Window chrome — moved here from .live-drawer-surface */
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+  border-radius: 10px;
+  border: 1px solid #dbe8f4;
+  box-shadow: 0 8px 40px rgba(15, 23, 42, 0.3);
+  /* overflow:hidden required for resize:both to work */
+  overflow: hidden;
+  resize: both;
+}
+
+.live-drawer:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* No backdrop for a floating window — player interacts with the board behind it */
+.live-drawer-backdrop {
+  display: none;
+}
+
+.live-drawer-surface {
+  /* Fills the floating window; chrome (bg, border, shadow) is on .live-drawer. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.live-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #dbe8f4;
+  /* Drag handle — mousedown here starts window drag (see live-drawer.js) */
+  cursor: move;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.live-drawer-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.live-drawer-tab {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.34rem 0.66rem;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.live-drawer-tab.live-drawer-tab-active {
+  border-color: #38bdf8;
+  color: #0f172a;
+  background: #f0f9ff;
+}
+
+.live-drawer-close-btn {
+  padding: 0.32rem 0.64rem;
+  width: auto;
+}
+
+.live-drawer-body {
+  flex: 1;
+  min-height: 0;
+  /* Allow scrollbars in both directions when content exceeds window size */
+  overflow: auto;
+  padding: 0.8rem;
+}
+
+.live-drawer-panel {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.farming-card,
+.leaderboard-card {
+  padding: 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.farming-card h2,
+.leaderboard-card h2 {
+  margin-bottom: 0.5rem;
+}
+
+/* Round option "chat disabled": the tab stays visible with an explanatory
+   note (like the Farming status line); list and composer are hidden. */
+.chat-disabled-note {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.chat-disabled-note[hidden],
+.chat-card.chat-card-disabled .chat-messages,
+.chat-card.chat-card-disabled .chat-form {
+  display: none;
+}
+
+.chat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-card-header h2 {
+  margin: 0;
+}
+
+.chat-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.chat-status[data-level='online'] {
+  color: var(--status-green);
+}
+
+.chat-status[data-level='warning'] {
+  color: #b45309;
+}
+
+.chat-status[data-level='error'] {
+  color: #dc2626;
+}
+
+.chat-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.chat-message-row {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px dashed var(--border-light);
+}
+
+.chat-message-row:last-child {
+  border-bottom: none;
+}
+
+.chat-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.chat-message-user {
+  color: var(--status-blue);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.chat-message-time {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.chat-message-text {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+}
+
+/* Emoji picker: inline grid inside the chat panel (not an overlay). */
+.chat-emoji-btn {
+  width: auto;
+  padding: 0.45rem 0.6rem;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.chat-emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.chat-emoji-picker[hidden] {
+  display: none;
+}
+
+.chat-emoji-option {
+  min-width: 0;
+  padding: 0.3rem 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.chat-emoji-option:hover,
+.chat-emoji-option:focus-visible {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+
+/* Moderation notices (muted) and the "chat was cleared" list entry. */
+.chat-notice {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.chat-notice[hidden] {
+  display: none;
+}
+
+.chat-message-system {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.chat-form input {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-light);
+  border-radius: calc(var(--radius) / 2);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
