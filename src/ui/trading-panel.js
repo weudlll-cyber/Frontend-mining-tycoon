@@ -543,6 +543,11 @@ export function initTradingPanel(deps) {
   let selectedToToken = FALLBACK_TOKENS[1];
   let amountInputValue = '';
   let isTradeSubmitting = false;
+  // WHY: a full rebuild replaces the Execute button. When it happens between
+  // pressing and releasing the mouse (the amount field's `change` on blur, or a
+  // live tick), the browser drops the click and the trade silently does not
+  // happen. While a press inside the panel is in progress, update in place.
+  let pointerPressedInPanel = false;
 
   function getTrading() {
     try {
@@ -850,11 +855,13 @@ export function initTradingPanel(deps) {
       (activeEl instanceof HTMLInputElement ||
         activeEl instanceof HTMLSelectElement ||
         activeEl instanceof HTMLTextAreaElement ||
-        activeEl?.isContentEditable === true);
+        activeEl?.isContentEditable === true ||
+        // Keyboard users: Tab to Execute must not lose the focused button.
+        activeEl?.dataset?.action === 'execute-trade');
 
     // Keep the current editor control mounted while the user types/selects.
     // Rebuilding the panel replaces the amount/select DOM node and drops focus.
-    if (isEditingField) {
+    if (isEditingField || pointerPressedInPanel) {
       // Keep the active control mounted while still refreshing computed preview text.
       updateEditingPanelInPlace(trading);
       renderBottomStatus(trading);
@@ -958,7 +965,20 @@ export function initTradingPanel(deps) {
     void handleExecuteTrade();
   }
 
+  function releasePointer() {
+    if (!pointerPressedInPanel) return;
+    // Clear after the click event that follows pointerup has been dispatched.
+    setTimeout(() => {
+      pointerPressedInPanel = false;
+    }, 0);
+  }
+
   if (tradingPanelRef) {
+    tradingPanelRef.addEventListener('pointerdown', () => {
+      pointerPressedInPanel = true;
+    });
+    document.addEventListener('pointerup', releasePointer, true);
+    document.addEventListener('pointercancel', releasePointer, true);
     tradingPanelRef.addEventListener('input', handlePanelInput);
     tradingPanelRef.addEventListener('change', handlePanelInput);
     tradingPanelRef.addEventListener('click', handlePanelClick);

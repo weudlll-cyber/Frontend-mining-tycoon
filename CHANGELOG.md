@@ -256,6 +256,13 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Fixed
 
+- Trade window: clicking **Execute Trade** right after typing an amount did
+  nothing. Leaving the amount field (or a live update arriving during the
+  click) rebuilt the panel between mouse down and click, so the browser dropped
+  the click. While a press inside the panel is in progress, or the Execute
+  button has keyboard focus, the panel now updates in place. Found by the new
+  browser end-to-end test.
+
 - Quick repeated upgrades no longer report the same level in every toast: the
   toast now shows the level confirmed in the upgrade response, and the response
   state is applied to the season cards right away instead of on the next stream
