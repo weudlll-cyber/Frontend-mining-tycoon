@@ -87,16 +87,16 @@ the backend deploy script).
 
 ### Script Parameters
 
-| Parameter | Meaning |
-| --- | --- |
-| `-VpsUser`, `-VpsHost` | SSH login (user needs passwordless sudo) |
-| `-FrontendDomain` | game host name, e.g. `game.example.com` (nginx `server_name`) |
-| `-ApiBaseUrl` | public backend URL baked into the build, e.g. `https://api.example.com` |
-| `-LetsEncryptEmail` | request/install a TLS certificate with certbot (`--redirect --hsts`) |
-| `-SshKey`, `-SshPort` | optional SSH key file and port (default 22) |
-| `-ResetNginxConfig` | rewrite the nginx site from the template (re-runs certbot when `-LetsEncryptEmail` is set) |
-| `-AllowInsecureHttp` | allow an `http://` API URL - testing only |
-| `-DryRun` | build and pack only; nothing is uploaded |
+| Parameter              | Meaning                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `-VpsUser`, `-VpsHost` | SSH login (user needs passwordless sudo)                                                   |
+| `-FrontendDomain`      | game host name, e.g. `game.example.com` (nginx `server_name`)                              |
+| `-ApiBaseUrl`          | public backend URL baked into the build, e.g. `https://api.example.com`                    |
+| `-LetsEncryptEmail`    | request/install a TLS certificate with certbot (`--redirect --hsts`)                       |
+| `-SshKey`, `-SshPort`  | optional SSH key file and port (default 22)                                                |
+| `-ResetNginxConfig`    | rewrite the nginx site from the template (re-runs certbot when `-LetsEncryptEmail` is set) |
+| `-AllowInsecureHttp`   | allow an `http://` API URL - testing only                                                  |
+| `-DryRun`              | build and pack only; nothing is uploaded                                                   |
 
 ## nginx
 
@@ -179,7 +179,7 @@ npm run build
 Remove-Item Env:VITE_API_BASE_URL
 ssh deploy@203.0.113.10 "rm -rf ~/mining-frontend-staging && mkdir ~/mining-frontend-staging"
 scp -r dist deploy deploy@203.0.113.10:mining-frontend-staging/
-ssh deploy@203.0.113.10 "sudo bash ~/mining-frontend-staging/deploy/remote/install-frontend.sh --frontend-domain game.example.com && rm -rf ~/mining-frontend-staging"
+ssh deploy@203.0.113.10 "sudo bash ~/mining-frontend-staging/deploy/remote/install-frontend.sh --frontend-domain game.example.com --api-origin https://api.example.com && rm -rf ~/mining-frontend-staging"
 ```
 
 ## Troubleshooting

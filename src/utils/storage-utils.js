@@ -47,6 +47,29 @@ export function getPlayerTokenStorageKey(gameId, playerId) {
   return `mining-tycoon:playerToken:${gameId}:${playerId}`;
 }
 
+const PLAYER_TOKEN_PREFIX = 'mining-tycoon:playerToken:';
+
+/**
+ * Remove every stored player token (all games). Called on logout, password
+ * change and account deletion, so the next person on a shared device cannot
+ * act as this player in a round that is still running.
+ * @returns {number} how many tokens were removed
+ */
+export function clearPlayerTokens() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(PLAYER_TOKEN_PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+    return keys.length;
+  } catch (e) {
+    console.warn('Failed to clear player tokens:', e);
+    return 0;
+  }
+}
+
 export function setStorageItem(key, value) {
   try {
     localStorage.setItem(key, value);

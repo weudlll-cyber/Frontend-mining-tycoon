@@ -9,6 +9,18 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Security
+
+- Logging out, changing the password, deleting the account or an expired
+  sign-in now also removes the stored player tokens, so the next person on a
+  shared device cannot act as this player in a round that is still running.
+- Content-Security-Policy in the nginx template: scripts only from the site
+  itself, network calls only to the site and the backend (`--api-origin`, passed
+  by `scripts/deploy-to-vps.ps1`), no framing. The admin link gate of
+  player.html moved from an inline script into `src/ui/admin-link-gate.js`.
+- CI: the workflow is read-only by default; only the PR comment job may write.
+- `.env` files (except `.env.example`) are gitignored.
+
 ### Added
 
 - Bot opponents (backend `bots`): admin section 2 has "Bot opponents" (Easy,

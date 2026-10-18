@@ -143,7 +143,9 @@ try {
     # -------------------------------------------------------------- package
     Invoke-Native $tarExe @("-czf", $archivePath, "-C", $projectRoot, "dist", "deploy")
 
-    $installerArgs = @("--frontend-domain", $FrontendDomain)
+    # Origin only (scheme://host[:port]) for the Content-Security-Policy.
+    $apiOrigin = ([System.Uri]$ApiBaseUrl).GetLeftPart([System.UriPartial]::Authority)
+    $installerArgs = @("--frontend-domain", $FrontendDomain, "--api-origin", $apiOrigin)
     if ($LetsEncryptEmail) { $installerArgs += @("--letsencrypt-email", $LetsEncryptEmail) }
     if ($ResetNginxConfig) { $installerArgs += "--reset-nginx" }
 

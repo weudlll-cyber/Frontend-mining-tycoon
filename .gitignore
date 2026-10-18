@@ -27,3 +27,13 @@ coverage
 # Local dev server state and logs (scripts/dev_frontend_start.ps1)
 data/frontend_dev_process.json
 data/frontend_dev_*.log
+
+# Local environment files may hold real tokens; only the example is tracked.
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.claude/
+.venv/
+.pytest_cache/
