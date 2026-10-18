@@ -22,6 +22,11 @@ pre-1.0 playtest builds.
   durations, scoring, trade count, advanced overrides; about 300 lines of
   `player.html`), `setup-host-controls.js` and their CSS. The round type now
   always comes from the round's meta; the join fields are unchanged.
+- CSS: the admin console styles moved from an inline `<style>` block in
+  `admin.html` to `src/admin.css` (imported by `admin-setup.js`); every
+  `style=""` attribute of `admin.html` and `player.html` became a class or
+  id rule. The BOT badge and last-game name rules live once in
+  `src/shared.css` (board and lobby).
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared
@@ -37,6 +42,8 @@ pre-1.0 playtest builds.
 
 ### Security
 
+- Content-Security-Policy: `style-src` no longer allows `'unsafe-inline'`;
+  no page has inline styles any more (guarded by a test).
 - Logging out, changing the password, deleting the account or an expired
   sign-in now also removes the stored player tokens, so the next person on a
   shared device cannot act as this player in a round that is still running.

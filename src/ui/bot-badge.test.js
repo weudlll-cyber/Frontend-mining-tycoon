@@ -40,10 +40,12 @@ describe('bot badge', () => {
 describe('bot badge styles', () => {
   it('keeps a hidden badge hidden despite its display rule', async () => {
     const fs = await import('node:fs');
-    for (const file of ['src/style.css', 'src/lobby.css']) {
-      const css = fs.readFileSync(file, 'utf8');
-      expect(css, file).toMatch(
-        /\.bot-badge\[hidden\]\s*\{\s*display:\s*none;/
+    // One shared rule for the board and the lobby (src/shared.css).
+    const css = fs.readFileSync('src/shared.css', 'utf8');
+    expect(css).toMatch(/\.bot-badge\[hidden\]\s*\{\s*display:\s*none;/);
+    for (const entry of ['src/main.js', 'src/lobby.js']) {
+      expect(fs.readFileSync(entry, 'utf8'), entry).toContain(
+        "import './shared.css';"
       );
     }
   });

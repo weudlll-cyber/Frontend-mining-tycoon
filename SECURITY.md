@@ -47,7 +47,7 @@ Historical frontend security snapshots live under `docs/history/audits/`.
 - Update this file whenever frontend security assumptions, rendering guarantees, storage handling, or request-safety rules change.
 - Keep the historical audit snapshots for traceability only; do not use them as the live release checklist.
 - Deploy only the built `dist/` output (see `DEPLOY.md`).
-- The nginx template (`deploy/nginx/mining-frontend.conf`) sends a Content-Security-Policy: scripts only from the site itself (no inline scripts), network calls only to the site and the backend origin (`connect-src` from the deploy's `--api-origin`), no plugins, no framing. New pages must not add inline scripts or third-party script/style origins.
+- The nginx template (`deploy/nginx/mining-frontend.conf`) sends a Content-Security-Policy: scripts and styles only from the site itself (no inline scripts, no `<style>` tags or `style=""` attributes; `style-src` has no `'unsafe-inline'`, JS may still set `element.style`), network calls only to the site and the backend origin (`connect-src` from the deploy's `--api-origin`), no plugins, no framing. New pages must not add inline scripts, inline styles or third-party script/style origins (`src/ui/admin-link-gate.test.js` checks every page).
 
 ## Verification
 

@@ -19,7 +19,7 @@ body {
   overflow: hidden;
 }
 
-/* Page theme variables (admin.html has its own inline styles) */
+/* Page theme variables (admin.html has its own, in src/admin.css) */
 :root {
   /* Player page accent: subtle blue-green */
   --accent-player: #0891b2;
@@ -1107,13 +1107,6 @@ body {
   color: var(--status-blue);
 }
 
-.last-game-score-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .game-over-overlay {
   display: flex;
   position: fixed;
@@ -1659,6 +1652,14 @@ body {
   outline: none;
   border-color: var(--status-blue);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* "+ New Game (Admin)" link: hidden until src/ui/admin-link-gate.js shows it
+   (?admin=1) with an inline display value. */
+#admin-setup-link {
+  text-decoration: none;
+  display: none;
+  align-items: center;
 }
 
 /* Buttons */
@@ -2980,24 +2981,4 @@ summary:focus-visible,
   .page-player .bottom-bar {
     padding: 0.4rem 0.8rem;
   }
-}
-
-/* Bot opponents are always marked (src/ui/bot-badge.js). */
-.bot-badge {
-  display: inline-block;
-  margin-left: 0.3em;
-  padding: 0 0.35em;
-  border-radius: 4px;
-  font-size: 0.68em;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.5;
-  vertical-align: middle;
-  color: #fff;
-  background: #4b5563;
-}
-
-/* The class rule above would otherwise override the hidden attribute. */
-.bot-badge[hidden] {
-  display: none;
 }

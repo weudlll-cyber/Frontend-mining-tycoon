@@ -74,6 +74,7 @@ import {
   setStorageItem,
 } from '../utils/storage-utils.js';
 import { byId as el } from '../utils/dom-utils.js';
+import '../admin.css';
 
 // ── Label maps ───────────────────────────────────────────────────────────────
 
@@ -635,7 +636,7 @@ export function init() {
   el('admin-sync-fields').addEventListener('change', () => {
     const preset = el('admin-duration-preset').value;
     el('admin-duration-custom-row').style.display =
-      preset === 'custom' ? '' : 'none';
+      preset === 'custom' ? 'flex' : 'none';
     syncDefaultTradeCount();
     updateReview();
   });

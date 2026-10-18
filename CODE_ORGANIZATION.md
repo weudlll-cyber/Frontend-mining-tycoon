@@ -9,11 +9,11 @@ overview. The 2026-03-25 modularity audit that used to live here is archived at
 
 | Page | Script | Role |
 |---|---|---|
-| `index.html` | `src/lobby.js` (+ `src/lobby.css`) | Lobby: register / login / logout, `/auth/me` check, forgot-password dialog, open-games list (auto-refresh every 10 s), join, last-game highscores |
-| `player.html` | `src/main.js` (+ `src/style.css`) | Player board for one joined round: SSE stream, season cards, inline upgrades, analytics, live tools window, game-over handling |
+| `index.html` | `src/lobby.js` (+ `src/lobby.css`, `src/shared.css`) | Lobby: register / login / logout, `/auth/me` check, forgot-password dialog, open-games list (auto-refresh every 10 s), join, last-game highscores |
+| `player.html` | `src/main.js` (+ `src/style.css`, `src/shared.css`) | Player board for one joined round: SSE stream, season cards, inline upgrades, analytics, live tools window, game-over handling |
 | `how-to-play.html` | none (static, `src/how-to-play.css`) | Player guide: rules, upgrades, halvings, trading, round types, scoring modes, events, live tools; linked from the lobby and the player-board header |
 | `privacy.html`, `imprint.html` | none (static, `src/how-to-play.css`) | Legal page templates for the operator (template banner, `[PLACEHOLDER]` markers); linked from the lobby footer, the registration dialog and the how-to-play footer |
-| `admin.html` | `src/admin/admin-setup.js` (+ `game-management.js`, `economy-settings.js`, `admin-metrics.js`, `game-config-settings.js`, `round-options.js`, `farming-options.js`, `farming-config-fields.js`, `schedule-options.js`, `admin-account.js`, `admin-session.js`, `admin-users.js`, `chat-moderation.js`) | Admin console: 13 sections (connection with administrator sign-in, round type, time, scoring, trading & farming, advanced overrides, review & create, game management, global economy, metrics, game settings, administrators, chat moderation) |
+| `admin.html` | `src/admin/admin-setup.js` (+ `src/admin.css`, `game-management.js`, `economy-settings.js`, `admin-metrics.js`, `game-config-settings.js`, `round-options.js`, `farming-options.js`, `farming-config-fields.js`, `schedule-options.js`, `admin-account.js`, `admin-session.js`, `admin-users.js`, `chat-moderation.js`) | Admin console: 13 sections (connection with administrator sign-in, round type, time, scoring, trading & farming, advanced overrides, review & create, game management, global economy, metrics, game settings, administrators, chat moderation) |
 
 `vite.config.js` declares the six inputs. Static images live in
 `public/assets/`.

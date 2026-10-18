@@ -1,7 +1,8 @@
 /**
  * File: src/ui/admin-link-gate.test.js
- * Purpose: The admin link on player.html appears only with ?admin=1, and
- *          player.html carries no inline script (Content-Security-Policy).
+ * Purpose: The admin link on player.html appears only with ?admin=1, and no
+ *          page carries an inline script or inline style
+ *          (Content-Security-Policy without 'unsafe-inline').
  */
 
 import fs from 'node:fs';
@@ -48,6 +49,12 @@ describe('Content-Security-Policy readiness', () => {
     scripts.forEach((tag) => expect(tag).toMatch(/\bsrc=/));
   });
 
+  it.each(pages)('%s has no inline styles', (page) => {
+    const html = fs.readFileSync(path.resolve(process.cwd(), page), 'utf8');
+    expect(html).not.toMatch(/<style\b/i);
+    expect(html).not.toMatch(/\sstyle\s*=/i);
+  });
+
   it('the nginx template sends the policy with the backend origin', () => {
     const conf = fs.readFileSync(
       path.resolve(process.cwd(), 'deploy/nginx/mining-frontend.conf'),
@@ -57,7 +64,9 @@ describe('Content-Security-Policy readiness', () => {
     // Server level and the hashed-assets location (add_header replaces).
     expect(policies).toHaveLength(2);
     policies.forEach((policy) => {
-      expect(policy).toContain("script-src 'self'");
+      expect(policy).toContain("script-src 'self';");
+      expect(policy).toContain("style-src 'self';");
+      expect(policy).not.toContain('unsafe-inline');
       expect(policy).toContain('connect-src');
       expect(policy).toContain('__API_ORIGIN__ __API_WS_ORIGIN__');
       expect(policy).toContain("frame-ancestors 'none'");

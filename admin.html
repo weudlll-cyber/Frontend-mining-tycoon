@@ -21,470 +21,6 @@ Security notes:
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Setup — Mining Tycoon</title>
-    <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
-      :root {
-        --bg: #f5f5f5;
-        --card: #ffffff;
-        --border: #d0d0d0;
-        --text: #1a1a1a;
-        --text-muted: #666;
-        --primary: #3b82f6;
-        --primary-hover: #2563eb;
-        --danger: #ef4444;
-        --warning-bg: #fef3c7;
-        --warning-border: #f59e0b;
-        --success-bg: #d1fae5;
-        --success-border: #10b981;
-        --error-bg: #fee2e2;
-        --error-border: #ef4444;
-        --radius: 8px;
-        --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-      }
-
-      body {
-        background: var(--bg);
-        color: var(--text);
-        padding: 1.5rem;
-        min-height: 100vh;
-      }
-
-      .admin-warning-banner {
-        background: var(--warning-bg);
-        border: 2px solid var(--warning-border);
-        border-radius: var(--radius);
-        padding: 0.75rem 1rem;
-        margin-bottom: 1.25rem;
-        font-weight: 600;
-        font-size: 0.9rem;
-      }
-
-      .page-header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .page-header h1 {
-        font-size: 1.4rem;
-      }
-
-      .page-header a {
-        font-size: 0.85rem;
-        color: var(--primary);
-        text-decoration: none;
-      }
-
-      .page-header a:hover {
-        text-decoration: underline;
-      }
-
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 1.25rem 1.5rem;
-        margin-bottom: 1rem;
-      }
-
-      .card h2 {
-        font-size: 1rem;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-        color: var(--text);
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 0.5rem;
-      }
-
-      .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem 1.25rem;
-      }
-
-      .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.3rem;
-      }
-
-      .form-group.full-width {
-        grid-column: 1 / -1;
-      }
-
-      label {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: var(--text-muted);
-      }
-
-      input[type='text'],
-      input[type='number'],
-      input[type='password'],
-      input[type='search'],
-      select {
-        padding: 0.45rem 0.6rem;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-size: 0.9rem;
-        background: #fff;
-        color: var(--text);
-        width: 100%;
-      }
-
-      input:focus,
-      select:focus {
-        outline: 2px solid var(--primary);
-        outline-offset: 1px;
-        border-color: var(--primary);
-      }
-
-      .radio-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-        margin-top: 0.1rem;
-      }
-
-      .radio-option {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.5rem;
-        cursor: pointer;
-        font-size: 0.875rem;
-        color: var(--text);
-      }
-
-      .radio-option input[type='radio'] {
-        width: auto;
-        margin-top: 0.15rem;
-        cursor: pointer;
-        accent-color: var(--primary);
-      }
-
-      .radio-option input[type='radio']:focus {
-        outline: 2px solid var(--primary);
-        outline-offset: 2px;
-      }
-
-      /* "Bot opponents" inputs (sync rounds, src/admin/bot-options.js). */
-      .bot-fields {
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 0.5rem 0.75rem;
-      }
-
-      .bot-field-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem 1.25rem;
-      }
-
-      .bot-field-row label {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-      }
-
-      .bot-field-row input {
-        width: 4.5rem;
-      }
-
-      /* Farming options greyed out while "Farming enabled" is unticked. */
-      .farming-fields-off .form-group:not(:first-child) {
-        opacity: 0.6;
-      }
-
-      .hidden-section {
-        display: none;
-      }
-
-      .schedule-preview {
-        margin-top: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        background: #f0f9ff;
-        border: 1px solid #bae6fd;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        color: #0c4a6e;
-        font-family: monospace;
-        white-space: pre-wrap;
-        min-height: 1.8rem;
-      }
-
-      .derived-note {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-        margin-top: 0.25rem;
-        font-style: italic;
-      }
-
-      .review-box {
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
-        font-size: 0.85rem;
-        line-height: 1.7;
-      }
-
-      .review-box dl {
-        display: grid;
-        grid-template-columns: 10rem 1fr;
-        gap: 0.1rem 0.75rem;
-      }
-
-      .review-box dt {
-        font-weight: 600;
-        color: var(--text-muted);
-      }
-
-      .review-box dd {
-        color: var(--text);
-      }
-
-      .create-btn {
-        margin-top: 1rem;
-        padding: 0.6rem 1.5rem;
-        background: var(--primary);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.15s;
-      }
-
-      .create-btn:hover:not(:disabled) {
-        background: var(--primary-hover);
-      }
-
-      .create-btn:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .result-box {
-        display: none;
-        margin-top: 1rem;
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        font-size: 0.875rem;
-      }
-
-      .result-box.success {
-        background: var(--success-bg);
-        border: 1px solid var(--success-border);
-        color: #065f46;
-        display: block;
-      }
-
-      .result-box.error {
-        background: var(--error-bg);
-        border: 1px solid var(--error-border);
-        color: #991b1b;
-        display: block;
-      }
-
-      .result-box .game-id-display {
-        font-size: 1.1rem;
-        font-weight: 700;
-        font-family: monospace;
-        margin: 0.25rem 0;
-      }
-
-      .result-box .join-link {
-        font-size: 0.8rem;
-        color: var(--primary);
-        word-break: break-all;
-      }
-
-      /* Grid/flex classes would otherwise override the hidden attribute. */
-      [hidden] {
-        display: none !important;
-      }
-
-      .result-box.info {
-        background: #f0f9ff;
-        border: 1px solid #bae6fd;
-        color: #0c4a6e;
-        display: block;
-      }
-
-      .admin-row-btn {
-        padding: 0.4rem 0.8rem;
-        margin: 0 0.2rem 0.2rem 0;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.8rem;
-        font-weight: 600;
-      }
-
-      .admin-row-btn:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .admin-secondary-btn {
-        padding: 0.5rem 1rem;
-        background: var(--primary);
-        color: #fff;
-        border: none;
-        border-radius: var(--radius);
-        cursor: pointer;
-        font-size: 0.875rem;
-      }
-
-      .admin-secondary-btn:hover:not(:disabled) {
-        background: var(--primary-hover);
-      }
-
-      .admin-secondary-btn:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .metrics-panel {
-        margin-top: 0.75rem;
-      }
-
-      .metrics-panel h3 {
-        font-size: 0.9rem;
-        margin-bottom: 0.4rem;
-      }
-
-      .admin-subheading {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin: 1rem 0 0.4rem;
-      }
-
-      .admin-users-search {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 0.75rem;
-      }
-
-      .admin-users-pager {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin-top: 0.75rem;
-        font-size: 0.85rem;
-      }
-
-      .section-note {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        margin-top: 0.1rem;
-        font-style: italic;
-      }
-
-      /* Section 11 — Game Settings editor */
-      .gc-fieldset {
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 0.75rem 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .schedule-fieldset {
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 0.75rem 1rem;
-        margin-top: 1rem;
-      }
-
-      .schedule-fieldset legend {
-        font-weight: 600;
-      }
-
-      #admin-scheduled-start-hint[data-kind='error'] {
-        color: var(--danger);
-        font-style: normal;
-      }
-
-      .gc-fieldset legend {
-        font-weight: 600;
-        font-size: 0.9rem;
-        padding: 0 0.3rem;
-      }
-
-      .gc-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.875rem;
-        margin-bottom: 0.5rem;
-      }
-
-      .gc-table th {
-        text-align: left;
-        padding: 0.3rem 0.4rem;
-        font-weight: 600;
-      }
-
-      .gc-table td {
-        padding: 0.25rem 0.4rem;
-      }
-
-      .visually-hidden {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-      }
-
-      .gc-checklist {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem 1rem;
-        margin: 0.3rem 0 0.75rem;
-        font-size: 0.875rem;
-      }
-
-      .gc-checklist label {
-        display: flex;
-        align-items: center;
-        gap: 0.3rem;
-        font-weight: 400;
-      }
-
-      .async-fields {
-        margin-top: 0.5rem;
-        padding: 0.6rem 0.8rem;
-        border-left: 3px solid var(--primary);
-        background: #f0f9ff;
-        border-radius: 0 6px 6px 0;
-      }
-
-      @media (max-width: 640px) {
-        .form-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .review-box dl {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
   </head>
   <body class="page-admin">
     <div class="page-banner">
@@ -692,25 +228,19 @@ Security notes:
             <!-- Populated by admin-setup.js from the effective game config -->
           </select>
         </div>
-        <div
-          id="admin-duration-custom-row"
-          class="form-group"
-          style="display: none"
-        >
+        <div id="admin-duration-custom-row" class="form-group js-hidden">
           <label for="admin-duration-custom-value">Custom Duration Value</label>
-          <div style="display: flex; gap: 0.5rem">
+          <div class="input-with-unit">
             <input
               id="admin-duration-custom-value"
               type="number"
               placeholder="e.g., 120"
               min="60"
               max="2592000"
-              style="flex: 2"
             />
             <select
               id="admin-duration-custom-unit"
               aria-label="Custom duration unit"
-              style="flex: 1"
             >
               <option value="seconds">seconds</option>
               <option value="minutes">minutes</option>
@@ -794,7 +324,7 @@ Security notes:
     <!-- Section 4: Scoring Mode -->
     <section class="card" aria-labelledby="section-scoring-title">
       <h2 id="section-scoring-title">4 — Scoring Mode</h2>
-      <p class="section-note" style="margin-bottom: 0.6rem">
+      <p class="section-note gap-below-xs">
         Snapshot-locked at round creation; players cannot change it.
       </p>
       <div class="form-group">
@@ -864,11 +394,7 @@ Security notes:
       </div>
       <!-- Farming Stage 1 (passive): defaults and limits come from Game
            Settings (section 11); populated by farming-options.js. -->
-      <div
-        id="admin-farming-fields"
-        class="form-grid"
-        style="margin-top: 0.75rem"
-      >
+      <div id="admin-farming-fields" class="form-grid gap-above-sm">
         <div class="form-group full-width">
           <label for="admin-farming-enabled">
             <input id="admin-farming-enabled" type="checkbox" />
@@ -879,19 +405,17 @@ Security notes:
           <label for="admin-farming-min-duration-value"
             >Farming minimum duration (one reward cycle)</label
           >
-          <div style="display: flex; gap: 0.5rem">
+          <div class="input-with-unit">
             <input
               id="admin-farming-min-duration-value"
               type="number"
               min="1"
               step="any"
               value="5"
-              style="flex: 2"
             />
             <select
               id="admin-farming-min-duration-unit"
               aria-label="Minimum farming duration unit"
-              style="flex: 1"
             >
               <option value="seconds">seconds</option>
               <option value="minutes" selected>minutes</option>
@@ -940,7 +464,7 @@ Security notes:
     <!-- Section 6: Advanced Overrides -->
     <section class="card" aria-labelledby="section-advanced-title">
       <h2 id="section-advanced-title">6 — Advanced Overrides (optional)</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Leave all fields blank to use server defaults. Override only when fine
         tuning emission rates or halving schedule.
       </p>
@@ -1005,7 +529,7 @@ Security notes:
     <!-- Section 8: Game Management -->
     <section class="card" aria-labelledby="section-games-title">
       <h2 id="section-games-title">8 — Game Management</h2>
-      <p class="section-note" style="margin-bottom: 1rem">
+      <p class="section-note gap-below-md">
         View and control all games. Sync games show player enrollment; async
         games accept new players during their session window. Metrics shows a
         game's aggregated counters, Reset creates a new game with the same
@@ -1013,72 +537,26 @@ Security notes:
         frees up resources.
       </p>
 
-      <div style="margin-bottom: 1rem">
-        <button
-          id="admin-refresh-games-btn"
-          type="button"
-          style="
-            padding: 0.5rem 1rem;
-            background: var(--primary);
-            color: #fff;
-            border: none;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: background 0.15s;
-          "
-        >
+      <div class="gap-below-md">
+        <button id="admin-refresh-games-btn" type="button">
           🔄 Refresh Game List
         </button>
       </div>
 
-      <div
-        id="admin-games-loading"
-        style="display: none; padding: 1rem; color: var(--text-muted)"
-      >
-        Loading games...
-      </div>
+      <div id="admin-games-loading" class="js-hidden">Loading games...</div>
 
-      <div
-        id="admin-games-error"
-        class="result-box error"
-        style="display: none"
-      ></div>
+      <div id="admin-games-error" class="result-box error js-hidden"></div>
 
-      <div
-        id="admin-games-list-container"
-        style="display: none; overflow-x: auto"
-      >
-        <table
-          style="width: 100%; border-collapse: collapse; font-size: 0.875rem"
-        >
+      <div id="admin-games-list-container" class="scroll-x js-hidden">
+        <table class="admin-games-table">
           <thead>
-            <tr
-              style="
-                border-bottom: 2px solid var(--border);
-                background: #f9f9f9;
-              "
-            >
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
-                Game ID
-              </th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
-                Status
-              </th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
-                Type
-              </th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
-                Time Remaining
-              </th>
-              <th style="text-align: left; padding: 0.75rem; font-weight: 600">
-                Players
-              </th>
-              <th
-                style="text-align: center; padding: 0.75rem; font-weight: 600"
-              >
-                Action
-              </th>
+            <tr>
+              <th>Game ID</th>
+              <th>Status</th>
+              <th>Type</th>
+              <th>Time Remaining</th>
+              <th>Players</th>
+              <th class="admin-games-action">Action</th>
             </tr>
           </thead>
           <tbody id="admin-games-tbody">
@@ -1087,36 +565,21 @@ Security notes:
         </table>
       </div>
 
-      <div
-        id="admin-games-empty"
-        style="
-          display: none;
-          padding: 1.5rem;
-          text-align: center;
-          color: var(--text-muted);
-          background: #f9f9f9;
-          border-radius: var(--radius);
-          border: 1px dashed var(--border);
-        "
-      >
+      <div id="admin-games-empty" class="js-hidden">
         No games found. Create one to get started!
       </div>
 
-      <div
-        id="admin-delete-result"
-        class="result-box"
-        style="display: none; margin-top: 1rem"
-      ></div>
+      <div id="admin-delete-result" class="result-box js-hidden"></div>
     </section>
 
     <!-- Section 9: Global Economy -->
     <section class="card" aria-labelledby="section-economy-title">
       <h2 id="section-economy-title">9 — Global Economy</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Changes apply to newly created games only. Existing games keep the
         economy snapshot taken when they were created.
       </p>
-      <div style="margin-bottom: 0.75rem">
+      <div class="gap-below-sm">
         <button
           id="admin-economy-load-btn"
           class="admin-secondary-btn"
@@ -1147,7 +610,7 @@ Security notes:
     <!-- Section 10: Metrics -->
     <section class="card" aria-labelledby="section-metrics-title">
       <h2 id="section-metrics-title">10 — Metrics</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Aggregated counters only (no personal data). Use the Metrics button in
         Game Management to inspect a single game.
       </p>
@@ -1173,12 +636,12 @@ Security notes:
     <!-- Section 11: Game Settings -->
     <section class="card" aria-labelledby="section-gameconfig-title">
       <h2 id="section-gameconfig-title">11 — Game Settings</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Applies to newly created rounds only; existing rounds keep their
         settings. Duration presets, the presets offered per round type,
         create-form defaults, limits and default trade counts.
       </p>
-      <div style="margin-bottom: 0.75rem">
+      <div class="gap-below-sm">
         <button
           id="admin-gameconfig-load-btn"
           class="admin-secondary-btn"
@@ -1541,7 +1004,7 @@ Security notes:
     <!-- Section 12: Administrators -->
     <section class="card" aria-labelledby="section-admins-title">
       <h2 id="section-admins-title">12 — Administrators</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Search accounts and grant or remove administrator rights. The backend
         refuses to remove the last administrator.
       </p>
@@ -1567,7 +1030,7 @@ Security notes:
           Search
         </button>
       </form>
-      <div style="overflow-x: auto">
+      <div class="scroll-x">
         <table id="admin-users-table" class="gc-table" hidden>
           <thead>
             <tr>
@@ -1608,7 +1071,7 @@ Security notes:
     <!-- Section 13: Chat Moderation -->
     <section class="card" aria-labelledby="section-chatmod-title">
       <h2 id="section-chatmod-title">13 — Chat Moderation</h2>
-      <p class="section-note" style="margin-bottom: 0.75rem">
+      <p class="section-note gap-below-sm">
         Chat is social-only. Mute a player in one game's chat (they can still
         play) or clear that game's chat. Use the Chat button in Game Management
         to choose a game.
@@ -1623,7 +1086,7 @@ Security notes:
         <p id="admin-chat-mutes-empty" class="derived-note" hidden>
           No player is muted in this game.
         </p>
-        <div style="overflow-x: auto">
+        <div class="scroll-x">
           <table id="admin-chat-mutes-table" class="gc-table" hidden>
             <thead>
               <tr>
@@ -1676,7 +1139,6 @@ Security notes:
           id="admin-chat-clear-btn"
           class="admin-secondary-btn"
           type="button"
-          style="background: var(--danger)"
         >
           🧹 Clear chat
         </button>

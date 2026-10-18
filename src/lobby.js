@@ -30,6 +30,7 @@ import '@fontsource/sora/latin-600.css';
 import '@fontsource/sora/latin-700.css';
 import '@fontsource/space-grotesk/latin-500.css';
 import '@fontsource/space-grotesk/latin-700.css';
+import './shared.css';
 import './lobby.css';
 import {
   STORAGE_KEYS,

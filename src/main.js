@@ -49,6 +49,7 @@ Manual QA (P2.4 Duration Presets & Overrides)
 9) Verify no innerHTML used in duration UI (all createElement/textContent)
 */
 
+import './shared.css';
 import './style.css';
 import { applyAdminLinkGate } from './ui/admin-link-gate.js';
 import {

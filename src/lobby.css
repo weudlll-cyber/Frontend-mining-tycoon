@@ -499,13 +499,6 @@ summary:focus-visible,
   font-weight: 700;
 }
 
-.last-game-score-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .game-list-item {
   display: flex;
   align-items: center;
@@ -844,24 +837,4 @@ dialog::backdrop {
   .game-list-item:hover {
     transform: none;
   }
-}
-
-/* Bot opponents are always marked (src/ui/bot-badge.js). */
-.bot-badge {
-  display: inline-block;
-  margin-left: 0.3em;
-  padding: 0 0.35em;
-  border-radius: 4px;
-  font-size: 0.68em;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.5;
-  vertical-align: middle;
-  color: #fff;
-  background: #4b5563;
-}
-
-/* The class rule above would otherwise override the hidden attribute. */
-.bot-badge[hidden] {
-  display: none;
 }
