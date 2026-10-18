@@ -4,9 +4,16 @@ All notable changes to the Mining Tycoon frontend. The backend has its own
 changelog in the `Mining-tycoon` repository.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-No versions have been released yet; `package.json` is still `0.0.0`.
+Versions follow [Semantic Versioning](https://semver.org/); `0.x` releases are
+pre-1.0 playtest builds.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-10-18
+
+First tagged version: the complete game as built so far (lobby, accounts,
+player board, admin console, how-to-play guide in English and German),
+ready for playtests.
 
 ### Added
 
