@@ -295,6 +295,35 @@ describe('trading-panel', () => {
       });
     });
 
+    it('shows a toast when the trade request fails', async () => {
+      const executeTrade = vi.fn().mockRejectedValue(new Error('Too late'));
+      const showToast = vi.fn();
+      const api = initTradingPanel({
+        getGameMeta: () => ({
+          conversion_fee_rate: 0.02,
+          game_duration_seconds: 600,
+          trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+        }),
+        getLastGameData: () => ({
+          player_state: { balances: { spring: 1000, summer: 500 } },
+          seconds_remaining: 520,
+          trades_used: 0,
+          trading_rules: { trade_count: 1, unlock_offsets_seconds: [60] },
+        }),
+        executeTrade,
+        showToast,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      amountInput.value = '10';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      panelEl.querySelector('.trading-execute-btn').click();
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      expect(showToast).toHaveBeenCalledWith('Trade failed: Too late', 'error');
+    });
+
     it('does not lose the Execute click when the amount field blurs (change) during the press', async () => {
       vi.useFakeTimers();
       try {

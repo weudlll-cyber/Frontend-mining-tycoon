@@ -81,6 +81,31 @@ describe('game list row actions', () => {
     ]);
   });
 
+  it('shows the remaining time of a running game', async () => {
+    const startedAt = new Date(Date.now() - 30_000).toISOString();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        okResponse({
+          games: [
+            {
+              game_id: 9,
+              status: 'running',
+              run_started_at: startedAt,
+              real_duration_seconds: 3600,
+              players_count: 1,
+            },
+          ],
+        })
+      )
+    );
+    initGameManagement();
+    await flush();
+    expect(document.querySelector('#admin-games-tbody tr').textContent).toMatch(
+      /\d+m \d+s left/
+    );
+  });
+
   it('opens per-game metrics from the row', async () => {
     const fetchMock = vi
       .fn()
