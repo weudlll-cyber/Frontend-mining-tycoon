@@ -11,6 +11,13 @@ pre-1.0 playtest builds.
 
 ### Added
 
+- "Buy several levels": a **×5** button next to each **Upgrade** button buys up
+  to five levels at once, as many as the pay balance covers (backend `levels`
+  on the upgrade endpoint; the limit comes from `/meta`
+  `max_upgrade_levels_per_action`, the button is hidden without it). The toast
+  names the levels bought ("to level 7 (+3)"). Guide (English and German)
+  explains it.
+
 - Game icon (`public/favicon.svg`, the "season gem": four facets in the season
   colors) on every page, replacing the default Vite logo. "A game icon" left
   the guide's roadmap (English and German).

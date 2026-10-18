@@ -1138,6 +1138,46 @@ body {
   opacity: 0.6;
 }
 
+/* "Buy several levels" (×5) next to Upgrade: same look, outlined so the
+   single-level button stays the primary action. */
+.season-upgrades span.upgrade-row-action {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  /* Buttons keep their full label; the auto track grows to fit both. */
+  overflow: visible;
+  width: auto;
+}
+
+.season-upgrades span.upgrade-row-action > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.season-upgrades .btn-upgrade-multi {
+  background: transparent;
+  color: var(--status-blue);
+  border: 1px solid var(--status-blue);
+  border-radius: calc(var(--radius) / 2);
+  padding: 0.25rem 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.season-upgrades .btn-upgrade-multi:hover:not(:disabled) {
+  background: var(--status-blue);
+  color: white;
+}
+
+.season-upgrades .btn-upgrade-multi:disabled {
+  border-color: #9ca3af;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .btn-upgrade-inline {
   background-color: var(--status-blue);
   color: white;
@@ -3281,6 +3321,18 @@ summary:focus-visible,
 
   .page-player .season-upgrades .btn-upgrade-inline {
     padding: 0.18rem 0.45rem;
+  }
+
+  .page-player .season-upgrades .btn-upgrade-inline {
+    padding-inline: 0.32rem;
+  }
+
+  .page-player .season-upgrades .btn-upgrade-multi {
+    padding: 0.13rem 0.18rem;
+  }
+
+  .page-player .season-upgrades span.upgrade-row-action {
+    gap: 0.12rem;
   }
 
   .page-player .bottom-bar {

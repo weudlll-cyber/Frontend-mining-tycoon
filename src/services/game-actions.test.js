@@ -87,6 +87,45 @@ describe('performUpgrade pay-token wiring', () => {
     expect(onUpgradeApplied).toHaveBeenCalledWith(payload);
   });
 
+  it('asks for several levels and names how many were bought', async () => {
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+    });
+    initGameActions(deps);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        levels_bought: 3,
+        updated_state: { upgrades_by_token: { summer: { efficiency: 7 } } },
+      }),
+    });
+
+    await performUpgrade('efficiency', 5, 'summer', 'summer', 5);
+
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body.levels).toBe(5);
+    expect(deps.showToast).toHaveBeenCalledWith(
+      'Upgraded Efficiency to level 7 (+3)',
+      'success'
+    );
+  });
+
+  it('sends no levels field for a single level', async () => {
+    const deps = buildDeps({
+      getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
+    });
+    initGameActions(deps);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    await performUpgrade('hashrate', 1, 'spring');
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body).not.toHaveProperty('levels');
+  });
+
   it('falls back to the requested level when the response has no levels', async () => {
     const deps = buildDeps({
       getLastGameData: vi.fn(() => ({ game_id: 'g-1', player_id: 'p-1' })),
