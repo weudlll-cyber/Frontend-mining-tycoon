@@ -792,16 +792,7 @@ function updateEditingPanelInPlace(ctx, trading) {
 }
 
 function renderBottomStatus(ctx, trading) {
-  const statusRef = ctx.tradingStatusRef;
-  if (!statusRef) return;
-
-  const statusText = trading.enabled ? 'Enabled' : 'Not Enabled';
-  const feeText = `${(trading.value_fee_rate * 100).toFixed(1)}%`;
-
-  statusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-  statusRef.className = trading.enabled
-    ? 'trading-status-enabled'
-    : 'trading-status-disabled';
+  renderBottomBarTradingStatus(trading, ctx.tradingStatusRef);
 }
 
 function isEditingPanelField(panelEl) {
@@ -986,23 +977,19 @@ export function renderTradingStatus(
     tradingPanelRef.appendChild(card);
   }
 
-  if (tradingStatusRef) {
-    const statusText = trading.enabled ? 'Enabled' : 'Not Enabled';
-    const feeText = `${(trading.value_fee_rate * 100).toFixed(1)}%`;
-
-    tradingStatusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-    tradingStatusRef.className = trading.enabled
-      ? 'trading-status-enabled'
-      : 'trading-status-disabled';
-  }
+  renderBottomBarTradingStatus(trading, tradingStatusRef);
 }
 
 export function renderBottomBarTradingStatus(data, statusRef) {
   if (!data || !statusRef) return;
   const statusText = data.enabled ? 'Enabled' : 'Not Enabled';
   const feeText = `${(data.value_fee_rate * 100).toFixed(1)}%`;
-  statusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-  statusRef.className = data.enabled
-    ? 'trading-status-enabled'
-    : 'trading-status-disabled';
+  // The pill already has the "Trading" label; the value is shortened with an
+  // ellipsis on narrow windows, so the full text is also the tooltip.
+  const text = `${statusText} (${feeText} fee)`;
+  statusRef.textContent = text;
+  statusRef.title = text;
+  // classList, not className: the bottom-bar-value class (ellipsis) must stay.
+  statusRef.classList.toggle('trading-status-enabled', Boolean(data.enabled));
+  statusRef.classList.toggle('trading-status-disabled', !data.enabled);
 }

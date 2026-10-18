@@ -109,8 +109,7 @@ describe('trading-panel', () => {
       const trading = normalizeTradingCapability(null, 0.02);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(statusEl.textContent).toContain('Trading:');
-      expect(statusEl.textContent).toContain('Not Enabled');
+      expect(statusEl.textContent).toBe('Not Enabled (2.0% fee)');
       expect(statusEl.textContent).toContain('2.0%');
     });
 
@@ -157,7 +156,20 @@ describe('trading-panel', () => {
       const trading = normalizeTradingCapability(null);
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe('trading-status-disabled');
+      expect(statusEl.classList.contains('trading-status-disabled')).toBe(true);
+    });
+
+    it('keeps the ellipsis class and shows the full text as tooltip', () => {
+      statusEl.className = 'bottom-bar-value';
+      renderBottomBarTradingStatus(
+        { enabled: true, value_fee_rate: 0.02 },
+        statusEl
+      );
+
+      expect(statusEl.textContent).toBe('Enabled (2.0% fee)');
+      expect(statusEl.title).toBe('Enabled (2.0% fee)');
+      expect(statusEl.classList.contains('bottom-bar-value')).toBe(true);
+      expect(statusEl.classList.contains('trading-status-enabled')).toBe(true);
     });
 
     it('applies trading-status-enabled class for enabled trading', () => {
@@ -167,7 +179,7 @@ describe('trading-panel', () => {
       };
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe('trading-status-enabled');
+      expect(statusEl.classList.contains('trading-status-enabled')).toBe(true);
     });
 
     it('handles null data gracefully', () => {
@@ -236,7 +248,7 @@ describe('trading-panel', () => {
 
       expect(panelEl.innerHTML).toContain('trading-card');
       expect(panelEl.innerHTML).toContain('Trades used:');
-      expect(statusEl.textContent).toContain('Trading:');
+      expect(statusEl.textContent).toContain('fee)');
       expect(panelEl.textContent).toContain('Execute Trade');
       expect(panelEl.querySelector('.trading-execute-btn')?.disabled).toBe(
         true
@@ -906,7 +918,8 @@ describe('trading-panel', () => {
 
       expect(api.getTrading().value_fee_rate).toBe(0);
       api.renderTradingStatus();
-      expect(statusEl.textContent).toBe('Trading: Not Enabled (0.0% fee)');
+      expect(statusEl.textContent).toBe('Not Enabled (0.0% fee)');
+      expect(statusEl.classList.contains('trading-status-disabled')).toBe(true);
     });
 
     it('shows the round fee and oracle spread from game meta in the cost note', () => {

@@ -9,6 +9,14 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Fixed
+
+- Board action bar at 1280×630 with an event banner: the bar wrapped into a
+  second row and the board scrolled by ~30 px. The bar now stays on one row;
+  the Trading/Farming values end with an ellipsis (full text as tooltip). The
+  trading status no longer drops its ellipsis class and no longer repeats
+  "Trading" ("Trading Trading: …"); its three copies are one function.
+
 ### Changed
 
 - One duration formatter (`src/utils/duration-format.js`, clock / compact /

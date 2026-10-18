@@ -182,6 +182,26 @@ Role in system: part of the player board stylesheet; imported in order by
   background: #f8fafc;
 }
 
+/* Desktop board: the action bar stays on one row (a second row would push the
+   board past the window height). Buttons keep their size; the two status
+   pills shrink and their values end with an ellipsis (full text in the
+   tooltip). */
+@media (min-width: 769px) {
+  .page-player .action-bar {
+    flex-wrap: nowrap;
+  }
+
+  .page-player .action-bar > .bottom-bar-item {
+    flex-shrink: 0;
+  }
+
+  .page-player .action-bar > .status-pill {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
 .bottom-bar-item .label {
   color: var(--text-secondary);
   font-weight: 500;
