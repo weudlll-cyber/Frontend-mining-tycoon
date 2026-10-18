@@ -14,6 +14,7 @@ import {
   deriveLastHalvingNoticeUpdate,
 } from '../halving.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
+import { formatDuration } from '../utils/duration-format.js';
 
 // Module-level state
 let _halvingClockInterval = null;
@@ -33,17 +34,6 @@ export function initHalvingDisplay(deps) {
 
 export function getLastHalvingNotice() {
   return _lastHalvingNotice;
-}
-
-/* ---------- clock formatting ---------- */
-
-export function formatCountdownClock(seconds) {
-  const s = Math.max(0, Math.floor(seconds || 0));
-  const mm = Math.floor(s / 60)
-    .toString()
-    .padStart(2, '0');
-  const ss = (s % 60).toString().padStart(2, '0');
-  return `${mm}:${ss}`;
 }
 
 /* ---------- next-halving countdown ---------- */
@@ -90,7 +80,7 @@ function renderNextHalvingCountdownTick() {
     0,
     _halvingCountdownTarget.halvingAtUnix - nowUnix
   );
-  _halvingCountdownTarget.textNode.textContent = `Next halving in: ~${formatCountdownClock(remainingSeconds)} (token: ${_halvingCountdownTarget.token.toUpperCase()})`;
+  _halvingCountdownTarget.textNode.textContent = `Next halving in: ~${formatDuration(remainingSeconds, { style: 'clock' })} (token: ${_halvingCountdownTarget.token.toUpperCase()})`;
 }
 
 export function startNextHalvingCountdown(target) {

@@ -27,7 +27,8 @@ Security notes:
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
-import { formatCountdownClock } from './halving-display.js';
+import { formatDuration } from '../utils/duration-format.js';
+import { isPlainObject } from '../utils/value-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _eventBannerEl = null;
@@ -56,10 +57,6 @@ const DOMAIN_LABELS = {
   oracle_price: 'Oracle price',
   oracle_spread: 'Spread',
 };
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Return all currently active events as an array.
@@ -226,7 +223,7 @@ function formatRemaining(activeEvent, data) {
   const remaining = getRemaining(activeEvent, data);
   if (!remaining) return '—';
   if (Number.isFinite(remaining.seconds)) {
-    return formatCountdownClock(remaining.seconds);
+    return formatDuration(remaining.seconds, { style: 'clock' });
   }
   const months = remaining.simMonths;
   return `${months} sim-month${months === 1 ? '' : 's'}`;

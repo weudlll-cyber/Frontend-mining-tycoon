@@ -17,6 +17,7 @@ import {
   formatOpensIn,
   normalizeUnixSeconds,
 } from '../utils/schedule-time.js';
+import { formatDuration } from '../utils/duration-format.js';
 
 function normalizeStatus(rawStatus) {
   const status = String(rawStatus || '')
@@ -55,18 +56,7 @@ function normalizeScoringModeLabel(rawScoringMode) {
 }
 
 export function formatDurationLabel(seconds) {
-  const total = Math.max(0, Math.floor(Number(seconds) || 0));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${String(secs).padStart(2, '0')}s`;
-  }
-  return `${secs}s`;
+  return formatDuration(seconds, { largest: 'h', pad: true });
 }
 
 /** Lifecycle status of a /games/active item (`game_status`, else `status`). */

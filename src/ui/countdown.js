@@ -6,6 +6,7 @@ Call init() once with the display elements before using the other exports.
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
+import { formatDuration } from '../utils/duration-format.js';
 import {
   formatOpensAtShort,
   normalizeUnixSeconds,
@@ -28,14 +29,11 @@ export function initCountdown(els, lastGameDataAccessor) {
 }
 
 export function formatCountdown(seconds) {
-  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
-    return '-';
-  }
-  const s = Math.max(0, Math.floor(seconds));
-  const hh = Math.floor(s / 3600);
-  const mm = Math.floor((s % 3600) / 60);
-  const ss = s % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  return formatDuration(seconds, {
+    style: 'clock',
+    hours: true,
+    fallback: '-',
+  });
 }
 
 function updateCountdown() {

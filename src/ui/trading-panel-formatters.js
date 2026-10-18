@@ -1,4 +1,6 @@
 // Pure formatting and normalization helpers for the trading panel UI.
+import { formatDuration } from '../utils/duration-format.js';
+
 const DEFAULT_SCORING_MODE = 'stockpile_total_tokens';
 
 export function normalizeScoringMode(rawMode) {
@@ -78,29 +80,19 @@ export function formatSignedTokens(value) {
   return `${formatSignedNumber(numeric, 0)} tokens`;
 }
 
+// Trading durations always show two units: "1h 5m" or "0m 42s".
+const TRADING_DURATION = Object.freeze({
+  largest: 'h',
+  minLeading: 'm',
+  round: 'round',
+  fallback: '--',
+});
+
+/** Signed duration change: "+1h 5m", "-0m 42s". */
 export function formatDurationCompact(seconds) {
-  const numeric = asNumber(seconds);
-  if (numeric === null) return '--';
-  const sign = numeric < 0 ? '-' : '+';
-  const total = Math.max(0, Math.round(Math.abs(numeric)));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hours > 0) {
-    return `${sign}${hours}h ${minutes}m`;
-  }
-  return `${sign}${minutes}m ${secs}s`;
+  return formatDuration(seconds, { ...TRADING_DURATION, signed: true });
 }
 
 export function formatDurationAbsolute(seconds) {
-  const numeric = asNumber(seconds);
-  if (numeric === null) return '--';
-  const total = Math.max(0, Math.round(numeric));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m ${secs}s`;
+  return formatDuration(seconds, TRADING_DURATION);
 }

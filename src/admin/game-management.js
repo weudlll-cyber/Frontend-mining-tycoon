@@ -18,6 +18,7 @@ import { createApiError, readApiError } from '../utils/api-error.js';
 import { showGameMetrics } from './admin-metrics.js';
 import { initChatModeration, showChatModeration } from './chat-moderation.js';
 import { byId as el } from '../utils/dom-utils.js';
+import { formatDuration } from '../utils/duration-format.js';
 
 async function getBackendUrl() {
   const url = (el('admin-backend-url')?.value || '').trim();
@@ -42,15 +43,9 @@ async function adminResponseError(response) {
   );
 }
 
-function formatDuration(seconds) {
+function formatRoundDuration(seconds) {
   if (!seconds || seconds < 0) return 'N/A';
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) {
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  }
-  return `${minutes}m`;
+  return formatDuration(seconds, { largest: 'h', smallest: 'm' });
 }
 
 function formatTimeRemaining(game) {
@@ -70,22 +65,13 @@ function formatTimeRemaining(game) {
   }
 
   if (endMs === null || isNaN(endMs)) {
-    return formatDuration(game.real_duration_seconds);
+    return formatRoundDuration(game.real_duration_seconds);
   }
 
   const remainingMs = endMs - now;
   if (remainingMs <= 0) return 'Ending soon';
 
-  const totalSecs = Math.floor(remainingMs / 1000);
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  const hours = Math.floor(mins / 60);
-  if (hours > 0) {
-    const m = mins % 60;
-    return `${hours}h ${m}m left`;
-  }
-  if (mins > 0) return `${mins}m ${secs}s left`;
-  return `${secs}s left`;
+  return `${formatDuration(remainingMs / 1000, { largest: 'h' })} left`;
 }
 
 function getStatusBadgeColor(status) {

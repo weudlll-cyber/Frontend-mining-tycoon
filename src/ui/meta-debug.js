@@ -18,6 +18,7 @@ import {
   shortMetaHash,
 } from '../meta/meta-manager.js';
 import { formatScoringModeName } from './trading-panel-formatters.js';
+import { formatDuration } from '../utils/duration-format.js';
 
 let _deps = {};
 
@@ -27,14 +28,6 @@ let _deps = {};
  */
 export function initMetaDebug(deps) {
   _deps = deps || {};
-}
-
-/** Round duration as one compact unit: 45s, 10m, 2h, 3d. */
-function formatMetaDurationLabel(durationSec) {
-  if (durationSec < 60) return `${durationSec}s`;
-  if (durationSec < 3600) return `${Math.round(durationSec / 60)}m`;
-  if (durationSec < 86400) return `${Math.round(durationSec / 3600)}h`;
-  return `${Math.round(durationSec / 86400)}d`;
 }
 
 export function renderMetaDebugLine() {
@@ -52,7 +45,7 @@ export function renderMetaDebugLine() {
   if (gameId) {
     const gameMeta = getGameMeta(gameId);
     if (gameMeta && gameMeta.game_duration_seconds) {
-      text += ` | Duration: ${formatMetaDurationLabel(gameMeta.game_duration_seconds)}`;
+      text += ` | Duration: ${formatDuration(gameMeta.game_duration_seconds, { parts: 1, round: 'round' })}`;
 
       if (gameMeta.emission_anchor_token) {
         const rate = gameMeta.emission_anchor_tokens_per_second || '?';

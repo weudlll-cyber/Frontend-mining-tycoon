@@ -19,9 +19,9 @@ import {
   stopNextHalvingCountdown,
   getHalvingCountdownTarget,
   getLastHalvingNotice,
-  formatCountdownClock,
   subscribeHalvingClock,
 } from './halving-display.js';
+import { formatDuration } from '../utils/duration-format.js';
 import {
   ensurePlayerStateViewLayout,
   toTokenLabel,
@@ -232,7 +232,7 @@ function renderFooterHalvingState() {
       0,
       countdownTarget.halvingAtUnix - nowUnix
     );
-    const countdownText = formatCountdownClock(remainingSeconds);
+    const countdownText = formatDuration(remainingSeconds, { style: 'clock' });
     halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
     halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
   } else if (lastHalvingNotice) {

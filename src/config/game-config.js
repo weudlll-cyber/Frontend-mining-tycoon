@@ -57,6 +57,7 @@ import {
   TRADE_DEFAULT_BUCKETS,
 } from './trading-control-data.js';
 import { getGlobalMeta } from '../meta/meta-manager.js';
+import { isFiniteNumber, isPlainObject } from '../utils/value-utils.js';
 
 // Farming Stage 2 default when the backend config has no value (backend seed).
 const FARMING_FAVORED_MULTIPLIER_DEFAULT = 2;
@@ -128,14 +129,6 @@ export function buildFallbackGameConfig() {
 }
 
 // ── Normalization (per top-level key) ───────────────────────────────────────
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 
 function normalizePresets(raw, fallback) {
   if (!isPlainObject(raw)) return fallback;
