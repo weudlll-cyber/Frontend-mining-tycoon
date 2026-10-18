@@ -49,9 +49,15 @@ import {
   login,
   logout,
   register,
-  resetPassword,
 } from './services/auth-client.js';
 import { readGameStatus } from './ui/lobby-games.js';
+import {
+  getEmailCapabilities,
+  handleEmailLinkFromQuery,
+  initAccountEmail,
+  loadEmailCapabilities,
+  renderEmailVerification,
+} from './ui/lobby-account-email.js';
 import {
   bindLobbyGameListKeyboard,
   markSelectedRow,
@@ -108,11 +114,6 @@ const registerDialog = document.getElementById('register-dialog');
 const openRegisterBtn = document.getElementById('open-register-dialog');
 const logoutBtn = document.getElementById('logout-btn');
 const cancelRegisterBtn = document.getElementById('cancel-register-dialog');
-const forgotDialog = document.getElementById('forgot-password-dialog');
-const openForgotBtn = document.getElementById('open-forgot-password');
-const cancelForgotBtn = document.getElementById('cancel-forgot-password');
-const forgotForm = document.getElementById('forgot-password-form');
-const forgotMessageEl = document.getElementById('forgot-password-message');
 const changePasswordDialog = document.getElementById('change-password-dialog');
 const openChangePasswordBtn = document.getElementById('open-change-password');
 const cancelChangePasswordBtn = document.getElementById(
@@ -163,20 +164,11 @@ function setRegisterMessage(message, kind = 'info') {
   registerMessageEl.dataset.kind = kind;
 }
 
-function setForgotMessage(message, kind = 'info') {
-  if (!forgotMessageEl) return;
-  forgotMessageEl.textContent = message;
-  forgotMessageEl.dataset.kind = kind;
-}
-
 function setChangePasswordMessage(message, kind = 'info') {
   if (!changePasswordMessageEl) return;
   changePasswordMessageEl.textContent = message;
   changePasswordMessageEl.dataset.kind = kind;
 }
-
-const PASSWORD_RESET_DISABLED_MESSAGE =
-  'Password reset is not available. Please contact an administrator.';
 
 function getBackendUrlOrThrow() {
   const rawValue =
@@ -227,10 +219,6 @@ function updateJoinButtonState() {
 
   if (logoutBtn) {
     logoutBtn.disabled = !authState.isAuthenticated;
-  }
-
-  if (openForgotBtn) {
-    openForgotBtn.disabled = authState.isAuthenticated;
   }
 
   // Changing a password needs the signed-in session's bearer token.
@@ -309,6 +297,13 @@ function setAuthenticatedSession(payload) {
     isAdmin,
   };
   renderAdminSetupLink(isAdmin);
+  // `email_verified` comes from login/register (`user.email_verified`) or
+  // GET /auth/me; unknown (older backend, restored session) hides the hint.
+  renderEmailVerification(
+    token
+      ? (payload?.user?.email_verified ?? payload?.email_verified)
+      : undefined
+  );
 
   setStorageItem(STORAGE_KEYS.authToken, token);
   setStorageItem(STORAGE_KEYS.authUsername, username);
@@ -668,49 +663,17 @@ async function handleRegisterSubmit(event) {
       discord: formData.get('discord'),
       telegram: formData.get('telegram'),
     });
-    setAuthMessage('Registration successful. You can sign in now.', 'success');
+    setAuthMessage(
+      getEmailCapabilities().emailVerification
+        ? 'Registration successful. You can sign in now. We have sent you an email to confirm your address.'
+        : 'Registration successful. You can sign in now.',
+      'success'
+    );
     registerDialog?.close();
     registerForm?.reset();
     setRegisterMessage('', 'info');
   } catch (error) {
     setRegisterMessage(error.message, 'error');
-  }
-}
-
-async function handleForgotPasswordSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(forgotForm);
-
-  let baseUrl;
-  try {
-    baseUrl = getBackendUrlOrThrow();
-  } catch (error) {
-    setAuthMessage(error.message, 'error');
-    return;
-  }
-
-  setForgotMessage('Submitting password reset...', 'info');
-  try {
-    await resetPassword(baseUrl, {
-      username: formData.get('username'),
-      email: formData.get('email'),
-      newPassword: formData.get('newPassword'),
-    });
-    setForgotMessage('', 'info');
-    setAuthMessage(
-      'Password reset succeeded. Please sign in with your new password.',
-      'success'
-    );
-    forgotDialog?.close();
-  } catch (error) {
-    // WHY: the backend disables self-service reset unless a dev flag is set and
-    // answers 403 (code PASSWORD_RESET_DISABLED). Keep the dialog open and show
-    // the server's explanation instead of a generic failure.
-    const message =
-      error?.status === 403
-        ? resolvePasswordResetDisabledMessage(error)
-        : error?.message || 'Password reset failed.';
-    setForgotMessage(message, 'error');
   }
 }
 
@@ -775,15 +738,6 @@ async function handleChangePasswordSubmit(event) {
     'Password changed. Please sign in again with your new password.',
     'success'
   );
-}
-
-function resolvePasswordResetDisabledMessage(error) {
-  const serverMessage = String(error?.message || '').trim();
-  // readApiError falls back to "Request failed (403)" when the body has no message.
-  if (!serverMessage || /^Request failed \(\d+\)$/.test(serverMessage)) {
-    return PASSWORD_RESET_DISABLED_MESSAGE;
-  }
-  return serverMessage;
 }
 
 function clearAuthSessionData() {
@@ -931,6 +885,7 @@ async function validateStoredSession(token) {
       username,
       display_name: displayName,
       is_admin: user?.is_admin,
+      email_verified: user?.email_verified,
     });
     void preferServerLastGame(token);
   } catch (error) {
@@ -1026,16 +981,6 @@ function bindEvents() {
   logoutBtn?.addEventListener('click', () => {
     void handleLogoutClick();
   });
-  openForgotBtn?.addEventListener('click', () => {
-    setForgotMessage('', 'info');
-    forgotDialog?.showModal();
-  });
-  cancelForgotBtn?.addEventListener('click', () => {
-    forgotDialog?.close();
-  });
-  forgotForm?.addEventListener('submit', (event) => {
-    void handleForgotPasswordSubmit(event);
-  });
   openResultsBtn?.addEventListener('click', () => {
     void openMyResults();
   });
@@ -1082,9 +1027,19 @@ function bootstrap() {
     setStatus: setAuthMessage,
   });
 
+  initAccountEmail({
+    getContext: () => ({
+      baseUrl: getBackendUrlOrThrow(),
+      authToken: authState.token,
+    }),
+    setStatus: setAuthMessage,
+  });
+
   hydrateFromStorage();
   bindEvents();
   openResultsFromQuery();
+  // Capabilities first, so a confirmation link can update the account hint.
+  void loadEmailCapabilities().then(handleEmailLinkFromQuery);
   void refreshOpenGames({ showSuccess: true });
   startLobbyRefreshLoop();
   updateJoinButtonState();

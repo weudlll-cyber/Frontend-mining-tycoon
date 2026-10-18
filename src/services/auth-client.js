@@ -71,14 +71,61 @@ export async function register(baseUrl, payload) {
   }
 }
 
-export async function resetPassword(baseUrl, payload) {
-  return await requestJson(baseUrl, '/auth/reset-password', {
+/**
+ * Which email features the backend offers (GET /auth/email-capabilities):
+ * `{ password_reset, email_verification }`. Older backends without the
+ * endpoint (404) are treated as "no email features".
+ */
+export async function fetchEmailCapabilities(baseUrl) {
+  try {
+    const payload = await requestJson(baseUrl, '/auth/email-capabilities');
+    return {
+      passwordReset: payload?.password_reset === true,
+      emailVerification: payload?.email_verification === true,
+    };
+  } catch (error) {
+    if (error?.status === 404) {
+      return { passwordReset: false, emailVerification: false };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Ask for a reset link (POST /auth/password-reset/request). The backend
+ * answers the same way whether or not the account exists.
+ */
+export async function requestPasswordReset(baseUrl, { identifier } = {}) {
+  return await requestJson(baseUrl, '/auth/password-reset/request', {
     method: 'POST',
-    body: {
-      username: safeTrim(payload?.username),
-      email: safeTrim(payload?.email),
-      new_password: String(payload?.newPassword || ''),
-    },
+    body: { identifier: safeTrim(identifier) },
+  });
+}
+
+/** Set a new password with the token from the emailed link. */
+export async function confirmPasswordReset(
+  baseUrl,
+  { token, newPassword } = {}
+) {
+  return await requestJson(baseUrl, '/auth/password-reset/confirm', {
+    method: 'POST',
+    body: { token: safeTrim(token), new_password: String(newPassword || '') },
+  });
+}
+
+/** Confirm the account's email address with the token from the emailed link. */
+export async function verifyEmail(baseUrl, { token } = {}) {
+  return await requestJson(baseUrl, '/auth/verify-email', {
+    method: 'POST',
+    body: { token: safeTrim(token) },
+  });
+}
+
+/** Send a new confirmation link to the signed-in account. */
+export async function resendVerificationEmail(baseUrl, { authToken } = {}) {
+  return await requestJson(baseUrl, '/auth/verify-email/resend', {
+    method: 'POST',
+    headers: bearerHeaders(authToken),
   });
 }
 

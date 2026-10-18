@@ -24,7 +24,7 @@ Optional backend switches (set before starting the backend; see the backend
 
 - `REQUIRE_ADMIN_FOR_GAME_CREATE=true` and `ADMIN_TOKEN=<local test token>` to test admin enforcement.
 - `REQUIRE_PLAYER_AUTH=1` to test player tokens and SSE tickets.
-- `ALLOW_UNVERIFIED_PASSWORD_RESET=true` only if you want to test the dev-only reset path (default: disabled).
+- Email: the default `MAIL_BACKEND=log` writes reset and confirmation emails (with their links) to the backend log, so no SMTP server is needed locally.
 
 Frontend:
 
@@ -71,7 +71,7 @@ window to play with two accounts.
 2. **Login / logout:** sign in; the sign-in form and "Create account" disappear and the "Your account" panel shows "Signed in as <display name> (@username)" with My results, Change password, Logout and the "Your data" row. Logout (after the confirmation) brings the sign-in form back and clears the local session even if the backend is unreachable.
 3. **Change password:** signed in, "Change password" opens a dialog. A mismatched confirmation is rejected locally; a weak new password shows the backend rule; a valid change signs you out and asks you to sign in with the new password.
 4. **Session check:** reload the page while signed in. The lobby calls `GET /auth/me`; a valid token keeps you signed in. Invalidate the token (log out in another tab or restart the backend with a fresh DB) and reload: the lobby clears the session and asks you to sign in.
-5. **Forgot password (default backend):** "Forgot password?" opens a dialog. Submitting shows "Password reset is not available. Please contact an administrator." (or the server's message) **inside the dialog**; the dialog stays open. With `ALLOW_UNVERIFIED_PASSWORD_RESET=true` a valid reset closes the dialog and shows a success message.
+5. **Forgot password / email confirmation:** after registering, the backend log contains "Confirm your Mining Tycoon email address" with a `?verify=` link; signed in, the account panel shows "Your email address is not confirmed yet" (**Send the link again** within a minute answers "Please wait a minute"). Open the link: the lobby says the address is confirmed, the token disappears from the address bar and the note is gone after the next sign-in. Sign out, click "Forgot password?", enter the username (or email): the lobby shows the generic answer (also for an unknown name). Open the `?reset=` link from the log: "Choose a new password" opens; different passwords show "The two passwords do not match."; a valid one signs out all sessions and the new password works. Opening the same link again shows "This link is invalid or has expired". With `MAIL_BACKEND=disabled` the "Forgot password?" button is hidden.
 6. **Open games:** the list shows enrolling games and running async games with a status badge and remaining time. Running sync games are not listed, and running async games are hidden when the session is not shorter than the remaining round time. The list refreshes every 10 s and when the tab becomes visible again.
 7. **Join:** "Enter game" is disabled until you are signed in and have selected a game. Clicking it joins and opens `player.html?autostart=1`. The join name is your display name, or a cleaned/shortened version (1-24 letters, digits, spaces, `_ - .`), falling back to your username.
 8. **Last Game Highscores:** after a finished game (section 5), the lobby shows that game's Top 5. Signed in, it comes from the server (newest entry of "My results"), so it matches on any device; signed out it shows the snapshot stored in this browser.
@@ -221,7 +221,7 @@ Use this to validate mining balance (moved here from `README.md`).
 ## 9. Summary Checklist
 
 - [ ] Admin console: 13 sections, defaults (backend game config), trade preview (30m/3 -> 6/14/22 min), sync + async create, overrides applied, round options (fee/spread overrides, chat enabled), game list + metrics/chat/reset/delete, chat moderation (mute/unmute/clear), global economy edit, metrics summary, game settings edit (2m test preset, chat default)
-- [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot-password disabled message, open-games filter + 10 s refresh, join, rejoin (same player), My results + Load more, Full results highlight, require sign-in, download my data, delete account
+- [ ] Lobby: register, login, change password, logout, `/auth/me` re-check, forgot password + reset link, email confirmation link + resend, open-games filter + 10 s refresh, join, rejoin (same player), My results + Load more, Full results highlight, require sign-in, download my data, delete account
 - [ ] Player board: autostart, no host controls, season cards + upgrades, analytics, halving, events banner
 - [ ] Live tools window: Trade / Farm / Chat / Top 5, drag, Escape and outside-click close, board stays usable; a chat-disabled round shows the disabled note and opens no WebSocket; emoji picker by mouse and keyboard; muted note and cleared notice
 - [ ] Standings label: Live (sync running) / Provisional (async open) / Final (finished) in header and Top 5
