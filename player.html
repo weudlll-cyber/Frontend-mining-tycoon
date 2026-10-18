@@ -1078,18 +1078,5 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
     </div>
     <div id="tooltip-layer" class="tooltip-layer"></div>
     <script type="module" src="/src/main.js"></script>
-    <script>
-      /**
-       * Admin link gate: show the "+ New Game (Admin)" link only if ?admin=1 is present.
-       * This prevents accidental navigation and keeps player UI clean.
-       */
-      (function () {
-        const params = new URLSearchParams(window.location.search);
-        const adminLink = document.getElementById('admin-setup-link');
-        if (params.get('admin') === '1' && adminLink) {
-          adminLink.style.display = 'inline-flex';
-        }
-      })();
-    </script>
   </body>
 </html>

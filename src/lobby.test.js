@@ -271,6 +271,18 @@ describe('lobby signed-in view', () => {
       ''
     );
   });
+
+  it('forgets the player tokens on logout (shared devices)', async () => {
+    const authClient = await bootLobbySignedIn();
+    vi.mocked(authClient.logout).mockResolvedValue(null);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    localStorage.setItem('mining-tycoon:playerToken:77:9', 'secret');
+
+    document.getElementById('logout-btn').click();
+    await flushPromises();
+
+    expect(localStorage.getItem('mining-tycoon:playerToken:77:9')).toBeNull();
+  });
 });
 
 describe('lobby join flow', () => {

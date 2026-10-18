@@ -50,6 +50,7 @@ Manual QA (P2.4 Duration Presets & Overrides)
 */
 
 import './style.css';
+import { applyAdminLinkGate } from './ui/admin-link-gate.js';
 import {
   DEFAULT_TOKEN_NAMES,
   computePayCostPreview,
@@ -331,6 +332,7 @@ function ensureInputsEditable() {
 
 initScoringModeUi(dom);
 initSetupHostControls(dom);
+applyAdminLinkGate();
 initChatPreview(dom);
 initMetaDebug({ ...dom, tokens: PLAYER_STATE_TOKENS });
 initSetupController({ ...dom, updateSetupActionsState });

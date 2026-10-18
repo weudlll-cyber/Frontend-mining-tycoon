@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   STORAGE_KEYS,
   cleanupGameMetaCache,
+  clearPlayerTokens,
   getGameMetaHashStorageKey,
   getPlayerTokenStorageKey,
   getStorageItem,
@@ -25,6 +26,29 @@ describe('storage-utils', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  it('clears every stored player token and nothing else', () => {
+    localStorage.setItem(getPlayerTokenStorageKey(1, 2), 'a');
+    localStorage.setItem(getPlayerTokenStorageKey(7, 9), 'b');
+    localStorage.setItem(STORAGE_KEYS.gameId, '7');
+    localStorage.setItem(getGameMetaHashStorageKey(7), 'hash');
+
+    expect(clearPlayerTokens()).toBe(2);
+
+    expect(localStorage.getItem(getPlayerTokenStorageKey(1, 2))).toBeNull();
+    expect(localStorage.getItem(getPlayerTokenStorageKey(7, 9))).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.gameId)).toBe('7');
+    expect(localStorage.getItem(getGameMetaHashStorageKey(7))).toBe('hash');
+  });
+
+  it('survives a storage that throws when clearing player tokens', () => {
+    vi.spyOn(Storage.prototype, 'key').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(getPlayerTokenStorageKey(1, 2), 'a');
+    expect(clearPlayerTokens()).toBe(0);
   });
 
   it('builds stable player token storage keys', () => {

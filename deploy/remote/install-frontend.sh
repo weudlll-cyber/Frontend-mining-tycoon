@@ -5,7 +5,11 @@
 # directory in the login user's home and runs this script from there:
 #
 #   sudo bash deploy/remote/install-frontend.sh --frontend-domain game.example.com \
+#       --api-origin https://api.example.com \
 #       [--letsencrypt-email ops@example.com] [--reset-nginx]
+#
+# --api-origin goes into the Content-Security-Policy (connect-src), so the
+# pages may only talk to this site and that backend.
 #
 # Idempotent: re-running replaces the site files and leaves an existing nginx
 # site (possibly edited by certbot) alone unless --reset-nginx is given.
@@ -18,6 +22,7 @@ SRC_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly SRC_DIR
 
 FRONTEND_DOMAIN=""
+API_ORIGIN=""
 LE_EMAIL=""
 RESET_NGINX=0
 
@@ -31,6 +36,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --frontend-domain) need_value "$1" $#; FRONTEND_DOMAIN=$2; shift 2 ;;
         --letsencrypt-email) need_value "$1" $#; LE_EMAIL=$2; shift 2 ;;
+        --api-origin) need_value "$1" $#; API_ORIGIN=${2%/}; shift 2 ;;
         --reset-nginx) RESET_NGINX=1; shift ;;
         *) die "unknown argument: $1" ;;
     esac
@@ -40,6 +46,14 @@ readonly DOMAIN_RE='^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-
 
 [ "$(id -u)" -eq 0 ] || die "run this script as root (sudo)"
 [[ $FRONTEND_DOMAIN =~ $DOMAIN_RE ]] || die "--frontend-domain must be a host name such as game.example.com"
+# http:// only for test servers (deploy-to-vps.ps1 -AllowInsecureHttp).
+[[ $API_ORIGIN =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] \
+    || die "--api-origin must be an origin such as https://api.example.com"
+if [[ $API_ORIGIN == https://* ]]; then
+    API_WS_ORIGIN="wss://${API_ORIGIN#https://}"
+else
+    API_WS_ORIGIN="ws://${API_ORIGIN#http://}"
+fi
 if [ -n "$LE_EMAIL" ]; then
     [[ $LE_EMAIL =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || die "--letsencrypt-email is not an e-mail address"
 fi
@@ -80,6 +94,7 @@ if [ ! -f "$site_available" ] || [ "$RESET_NGINX" -eq 1 ]; then
     log "Writing nginx site $site_available"
     [ -f "$site_available" ] && cp -p "$site_available" "$site_available.bak"
     sed -e "s/__FRONTEND_DOMAIN__/$FRONTEND_DOMAIN/g" -e "s#__WEB_ROOT__#$WEB_ROOT#g" \
+        -e "s#__API_ORIGIN__#$API_ORIGIN#g" -e "s#__API_WS_ORIGIN__#$API_WS_ORIGIN#g" \
         "$SRC_DIR/deploy/nginx/mining-frontend.conf" >"$site_available"
     nginx_written=1
 else

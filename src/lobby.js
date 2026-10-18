@@ -33,6 +33,7 @@ import '@fontsource/space-grotesk/latin-700.css';
 import './lobby.css';
 import {
   STORAGE_KEYS,
+  clearPlayerTokens,
   getPlayerTokenStorageKey,
   getStorageItem,
   normalizeBaseUrl,
@@ -749,6 +750,8 @@ function clearAuthSessionData() {
   setStorageItem(STORAGE_KEYS.authUsername, '');
   setStorageItem(STORAGE_KEYS.authDisplayName, '');
   setStorageItem(STORAGE_KEYS.playerName, '');
+  // Player tokens of this person's rounds must not outlive the sign-in.
+  clearPlayerTokens();
   document.cookie = 'app-auth-session=; Max-Age=0; path=/; SameSite=Strict';
 }
 

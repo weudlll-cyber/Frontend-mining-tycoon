@@ -4,10 +4,9 @@ on:
   push:
   pull_request:
 
+# Read-only by default; only the PR comment job below may write.
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -368,6 +367,10 @@ jobs:
       - security_audit
       - ci-summary
     if: always() && github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Create or update PR results comment
         uses: actions/github-script@v9
@@ -448,4 +451,3 @@ jobs:
               issue_number: prNumber,
               body,
             });
-
