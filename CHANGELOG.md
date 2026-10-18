@@ -11,6 +11,13 @@ pre-1.0 playtest builds.
 
 ### Added
 
+- Bot opponents (backend `bots`): admin section 2 has "Bot opponents" (Easy,
+  Medium, Hard counts; sync rounds only; limit from `/meta`
+  `max_bots_per_round`) with a review row. Bots are always recognisable: a
+  **BOT** badge (level in the tooltip) next to their "Bot ..." names in the Top
+  5, the lobby's Last Game Highscores and Full results. Guide (English and
+  German) explains the levels.
+
 - Admin Game Settings: "Default favored season bonus" (`defaults.farming_favored_multiplier`,
   1-5); the round form takes its default from it. Older backends without the
   key keep ×2.

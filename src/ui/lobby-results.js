@@ -16,6 +16,7 @@ Security notes: every backend value (player names included) is rendered with
 */
 
 import { formatBackendScore } from '../utils/score-format.js';
+import { createBotBadge, isBotEntry } from './bot-badge.js';
 
 const SCORING_MODE_LABELS = Object.freeze({
   stockpile: 'Stockpile',
@@ -149,9 +150,11 @@ export function buildResultsList(payload, highlight = {}) {
       item.classList.add('is-own');
       item.setAttribute('aria-current', 'true');
     }
+    const nameEl = span('results-name', String(row?.player_name || 'Player'));
+    if (isBotEntry(row)) nameEl.append(' ', createBotBadge(row.bot_level));
     item.append(
       span('results-rank', `#${row?.rank ?? index + 1}`),
-      span('results-name', String(row?.player_name || 'Player')),
+      nameEl,
       span(
         'results-score',
         formatBackendScore(row?.score, payload?.scoring_mode)
@@ -190,6 +193,9 @@ export function buildServerLastGameSnapshot(payload) {
     leaderboard: rows.slice(0, 5).map((row, index) => ({
       rank: Number(row?.rank) || index + 1,
       name: String(row?.player_name || 'Player'),
+      ...(row?.is_bot === true
+        ? { is_bot: true, bot_level: row?.bot_level ?? null }
+        : {}),
       score: formatBackendScore(row?.score, payload?.scoring_mode, {
         grouping: false,
       }),

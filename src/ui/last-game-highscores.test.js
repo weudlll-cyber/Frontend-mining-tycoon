@@ -72,3 +72,30 @@ describe('last game snapshot score formatting', () => {
     expect(snapshot.leaderboard[0].score).toBe('1.5000×');
   });
 });
+
+describe('bot opponents in last game highscores', () => {
+  it('shows the BOT badge next to bot names', () => {
+    const snapshot = buildLastGameSnapshot({
+      data: {
+        scoring_mode: 'stockpile',
+        leaderboard_top_5: [
+          {
+            player_id: 1,
+            name: 'Bot Easy 1',
+            score: 3,
+            is_bot: true,
+            bot_level: 'easy',
+          },
+          { player_id: 2, name: 'Alice', score: 2 },
+        ],
+      },
+      gameId: '9',
+    });
+    renderLastGameHighscores(snapshot);
+    const names = document.querySelectorAll('.last-game-score-name');
+    expect(names[0].querySelector('.bot-badge').title).toBe(
+      'Bot opponent (Easy)'
+    );
+    expect(names[1].querySelector('.bot-badge')).toBeNull();
+  });
+});

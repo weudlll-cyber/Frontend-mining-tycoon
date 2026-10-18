@@ -180,6 +180,29 @@ Security notes:
         outline-offset: 2px;
       }
 
+      /* "Bot opponents" inputs (sync rounds, src/admin/bot-options.js). */
+      .bot-fields {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+      }
+
+      .bot-field-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.25rem;
+      }
+
+      .bot-field-row label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .bot-field-row input {
+        width: 4.5rem;
+      }
+
       /* Farming options greyed out while "Farming enabled" is unticked. */
       .farming-fields-off .form-group:not(:first-child) {
         opacity: 0.6;
@@ -621,6 +644,47 @@ Security notes:
             How long players can join before the round starts (limits come from
             Game Settings).
           </p>
+        </div>
+        <div class="form-group full-width">
+          <fieldset id="admin-bots-fields" class="bot-fields">
+            <legend>Bot opponents</legend>
+            <div class="bot-field-row">
+              <label for="admin-bots-easy"
+                >Easy
+                <input
+                  id="admin-bots-easy"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value="0"
+              /></label>
+              <label for="admin-bots-medium"
+                >Medium
+                <input
+                  id="admin-bots-medium"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value="0"
+              /></label>
+              <label for="admin-bots-hard"
+                >Hard
+                <input
+                  id="admin-bots-hard"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value="0"
+              /></label>
+            </div>
+            <p id="admin-bots-note" class="derived-note">
+              Bots play like real players and are always shown as "Bot …" with a
+              BOT badge. Up to 10 bots per round (sync rounds only).
+            </p>
+          </fieldset>
         </div>
         <div class="form-group">
           <label for="admin-duration-preset">Round Duration</label>

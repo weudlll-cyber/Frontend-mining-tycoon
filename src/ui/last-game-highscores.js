@@ -5,6 +5,7 @@ Purpose: Render the latest finished game's highscore snapshot in the player pane
 
 import { formatBackendScore } from '../utils/score-format.js';
 import { clearNode, setElementTextValue } from '../utils/dom-utils.js';
+import { createBotBadge, isBotEntry } from './bot-badge.js';
 
 let _summaryEl = null;
 let _listEl = null;
@@ -24,6 +25,10 @@ function normalizeLeaderboardRows(data) {
   return leaderboard.slice(0, 5).map((entry, index) => ({
     rank: index + 1,
     name: String(entry?.name || entry?.player_id || 'Unknown player'),
+    // Bot rows only, so the stored snapshot shape stays the same for players.
+    ...(entry?.is_bot === true
+      ? { is_bot: true, bot_level: entry?.bot_level ?? null }
+      : {}),
     score: formatBackendScore(entry?.score ?? 0, data?.scoring_mode, {
       grouping: false,
     }),
@@ -102,6 +107,7 @@ export function renderLastGameHighscores(snapshot = null) {
     score.className = 'last-game-score-value';
     score.textContent = entry.score;
 
+    if (isBotEntry(entry)) name.append(' ', createBotBadge(entry.bot_level));
     item.append(rank, name, score);
     list.appendChild(item);
   });

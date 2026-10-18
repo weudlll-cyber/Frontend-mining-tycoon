@@ -27,7 +27,13 @@ import {
   getDefaultTradeCount,
   computeTradeUnlockOffsetsSeconds,
 } from '../config/index.js';
-import { fetchMetaSnapshot } from '../meta/meta-manager.js';
+import { fetchMetaSnapshot, getGlobalMeta } from '../meta/meta-manager.js';
+import {
+  applyBotLimits,
+  bindBotInputs,
+  buildBotReviewRows,
+  collectBotPayload,
+} from './bot-options.js';
 import { initGameManagement, refreshGameList } from './game-management.js';
 import { initEconomySettings } from './economy-settings.js';
 import { initAdminMetrics } from './admin-metrics.js';
@@ -141,6 +147,7 @@ export function applyGameConfigToForm() {
 
   applyChatDefault(config);
   applyFarmingDefaults(config);
+  applyBotLimits(getGlobalMeta());
   // /meta also carries the global fee/spread used as override placeholders.
   refreshRateOverrideHints();
 
@@ -370,6 +377,7 @@ export function buildReviewSummary() {
   rows.push(...buildRoundOptionsReviewRows());
   // Farming's minimum duration must fit the round (sync) / session (async).
   rows.push(...buildFarmingReviewRows(resolveTradeWindowSeconds()));
+  rows.push(...buildBotReviewRows(roundType));
 
   return rows;
 }
@@ -463,6 +471,8 @@ export function buildGamePayload() {
   // Farming Stage 1 options; throws when enabled values are invalid or the
   // minimum duration is not shorter than the round/session.
   Object.assign(payload, collectFarmingPayload(resolveTradeWindowSeconds()));
+  // Bot opponents (sync rounds only); throws when the counts are invalid.
+  Object.assign(payload, collectBotPayload(roundType));
 
   return payload;
 }
@@ -664,6 +674,7 @@ export function init() {
   );
   el('admin-chat-enabled').addEventListener('change', updateReview);
   bindFarmingInputs(updateReview);
+  bindBotInputs(updateReview);
   bindScheduleInputs(_getSelectedRoundType, updateReview);
 
   el('admin-create-btn').addEventListener('click', createRound);
