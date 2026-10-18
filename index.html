@@ -63,7 +63,12 @@
                 required
               />
             </label>
-            <button id="open-forgot-password" class="inline-link" type="button">
+            <button
+              id="open-forgot-password"
+              class="inline-link"
+              type="button"
+              hidden
+            >
               Forgot password?
             </button>
             <button class="auth-button" type="submit">Sign in</button>
@@ -89,6 +94,25 @@
               <strong id="account-display-name"></strong>
               <span id="account-username" class="account-username"></span>
             </p>
+            <div id="email-verify-hint" class="email-verify-hint" hidden>
+              <p>
+                Your email address is not confirmed yet. Open the link we sent
+                you, so you can reset your password if you ever forget it.
+              </p>
+              <button
+                id="resend-verification-btn"
+                class="logout-btn"
+                type="button"
+              >
+                Send the link again
+              </button>
+              <p
+                id="email-verify-message"
+                class="message"
+                data-kind="info"
+                aria-live="polite"
+              ></p>
+            </div>
             <div class="auth-helpers">
               <button
                 id="open-results-dialog"
@@ -208,22 +232,18 @@
 
     <dialog id="forgot-password-dialog" aria-label="Forgot password form">
       <form id="forgot-password-form" class="dialog-form" method="dialog">
-        <h3>Reset password</h3>
-        <label class="auth-form-row" for="forgot-username">
-          <span>Username</span>
-          <input id="forgot-username" name="username" type="text" required />
-        </label>
-        <label class="auth-form-row" for="forgot-email">
-          <span>Email</span>
-          <input id="forgot-email" name="email" type="email" required />
-        </label>
-        <label class="auth-form-row" for="forgot-new-password">
-          <span>New password</span>
+        <h3>Forgot your password?</h3>
+        <p class="dialog-note">
+          Enter your username or email address. We will send a link to the email
+          address of your account; it is valid for 30 minutes.
+        </p>
+        <label class="auth-form-row" for="forgot-identifier">
+          <span>Username or email</span>
           <input
-            id="forgot-new-password"
-            name="newPassword"
-            type="password"
-            autocomplete="new-password"
+            id="forgot-identifier"
+            name="identifier"
+            type="text"
+            autocomplete="username"
             required
           />
         </label>
@@ -235,7 +255,47 @@
         ></p>
         <div class="dialog-actions">
           <button id="cancel-forgot-password" type="button">Cancel</button>
-          <button type="submit" class="auth-button">Reset</button>
+          <button type="submit" class="auth-button">Send link</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="reset-password-dialog" aria-label="Choose a new password">
+      <form id="reset-password-form" class="dialog-form" method="dialog">
+        <h3>Choose a new password</h3>
+        <p class="dialog-note">
+          At least 12 characters with upper and lower case, a digit and a
+          special character. All your sessions are signed out afterwards.
+        </p>
+        <label class="auth-form-row" for="reset-new-password">
+          <span>New password</span>
+          <input
+            id="reset-new-password"
+            name="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <label class="auth-form-row" for="reset-new-password-confirm">
+          <span>Repeat new password</span>
+          <input
+            id="reset-new-password-confirm"
+            name="newPasswordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <p
+          id="reset-password-message"
+          class="message"
+          data-kind="info"
+          aria-live="polite"
+        ></p>
+        <div class="dialog-actions">
+          <button id="cancel-reset-password" type="button">Cancel</button>
+          <button type="submit" class="auth-button">Save password</button>
         </div>
       </form>
     </dialog>

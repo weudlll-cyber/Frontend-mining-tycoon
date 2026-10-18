@@ -10,6 +10,15 @@ No versions have been released yet; `package.json` is still `0.0.0`.
 
 ### Added
 
+- Lobby password reset by email and email confirmation (backend email-link
+  flow): "Forgot password?" asks for the username or email and requests a
+  link; `?reset=<token>` opens "Choose a new password"; `?verify=<token>`
+  confirms the address; an unconfirmed account sees a note with "Send the link
+  again". Tokens are removed from the address bar at once. "Forgot password?"
+  only appears when the backend can send email (`/auth/email-capabilities`).
+  The guide (English and German) explains both; "Safer accounts" left the
+  roadmap.
+
 - Player board: 1-3 small dots under each upgrade name show that upgrade's
   profile in the current round (small steps, steady, big step), ranked by the
   per-level increment from the game's own meta; the name's tooltip gives the

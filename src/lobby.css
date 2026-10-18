@@ -301,6 +301,34 @@ summary:focus-visible,
   margin-top: 0.9rem;
 }
 
+/* "Email not confirmed" hint in the account panel (lobby-account-email.js). */
+.email-verify-hint {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(243, 180, 49, 0.45);
+  border-radius: 10px;
+  background: rgba(243, 180, 49, 0.08);
+  font-size: 0.85rem;
+}
+
+.email-verify-hint p {
+  margin: 0 0 0.5rem;
+  color: var(--lobby-text-soft);
+  line-height: 1.45;
+}
+
+.email-verify-hint .message {
+  margin: 0.4rem 0 0;
+  min-height: 0;
+}
+
+.dialog-note {
+  margin: 0 0 0.6rem;
+  color: var(--lobby-text-soft);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 /* Account data-protection row (download / delete), below the account
    buttons so the main row stays short. */
 .account-data-actions {

@@ -12,7 +12,13 @@ vi.mock('./services/auth-client.js', () => ({
   login: vi.fn(),
   logout: vi.fn(),
   register: vi.fn(),
-  resetPassword: vi.fn(),
+  fetchEmailCapabilities: vi
+    .fn()
+    .mockResolvedValue({ passwordReset: true, emailVerification: true }),
+  requestPasswordReset: vi.fn(),
+  confirmPasswordReset: vi.fn(),
+  verifyEmail: vi.fn(),
+  resendVerificationEmail: vi.fn(),
   changePassword: vi.fn(),
   deleteMyAccount: vi.fn(),
   exportMyAccountData: vi.fn(),
@@ -382,77 +388,183 @@ describe('lobby stored-session validation', () => {
 });
 
 describe('lobby forgot-password dialog', () => {
-  async function bootAndSubmitForgotForm(resetImpl) {
+  async function bootAndSubmitForgotForm(requestImpl) {
     const authClient = await import('./services/auth-client.js');
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    resetImpl(vi.mocked(authClient.resetPassword));
+    await flushPromises();
+    requestImpl(vi.mocked(authClient.requestPasswordReset));
 
     const form = document.getElementById('forgot-password-form');
-    form.querySelector('#forgot-username').value = 'alice';
-    form.querySelector('#forgot-email').value = 'a@example.com';
-    form.querySelector('#forgot-new-password').value = 'NewPassword123!';
+    form.querySelector('#forgot-identifier').value = 'alice';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     await flushPromises();
+    return authClient;
   }
 
-  it('shows the server message when reset is disabled (403)', async () => {
-    await bootAndSubmitForgotForm((mock) =>
-      mock.mockRejectedValue(
-        Object.assign(
-          new Error(
-            'Password reset is not available. Please contact an administrator.'
-          ),
-          { status: 403, code: 'PASSWORD_RESET_DISABLED' }
-        )
-      )
+  it('shows "Forgot password?" only when the server can send email', async () => {
+    const authClient = await import('./services/auth-client.js');
+    // WHY: earlier tests' lobby instances also react to DOMContentLoaded, so
+    // use a persistent value (not ...Once) and restore it afterwards.
+    vi.mocked(authClient.fetchEmailCapabilities).mockResolvedValue({
+      passwordReset: false,
+      emailVerification: false,
+    });
+    try {
+      await import('./lobby.js');
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      await flushPromises();
+      expect(document.getElementById('open-forgot-password').hidden).toBe(true);
+    } finally {
+      vi.mocked(authClient.fetchEmailCapabilities).mockResolvedValue({
+        passwordReset: true,
+        emailVerification: true,
+      });
+    }
+  });
+
+  it('sends the identifier and shows the generic answer', async () => {
+    const dialog = document.getElementById('forgot-password-dialog');
+    dialog.close = vi.fn();
+    const authClient = await bootAndSubmitForgotForm((mock) =>
+      mock.mockResolvedValue({ message: 'If an account exists, we sent it.' })
     );
 
+    expect(document.getElementById('open-forgot-password').hidden).toBe(false);
+    expect(vi.mocked(authClient.requestPasswordReset)).toHaveBeenCalledWith(
+      expect.any(String),
+      { identifier: 'alice' }
+    );
+    expect(dialog.close).toHaveBeenCalled();
+    expect(document.getElementById('auth-message').textContent).toBe(
+      'If an account exists, we sent it.'
+    );
+  });
+
+  it('shows the disabled-reset guidance on 403 and other errors in the dialog', async () => {
+    const authClient = await bootAndSubmitForgotForm((mock) =>
+      mock.mockRejectedValue(
+        Object.assign(new Error('Request failed (403)'), { status: 403 })
+      )
+    );
     const message = document.getElementById('forgot-password-message');
     expect(message.textContent).toBe(
       'Password reset is not available. Please contact an administrator.'
     );
     expect(message.dataset.kind).toBe('error');
-  });
 
-  it('falls back to the disabled-reset guidance when a 403 has no message', async () => {
-    await bootAndSubmitForgotForm((mock) =>
-      mock.mockRejectedValue(
-        Object.assign(new Error('Request failed (403)'), { status: 403 })
-      )
+    vi.mocked(authClient.requestPasswordReset).mockRejectedValue(
+      Object.assign(new Error('Too many attempts'), { status: 429 })
     );
-
-    expect(document.getElementById('forgot-password-message').textContent).toBe(
-      'Password reset is not available. Please contact an administrator.'
-    );
+    document
+      .getElementById('forgot-password-form')
+      .dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+    expect(message.textContent).toBe('Too many attempts');
   });
+});
 
-  it('still completes the reset when the backend allows it (dev flag)', async () => {
-    const dialog = document.getElementById('forgot-password-dialog');
+describe('lobby email links', () => {
+  it('opens the new-password dialog for ?reset= and clears the token from the URL', async () => {
+    window.history.replaceState(null, '', '/?reset=secret-token');
+    const dialog = document.getElementById('reset-password-dialog');
+    dialog.showModal = vi.fn();
     dialog.close = vi.fn();
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.confirmPasswordReset).mockResolvedValue({
+      message: 'Your password has been changed.',
+    });
 
-    await bootAndSubmitForgotForm((mock) =>
-      mock.mockResolvedValue({ message: 'Password reset successfully' })
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    expect(window.location.search).toBe('');
+    expect(dialog.showModal).toHaveBeenCalled();
+
+    document.getElementById('reset-new-password').value = 'NewPassword123!';
+    document.getElementById('reset-new-password-confirm').value = 'Different1!';
+    const form = document.getElementById('reset-password-form');
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+    expect(document.getElementById('reset-password-message').textContent).toBe(
+      'The two passwords do not match.'
     );
+    expect(vi.mocked(authClient.confirmPasswordReset)).not.toHaveBeenCalled();
 
+    document.getElementById('reset-new-password-confirm').value =
+      'NewPassword123!';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+    expect(vi.mocked(authClient.confirmPasswordReset)).toHaveBeenCalledWith(
+      expect.any(String),
+      { token: 'secret-token', newPassword: 'NewPassword123!' }
+    );
     expect(dialog.close).toHaveBeenCalled();
-    expect(document.getElementById('auth-message').textContent).toContain(
-      'Password reset succeeded'
-    );
-    expect(document.getElementById('forgot-password-message').textContent).toBe(
-      ''
+    expect(document.getElementById('auth-message').textContent).toBe(
+      'Your password has been changed.'
     );
   });
 
-  it('shows other reset errors inside the dialog', async () => {
-    await bootAndSubmitForgotForm((mock) =>
-      mock.mockRejectedValue(
-        Object.assign(new Error('User not found'), { status: 404 })
-      )
+  it('keeps the dialog open with the server message for a bad reset link', async () => {
+    window.history.replaceState(null, '', '/?reset=old-token');
+    const dialog = document.getElementById('reset-password-dialog');
+    dialog.showModal = vi.fn();
+    dialog.close = vi.fn();
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.confirmPasswordReset).mockRejectedValue(
+      Object.assign(new Error('This link is invalid or has expired.'), {
+        status: 400,
+      })
     );
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
 
-    expect(document.getElementById('forgot-password-message').textContent).toBe(
-      'User not found'
+    document.getElementById('reset-new-password').value = 'NewPassword123!';
+    document.getElementById('reset-new-password-confirm').value =
+      'NewPassword123!';
+    document
+      .getElementById('reset-password-form')
+      .dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+    expect(dialog.close).not.toHaveBeenCalled();
+    expect(document.getElementById('reset-password-message').textContent).toBe(
+      'This link is invalid or has expired.'
+    );
+  });
+
+  it('shows the "not confirmed" hint after sign-in and resends the link', async () => {
+    const authClient = await import('./services/auth-client.js');
+    vi.mocked(authClient.login).mockResolvedValue({
+      session_token: 'tok-1',
+      user: { username: 'alice', display_name: 'Alice', email_verified: false },
+    });
+    vi.mocked(authClient.resendVerificationEmail).mockResolvedValue({
+      message: 'We have sent a new confirmation link to alice@example.com.',
+    });
+    await import('./lobby.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushPromises();
+
+    const hint = document.getElementById('email-verify-hint');
+    expect(hint.hidden).toBe(true);
+    document.getElementById('login-username').value = 'alice';
+    document.getElementById('login-password').value = 'StrongPass!123';
+    document
+      .getElementById('login-form')
+      .dispatchEvent(new Event('submit', { cancelable: true }));
+    await flushPromises();
+    expect(hint.hidden).toBe(false);
+
+    document.getElementById('resend-verification-btn').click();
+    await flushPromises();
+    expect(vi.mocked(authClient.resendVerificationEmail)).toHaveBeenCalledWith(
+      expect.any(String),
+      { authToken: 'tok-1' }
+    );
+    expect(document.getElementById('email-verify-message').textContent).toBe(
+      'We have sent a new confirmation link to alice@example.com.'
     );
   });
 });

@@ -11,7 +11,11 @@ import {
   login,
   logout,
   register,
-  resetPassword,
+  confirmPasswordReset,
+  fetchEmailCapabilities,
+  requestPasswordReset,
+  resendVerificationEmail,
+  verifyEmail,
 } from './auth-client.js';
 
 describe('auth-client', () => {
@@ -128,22 +132,89 @@ describe('auth-client', () => {
     expect(options.headers.Authorization).toBe('Bearer jwt-1');
   });
 
-  it('posts forgot-password payload', async () => {
+  it('requests a reset link with the username or email', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      status: 200,
-      json: async () => ({ ok: true }),
+      status: 202,
+      json: async () => ({ message: 'sent' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await resetPassword('http://127.0.0.1:8000', {
-      username: 'alice',
-      email: 'a@example.com',
-      newPassword: 'new-secret',
+    await requestPasswordReset('http://127.0.0.1:8000', {
+      identifier: '  alice  ',
     });
 
-    const [, options] = fetchMock.mock.calls[0];
-    expect(options.body).toContain('new_password');
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/auth/password-reset/request');
+    expect(JSON.parse(options.body)).toEqual({ identifier: 'alice' });
+  });
+
+  it('confirms a reset, verifies an email and resends the link', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'ok' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const base = 'http://127.0.0.1:8000';
+
+    await confirmPasswordReset(base, { token: 'tok', newPassword: 'P' });
+    await verifyEmail(base, { token: 'vtok' });
+    await resendVerificationEmail(base, { authToken: 'jwt-9' });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${base}/auth/password-reset/confirm`
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      token: 'tok',
+      new_password: 'P',
+    });
+    expect(fetchMock.mock.calls[1][0]).toBe(`${base}/auth/verify-email`);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      token: 'vtok',
+    });
+    expect(fetchMock.mock.calls[2][0]).toBe(`${base}/auth/verify-email/resend`);
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe(
+      'Bearer jwt-9'
+    );
+  });
+
+  it('reads email capabilities and treats a missing endpoint as none', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ password_reset: true, email_verification: true }),
+      })
+    );
+    await expect(
+      fetchEmailCapabilities('http://127.0.0.1:8000')
+    ).resolves.toEqual({ passwordReset: true, emailVerification: true });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not Found' }),
+      })
+    );
+    await expect(
+      fetchEmailCapabilities('http://127.0.0.1:8000')
+    ).resolves.toEqual({ passwordReset: false, emailVerification: false });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ detail: 'boom' }),
+      })
+    );
+    await expect(
+      fetchEmailCapabilities('http://127.0.0.1:8000')
+    ).rejects.toMatchObject({ status: 500 });
   });
 
   it('posts logout payload with authorization header', async () => {
@@ -217,11 +288,7 @@ describe('auth-client', () => {
     );
 
     await expect(
-      resetPassword('http://127.0.0.1:8000', {
-        username: 'alice',
-        email: 'a@example.com',
-        newPassword: 'x',
-      })
+      requestPasswordReset('http://127.0.0.1:8000', { identifier: 'alice' })
     ).rejects.toMatchObject({
       status: 403,
       code: 'PASSWORD_RESET_DISABLED',
@@ -314,11 +381,7 @@ describe('auth-client contract errors', () => {
     );
 
     await expect(
-      resetPassword('http://127.0.0.1:8000', {
-        username: 'alice',
-        email: 'a@example.com',
-        newPassword: 'x',
-      })
+      requestPasswordReset('http://127.0.0.1:8000', { identifier: 'alice' })
     ).rejects.toMatchObject({
       status: 403,
       code: 'PASSWORD_RESET_DISABLED',
