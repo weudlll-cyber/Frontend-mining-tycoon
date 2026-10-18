@@ -484,6 +484,7 @@ describe('editing and saving', () => {
         farming_enabled: false,
         farming_min_duration_seconds: 300,
         farming_reward_rate: 0.05,
+        farming_favored_multiplier: 2,
       },
       farming_min_duration_limits: { min_seconds: 10, max_seconds: 604800 },
       farming_reward_rate_limits: { min: 0.0001, max: 1 },
@@ -531,6 +532,34 @@ describe('farming settings (Stage 1)', () => {
       defaults: { farming_enabled: false, farming_reward_rate: 0.07 },
       farming_reward_rate_limits: { min: 0.01, max: 0.6 },
     });
+  });
+
+  it('renders and saves the favored season bonus default', async () => {
+    const fetchMock = await loadWith(
+      documentFor({
+        ...FARMING_CONFIG,
+        defaults: { ...FARMING_CONFIG.defaults, farming_favored_multiplier: 3 },
+      })
+    );
+    expect($('default-farming-favored').value).toBe('3');
+    $('default-farming-favored').value = '1.5';
+    fetchMock.mockResolvedValueOnce(okResponse(documentFor(FARMING_CONFIG, 2)));
+    $('save-btn').click();
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      defaults: { farming_favored_multiplier: 1.5 },
+    });
+  });
+
+  it('rejects a favored season bonus outside 1-5', async () => {
+    const fetchMock = await loadWith(documentFor(FARMING_CONFIG));
+    $('default-farming-favored').value = '7';
+    $('save-btn').click();
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(resultText()).toContain(
+      'Default favored season bonus must be between 1 and 5.'
+    );
   });
 
   it('rejects farming values outside their limits before saving', async () => {

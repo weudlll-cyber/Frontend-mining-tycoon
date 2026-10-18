@@ -3,7 +3,8 @@
  * Purpose: Farming editors of the admin "Game Settings" section (admin.html,
  *          section 11): create-form defaults (`defaults.farming_enabled`,
  *          `defaults.farming_min_duration_seconds`,
- *          `defaults.farming_reward_rate`) and the limits
+ *          `defaults.farming_reward_rate`,
+ *          `defaults.farming_favored_multiplier`) and the limits
  *          (`farming_min_duration_limits`, `farming_reward_rate_limits`).
  * Role in system: Helper of src/admin/game-config-settings.js (render, read,
  *          validate and diff), kept separate so that module stays focused.
@@ -23,6 +24,7 @@ const IDS = Object.freeze({
   enabled: `${PREFIX}-default-farming-enabled`,
   minDuration: `${PREFIX}-default-farming-min-duration`,
   reward: `${PREFIX}-default-farming-reward`,
+  favored: `${PREFIX}-default-farming-favored`,
   durationMin: `${PREFIX}-farming-duration-min`,
   durationMax: `${PREFIX}-farming-duration-max`,
   rewardMin: `${PREFIX}-farming-reward-min`,
@@ -33,6 +35,7 @@ const DEFAULT_KEYS = Object.freeze([
   'farming_enabled',
   'farming_min_duration_seconds',
   'farming_reward_rate',
+  'farming_favored_multiplier',
 ]);
 
 const LIMIT_KEYS = Object.freeze([
@@ -76,6 +79,9 @@ export function renderFarmingConfig(config) {
     config.defaults.farming_min_duration_seconds
   );
   el(IDS.reward).value = rateToPercentText(config.defaults.farming_reward_rate);
+  if (el(IDS.favored)) {
+    el(IDS.favored).value = String(config.defaults.farming_favored_multiplier);
+  }
   el(IDS.durationMin).value = String(
     config.farming_min_duration_limits.min_seconds
   );
@@ -112,6 +118,16 @@ export function readFarmingConfigDraft(errors) {
         errors,
         { percent: true }
       ),
+      ...(el(IDS.favored)
+        ? {
+            farming_favored_multiplier: readNumber(
+              IDS.favored,
+              'Default favored season bonus',
+              errors,
+              {}
+            ),
+          }
+        : {}),
     },
     farming_min_duration_limits: {
       min_seconds: readNumber(
@@ -170,6 +186,10 @@ export function validateFarmingConfig(config) {
     errors.push(
       'Default farming reward must be within the farming reward limits.'
     );
+  }
+  const favored = config.defaults?.farming_favored_multiplier;
+  if (favored !== undefined && (favored < 1 || favored > 5)) {
+    errors.push('Default favored season bonus must be between 1 and 5.');
   }
   return errors;
 }

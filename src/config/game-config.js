@@ -58,6 +58,9 @@ import {
 } from './trading-control-data.js';
 import { getGlobalMeta } from '../meta/meta-manager.js';
 
+// Farming Stage 2 default when the backend config has no value (backend seed).
+export const FARMING_FAVORED_MULTIPLIER_DEFAULT = 2;
+
 // Round type strings accepted by the create-game API (`round_type`).
 export const ROUND_TYPE_VALUES = Object.freeze([
   'synchronous',
@@ -92,6 +95,7 @@ export function buildFallbackGameConfig() {
       farming_enabled: FARMING_DEFAULTS.enabled,
       farming_min_duration_seconds: FARMING_DEFAULTS.min_duration_seconds,
       farming_reward_rate: FARMING_DEFAULTS.reward_rate,
+      farming_favored_multiplier: FARMING_FAVORED_MULTIPLIER_DEFAULT,
     },
     duration_limits: {
       min_seconds: ROUND_DURATION_LIMITS.min,
@@ -270,6 +274,12 @@ function normalizeDefaults(raw, fallback, config) {
       source.farming_reward_rate > 0
         ? source.farming_reward_rate
         : fallback.farming_reward_rate,
+    // Farming Stage 2 bonus (1-5); older backends without it use 2.
+    farming_favored_multiplier:
+      isFiniteNumber(source.farming_favored_multiplier) &&
+      source.farming_favored_multiplier >= 1
+        ? source.farming_favored_multiplier
+        : fallback.farming_favored_multiplier,
   };
 }
 
