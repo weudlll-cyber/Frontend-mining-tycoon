@@ -38,6 +38,10 @@ pre-1.0 playtest builds.
   `/games/active` items, the `token`/`session_token`/`login` auth keys, the
   404 path of `/auth/email-capabilities` and the aggregated `upgrade_levels`.
   Defensive handling of missing or malformed data stays.
+- `initTradingPanel` (about 480 lines of closures) is split into module-level
+  functions with an explicit panel state object; the lobby account forms
+  (login, register, change password, logout) moved from `src/lobby.js` to
+  `src/ui/lobby-auth-forms.js`. Behaviour is unchanged.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

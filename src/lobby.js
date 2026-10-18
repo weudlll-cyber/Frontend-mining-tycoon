@@ -1,6 +1,7 @@
 /**
 File: src/lobby.js
-Purpose: Lobby page (index.html): register / login / logout / change password,
+Purpose: Lobby page (index.html): session state (the register / login /
+  logout / change password forms live in src/ui/lobby-auth-forms.js),
   account data download and account deletion, the open-games list with join and rejoin, "My results" (account history and
   full final leaderboards) and the "Last Game Highscores" panel.
 Role in system: entry point before the player board. Stores the backend URL,
@@ -42,19 +43,15 @@ import {
 import { DEFAULT_BACKEND_URL } from './config/backend-url.js';
 import { toPlayerName } from './utils/player-name.js';
 import {
-  changePassword,
   fetchCurrentUser,
   fetchGameResults,
   fetchMyHistory,
   fetchOpenGames,
   joinGame,
-  login,
-  logout,
-  register,
 } from './services/auth-client.js';
 import { readGameStatus } from './ui/lobby-games.js';
+import { initLobbyAuthForms } from './ui/lobby-auth-forms.js';
 import {
-  getEmailCapabilities,
   handleEmailLinkFromQuery,
   initAccountEmail,
   loadEmailCapabilities,
@@ -106,26 +103,9 @@ const accountPanelEl = document.getElementById('account-panel');
 const accountDisplayNameEl = document.getElementById('account-display-name');
 const accountUsernameEl = document.getElementById('account-username');
 const brandSubtitleEl = document.querySelector('.brand-subtitle');
-const registerForm = document.getElementById('register-form');
-const registerMessageEl = document.getElementById('register-message');
-const registerUsernameInput = document.getElementById('register-username');
-const registerDisplayNameInput = document.getElementById(
-  'register-display-name'
-);
-const registerDialog = document.getElementById('register-dialog');
-const openRegisterBtn = document.getElementById('open-register-dialog');
-const logoutBtn = document.getElementById('logout-btn');
-const cancelRegisterBtn = document.getElementById('cancel-register-dialog');
-const changePasswordDialog = document.getElementById('change-password-dialog');
-const openChangePasswordBtn = document.getElementById('open-change-password');
-const cancelChangePasswordBtn = document.getElementById(
-  'cancel-change-password'
-);
-const changePasswordForm = document.getElementById('change-password-form');
-const changePasswordMessageEl = document.getElementById(
-  'change-password-message'
-);
 const openResultsBtn = document.getElementById('open-results-dialog');
+const logoutBtn = document.getElementById('logout-btn');
+const openChangePasswordBtn = document.getElementById('open-change-password');
 const lastGameSummaryEl = document.getElementById('last-game-summary');
 const lastGameHighscoresEl = document.getElementById('last-game-highscores');
 const adminSetupLinkEl = document.getElementById('admin-setup-link');
@@ -139,7 +119,6 @@ let selectedGameIsMine = false;
 // round that cannot be joined yet; null otherwise.
 let selectedGameOpensAt = null;
 let lastDueRefreshMs = 0;
-let displayNameUserEdited = false;
 let authState = {
   isAuthenticated: false,
   token: '',
@@ -158,18 +137,6 @@ function setLobbyMessage(message, kind = 'info') {
   if (!lobbyMessageEl) return;
   lobbyMessageEl.textContent = message;
   lobbyMessageEl.dataset.kind = kind;
-}
-
-function setRegisterMessage(message, kind = 'info') {
-  if (!registerMessageEl) return;
-  registerMessageEl.textContent = message;
-  registerMessageEl.dataset.kind = kind;
-}
-
-function setChangePasswordMessage(message, kind = 'info') {
-  if (!changePasswordMessageEl) return;
-  changePasswordMessageEl.textContent = message;
-  changePasswordMessageEl.dataset.kind = kind;
 }
 
 function getBackendUrlOrThrow() {
@@ -573,175 +540,6 @@ function handleJoinError(error) {
   updateJoinButtonState();
 }
 
-async function handleLoginSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(loginForm);
-
-  let baseUrl;
-  try {
-    baseUrl = getBackendUrlOrThrow();
-  } catch (error) {
-    setAuthMessage(error.message, 'error');
-    return;
-  }
-
-  try {
-    const payload = await login(baseUrl, {
-      username: formData.get('username'),
-      password: formData.get('password'),
-    });
-    setAuthenticatedSession(payload);
-    if (!authState.isAuthenticated) {
-      throw new Error('Login response did not include an access token.');
-    }
-    setAuthMessage(
-      'Login successful. Please select a game from the open list.',
-      'success'
-    );
-    // Re-list games with the token so the account's games show "Rejoin".
-    void refreshOpenGames();
-    void preferServerLastGame(authState.token);
-  } catch (error) {
-    setAuthMessage(error.message, 'error');
-  }
-}
-
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validatePasswordClient(password) {
-  if (password.length < 12) return 'Password must be at least 12 characters.';
-  if (!/[A-Z]/.test(password))
-    return 'Password must contain at least one uppercase letter.';
-  if (!/[a-z]/.test(password))
-    return 'Password must contain at least one lowercase letter.';
-  if (!/[0-9]/.test(password))
-    return 'Password must contain at least one digit.';
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password))
-    return 'Password must contain at least one special character (e.g. !@#$)';
-  return null;
-}
-
-async function handleRegisterSubmit(event) {
-  event.preventDefault();
-  setRegisterMessage('', 'info');
-  const formData = new FormData(registerForm);
-
-  const emailVal = String(formData.get('email') || '').trim();
-  if (!validateEmail(emailVal)) {
-    setRegisterMessage('Please enter a valid email address.', 'error');
-    return;
-  }
-
-  const password = String(formData.get('password') || '');
-  const passwordConfirm = String(formData.get('passwordConfirm') || '');
-
-  const pwError = validatePasswordClient(password);
-  if (pwError) {
-    setRegisterMessage(pwError, 'error');
-    return;
-  }
-
-  if (password !== passwordConfirm) {
-    setRegisterMessage('Password confirmation does not match.', 'error');
-    return;
-  }
-
-  let baseUrl;
-  try {
-    baseUrl = getBackendUrlOrThrow();
-  } catch (error) {
-    setRegisterMessage(error.message, 'error');
-    return;
-  }
-
-  try {
-    await register(baseUrl, {
-      username: formData.get('username'),
-      email: formData.get('email'),
-      password,
-      displayName: formData.get('displayName'),
-      discord: formData.get('discord'),
-      telegram: formData.get('telegram'),
-    });
-    setAuthMessage(
-      getEmailCapabilities().emailVerification
-        ? 'Registration successful. You can sign in now. We have sent you an email to confirm your address.'
-        : 'Registration successful. You can sign in now.',
-      'success'
-    );
-    registerDialog?.close();
-    registerForm?.reset();
-    setRegisterMessage('', 'info');
-  } catch (error) {
-    setRegisterMessage(error.message, 'error');
-  }
-}
-
-async function handleChangePasswordSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(changePasswordForm);
-  const currentPassword = String(formData.get('currentPassword') || '');
-  const newPassword = String(formData.get('newPassword') || '');
-  const newPasswordConfirm = String(formData.get('newPasswordConfirm') || '');
-
-  if (!authState.isAuthenticated) {
-    setChangePasswordMessage('Please sign in first.', 'error');
-    return;
-  }
-  // WHY: only the confirmation match is checked locally; password strength
-  // rules are owned by the backend and its 400/422 message is shown verbatim.
-  if (newPassword !== newPasswordConfirm) {
-    setChangePasswordMessage(
-      'New password confirmation does not match.',
-      'error'
-    );
-    return;
-  }
-
-  let baseUrl;
-  try {
-    baseUrl = getBackendUrlOrThrow();
-  } catch (error) {
-    setChangePasswordMessage(error.message, 'error');
-    return;
-  }
-
-  setChangePasswordMessage('Changing password...', 'info');
-  try {
-    await changePassword(baseUrl, {
-      authToken: authState.token,
-      currentPassword,
-      newPassword,
-    });
-  } catch (error) {
-    if (error?.status === 401) {
-      changePasswordDialog?.close();
-      expireStoredSession();
-      return;
-    }
-    setChangePasswordMessage(
-      error?.message || 'Password change failed.',
-      'error'
-    );
-    return;
-  }
-
-  // WHY: the backend revokes every session of the account after a password
-  // change, so the stored token is dead; clear it and ask for a fresh sign-in.
-  changePasswordForm?.reset();
-  setChangePasswordMessage('', 'info');
-  changePasswordDialog?.close();
-  clearAuthSessionData();
-  resetSelection();
-  setAuthenticatedSession({ access_token: '' });
-  setAuthMessage(
-    'Password changed. Please sign in again with your new password.',
-    'success'
-  );
-}
-
 function clearAuthSessionData() {
   // Account-bound views fall back to the local, device-only data.
   resetLobbyResults();
@@ -753,52 +551,6 @@ function clearAuthSessionData() {
   // Player tokens of this person's rounds must not outlive the sign-in.
   clearPlayerTokens();
   document.cookie = 'app-auth-session=; Max-Age=0; path=/; SameSite=Strict';
-}
-
-async function handleLogoutClick() {
-  const confirmed = window.confirm('Do you really want to log out?');
-  if (!confirmed) {
-    return;
-  }
-
-  const authToken = String(authState.token || '').trim();
-  if (!authToken) {
-    clearAuthSessionData();
-    resetSelection();
-    setAuthenticatedSession({ access_token: '' });
-    setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
-    setLobbyMessage(
-      'You are logged out. Open games keep auto-refreshing.',
-      'info'
-    );
-    return;
-  }
-
-  let baseUrl;
-  try {
-    baseUrl = getBackendUrlOrThrow();
-  } catch {
-    baseUrl = DEFAULT_BACKEND_URL;
-  }
-
-  logoutBtn.disabled = true;
-  setAuthMessage('Logging out...', 'info');
-
-  try {
-    await logout(baseUrl, { authToken });
-  } catch {
-    // Continue local logout even if backend is unavailable to avoid trapping user state.
-  }
-
-  clearAuthSessionData();
-  resetSelection();
-  setAuthenticatedSession({ access_token: '' });
-  if (openGamesListEl) markSelectedRow(openGamesListEl, null);
-  setAuthMessage('Logged out successfully. Sign in to continue.', 'success');
-  setLobbyMessage(
-    'You are logged out. Open games keep auto-refreshing.',
-    'info'
-  );
 }
 
 function startLobbyRefreshLoop() {
@@ -941,63 +693,37 @@ function openResultsFromQuery() {
   });
 }
 
+/** Drop the stored session and the game selection (logout, password change). */
+function clearSessionLocally() {
+  clearAuthSessionData();
+  resetSelection();
+  setAuthenticatedSession({ access_token: '' });
+}
+
 function bindEvents() {
-  loginForm?.addEventListener('submit', (event) => {
-    void handleLoginSubmit(event);
-  });
-  registerForm?.addEventListener('submit', (event) => {
-    void handleRegisterSubmit(event);
-  });
-  openRegisterBtn?.addEventListener('click', () => {
-    displayNameUserEdited = false;
-    setRegisterMessage('Create your account details below.', 'info');
-    registerDialog?.showModal();
-  });
-  cancelRegisterBtn?.addEventListener('click', () => {
-    registerDialog?.close();
-  });
-  registerDisplayNameInput?.addEventListener('input', () => {
-    displayNameUserEdited = true;
-  });
-  registerUsernameInput?.addEventListener('input', () => {
-    if (!registerDisplayNameInput) return;
-    if (!displayNameUserEdited) {
-      registerDisplayNameInput.value = String(
-        registerUsernameInput.value || ''
-      ).trim();
-    }
-  });
-  registerUsernameInput?.addEventListener('blur', () => {
-    if (!registerDisplayNameInput) return;
-    if (
-      !displayNameUserEdited &&
-      !String(registerDisplayNameInput.value || '').trim()
-    ) {
-      registerDisplayNameInput.value = String(
-        registerUsernameInput.value || ''
-      ).trim();
-    }
+  initLobbyAuthForms({
+    getBackendUrl: getBackendUrlOrThrow,
+    getAuthState: () => authState,
+    applySession: setAuthenticatedSession,
+    setAuthMessage,
+    setLobbyMessage,
+    onSignedIn(token) {
+      // Re-list games with the token so the account's games show "Rejoin".
+      void refreshOpenGames();
+      void preferServerLastGame(token);
+    },
+    onSessionExpired: expireStoredSession,
+    clearSessionLocally,
+    onLoggedOut() {
+      if (openGamesListEl) markSelectedRow(openGamesListEl, null);
+    },
   });
   if (openGamesListEl) bindLobbyGameListKeyboard(openGamesListEl);
   joinSelectedBtn?.addEventListener('click', () => {
     void handleJoinSelectedGame();
   });
-  logoutBtn?.addEventListener('click', () => {
-    void handleLogoutClick();
-  });
   openResultsBtn?.addEventListener('click', () => {
     void openMyResults();
-  });
-  openChangePasswordBtn?.addEventListener('click', () => {
-    changePasswordForm?.reset();
-    setChangePasswordMessage('', 'info');
-    changePasswordDialog?.showModal();
-  });
-  cancelChangePasswordBtn?.addEventListener('click', () => {
-    changePasswordDialog?.close();
-  });
-  changePasswordForm?.addEventListener('submit', (event) => {
-    void handleChangePasswordSubmit(event);
   });
 
   // Keep lobby state fresh when users return from player view or a crashed tab.
