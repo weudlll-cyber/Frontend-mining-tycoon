@@ -44,7 +44,7 @@ describe('Content-Security-Policy readiness', () => {
 
   it.each(pages)('%s has no inline <script>', (page) => {
     const html = fs.readFileSync(path.resolve(process.cwd(), page), 'utf8');
-    const scripts = html.match(/<script\b[^>]*>/g) || [];
+    const scripts = html.match(/<script\b[^>]*>/gi) || [];
     scripts.forEach((tag) => expect(tag).toMatch(/\bsrc=/));
   });
 
