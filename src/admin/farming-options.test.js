@@ -65,6 +65,12 @@ describe('applyFarmingDefaults', () => {
     expect($('note').textContent).toContain('10s to 7d');
   });
 
+  it('takes the favored season bonus default from the game config', () => {
+    expect($('favored').value).toBe('2');
+    applyFarmingDefaults(configWith({ farming_favored_multiplier: 3 }));
+    expect($('favored').value).toBe('3');
+  });
+
   it('applies backend defaults and limits', () => {
     applyFarmingDefaults(
       configWith(

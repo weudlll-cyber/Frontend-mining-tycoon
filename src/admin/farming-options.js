@@ -124,6 +124,12 @@ export function applyFarmingDefaults(config) {
     reward.min = formatRateAsPercent(current.rewardLimits.min) ?? '';
     reward.max = formatRateAsPercent(current.rewardLimits.max) ?? '';
   }
+  const favored = el(IDS.favored);
+  if (favored) {
+    favored.value = String(
+      defaults.farming_favored_multiplier ?? FAVORED_LIMITS.fallback
+    );
+  }
   const note = el(IDS.note);
   if (note) {
     const { min_seconds: minS, max_seconds: maxS } = current.durationLimits;

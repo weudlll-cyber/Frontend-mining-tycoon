@@ -44,6 +44,7 @@ const BACKEND_CONFIG = {
     farming_enabled: true,
     farming_min_duration_seconds: 120,
     farming_reward_rate: 0.1,
+    farming_favored_multiplier: 3,
   },
   duration_limits: { min_seconds: 30, max_seconds: 7200 },
   enrollment_window_limits: { min_seconds: 15, max_seconds: 60 },
@@ -94,6 +95,7 @@ describe('effective config resolution', () => {
       farming_enabled: false,
       farming_min_duration_seconds: 300,
       farming_reward_rate: 0.05,
+      farming_favored_multiplier: 2,
     });
     expect(config.farming_min_duration_limits).toEqual({
       min_seconds: 10,
@@ -193,6 +195,7 @@ describe('normalizeGameConfig', () => {
       farming_enabled: false,
       farming_min_duration_seconds: 300,
       farming_reward_rate: 0.05,
+      farming_favored_multiplier: 2,
     });
     // A non-boolean chat default falls back to "chat on" (today's behavior).
     expect(

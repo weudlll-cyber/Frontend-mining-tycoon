@@ -11,6 +11,10 @@ pre-1.0 playtest builds.
 
 ### Added
 
+- Admin Game Settings: "Default favored season bonus" (`defaults.farming_favored_multiplier`,
+  1-5); the round form takes its default from it. Older backends without the
+  key keep ×2.
+
 - Farming Stage 2 on the board (backend "the favored season pays more"): the
   Farm tab names the favored season token, marks its row ("×2 now"), counts
   down to the next change and labels the card "Stage 2 · Favored season"; the
