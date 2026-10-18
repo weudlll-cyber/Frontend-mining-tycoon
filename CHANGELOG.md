@@ -29,6 +29,9 @@ pre-1.0 playtest builds.
   `src/shared.css` (board and lobby). `src/style.css` (about 3000 lines) is
   split by area into `src/styles/*.css` and imports them in the old order;
   the built CSS is byte-identical.
+- Console noise: a failed admin game delete logs one clear `console.error`
+  instead of a "[DELETE] Catch block error" stack dump; the meta-hash change
+  note is a dev-only `debugLog`.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

@@ -13,6 +13,7 @@ import {
   cleanupGameMetaCache,
   normalizeBaseUrl,
 } from '../utils/storage-utils.js';
+import { debugLog } from '../utils/debug-log.js';
 
 // Module-level meta state
 let _globalMeta = null;
@@ -267,8 +268,9 @@ export async function fetchMetaSnapshot(baseUrl, gameId = null, options = {}) {
       persistMetaHash(gameMeta, gameIdStr);
 
       if (previousHash && nextHash && previousHash !== nextHash) {
-        console.info(
-          `[meta] meta_hash changed for game ${gameIdStr}: ${shortMetaHash(previousHash)} -> ${shortMetaHash(nextHash)}`
+        debugLog(
+          'meta',
+          `meta_hash changed for game ${gameIdStr}: ${shortMetaHash(previousHash)} -> ${shortMetaHash(nextHash)}`
         );
         if (!_metaChangeToastShownForGame.has(gameIdStr)) {
           _showToast?.('Game rules updated - refreshing upgrades...', 'info');

@@ -284,7 +284,7 @@ async function deleteGame(gameId, buttonEl) {
 
     setTimeout(fetchAndDisplayGames, 800);
   } catch (error) {
-    console.error('[DELETE] Catch block error:', error.message, error.stack);
+    console.error(`Deleting game ${gameId} failed:`, error);
     buttonEl.disabled = false;
     buttonEl.textContent = '🗑 Delete';
     resultEl.className = 'result-box error';
