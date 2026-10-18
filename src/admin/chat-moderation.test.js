@@ -15,6 +15,7 @@ import {
   parseMuteMinutes,
   showChatModeration,
 } from './chat-moderation.js';
+import { flush } from '../test-utils/async-helpers.js';
 
 const BASE = 'http://127.0.0.1:8000';
 
@@ -29,12 +30,6 @@ function fail(status, detail) {
     statusText: 'Error',
     json: async () => ({ detail }),
   };
-}
-
-async function flush() {
-  for (let i = 0; i < 10; i += 1) {
-    await Promise.resolve();
-  }
 }
 
 function buildDom() {

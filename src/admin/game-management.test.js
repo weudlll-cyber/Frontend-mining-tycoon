@@ -17,6 +17,7 @@ import {
   getAdminSession,
   setAdminSession,
 } from './admin-session.js';
+import { flush, okResponse } from '../test-utils/async-helpers.js';
 
 const GAMES = {
   games: [
@@ -30,16 +31,6 @@ const GAMES = {
     { game_id: 8, status: 'finished', players_count: 0 },
   ],
 };
-
-function okResponse(body) {
-  return { ok: true, status: 200, json: async () => body };
-}
-
-async function flush() {
-  for (let i = 0; i < 8; i += 1) {
-    await Promise.resolve();
-  }
-}
 
 function buildDom() {
   document.body.innerHTML = `

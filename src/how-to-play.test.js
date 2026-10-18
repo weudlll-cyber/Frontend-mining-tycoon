@@ -9,14 +9,8 @@ Invariants: The guide stays static (no script, no external resources); the
 */
 
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
 import { GUIDE_LANGUAGES } from './config/guide-languages.js';
-
-function readRepoFile(relativePath) {
-  return fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8');
-}
+import { readRepoFile } from './test-utils/repo-files.js';
 
 function parseHtml(relativePath) {
   return new DOMParser().parseFromString(

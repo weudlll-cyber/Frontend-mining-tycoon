@@ -14,6 +14,7 @@ import {
   loadEconomySettings,
   saveEconomySettings,
 } from './economy-settings.js';
+import { flush, okResponse } from '../test-utils/async-helpers.js';
 
 const CONFIG = {
   base_mining_rate: 1,
@@ -40,10 +41,6 @@ function settings(overrides = {}, version = 4) {
   };
 }
 
-function okResponse(body) {
-  return { ok: true, status: 200, json: async () => body };
-}
-
 function buildDom() {
   document.body.innerHTML = `
     <input id="admin-backend-url" value="http://127.0.0.1:8000" />
@@ -54,12 +51,6 @@ function buildDom() {
     <button id="admin-economy-save-btn" type="button"></button>
     <div id="admin-economy-result" class="result-box"></div>
   `;
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
 }
 
 function input(key) {

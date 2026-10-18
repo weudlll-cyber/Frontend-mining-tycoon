@@ -72,16 +72,46 @@ describe('trading-control-data', () => {
     expect(getDefaultTradeCount(54000)).toBe(5);
   });
 
-  it('reproduces the legacy default for every whole second up to 8 days', () => {
+  it('reproduces the legacy default around every boundary and on a grid', () => {
     const config = buildFallbackGameConfig();
-    for (let duration = 0; duration <= 8 * 86400; duration += 1) {
-      if (
+    // Every place where the result can change: range edges, bucket edges,
+    // centers and the midpoints between centers (+/- 2 s), plus a 61 s grid
+    // up to 8 days. Checking all ~691k whole seconds took seconds per run.
+    const centers = [600, 1350, 3150, 9000, 32400, 86400];
+    const critical = [
+      300,
+      600,
+      900,
+      1800,
+      2700,
+      3600,
+      7200,
+      10800,
+      21600,
+      43200,
+      86400,
+      ...centers,
+      ...centers.slice(1).map((center, i) => (center + centers[i]) / 2),
+      ...TRADE_DEFAULT_BUCKETS.map((b) => b.max_duration_seconds).filter(
+        (value) => value !== null
+      ),
+    ];
+    const samples = new Set();
+    critical.forEach((point) => {
+      for (let delta = -2; delta <= 2; delta += 1) {
+        samples.add(Math.max(0, Math.floor(point) + delta));
+      }
+    });
+    for (let duration = 0; duration <= 8 * 86400; duration += 61) {
+      samples.add(duration);
+    }
+    const mismatches = [...samples].filter(
+      (duration) =>
         getDefaultTradeCount(duration, config) !==
         legacyDefaultTradeCount(duration)
-      ) {
-        throw new Error(`mismatch at ${duration}s`);
-      }
-    }
+    );
+    expect(samples.size).toBeGreaterThan(11000);
+    expect(mismatches).toEqual([]);
   });
 
   it('computes deterministic unlock offsets with strict monotonicity', () => {

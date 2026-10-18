@@ -11,10 +11,7 @@ import {
   initStreamController,
   startStream,
 } from './stream-controller.js';
-
-function flush() {
-  return Promise.resolve().then(() => Promise.resolve());
-}
+import { flush } from '../test-utils/async-helpers.js';
 
 describe('stream-controller session SSE routing', () => {
   const urls = [];
@@ -60,7 +57,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: false,
       roundMode: 'async',
     });
-    await flush();
+    await flush(2);
 
     expect(urls.length).toBe(1);
     expect(urls[0]).toContain('/sessions/987/stream?player_id=44');
@@ -103,7 +100,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: true,
       roundMode: 'async',
     });
-    await flush();
+    await flush(2);
 
     expect(deps.getStreamTicket).toHaveBeenCalledTimes(1);
     expect(urls.length).toBe(1);
@@ -142,7 +139,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: true,
       roundMode: 'async',
     });
-    await flush();
+    await flush(2);
 
     expect(urls.length).toBe(0);
     expect(deps.onSessionStreamError).toHaveBeenCalledTimes(1);
@@ -176,7 +173,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: false,
       roundMode: 'async',
     });
-    await flush();
+    await flush(2);
 
     expect(urls.length).toBe(0);
     expect(deps.onSessionStreamError).toHaveBeenCalledTimes(1);
@@ -209,7 +206,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: false,
       roundMode: 'sync',
     });
-    await flush();
+    await flush(2);
 
     expect(urls.length).toBe(1);
     expect(urls[0]).toContain('/games/123/stream?player_id=44');
@@ -260,7 +257,7 @@ describe('stream-controller session SSE routing', () => {
       requiresPlayerAuth: false,
       roundMode: 'async',
     });
-    await flush();
+    await flush(2);
 
     latestSource.onmessage?.({
       data: JSON.stringify({

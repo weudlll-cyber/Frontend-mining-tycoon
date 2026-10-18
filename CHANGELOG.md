@@ -42,6 +42,10 @@ pre-1.0 playtest builds.
   functions with an explicit panel state object; the lobby account forms
   (login, register, change password, logout) moved from `src/lobby.js` to
   `src/ui/lobby-auth-forms.js`. Behaviour is unchanged.
+- Tests: shared helpers in `src/test-utils/` (`flush`, `okResponse`,
+  `readRepoFile`, `readCssBundle`, the board and setup-flow fixtures) replace
+  per-file copies; the trade-default check samples every boundary and a 61 s
+  grid instead of looping over 691k seconds without `expect`.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

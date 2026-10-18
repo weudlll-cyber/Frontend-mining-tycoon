@@ -3,44 +3,13 @@ File: src/main.halving-passthrough.test.js
 Purpose: Small passthrough checks for main halving helpers.
 */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import {
+  installMainTestHooks,
+  loadMainModule,
+} from './test-utils/main-test-helpers.js';
 
-function buildDomFixture() {
-  document.body.innerHTML = `
-    <div id="app">
-      <input id="base-url" value="http://127.0.0.1:8000" />
-      <input id="player-name" value="Tester" />
-      <input id="game-duration" value="300" />
-      <input id="enrollment-window" value="60" />
-      <input id="game-id" value="1" />
-      <input id="player-id" value="1" />
-      <button id="new-game-btn"></button>
-      <button id="start-btn"></button>
-      <button id="stop-btn"></button>
-      <div id="conn-status"></div>
-      <div id="game-status"></div>
-      <div id="countdown"></div>
-      <div id="countdown-label"></div>
-      <div id="new-game-status"></div>
-      <div id="meta-debug"></div>
-      <div id="player-state"></div>
-      <div id="leaderboard"></div>
-      <div id="portfolio-value">—</div>
-    </div>
-  `;
-}
-
-let mainModule;
-
-async function loadMainModule() {
-  mainModule = await import('./main.js');
-  return mainModule;
-}
-
-beforeEach(() => {
-  vi.resetModules();
-  buildDomFixture();
-});
+installMainTestHooks();
 
 describe('main halving helper passthroughs', () => {
   it('resets next-halving target only when hash changed', async () => {

@@ -10,13 +10,8 @@ Covers:
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fs from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
-
-function readRepoFile(relativePath) {
-  return fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8');
-}
+import { readRepoFile } from './test-utils/repo-files.js';
 
 function loadPlayerFixture() {
   const html = readRepoFile('player.html');

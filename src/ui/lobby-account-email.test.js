@@ -23,6 +23,7 @@ import {
   loadEmailCapabilities,
   renderEmailVerification,
 } from './lobby-account-email.js';
+import { flush } from '../test-utils/async-helpers.js';
 
 const setStatus = vi.fn();
 
@@ -56,12 +57,6 @@ function buildDom() {
   for (const dialog of document.querySelectorAll('dialog')) {
     dialog.showModal = vi.fn();
     dialog.close = vi.fn();
-  }
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
   }
 }
 

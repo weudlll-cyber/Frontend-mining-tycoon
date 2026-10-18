@@ -11,13 +11,7 @@ Invariants: The pages stay static (no script, no external resources); every
 */
 
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
-
-function readRepoFile(relativePath) {
-  return fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8');
-}
+import { readRepoFile } from './test-utils/repo-files.js';
 
 function parseHtml(relativePath) {
   return new DOMParser().parseFromString(

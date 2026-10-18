@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { flush } from './test-utils/async-helpers.js';
 
 vi.mock('./services/auth-client.js', () => ({
   fetchCurrentUser: vi.fn().mockResolvedValue({ username: 'weudl' }),
@@ -189,12 +190,6 @@ describe('lobby last game highscores', () => {
   });
 });
 
-async function flushPromises() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
-}
-
 const OPEN_SYNC_GAME = {
   game_id: '77',
   game_status: 'enrolling',
@@ -213,7 +208,7 @@ async function bootLobbySignedIn({ games = [OPEN_SYNC_GAME] } = {}) {
   localStorage.setItem('mining-tycoon:authDisplayName', 'Weudl');
   await import('./lobby.js');
   document.dispatchEvent(new Event('DOMContentLoaded'));
-  await flushPromises();
+  await flush();
   return authClient;
 }
 
@@ -221,7 +216,7 @@ describe('lobby signed-in view', () => {
   it('shows the sign-in form and hides the account panel when signed out', async () => {
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     expect(document.getElementById('login-form').hidden).toBe(false);
     expect(document.getElementById('account-panel').hidden).toBe(true);
@@ -263,7 +258,7 @@ describe('lobby signed-in view', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     document.getElementById('logout-btn').click();
-    await flushPromises();
+    await flush();
 
     expect(document.getElementById('login-form').hidden).toBe(false);
     expect(document.getElementById('account-panel').hidden).toBe(true);
@@ -279,7 +274,7 @@ describe('lobby signed-in view', () => {
     localStorage.setItem('mining-tycoon:playerToken:77:9', 'secret');
 
     document.getElementById('logout-btn').click();
-    await flushPromises();
+    await flush();
 
     expect(localStorage.getItem('mining-tycoon:playerToken:77:9')).toBeNull();
   });
@@ -295,7 +290,7 @@ describe('lobby join flow', () => {
 
     document.querySelector('.game-list-item[data-game-id="77"]').click();
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
 
     expect(localStorage.getItem('mining-tycoon:gameId')).toBe('77');
     expect(localStorage.getItem('mining-tycoon:playerId')).toBe('9');
@@ -319,7 +314,7 @@ describe('lobby join flow', () => {
 
     document.querySelector('.game-list-item[data-game-id="77"]').click();
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
 
     const message = document.getElementById('lobby-message');
     expect(message.textContent).toBe(
@@ -404,13 +399,13 @@ describe('lobby forgot-password dialog', () => {
     const authClient = await import('./services/auth-client.js');
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
     requestImpl(vi.mocked(authClient.requestPasswordReset));
 
     const form = document.getElementById('forgot-password-form');
     form.querySelector('#forgot-identifier').value = 'alice';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     return authClient;
   }
 
@@ -425,7 +420,7 @@ describe('lobby forgot-password dialog', () => {
     try {
       await import('./lobby.js');
       document.dispatchEvent(new Event('DOMContentLoaded'));
-      await flushPromises();
+      await flush();
       expect(document.getElementById('open-forgot-password').hidden).toBe(true);
     } finally {
       vi.mocked(authClient.fetchEmailCapabilities).mockResolvedValue({
@@ -471,7 +466,7 @@ describe('lobby forgot-password dialog', () => {
     document
       .getElementById('forgot-password-form')
       .dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     expect(message.textContent).toBe('Too many attempts');
   });
 });
@@ -489,7 +484,7 @@ describe('lobby email links', () => {
 
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     expect(window.location.search).toBe('');
     expect(dialog.showModal).toHaveBeenCalled();
@@ -498,7 +493,7 @@ describe('lobby email links', () => {
     document.getElementById('reset-new-password-confirm').value = 'Different1!';
     const form = document.getElementById('reset-password-form');
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     expect(document.getElementById('reset-password-message').textContent).toBe(
       'The two passwords do not match.'
     );
@@ -507,7 +502,7 @@ describe('lobby email links', () => {
     document.getElementById('reset-new-password-confirm').value =
       'NewPassword123!';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     expect(vi.mocked(authClient.confirmPasswordReset)).toHaveBeenCalledWith(
       expect.any(String),
       { token: 'secret-token', newPassword: 'NewPassword123!' }
@@ -531,7 +526,7 @@ describe('lobby email links', () => {
     );
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     document.getElementById('reset-new-password').value = 'NewPassword123!';
     document.getElementById('reset-new-password-confirm').value =
@@ -539,7 +534,7 @@ describe('lobby email links', () => {
     document
       .getElementById('reset-password-form')
       .dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     expect(dialog.close).not.toHaveBeenCalled();
     expect(document.getElementById('reset-password-message').textContent).toBe(
       'This link is invalid or has expired.'
@@ -557,7 +552,7 @@ describe('lobby email links', () => {
     });
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     const hint = document.getElementById('email-verify-hint');
     expect(hint.hidden).toBe(true);
@@ -566,11 +561,11 @@ describe('lobby email links', () => {
     document
       .getElementById('login-form')
       .dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
     expect(hint.hidden).toBe(false);
 
     document.getElementById('resend-verification-btn').click();
-    await flushPromises();
+    await flush();
     expect(vi.mocked(authClient.resendVerificationEmail)).toHaveBeenCalledWith(
       expect.any(String),
       { authToken: 'tok-1' }
@@ -602,13 +597,13 @@ describe('lobby change-password dialog', () => {
     form.querySelector('#change-new-password').value = next;
     form.querySelector('#change-new-password-confirm').value = confirm;
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
   }
 
   it('is only available while signed in', async () => {
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     expect(document.getElementById('open-change-password').disabled).toBe(true);
   });
@@ -748,12 +743,6 @@ describe('lobby change-password dialog', () => {
   });
 });
 
-async function flushDeep() {
-  for (let i = 0; i < 30; i += 1) {
-    await Promise.resolve();
-  }
-}
-
 describe('lobby account-linked players', () => {
   beforeEach(async () => {
     const authClient = await import('./services/auth-client.js');
@@ -807,7 +796,7 @@ describe('lobby account-linked players', () => {
 
     // Auto-refresh re-renders the list; the selection stays a rejoin.
     vi.advanceTimersByTime(10000);
-    await flushPromises();
+    await flush();
     expect(document.getElementById('join-selected-btn').textContent).toBe(
       'Rejoin'
     );
@@ -822,7 +811,7 @@ describe('lobby account-linked players', () => {
     expect(document.getElementById('lobby-message').textContent).toBe(
       'Rejoining your player...'
     );
-    await flushPromises();
+    await flush();
 
     expect(authClient.joinGame).toHaveBeenCalledWith('http://127.0.0.1:8000', {
       gameId: '77',
@@ -862,7 +851,7 @@ describe('lobby account-linked players', () => {
 
     document.querySelector('.game-list-item[data-game-id="77"]').click();
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
 
     expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
     expect(document.getElementById('auth-message').textContent).toContain(
@@ -889,13 +878,13 @@ describe('lobby account-linked players', () => {
 
     document.querySelector('.game-list-item[data-game-id="77"]').click();
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
     const message = document.getElementById('lobby-message');
     expect(message.textContent).toBe('Sign in to join this game, please.');
     expect(document.getElementById('join-selected-btn').disabled).toBe(false);
 
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
     expect(message.textContent).toBe('Sign in to join this game.');
     expect(localStorage.getItem('mining-tycoon:authToken')).toBe('token');
   });
@@ -916,7 +905,7 @@ describe('lobby account-linked players', () => {
     localStorage.setItem('mining-tycoon:authToken', 'token');
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushDeep();
+    await flush(30);
 
     expect(localStorage.getItem('mining-tycoon:authToken')).toBe('');
     expect(document.querySelectorAll('.game-list-item')).toHaveLength(1);
@@ -957,7 +946,7 @@ describe('lobby results and history', () => {
   it('enables "My results" only when signed in and opens the history', async () => {
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
     expect(document.getElementById('open-results-dialog').disabled).toBe(true);
 
     vi.resetModules();
@@ -967,7 +956,7 @@ describe('lobby results and history', () => {
     expect(button.disabled).toBe(false);
 
     button.click();
-    await flushDeep();
+    await flush(30);
     expect(authClient.fetchMyHistory).toHaveBeenLastCalledWith(
       'http://127.0.0.1:8000',
       { authToken: 'token', limit: 20, offset: 0 }
@@ -993,7 +982,7 @@ describe('lobby results and history', () => {
     });
 
     await bootLobbySignedIn({ games: [] });
-    await flushDeep();
+    await flush(30);
 
     expect(authClient.fetchMyHistory).toHaveBeenCalledWith(
       'http://127.0.0.1:8000',
@@ -1008,7 +997,7 @@ describe('lobby results and history', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(authClient.logout).mockResolvedValue(null);
     document.getElementById('logout-btn').click();
-    await flushDeep();
+    await flush(30);
     expect(document.getElementById('last-game-summary').textContent).toContain(
       'local-1'
     );
@@ -1020,7 +1009,7 @@ describe('lobby results and history', () => {
       Object.assign(new Error('Not Found'), { status: 404 })
     );
     await bootLobbySignedIn({ games: [] });
-    await flushDeep();
+    await flush(30);
     expect(document.getElementById('last-game-summary').textContent).toBe(
       'No finished game recorded yet.'
     );
@@ -1039,14 +1028,14 @@ describe('lobby results and history', () => {
     });
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
     vi.mocked(authClient.fetchOpenGames).mockClear();
 
     const form = document.getElementById('login-form');
     form.querySelector('#login-username').value = 'weudl';
     form.querySelector('#login-password').value = 'pw';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushDeep();
+    await flush(30);
 
     expect(authClient.fetchOpenGames).toHaveBeenCalledWith(
       'http://127.0.0.1:8000',
@@ -1065,13 +1054,13 @@ describe('lobby results and history', () => {
     });
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     const form = document.getElementById('login-form');
     form.querySelector('#login-username').value = 'boss';
     form.querySelector('#login-password').value = 'pw';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushDeep();
+    await flush(30);
 
     expect(document.getElementById('admin-setup-link').textContent).toBe(
       'Admin setup (you are an administrator)'
@@ -1084,7 +1073,7 @@ describe('lobby results and history', () => {
 
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushDeep();
+    await flush(30);
 
     expect(authClient.fetchGameResults).toHaveBeenCalledWith(
       'http://127.0.0.1:8000',
@@ -1110,7 +1099,7 @@ describe('lobby account data protection', () => {
   it('offers download and delete only while signed in', async () => {
     await import('./lobby.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    await flushPromises();
+    await flush();
 
     expect(document.getElementById('download-account-data').disabled).toBe(
       true
@@ -1135,7 +1124,7 @@ describe('lobby account data protection', () => {
     document
       .getElementById('delete-account-form')
       .dispatchEvent(new Event('submit', { cancelable: true }));
-    await flushPromises();
+    await flush();
 
     expect(authClient.deleteMyAccount).toHaveBeenCalledWith(
       'http://127.0.0.1:8000',
@@ -1213,7 +1202,7 @@ describe('lobby scheduled rounds (Upcoming)', () => {
     // Even if the button were clicked, no join request is sent.
     joinBtn.disabled = false;
     joinBtn.click();
-    await flushPromises();
+    await flush();
     const authClient = await import('./services/auth-client.js');
     expect(authClient.joinGame).not.toHaveBeenCalled();
     expect(document.getElementById('lobby-message').textContent).toContain(
@@ -1234,12 +1223,12 @@ describe('lobby scheduled rounds (Upcoming)', () => {
       document.querySelector('.game-list-item .game-countdown').textContent;
     expect(countdown()).toBe('opens in 3 s');
 
-    await flushDeep();
+    await flush(30);
     vi.mocked(authClient.fetchOpenGames).mockResolvedValue([
       { ...OPEN_SYNC_GAME, game_id: 'sched-1' },
     ]);
     vi.advanceTimersByTime(1000);
-    await flushPromises();
+    await flush();
     expect(countdown()).toBe('opens in 2 s');
     expect(
       document.querySelector('.game-list-item .game-badge').textContent
@@ -1247,7 +1236,7 @@ describe('lobby scheduled rounds (Upcoming)', () => {
 
     // Due at 3 s (well before the 10 s auto refresh): the list reloads.
     vi.advanceTimersByTime(2000);
-    await flushPromises();
+    await flush();
     const row = document.querySelector('.game-list-item');
     expect(row.querySelector('.game-badge').textContent).toBe('Enrolling');
   });
@@ -1256,20 +1245,20 @@ describe('lobby scheduled rounds (Upcoming)', () => {
     const authClient = await bootLobbySignedIn({
       games: [{ ...SCHEDULED_GAME, opens_in_seconds: 0 }],
     });
-    await flushDeep();
+    await flush(30);
     const message = document.getElementById('lobby-message');
     // The backend still reports the round as scheduled for a moment: the
     // first due tick reloads (and re-announces the list)...
     vi.advanceTimersByTime(1000);
-    await flushPromises();
+    await flush();
     expect(message.textContent).toBe('Loaded 0 open games. 1 upcoming.');
     // ...but the next ticks within 5 s do not reload again.
     message.textContent = 'marker';
     vi.advanceTimersByTime(2000);
-    await flushPromises();
+    await flush();
     expect(message.textContent).toBe('marker');
     vi.advanceTimersByTime(4000);
-    await flushPromises();
+    await flush();
     expect(message.textContent).toBe('Loaded 0 open games. 1 upcoming.');
     expect(authClient.fetchOpenGames).toHaveBeenCalled();
   });
@@ -1289,7 +1278,7 @@ describe('lobby scheduled rounds (Upcoming)', () => {
       { ...SCHEDULED_GAME, game_id: '77', opens_in_seconds: 600 },
     ]);
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
 
     expect(document.getElementById('lobby-message').textContent).toMatch(
       /^This round has not opened yet\. It opens at /
@@ -1305,10 +1294,10 @@ describe('lobby scheduled rounds (Upcoming)', () => {
     );
     vi.mocked(authClient.fetchOpenGames).mockResolvedValue([OPEN_SYNC_GAME]);
     vi.advanceTimersByTime(10000);
-    await flushPromises();
+    await flush();
     document.querySelector('.game-list-item[data-game-id="77"]').click();
     document.getElementById('join-selected-btn').click();
-    await flushPromises();
+    await flush();
     expect(document.getElementById('lobby-message').textContent).toBe(
       'This round has not opened yet.'
     );
@@ -1389,7 +1378,7 @@ describe('lobby open-games keyboard access', () => {
     const list = document.getElementById('open-games-list');
     list.querySelector('[data-game-id="b"]').focus();
     vi.advanceTimersByTime(10000);
-    await flushPromises();
+    await flush();
     expect(document.activeElement.dataset.gameId).toBe('b');
     expect(document.activeElement.isConnected).toBe(true);
   });
