@@ -403,8 +403,8 @@ export function renderInlineSeasonUpgrades(
   const perTokenMetrics = metrics[seasonToken] || {};
   const upgrades = perTokenMetrics.upgrades || metrics.upgrades || {};
   const upgradeLevelsByToken = playerState.upgrades_by_token || {};
-  const selectedTokenLevels =
-    upgradeLevelsByToken[seasonToken] || playerState.upgrade_levels || {};
+  // Per-token levels; the aggregated `upgrade_levels` would mix all seasons.
+  const selectedTokenLevels = upgradeLevelsByToken[seasonToken] || {};
 
   const activeUpgradeDefinitions = _getActiveUpgradeDefinitions?.();
   const contractSupported = _isActiveContractSupported?.() ?? true;

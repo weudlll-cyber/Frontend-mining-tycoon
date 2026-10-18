@@ -17,7 +17,6 @@ Backend contract notes:
   join button is disabled ("Opens at HH:MM") and the list reloads when the
   countdown reaches 0. A join that races the opening gets 409
   JOIN_NOT_ALLOWED_SCHEDULED (`opens_at`), shown as a friendly message.
-- Older backends omit these fields; the lobby then behaves as before.
 Accessibility: the list is a keyboard-operable listbox (src/ui/lobby-game-list.js).
 Security notes: tokens are never rendered; all backend text uses textContent.
 */
@@ -277,18 +276,18 @@ function renderAdminSetupLink(isAdmin) {
 }
 
 function setAuthenticatedSession(payload) {
-  const token = String(
-    payload?.access_token || payload?.token || payload?.session_token || ''
-  ).trim();
+  // Login/register answer `{ access_token, user: {...} }`; GET /auth/me and a
+  // restored session pass the user fields flat.
+  const token = String(payload?.access_token || '').trim();
   const username = String(
-    payload?.username || payload?.user?.username || payload?.login || ''
+    payload?.username || payload?.user?.username || ''
   ).trim();
   const displayName = String(
     payload?.display_name || payload?.user?.display_name || username || 'Player'
   ).trim();
 
   // `is_admin` comes from POST /auth/login (`user.is_admin`) or GET /auth/me;
-  // older backends omit it (= not an administrator).
+  // a restored session does not know it yet (= not an administrator).
   const isAdmin =
     Boolean(token) && (payload?.user?.is_admin ?? payload?.is_admin) === true;
 
@@ -301,7 +300,7 @@ function setAuthenticatedSession(payload) {
   };
   renderAdminSetupLink(isAdmin);
   // `email_verified` comes from login/register (`user.email_verified`) or
-  // GET /auth/me; unknown (older backend, restored session) hides the hint.
+  // GET /auth/me; unknown (restored session before /auth/me) hides the hint.
   renderEmailVerification(
     token
       ? (payload?.user?.email_verified ?? payload?.email_verified)
@@ -903,7 +902,7 @@ async function validateStoredSession(token) {
 /**
  * "Last Game Highscores" prefers the server: when signed in, show the top 5 of
  * the account's most recent finished round (history + full results). Any
- * failure (older backend without history, no rounds yet) keeps the local
+ * failure (network error, no finished rounds yet) keeps the local
  * device snapshot written by player.html.
  */
 async function preferServerLastGame(token) {

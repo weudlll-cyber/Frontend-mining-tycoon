@@ -69,7 +69,7 @@ export async function loadEmailCapabilities() {
 /**
  * Show or hide the "not confirmed" hint for the signed-in account.
  * `verified` is the `email_verified` flag from login or /auth/me; `undefined`
- * (older backend, or not known yet) hides the hint.
+ * (not known yet, e.g. a restored session before /auth/me) hides the hint.
  */
 export function renderEmailVerification(verified) {
   if (!els?.verifyHint) return;

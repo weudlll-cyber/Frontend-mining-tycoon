@@ -1,15 +1,14 @@
 /**
 File: src/ui/lobby-games.js
 Purpose: Shared helpers for formatting and normalizing open game records in the lobby.
-Backend contract: GET /games/active items; with an account token each item may
-carry `my_player_id` (the caller's linked player in that game, or null). Older
-backends omit it, which reads as "not joined yet".
-Scheduled sync rounds: items with `game_status: "scheduled"` (a `status` key
-is accepted as a fallback) carry `scheduled_start_at` (unix seconds) and
-`opens_in_seconds` (null once open). "Upcoming" is decided by the status only:
-`scheduled_start_at` stays set after the round opens.
-They are listed as "Upcoming" but cannot be joined until they open; older
-backends never send them.
+Backend contract: GET /games/active items always carry `game_status` and
+`my_player_id` (the caller's linked player in that game; null when not joined
+or without an account token).
+Scheduled sync rounds: items with `game_status: "scheduled"` carry
+`scheduled_start_at` (unix seconds) and `opens_in_seconds` (null once open).
+"Upcoming" is decided by the status only: `scheduled_start_at` stays set after
+the round opens. They are listed as "Upcoming" but cannot be joined until they
+open.
 */
 
 import {
@@ -59,9 +58,9 @@ export function formatDurationLabel(seconds) {
   return formatDuration(seconds, { largest: 'h', pad: true });
 }
 
-/** Lifecycle status of a /games/active item (`game_status`, else `status`). */
+/** Lifecycle status of a /games/active item (`game_status`). */
 export function readGameStatus(rawGame) {
-  return normalizeStatus(rawGame?.game_status || rawGame?.status);
+  return normalizeStatus(rawGame?.game_status);
 }
 
 /**

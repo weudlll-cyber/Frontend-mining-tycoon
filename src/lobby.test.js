@@ -549,7 +549,7 @@ describe('lobby email links', () => {
   it('shows the "not confirmed" hint after sign-in and resends the link', async () => {
     const authClient = await import('./services/auth-client.js');
     vi.mocked(authClient.login).mockResolvedValue({
-      session_token: 'tok-1',
+      access_token: 'tok-1',
       user: { username: 'alice', display_name: 'Alice', email_verified: false },
     });
     vi.mocked(authClient.resendVerificationEmail).mockResolvedValue({

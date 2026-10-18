@@ -120,7 +120,8 @@ export function resolveChatUserLabel(
 
 /**
  * Whether a round's game meta allows chat. Only an explicit `false` disables
- * it, so an older backend without the field keeps chat on.
+ * it; while the meta is not loaded yet chat stays on (the backend still
+ * rejects messages in a chat-disabled round).
  */
 export function isChatEnabledForRound(gameMeta) {
   return gameMeta?.chat_enabled !== false;

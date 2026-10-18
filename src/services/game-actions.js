@@ -122,13 +122,11 @@ export async function performUpgrade(
 
 /**
  * Level of one upgrade lane in a player state from the backend
- * (`upgrades_by_token[token][type]`, legacy `upgrade_levels[type]`).
+ * (`upgrades_by_token[token][type]`, always sent by the backend).
  * Returns null when the state does not contain it.
  */
 export function readUpgradeLevel(playerState, token, upgradeType) {
-  const byToken = playerState?.upgrades_by_token?.[token];
-  const raw =
-    byToken?.[upgradeType] ?? playerState?.upgrade_levels?.[upgradeType];
+  const raw = playerState?.upgrades_by_token?.[token]?.[upgradeType];
   const level = Number(raw);
   return Number.isFinite(level) ? level : null;
 }

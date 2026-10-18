@@ -61,7 +61,7 @@ describe('lobby-games helpers', () => {
     const game = normalizeGameItem(
       {
         game_id: 's1',
-        status: 'scheduled',
+        game_status: 'scheduled',
         scheduled_start_at: 1_800_003_900,
         opens_in_seconds: 3900,
       },
@@ -91,13 +91,16 @@ describe('lobby-games helpers', () => {
 
     // Only opens_in_seconds: the start time is derived from it.
     const fromOpensIn = normalizeGameItem(
-      { game_id: 's3', status: 'scheduled', opens_in_seconds: 60 },
+      { game_id: 's3', game_status: 'scheduled', opens_in_seconds: 60 },
       nowMs
     );
     expect(fromOpensIn.startLabel).toMatch(/^Starts /);
 
     // Neither: still listed, without a countdown.
-    const unknown = normalizeGameItem({ game_id: 's4', status: 'scheduled' });
+    const unknown = normalizeGameItem({
+      game_id: 's4',
+      game_status: 'scheduled',
+    });
     expect(unknown.opensAtMs).toBeNull();
     expect(unknown.startLabel).toBe('');
     expect(unknown.remainingLabel).toBe('Opens soon');
@@ -125,11 +128,12 @@ describe('lobby-games helpers', () => {
     expect(opened.remainingLabel).toContain('Starts in');
   });
 
-  it('reads game_status first and falls back to status', () => {
+  it('reads game_status only', () => {
     expect(
       readGameStatus({ game_status: 'running', status: 'scheduled' })
     ).toBe('running');
-    expect(readGameStatus({ status: 'SCHEDULED' })).toBe('scheduled');
+    expect(readGameStatus({ game_status: 'SCHEDULED' })).toBe('scheduled');
+    expect(readGameStatus({ status: 'scheduled' })).toBe('unknown');
     expect(readGameStatus({})).toBe('unknown');
   });
 

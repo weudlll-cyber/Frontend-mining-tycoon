@@ -32,6 +32,12 @@ pre-1.0 playtest builds.
 - Console noise: a failed admin game delete logs one clear `console.error`
   instead of a "[DELETE] Catch block error" stack dump; the meta-hash change
   note is a dev-only `debugLog`.
+- Removed fallbacks for backend fields that the bundled backend always sends
+  (verified in the backend code): the old single-event keys (`active_event`,
+  `event_context.active_event`, `events.active`), the `status` key of
+  `/games/active` items, the `token`/`session_token`/`login` auth keys, the
+  404 path of `/auth/email-capabilities` and the aggregated `upgrade_levels`.
+  Defensive handling of missing or malformed data stays.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

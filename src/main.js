@@ -399,11 +399,11 @@ function initLiveToolsWindow() {
     noticeEl: dom.chatNoticeEl,
     emojiBtnEl: dom.chatEmojiBtnEl,
     emojiPickerEl: dom.chatEmojiPickerEl,
-    // Curated `/meta` `chat_emoji`; older backends fall back to the built-in list.
+    // Curated `/meta` `chat_emoji`; the built-in list covers a not yet loaded meta.
     getEmojiList: () => getGlobalMeta()?.chat_emoji,
     onCleared: handleChatClearedPreview,
     // `chat_enabled` from the round's game meta (fetched before the stream
-    // starts); missing = enabled, as with older backends.
+    // starts); a not yet loaded meta counts as enabled.
     isChatEnabled: () => isChatEnabledForRound(getGameMeta(gameIdInput?.value)),
     onAvailabilityChange: handleChatAvailabilityChange,
     getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
