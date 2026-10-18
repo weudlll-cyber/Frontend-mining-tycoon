@@ -339,6 +339,10 @@ describe('player state matrix', () => {
     const line1Text = line1?.textContent || '';
     expect(line1Text).toContain('Next halving');
     expect(line1Text).toContain('Mined 42.00');
+    // Token names are title case like everywhere else, not "SPRING".
+    expect(line1Text).toMatch(
+      /Next halving \d{2}:\d{2} \((Spring|Summer|Autumn|Winter)\)/
+    );
 
     const footerTrigger = line2?.querySelector('.ps-tip-trigger');
     expect(footerTrigger).not.toBeNull();
@@ -348,6 +352,9 @@ describe('player state matrix', () => {
     const footerTooltip = tooltipId ? document.getElementById(tooltipId) : null;
     expect(footerTooltip).not.toBeNull();
     expect(footerTooltip?.textContent || '').toContain('Halving: Next halving');
+    expect(footerTooltip?.textContent || '').not.toMatch(
+      /SPRING|SUMMER|AUTUMN|WINTER/
+    );
   });
 
   it('renders tooltip triggers with aria-describedby and tooltip role', () => {

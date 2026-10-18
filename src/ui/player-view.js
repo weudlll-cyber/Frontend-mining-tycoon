@@ -22,6 +22,7 @@ import {
   subscribeHalvingClock,
 } from './halving-display.js';
 import { formatDuration } from '../utils/duration-format.js';
+import { formatTokenName } from '../utils/value-utils.js';
 import {
   ensurePlayerStateViewLayout,
   toTokenLabel,
@@ -223,7 +224,7 @@ function renderFooterHalvingState() {
   const { refs, minedPart, fee, spread, lastHalvingNotice } = _footerClockState;
   const countdownTarget = getHalvingCountdownTarget();
 
-  let halvinPart = 'No further halvings';
+  let halvingPart = 'No further halvings';
   let halvingTooltipPart = 'No further halvings in this round.';
 
   if (countdownTarget) {
@@ -233,13 +234,13 @@ function renderFooterHalvingState() {
       countdownTarget.halvingAtUnix - nowUnix
     );
     const countdownText = formatDuration(remainingSeconds, { style: 'clock' });
-    halvinPart = `Next halving ${countdownText} (${countdownTarget.token.toUpperCase()})`;
-    halvingTooltipPart = `Next halving in ~${countdownText} for ${countdownTarget.token.toUpperCase()} (month ${countdownTarget.halvingMonth}).`;
+    halvingPart = `Next halving ${countdownText} (${formatTokenName(countdownTarget.token)})`;
+    halvingTooltipPart = `Next halving in ~${countdownText} for ${formatTokenName(countdownTarget.token)} (month ${countdownTarget.halvingMonth}).`;
   } else if (lastHalvingNotice) {
-    halvingTooltipPart = `Last halving: ${lastHalvingNotice.token.toUpperCase()} at month ${lastHalvingNotice.halvingMonth}.`;
+    halvingTooltipPart = `Last halving: ${formatTokenName(lastHalvingNotice.token)} at month ${lastHalvingNotice.halvingMonth}.`;
   }
 
-  setTextNodeValue(refs.footerLine1Node, `${halvinPart} | Mined ${minedPart}`);
+  setTextNodeValue(refs.footerLine1Node, `${halvingPart} | Mined ${minedPart}`);
   setTextNodeValue(
     refs.tooltipNodes.footer,
     `Halving: ${halvingTooltipPart} | Mined: cumulative tokens earned | Fee: conversion cost (${format4(fee)}%) | Spread: oracle bid-ask gap (${format4(spread)}%)`

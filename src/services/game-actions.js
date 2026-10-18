@@ -16,6 +16,7 @@ Security notes:
 */
 
 import { createApiError, readApiError } from '../utils/api-error.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 let _deps = null;
 
@@ -101,7 +102,7 @@ export async function performUpgrade(
     );
     const bought = Number(payload?.levels_bought) || 1;
     _deps.showToast(
-      `Upgraded ${upgradeType.charAt(0).toUpperCase() + upgradeType.slice(1)} to level ${confirmedLevel ?? nextLevel}${bought > 1 ? ` (+${bought})` : ''}`,
+      `Upgraded ${formatTokenName(upgradeType)} to level ${confirmedLevel ?? nextLevel}${bought > 1 ? ` (+${bought})` : ''}`,
       'success'
     );
     if (typeof _deps.onUpgradeApplied === 'function') {

@@ -15,6 +15,7 @@ import {
 } from '../halving.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
 import { formatDuration } from '../utils/duration-format.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 // Module-level state
 let _halvingClockInterval = null;
@@ -80,7 +81,7 @@ function renderNextHalvingCountdownTick() {
     0,
     _halvingCountdownTarget.halvingAtUnix - nowUnix
   );
-  _halvingCountdownTarget.textNode.textContent = `Next halving in: ~${formatDuration(remainingSeconds, { style: 'clock' })} (token: ${_halvingCountdownTarget.token.toUpperCase()})`;
+  _halvingCountdownTarget.textNode.textContent = `Next halving in: ~${formatDuration(remainingSeconds, { style: 'clock' })} (token: ${formatTokenName(_halvingCountdownTarget.token)})`;
 }
 
 export function startNextHalvingCountdown(target) {

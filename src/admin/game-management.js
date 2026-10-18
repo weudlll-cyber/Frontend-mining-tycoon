@@ -19,6 +19,7 @@ import { showGameMetrics } from './admin-metrics.js';
 import { initChatModeration, showChatModeration } from './chat-moderation.js';
 import { byId as el } from '../utils/dom-utils.js';
 import { formatDuration } from '../utils/duration-format.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 async function getBackendUrl() {
   const url = (el('admin-backend-url')?.value || '').trim();
@@ -171,8 +172,7 @@ async function fetchAndDisplayGames() {
         game.status === 'running' || game.status === 'enrolling'
           ? '#fff'
           : '#1a1a1a';
-      statusBadge.textContent =
-        game.status.charAt(0).toUpperCase() + game.status.slice(1);
+      statusBadge.textContent = formatTokenName(game.status);
       statusCell.appendChild(statusBadge);
 
       const typeCell = document.createElement('td');

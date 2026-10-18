@@ -37,12 +37,6 @@ export function formatScoringModeName(mode) {
   return 'Stockpile Mode';
 }
 
-export function formatTokenName(token) {
-  const text = String(token || '').trim();
-  if (!text) return 'Unknown';
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 export function asNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

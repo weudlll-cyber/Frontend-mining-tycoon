@@ -13,10 +13,10 @@
 
 import { adminRequest } from './admin-api.js';
 import { byId as el } from '../utils/dom-utils.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 function humanizeKey(key) {
-  const text = String(key).replaceAll('_', ' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return formatTokenName(String(key).replaceAll('_', ' '));
 }
 
 /**

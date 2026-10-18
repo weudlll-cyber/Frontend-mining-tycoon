@@ -6,6 +6,7 @@ Key responsibilities:
 - isPlainObject / isFiniteNumber / toFiniteNumber type guards for backend
   payloads.
 - formatRatePercent: a rate as percent text without float noise.
+- formatTokenName: "summer" -> "Summer" for token, upgrade and status names.
 Dependencies: none (pure helpers).
 Security notes: returns plain values/strings; callers render via textContent.
 */
@@ -36,4 +37,11 @@ export function formatRatePercent(rate, { suffix = '', fallback = null } = {}) {
   const numeric = toFiniteNumber(rate);
   if (numeric === null) return fallback;
   return `${Number((numeric * 100).toFixed(4))}${suffix}`;
+}
+
+/** Capitalize a token/upgrade name ("summer" -> "Summer"); "Unknown" if empty. */
+export function formatTokenName(token) {
+  const text = String(token || '').trim();
+  if (!text) return 'Unknown';
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

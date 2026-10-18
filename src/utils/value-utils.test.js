@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatRatePercent,
   isFiniteNumber,
+  formatTokenName,
   isPlainObject,
   toFiniteNumber,
 } from './value-utils.js';
@@ -36,5 +37,12 @@ describe('value-utils', () => {
     expect(formatRatePercent(0.05, { suffix: '%' })).toBe('5%');
     expect(formatRatePercent(undefined)).toBeNull();
     expect(formatRatePercent('x', { fallback: '--' })).toBe('--');
+  });
+
+  it('formatTokenName capitalizes the first letter only', () => {
+    expect(formatTokenName('summer')).toBe('Summer');
+    expect(formatTokenName(' autumn ')).toBe('Autumn');
+    expect(formatTokenName('')).toBe('Unknown');
+    expect(formatTokenName(null)).toBe('Unknown');
   });
 });

@@ -14,6 +14,7 @@ import {
   normalizeTokenNames,
 } from '../utils/token-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 let _getActiveGameMeta = null;
 let _isActiveContractSupported = null;
@@ -452,7 +453,7 @@ export function renderInlineSeasonUpgrades(
       return;
     }
 
-    const title = type.charAt(0).toUpperCase() + type.slice(1);
+    const title = formatTokenName(type);
     const level = selectedTokenLevels[type] || 0;
     const formattedLevel = formatInlineLevel(level);
     const formattedCost = formatInlineCost(info?.cost_to_next);

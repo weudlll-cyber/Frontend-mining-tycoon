@@ -15,6 +15,9 @@ pre-1.0 playtest builds.
   long styles) replaces ten per-module copies; one `isPlainObject`,
   `isFiniteNumber`, `toFiniteNumber` and rate-percent formatter in
   `src/utils/value-utils.js`. Every visible label is unchanged.
+- One `formatTokenName` (`src/utils/value-utils.js`) for token, upgrade and
+  status names; the halving footer and countdown now say "Summer" like the
+  rest of the board instead of "SUMMER".
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

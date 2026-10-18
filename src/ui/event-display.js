@@ -28,7 +28,7 @@ Security notes:
 
 import { setElementTextValue } from '../utils/dom-utils.js';
 import { formatDuration } from '../utils/duration-format.js';
-import { isPlainObject } from '../utils/value-utils.js';
+import { formatTokenName, isPlainObject } from '../utils/value-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _eventBannerEl = null;
@@ -98,7 +98,7 @@ function humanizeEventType(eventType) {
     .toLowerCase()
     .split('_')
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => formatTokenName(part))
     .join(' ');
 }
 
