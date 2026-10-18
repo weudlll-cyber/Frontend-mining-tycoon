@@ -59,6 +59,10 @@ pre-1.0 playtest builds.
 
 - Content-Security-Policy: `style-src` no longer allows `'unsafe-inline'`;
   no page has inline styles any more (guarded by a test).
+- Email confirmation links (`index.html?verify=`) no longer confirm on page
+  load: the token is still removed from the address bar, and the lobby shows
+  a "Confirm my email" button that sends it. Mail link scanners and
+  prefetchers can no longer use up the one-time token.
 - Logging out, changing the password, deleting the account or an expired
   sign-in now also removes the stored player tokens, so the next person on a
   shared device cannot act as this player in a round that is still running.
