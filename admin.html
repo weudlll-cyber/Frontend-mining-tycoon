@@ -841,11 +841,25 @@ Security notes:
             value="5"
           />
         </div>
+        <div class="form-group">
+          <label for="admin-farming-favored"
+            >Favored season bonus (× reward)</label
+          >
+          <input
+            id="admin-farming-favored"
+            type="number"
+            min="1"
+            max="5"
+            step="0.5"
+            value="2"
+          />
+        </div>
         <div class="form-group full-width">
           <p id="admin-farming-note" class="derived-note">
             Rewards are added after each full minimum duration and compound. The
             minimum duration must be shorter than the round (sync) or session
-            (async).
+            (async). Stage 2: a cycle that completes while its token is the
+            season favored by the oracle rotation earns the bonus (1 = off).
           </p>
         </div>
       </div>

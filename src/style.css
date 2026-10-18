@@ -2654,6 +2654,30 @@ button {
   min-width: 4rem;
 }
 
+/* Farming Stage 2: the favored season's row and the line above the rows. */
+.farming-favored-line {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--status-blue);
+}
+
+.farming-row-favored {
+  border-top-color: var(--status-blue);
+  background: rgba(59, 130, 246, 0.07);
+  border-radius: calc(var(--radius) / 2);
+  padding-inline: 0.3rem;
+}
+
+.farming-favored-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--status-blue);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
 .farming-stat-label {
   color: var(--text-secondary);
   margin-right: 0.25rem;

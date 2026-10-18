@@ -60,8 +60,12 @@ export function resolveRawFarming(state) {
 /**
  * Effective farming capability for the board: the live state block wins
  * (it carries positions), the round meta fills missing rule fields.
+ * Stage 2 fields: `favored_multiplier` (1 = no bonus), `favored_token` (the
+ * season token that earns the bonus now) and `favored_changes_in_seconds`.
  * @returns {{ enabled: boolean, min_duration_seconds: number|null,
- *   reward_rate: number|null, positions: Record<string, object> }}
+ *   reward_rate: number|null, favored_multiplier: number,
+ *   favored_token: string|null, favored_changes_in_seconds: number|null,
+ *   positions: Record<string, object> }}
  */
 export function normalizeFarming(meta, state) {
   const fromState = resolveRawFarming(state);
@@ -84,11 +88,26 @@ export function normalizeFarming(meta, state) {
     if (key) positions[key] = normalizePosition(raw);
   });
 
+  const favoredMultiplier = toFiniteNumber(pick('favored_multiplier'));
+  const favoredToken = String(pick('favored_token') || '')
+    .trim()
+    .toLowerCase();
+  const favoredChangesIn = toFiniteNumber(pick('favored_changes_in_seconds'));
+
   return {
     enabled: pick('enabled') === true,
     min_duration_seconds:
       minDuration !== null && minDuration > 0 ? Math.round(minDuration) : null,
     reward_rate: rewardRate !== null && rewardRate >= 0 ? rewardRate : null,
+    favored_multiplier:
+      favoredMultiplier !== null && favoredMultiplier > 1
+        ? favoredMultiplier
+        : 1,
+    favored_token: favoredToken || null,
+    favored_changes_in_seconds:
+      favoredChangesIn !== null && favoredChangesIn >= 0
+        ? Math.round(favoredChangesIn)
+        : null,
     positions,
   };
 }

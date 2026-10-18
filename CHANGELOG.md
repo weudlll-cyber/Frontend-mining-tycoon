@@ -11,6 +11,14 @@ pre-1.0 playtest builds.
 
 ### Added
 
+- Farming Stage 2 on the board (backend "the favored season pays more"): the
+  Farm tab names the favored season token, marks its row ("×2 now"), counts
+  down to the next change and labels the card "Stage 2 · Favored season"; the
+  action-bar pill and rule summary mention the bonus. Admin section 2 adds
+  "Favored season bonus (× reward)" (1-5, default 2) sent as
+  `farming_favored_multiplier` and shown in the review. Guide (English and
+  German) explains Stage 2; "Rotating farming" left the roadmap.
+
 - "Buy several levels": a **×5** button next to each **Upgrade** button buys up
   to five levels at once, as many as the pay balance covers (backend `levels`
   on the upgrade endpoint; the limit comes from `/meta`

@@ -604,9 +604,16 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
             running (and, in async rounds, during your session).
           </li>
         </ul>
+        <h3>Stage 2: the favored season pays more</h3>
         <p>
-          Stage 2 (rotating farming, where the most rewarding token changes over
-          time) will come later.
+          The oracle prices always favor one season token, and the favored
+          season rotates every few sim-months (see
+          <a href="#oracle-prices">Oracle prices</a>). A farming cycle that
+          completes while its token is the favored one earns the reward times
+          the round's <strong>favored season bonus</strong> (by default
+          &times;2). The Farm tab shows which token is favored now, marks its
+          row and counts down to the next change. The admin can set the bonus
+          per round (&times;1 turns it off).
         </p>
       </section>
 
@@ -623,11 +630,6 @@ Security notes: Static HTML only; no script, no external fonts or CDNs.
             <strong>More languages:</strong> the game itself in other languages;
             this guide is already available in English and German. New languages
             appear in the language switch at the top of this page.
-          </li>
-          <li>
-            <strong>Rotating farming (Stage 2):</strong> the token that pays the
-            best farming reward changes during the round, so farming becomes a
-            timing decision as well.
           </li>
           <li>
             <strong>Balanced economy:</strong> playtests tune mining speed,

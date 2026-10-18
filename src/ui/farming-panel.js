@@ -133,7 +133,9 @@ export function formatNextReward(position, elapsedSeconds = 0) {
 export function formatFarmingRuleSummary(farming) {
   const reward = formatRewardPercent(farming?.reward_rate);
   const cycle = formatFarmDuration(farming?.min_duration_seconds);
-  return `Reward: ${reward} of the farmed amount per completed ${cycle} cycle (minimum duration).`;
+  const summary = `Reward: ${reward} of the farmed amount per completed ${cycle} cycle (minimum duration).`;
+  if (!hasFavoredBonus(farming)) return summary;
+  return `${summary} A cycle that completes while its token is the favored season earns ${formatMultiplier(farming.favored_multiplier)}; the favored season rotates with the oracle prices.`;
 }
 
 /** Action-bar pill text for the farming status. */
@@ -146,7 +148,36 @@ export function formatFarmingPillText(farming) {
   if (farming.min_duration_seconds !== null) {
     parts.push(formatFarmDuration(farming.min_duration_seconds));
   }
+  if (hasFavoredBonus(farming)) {
+    parts.push(`favored ${formatMultiplier(farming.favored_multiplier)}`);
+  }
   return parts.length ? `Enabled (${parts.join(' / ')})` : 'Enabled';
+}
+
+function hasFavoredBonus(farming) {
+  return Number(farming?.favored_multiplier) > 1;
+}
+
+function formatMultiplier(value) {
+  return `×${Number(Number(value).toFixed(2))}`;
+}
+
+/**
+ * Stage 2 line, e.g. "Favored now: Summer earns ×2 per cycle · changes in 42s".
+ * Empty when the round has no favored-season bonus or the server sent no token.
+ */
+export function formatFavoredLine(farming, elapsedSeconds = 0) {
+  if (!hasFavoredBonus(farming) || !farming.favored_token) return '';
+  const name = formatTokenName(farming.favored_token);
+  const base = `Favored now: ${name} earns ${formatMultiplier(farming.favored_multiplier)} per cycle`;
+  if (farming.favored_changes_in_seconds === null) return base;
+  const remaining = Math.max(
+    0,
+    farming.favored_changes_in_seconds - Math.max(0, elapsedSeconds)
+  );
+  return remaining > 0
+    ? `${base} · changes in ${formatFarmDuration(remaining)}`
+    : `${base} · changing now`;
 }
 
 function createEl(tag, className, text) {
@@ -185,6 +216,9 @@ function buildTokenRow(token) {
 
   const head = createEl('div', 'farming-row-head');
   head.appendChild(createEl('strong', 'farming-token', formatTokenName(token)));
+  const favoredBadge = createEl('span', 'farming-favored-badge');
+  favoredBadge.hidden = true;
+  head.appendChild(favoredBadge);
   const balance = createStat('Balance');
   const farmed = createStat('Farmed');
   const cycles = createStat('Cycles');
@@ -222,6 +256,7 @@ function buildTokenRow(token) {
     farmedEl: farmed.value,
     cyclesEl: cycles.value,
     nextEl: next.value,
+    favoredBadge,
   };
 }
 
@@ -230,10 +265,13 @@ function buildLayout(tokens) {
 
   const header = createEl('div', 'farming-card-header');
   header.appendChild(createEl('h2', '', 'Farming'));
-  header.appendChild(createEl('span', 'farming-stage', 'Stage 1 · Passive'));
+  const stageEl = createEl('span', 'farming-stage', 'Stage 1 · Passive');
+  header.appendChild(stageEl);
 
   const statusEl = createEl('p', 'farming-status-line', FARMING_DISABLED_TEXT);
   statusEl.setAttribute('role', 'status');
+  const favoredEl = createEl('p', 'farming-favored-line');
+  favoredEl.hidden = true;
 
   const rulesEl = createEl('div', 'farming-rules');
   const summaryEl = createEl('p', 'farming-rule-summary');
@@ -251,10 +289,12 @@ function buildLayout(tokens) {
     rowsEl.appendChild(rows[token].row);
   });
 
-  card.append(header, statusEl, rulesEl, availabilityEl, rowsEl);
+  card.append(header, statusEl, favoredEl, rulesEl, availabilityEl, rowsEl);
   return {
     key: tokens.join('|'),
     card,
+    stageEl,
+    favoredEl,
     statusEl,
     rulesEl,
     summaryEl,
@@ -330,6 +370,7 @@ export function initFarmingPanel(deps) {
         elapsed
       );
     });
+    renderFavored(layout, lastFarming, elapsed);
   }
 
   function syncTicker(enabled) {
@@ -378,6 +419,9 @@ export function initFarmingPanel(deps) {
     refs.rulesEl.hidden = !farming.enabled;
     refs.rowsEl.hidden = !farming.enabled;
     refs.summaryEl.textContent = formatFarmingRuleSummary(farming);
+    refs.stageEl.textContent = hasFavoredBonus(farming)
+      ? 'Stage 2 · Favored season'
+      : 'Stage 1 · Passive';
 
     const blocked = farming.enabled && availability && !availability.allowed;
     refs.availabilityEl.hidden = !blocked;
@@ -386,6 +430,7 @@ export function initFarmingPanel(deps) {
       : '';
 
     const elapsed = elapsedSeconds();
+    renderFavored(refs, farming, elapsed);
     tokens.forEach((token) => {
       const row = refs.rows[token];
       const position = getFarmPosition(farming, token);
@@ -422,6 +467,20 @@ export function initFarmingPanel(deps) {
             ? 'Working...'
             : ACTION_LABELS[action];
       });
+    });
+  }
+
+  function renderFavored(refs, farming, elapsed) {
+    const line = farming.enabled ? formatFavoredLine(farming, elapsed) : '';
+    refs.favoredEl.hidden = !line;
+    if (refs.favoredEl.textContent !== line) refs.favoredEl.textContent = line;
+    Object.entries(refs.rows).forEach(([token, row]) => {
+      const favored = Boolean(line) && farming.favored_token === token;
+      row.row.classList.toggle('farming-row-favored', favored);
+      row.favoredBadge.hidden = !favored;
+      row.favoredBadge.textContent = favored
+        ? `${formatMultiplier(farming.favored_multiplier)} now`
+        : '';
     });
   }
 

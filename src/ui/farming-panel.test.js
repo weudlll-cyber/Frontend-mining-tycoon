@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FARMING_DISABLED_TEXT,
   formatFarmingPillText,
+  formatFavoredLine,
+  formatFarmingRuleSummary,
   formatNextReward,
   initFarmingPanel,
   resolveFarmActionState,
@@ -448,6 +450,89 @@ describe('initFarmingPanel status pill only', () => {
       farmingStatusRef: statusEl,
     });
     expect(statusEl.textContent).toBe('Enabled (5% / 5m)');
+    api.dispose();
+  });
+});
+
+describe('Farming Stage 2 (favored season)', () => {
+  const FARM = {
+    enabled: true,
+    reward_rate: 0.05,
+    min_duration_seconds: 60,
+    favored_multiplier: 2,
+    favored_token: 'summer',
+    favored_changes_in_seconds: 42,
+    positions: {},
+  };
+
+  it('describes the favored season and counts down to the change', () => {
+    expect(formatFavoredLine(FARM)).toBe(
+      'Favored now: Summer earns ×2 per cycle · changes in 42s'
+    );
+    expect(formatFavoredLine(FARM, 42)).toBe(
+      'Favored now: Summer earns ×2 per cycle · changing now'
+    );
+    expect(formatFavoredLine({ ...FARM, favored_multiplier: 1 })).toBe('');
+    expect(formatFavoredLine({ ...FARM, favored_token: null })).toBe('');
+  });
+
+  it('adds the bonus to the pill and the rule summary', () => {
+    expect(formatFarmingPillText(FARM)).toBe('Enabled (5% / 1m / favored ×2)');
+    expect(formatFarmingRuleSummary(FARM)).toContain('favored season earns ×2');
+    expect(
+      formatFarmingRuleSummary({ ...FARM, favored_multiplier: 1 })
+    ).not.toContain('favored');
+  });
+});
+
+describe('Farm tab highlights the favored season', () => {
+  it('marks the favored row, shows the line and counts down', () => {
+    vi.useFakeTimers();
+    try {
+      const { panelEl, statusEl, api, advance } = setup({
+        state: buildState({
+          ...ENABLED_FARMING,
+          favored_multiplier: 2,
+          favored_token: 'summer',
+          favored_changes_in_seconds: 10,
+        }),
+      });
+      const line = panelEl.querySelector('.farming-favored-line');
+      expect(line.hidden).toBe(false);
+      expect(line.textContent).toBe(
+        'Favored now: Summer earns ×2 per cycle · changes in 10s'
+      );
+      expect(panelEl.querySelector('.farming-stage').textContent).toBe(
+        'Stage 2 · Favored season'
+      );
+      const summer = panelEl.querySelector('.farming-row[data-token="summer"]');
+      const spring = panelEl.querySelector('.farming-row[data-token="spring"]');
+      expect(summer.classList.contains('farming-row-favored')).toBe(true);
+      expect(summer.querySelector('.farming-favored-badge').textContent).toBe(
+        '×2 now'
+      );
+      expect(spring.classList.contains('farming-row-favored')).toBe(false);
+      expect(spring.querySelector('.farming-favored-badge').hidden).toBe(true);
+      expect(statusEl.textContent).toContain('favored ×2');
+
+      advance(4000);
+      vi.advanceTimersByTime(1000);
+      expect(line.textContent).toBe(
+        'Favored now: Summer earns ×2 per cycle · changes in 6s'
+      );
+      api.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows nothing extra for a Stage 1 round', () => {
+    const { panelEl, api } = setup();
+    expect(panelEl.querySelector('.farming-favored-line').hidden).toBe(true);
+    expect(panelEl.querySelector('.farming-stage').textContent).toBe(
+      'Stage 1 · Passive'
+    );
+    expect(panelEl.querySelectorAll('.farming-row-favored')).toHaveLength(0);
     api.dispose();
   });
 });
