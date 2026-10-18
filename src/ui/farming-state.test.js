@@ -37,11 +37,35 @@ describe('normalizeFarming', () => {
       enabled: false,
       min_duration_seconds: null,
       reward_rate: null,
+      favored_multiplier: 1,
+      favored_token: null,
+      favored_changes_in_seconds: null,
       positions: {},
     });
     expect(
       normalizeFarming({}, { player_state: { balances: {} } }).enabled
     ).toBe(false);
+  });
+
+  it('reads the Stage 2 favored-season fields', () => {
+    const farming = normalizeFarming(
+      { farming: { enabled: true, favored_multiplier: 2 } },
+      {
+        farming: {
+          enabled: true,
+          favored_token: 'Summer',
+          favored_changes_in_seconds: 41.6,
+          positions: {},
+        },
+      }
+    );
+    expect(farming.favored_multiplier).toBe(2);
+    expect(farming.favored_token).toBe('summer');
+    expect(farming.favored_changes_in_seconds).toBe(42);
+    expect(
+      normalizeFarming({ farming: { favored_multiplier: 1 } }, null)
+        .favored_multiplier
+    ).toBe(1);
   });
 
   it('uses meta rules when the state has no farming block', () => {

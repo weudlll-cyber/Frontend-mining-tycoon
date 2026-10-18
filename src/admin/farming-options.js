@@ -29,8 +29,12 @@ const IDS = Object.freeze({
   durationValue: 'admin-farming-min-duration-value',
   durationUnit: 'admin-farming-min-duration-unit',
   reward: 'admin-farming-reward',
+  favored: 'admin-farming-favored',
   note: 'admin-farming-note',
 });
+
+// Mirrors the backend's farming_favored_multiplier bounds (schema, 422 otherwise).
+const FAVORED_LIMITS = Object.freeze({ min: 1, max: 5, fallback: 2 });
 
 const UNIT_SECONDS = Object.freeze({
   seconds: 1,
@@ -79,10 +83,12 @@ function isEnabledChecked() {
 /** Grey out the value fields while farming is off. */
 function syncFieldState() {
   const disabled = !isEnabledChecked();
-  [IDS.durationValue, IDS.durationUnit, IDS.reward].forEach((id) => {
-    const input = el(id);
-    if (input) input.disabled = disabled;
-  });
+  [IDS.durationValue, IDS.durationUnit, IDS.reward, IDS.favored].forEach(
+    (id) => {
+      const input = el(id);
+      if (input) input.disabled = disabled;
+    }
+  );
   el(IDS.fields)?.classList.toggle('farming-fields-off', disabled);
 }
 
@@ -134,7 +140,8 @@ export function applyFarmingDefaults(config) {
  * Read and validate the farming inputs.
  * @param {number} windowSeconds round (sync) or session (async) length
  * @returns {{ enabled: boolean, minDurationSeconds: number|null,
- *   rewardRate: number|null, errors: string[] }}
+ *   rewardRate: number|null, favoredMultiplier: number|null,
+ *   errors: string[] }}
  */
 export function readFarmingForm(windowSeconds) {
   const enabled = isEnabledChecked();
@@ -142,6 +149,7 @@ export function readFarmingForm(windowSeconds) {
     enabled,
     minDurationSeconds: null,
     rewardRate: null,
+    favoredMultiplier: null,
     errors: [],
   };
   if (!enabled) return result;
@@ -184,6 +192,24 @@ export function readFarmingForm(windowSeconds) {
   } else {
     result.rewardRate = rate;
   }
+
+  // Stage 2 (optional field; older admin pages without it send nothing).
+  const favoredInput = el(IDS.favored);
+  if (favoredInput) {
+    const favoredText = String(favoredInput.value ?? '').trim();
+    const favored = favoredText ? Number(favoredText) : FAVORED_LIMITS.fallback;
+    if (
+      !Number.isFinite(favored) ||
+      favored < FAVORED_LIMITS.min ||
+      favored > FAVORED_LIMITS.max
+    ) {
+      result.errors.push(
+        `Favored season bonus must be between ×${FAVORED_LIMITS.min} and ×${FAVORED_LIMITS.max}.`
+      );
+    } else {
+      result.favoredMultiplier = favored;
+    }
+  }
   return result;
 }
 
@@ -206,6 +232,9 @@ export function collectFarmingPayload(windowSeconds) {
     farming_enabled: true,
     farming_min_duration_seconds: form.minDurationSeconds,
     farming_reward_rate: form.rewardRate,
+    ...(form.favoredMultiplier !== null
+      ? { farming_favored_multiplier: form.favoredMultiplier }
+      : {}),
   };
 }
 
@@ -218,7 +247,7 @@ export function buildFarmingReviewRows(windowSeconds) {
   return [
     [
       'Farming',
-      `Enabled: ${formatRateAsPercent(form.rewardRate)}% per ${formatFarmDuration(form.minDurationSeconds)} cycle`,
+      `Enabled: ${formatRateAsPercent(form.rewardRate)}% per ${formatFarmDuration(form.minDurationSeconds)} cycle${form.favoredMultiplier > 1 ? `, favored season ×${form.favoredMultiplier}` : ''}`,
     ],
   ];
 }
@@ -229,7 +258,7 @@ export function bindFarmingInputs(onChange) {
     syncFieldState();
     onChange?.();
   });
-  [IDS.durationValue, IDS.reward].forEach((id) =>
+  [IDS.durationValue, IDS.reward, IDS.favored].forEach((id) =>
     el(id)?.addEventListener('input', () => onChange?.())
   );
   el(IDS.durationUnit)?.addEventListener('change', () => onChange?.());

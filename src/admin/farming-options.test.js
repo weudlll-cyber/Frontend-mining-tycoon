@@ -115,10 +115,27 @@ describe('payload and review', () => {
       farming_enabled: true,
       farming_min_duration_seconds: 120,
       farming_reward_rate: 0.07,
+      farming_favored_multiplier: 2,
     });
     expect(buildFarmingReviewRows(600)).toEqual([
-      ['Farming', 'Enabled: 7% per 2m cycle'],
+      ['Farming', 'Enabled: 7% per 2m cycle, favored season ×2'],
     ]);
+  });
+
+  it('sends the favored season bonus and checks its range', () => {
+    $('enabled').checked = true;
+    $('min-duration-value').value = '2';
+    $('min-duration-unit').value = 'minutes';
+    $('reward').value = '5';
+    $('favored').value = '1';
+    expect(collectFarmingPayload(600).farming_favored_multiplier).toBe(1);
+    expect(buildFarmingReviewRows(600)).toEqual([
+      ['Farming', 'Enabled: 5% per 2m cycle'],
+    ]);
+    $('favored').value = '6';
+    expect(() => collectFarmingPayload(600)).toThrow(
+      'Favored season bonus must be between ×1 and ×5.'
+    );
   });
 
   it('requires the minimum duration to be shorter than the round/session', () => {
