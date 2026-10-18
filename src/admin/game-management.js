@@ -9,7 +9,7 @@
  * Security notes: backend values are rendered via textContent/createElement;
  *          game IDs are URL-encoded.
  */
-import { adminRequest } from './admin-api.js';
+import { adminRequest, readAdminConnection } from './admin-api.js';
 import {
   buildAdminAuthHeaders,
   handleAdminAuthError,
@@ -22,11 +22,7 @@ import { formatDuration } from '../utils/duration-format.js';
 import { formatTokenName } from '../utils/value-utils.js';
 
 async function getBackendUrl() {
-  const url = (el('admin-backend-url')?.value || '').trim();
-  if (!url) {
-    throw new Error('Backend URL is not set. Please enter a backend URL.');
-  }
-  return url;
+  return readAdminConnection().baseUrl;
 }
 
 function adminHeaders() {

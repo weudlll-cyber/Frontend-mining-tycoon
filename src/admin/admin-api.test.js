@@ -37,6 +37,25 @@ describe('readAdminConnection', () => {
     document.getElementById('admin-backend-url').value = '  ';
     expect(() => readAdminConnection()).toThrow('Backend URL is not set');
   });
+
+  it('rejects a URL that is not http(s)', () => {
+    document.getElementById('admin-backend-url').value = 'ftp://example.com';
+    expect(() => readAdminConnection()).toThrow('must use http or https');
+  });
+
+  it('requires https for remote hosts in production builds', () => {
+    vi.stubEnv('PROD', true);
+    try {
+      document.getElementById('admin-backend-url').value =
+        'http://api.example.com';
+      expect(() => readAdminConnection()).toThrow(/must use https/);
+      document.getElementById('admin-backend-url').value =
+        'http://localhost:8000/';
+      expect(readAdminConnection().baseUrl).toBe('http://localhost:8000');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe('adminRequest', () => {

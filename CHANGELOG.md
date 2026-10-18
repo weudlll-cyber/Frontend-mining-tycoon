@@ -67,6 +67,8 @@ pre-1.0 playtest builds.
   load: the token is still removed from the address bar, and the lobby shows
   a "Confirm my email" button that sends it. Mail link scanners and
   prefetchers can no longer use up the one-time token.
+- Production builds reject a plain `http://` backend URL override (lobby,
+  board and admin console) unless it points to `localhost` / `127.0.0.1`.
 - Logging out, changing the password, deleting the account or an expired
   sign-in now also removes the stored player tokens, so the next person on a
   shared device cannot act as this player in a round that is still running.

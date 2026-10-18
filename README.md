@@ -110,7 +110,9 @@ at build time from `VITE_API_BASE_URL` (copy `.env.example` to `.env.local` and
 set it, or set it before `npm run build`). When it is unset or not an http(s)
 URL, the fallback is `http://127.0.0.1:8000`. The lobby, player board and admin
 console all use this default; the Backend URL fields on `player.html` and
-`admin.html` can override it, and the override is stored in localStorage.
+`admin.html` can override it, and the override is stored in localStorage. In
+a production build an override must use https; plain http is only accepted for
+`localhost` / `127.0.0.1`.
 
 ## Pages
 

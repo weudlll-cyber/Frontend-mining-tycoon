@@ -71,6 +71,7 @@ import { DEFAULT_BACKEND_URL } from '../config/backend-url.js';
 import {
   STORAGE_KEYS,
   getStorageItem,
+  normalizeBaseUrl,
   setStorageItem,
 } from '../utils/storage-utils.js';
 import { byId as el } from '../utils/dom-utils.js';
@@ -167,9 +168,18 @@ function renderConfigSource() {
  * Fetch GET /meta (public) and re-render the form with its game_config.
  * Failures keep the current (fallback) form; meta-manager logs them.
  */
+/** Normalized backend URL of the field, or null when it is not acceptable. */
+function readBackendUrlOrNull(value) {
+  try {
+    return normalizeBaseUrl(String(value || ''));
+  } catch {
+    return null;
+  }
+}
+
 export async function refreshGameConfigFromMeta() {
-  const baseUrl = String(el('admin-backend-url').value || '').trim();
-  if (!/^https?:\/\/.+/.test(baseUrl)) return;
+  const baseUrl = readBackendUrlOrNull(el('admin-backend-url').value);
+  if (!baseUrl) return;
   await fetchMetaSnapshot(baseUrl, null, { force: true });
   applyGameConfigToForm();
 }
@@ -527,10 +537,8 @@ export function initBackendUrlField() {
     input.value = stored || DEFAULT_BACKEND_URL;
   }
   input.addEventListener('change', () => {
-    const value = String(input.value || '').trim();
-    if (/^https?:\/\/.+/.test(value)) {
-      setStorageItem(STORAGE_KEYS.baseUrl, value.replace(/\/+$/, ''));
-    }
+    const value = readBackendUrlOrNull(input.value);
+    if (value) setStorageItem(STORAGE_KEYS.baseUrl, value);
   });
 }
 
@@ -544,14 +552,14 @@ export async function createRound() {
   createBtn.textContent = 'Creating…';
 
   try {
-    const baseUrl = (el('admin-backend-url').value || '')
-      .trim()
-      .replace(/\/$/, '');
-    if (!baseUrl || !/^https?:\/\/.+/.test(baseUrl)) {
+    const rawUrl = String(el('admin-backend-url').value || '').trim();
+    if (!rawUrl) {
       throw new Error(
         'Invalid backend URL. Use http://host:port or https://host:port.'
       );
     }
+    // Same rules as the lobby/board (https only in production builds).
+    const baseUrl = normalizeBaseUrl(rawUrl);
 
     const payload = buildGamePayload();
 
