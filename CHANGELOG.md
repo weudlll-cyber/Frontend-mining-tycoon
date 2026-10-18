@@ -46,6 +46,11 @@ pre-1.0 playtest builds.
   `readRepoFile`, `readCssBundle`, the board and setup-flow fixtures) replace
   per-file copies; the trade-default check samples every boundary and a 61 s
   grid instead of looping over 691k seconds without `expect`.
+- CI: third-party actions (`dorny/paths-filter`, `github/codeql-action`,
+  `gitleaks/gitleaks-action`, `anchore/sbom-action`) are pinned to commit
+  SHAs, `license-checker` to 25.0.1; `stable-tag` takes an optional
+  `tag_message` input (generic default) and passes inputs via `env`; the
+  unused `any` output of `detect-changes` is gone.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared

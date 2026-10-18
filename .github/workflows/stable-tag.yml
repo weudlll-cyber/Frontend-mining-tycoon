@@ -13,6 +13,11 @@ on:
         required: true
         default: snapshot-stable-v1
         type: string
+      tag_message:
+        description: Annotated tag message (empty = generic message with the tag name and ref)
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -35,10 +40,15 @@ jobs:
 
       - name: Create annotated stable tag
         shell: bash
+        env:
+          # Inputs via env, not inline expressions (no shell injection).
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_TAG_MESSAGE: ${{ inputs.tag_message }}
+          INPUT_REF: ${{ inputs.ref }}
         run: |
           set -euo pipefail
-          TAG_NAME="${{ inputs.tag_name }}"
-          TAG_MESSAGE="Stable snapshot after full hygiene, tooltip parity, layout stabilization, and documentation sync."
+          TAG_NAME="${INPUT_TAG_NAME}"
+          TAG_MESSAGE="${INPUT_TAG_MESSAGE:-Stable snapshot ${INPUT_TAG_NAME} of ${INPUT_REF}}"
 
           if git rev-parse "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
             echo "Tag ${TAG_NAME} already exists."

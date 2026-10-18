@@ -94,7 +94,7 @@ passes "by policy" without running.
 | `dependency-review.yml` | `Dependency Review` (skips when the dependency graph is unavailable) | blocking |
 | `actionlint.yml` | `Actionlint` (also on push) | blocking |
 | `security-compliance.yml` | `Secret scan` (gitleaks, full history) | blocking |
-| `security-compliance.yml` | `License policy` (`license-checker --production` + `scripts/check_license_policy.mjs`; denies GPL/AGPL/SSPL) | blocking |
+| `security-compliance.yml` | `License policy` (`license-checker@25.0.1 --production` + `scripts/check_license_policy.mjs`; denies GPL/AGPL/SSPL) | blocking |
 | `security-compliance.yml` | `Compliance summary gate` | blocking |
 
 The project has only devDependencies, so `License policy` currently has nothing
