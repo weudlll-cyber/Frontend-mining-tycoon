@@ -11,16 +11,7 @@ import {
   loadMetricsSummary,
   showGameMetrics,
 } from './admin-metrics.js';
-
-function okResponse(body) {
-  return { ok: true, status: 200, json: async () => body };
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
-}
+import { flush, okResponse } from '../test-utils/async-helpers.js';
 
 beforeEach(() => {
   document.body.innerHTML = `

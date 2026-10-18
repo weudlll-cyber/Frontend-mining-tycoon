@@ -17,8 +17,8 @@ Backend contract (P2.3 events, app/core/events.py summarize_active_events):
 - Remaining real time is derived from (end_sim_month - current_sim_month) divided by
   the game's sim_months_per_real_second (from game meta); without a rate the banner
   falls back to remaining sim-months.
-- Legacy single-object shapes (active_event / event_context.active_event /
-  events.active with name/effect_description/end_unix) are still tolerated.
+- Events come only from the `active_events` list (always sent by /state and
+  the stream); the old single-object keys are no longer read.
 Constraints:
 - LOCKED_DECISIONS.md §C: no overlay/modal behavior; event banner is inline.
 - Frontend is display-only; active event data comes from backend payloads.
@@ -27,7 +27,8 @@ Security notes:
 */
 
 import { setElementTextValue } from '../utils/dom-utils.js';
-import { formatCountdownClock } from './halving-display.js';
+import { formatDuration } from '../utils/duration-format.js';
+import { formatTokenName, isPlainObject } from '../utils/value-utils.js';
 import { initMicroTooltips } from './micro-tooltip.js';
 
 let _eventBannerEl = null;
@@ -57,24 +58,14 @@ const DOMAIN_LABELS = {
   oracle_spread: 'Spread',
 };
 
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
- * Return all currently active events as an array.
- * Prefers the backend list `active_events`; falls back to legacy single-object keys.
+ * Return all currently active events as an array (backend `active_events`,
+ * always a list in /state and the stream). Malformed entries are skipped.
  */
 export function getActiveEvents(data) {
-  if (Array.isArray(data?.active_events)) {
-    return data.active_events.filter(isPlainObject);
-  }
-  const legacy =
-    data?.active_event ||
-    data?.event_context?.active_event ||
-    data?.events?.active ||
-    null;
-  return isPlainObject(legacy) ? [legacy] : [];
+  return Array.isArray(data?.active_events)
+    ? data.active_events.filter(isPlainObject)
+    : [];
 }
 
 function getEventDomains(activeEvent) {
@@ -101,7 +92,7 @@ function humanizeEventType(eventType) {
     .toLowerCase()
     .split('_')
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => formatTokenName(part))
     .join(' ');
 }
 
@@ -226,7 +217,7 @@ function formatRemaining(activeEvent, data) {
   const remaining = getRemaining(activeEvent, data);
   if (!remaining) return '—';
   if (Number.isFinite(remaining.seconds)) {
-    return formatCountdownClock(remaining.seconds);
+    return formatDuration(remaining.seconds, { style: 'clock' });
   }
   const months = remaining.simMonths;
   return `${months} sim-month${months === 1 ? '' : 's'}`;

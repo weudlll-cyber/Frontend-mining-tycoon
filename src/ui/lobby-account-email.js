@@ -5,7 +5,10 @@ Purpose: Lobby side of the email features (index.html):
     link (POST /auth/password-reset/request);
   - reset link `index.html?reset=<token>`: opens the "Choose a new password"
     dialog and sends POST /auth/password-reset/confirm;
-  - confirmation link `index.html?verify=<token>`: POST /auth/verify-email;
+  - confirmation link `index.html?verify=<token>`: shows a small notice with
+    a "Confirm my email" button that sends POST /auth/verify-email (not on
+    page load: mail link scanners and prefetchers open links and would
+    otherwise use up the one-time token);
   - the account panel hint "Your email address is not confirmed yet" with a
     "Send the link again" button (POST /auth/verify-email/resend).
 Role in system: lobby-only, so native <dialog>s are allowed (LOCKED_DECISIONS
@@ -35,6 +38,7 @@ let getContext = () => ({ baseUrl: '', authToken: '' });
 let setStatus = () => {};
 let capabilities = { passwordReset: false, emailVerification: false };
 let resetToken = '';
+let verifyToken = '';
 
 function byId(id) {
   return document.getElementById(id);
@@ -69,7 +73,7 @@ export async function loadEmailCapabilities() {
 /**
  * Show or hide the "not confirmed" hint for the signed-in account.
  * `verified` is the `email_verified` flag from login or /auth/me; `undefined`
- * (older backend, or not known yet) hides the hint.
+ * (not known yet, e.g. a restored session before /auth/me) hides the hint.
  */
 export function renderEmailVerification(verified) {
   if (!els?.verifyHint) return;
@@ -178,15 +182,30 @@ export async function handleEmailLinkFromQuery() {
     els.resetDialog?.showModal();
     return;
   }
+  verifyToken = verify;
+  if (els.confirmNotice) els.confirmNotice.hidden = false;
+}
+
+/** "Confirm my email": send the token kept from the `?verify=` link. */
+async function handleConfirmEmailClick() {
+  if (!verifyToken) return;
+  if (els.confirmBtn) els.confirmBtn.disabled = true;
   try {
-    const result = await verifyEmail(getContext().baseUrl, { token: verify });
+    const result = await verifyEmail(getContext().baseUrl, {
+      token: verifyToken,
+    });
+    verifyToken = '';
+    if (els.confirmNotice) els.confirmNotice.hidden = true;
     setStatus(result?.message || 'Your email address is confirmed.', 'success');
     renderEmailVerification(true);
   } catch (error) {
+    // The notice stays, so a network error can be retried.
     setStatus(
       error?.message || 'This confirmation link did not work.',
       'error'
     );
+  } finally {
+    if (els.confirmBtn) els.confirmBtn.disabled = false;
   }
 }
 
@@ -199,6 +218,7 @@ export function initAccountEmail(options = {}) {
   setStatus = options.setStatus || setStatus;
   capabilities = { passwordReset: false, emailVerification: false };
   resetToken = '';
+  verifyToken = '';
   els = {
     openForgot: byId('open-forgot-password'),
     forgotDialog: byId('forgot-password-dialog'),
@@ -215,6 +235,8 @@ export function initAccountEmail(options = {}) {
     verifyHint: byId('email-verify-hint'),
     verifyMessage: byId('email-verify-message'),
     resendBtn: byId('resend-verification-btn'),
+    confirmNotice: byId('email-confirm-notice'),
+    confirmBtn: byId('confirm-email-btn'),
   };
   applyCapabilities();
 
@@ -236,5 +258,8 @@ export function initAccountEmail(options = {}) {
   });
   els.resendBtn?.addEventListener('click', () => {
     void handleResendClick();
+  });
+  els.confirmBtn?.addEventListener('click', () => {
+    void handleConfirmEmailClick();
   });
 }

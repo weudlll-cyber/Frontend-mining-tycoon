@@ -7,7 +7,9 @@ Invariants:
 - Storage failures remain non-fatal to gameplay.
 - Keys remain namespaced to avoid collisions and accidental authority leaks.
 Security notes:
-- URL normalization accepts only http and https origins.
+- URL normalization accepts only http and https origins; production builds
+  (import.meta.env.PROD) accept plain http only for localhost / 127.0.0.1, so
+  a backend URL override cannot send tokens unencrypted.
 - Storage wrappers avoid throwing on browser quota or policy failures.
 */
 
@@ -21,17 +23,6 @@ export const STORAGE_KEYS = {
   authDisplayName: 'mining-tycoon:authDisplayName',
   lastPlayedGameSnapshot: 'mining-tycoon:lastPlayedGameSnapshot',
   playerName: 'mining-tycoon:playerName',
-  durationPreset: 'mining-tycoon:durationPreset',
-  durationCustomValue: 'mining-tycoon:durationCustomValue',
-  durationCustomUnit: 'mining-tycoon:durationCustomUnit',
-  enrollmentWindow: 'mining-tycoon:enrollmentWindow',
-  scoringMode: 'mining-tycoon:scoringMode',
-  tradeCount: 'mining-tycoon:tradeCount',
-  tradeCountOverride: 'mining-tycoon:tradeCountOverride',
-  roundType: 'mining-tycoon:roundType',
-  asyncDurationPreset: 'mining-tycoon:asyncDurationPreset',
-  asyncDurationCustomMinutes: 'mining-tycoon:asyncDurationCustomMinutes',
-  asyncAutoStart: 'mining-tycoon:asyncAutoStart',
   debugPanelOpen: 'mining-tycoon:debugPanelOpen',
   gameId: 'mining-tycoon:gameId',
   playerId: 'mining-tycoon:playerId',
@@ -87,7 +78,18 @@ export function getStorageItem(key) {
   }
 }
 
-export function normalizeBaseUrl(rawValue) {
+// Hosts that may stay on plain http in a production build (local backends).
+const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Validate and normalize a backend URL (no trailing slash).
+ * @param {string} rawValue
+ * @param {{ production?: boolean }} [options] defaults to the build mode
+ */
+export function normalizeBaseUrl(
+  rawValue,
+  { production = Boolean(import.meta.env?.PROD) } = {}
+) {
   const trimmed = (rawValue || '').trim().replace(/\/+$/, '');
   let parsed;
   try {
@@ -99,6 +101,15 @@ export function normalizeBaseUrl(rawValue) {
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('Backend URL must use http or https.');
+  }
+  if (
+    production &&
+    parsed.protocol === 'http:' &&
+    !LOCAL_HTTP_HOSTS.has(parsed.hostname)
+  ) {
+    throw new Error(
+      'Backend URL must use https (plain http is only allowed for localhost).'
+    );
   }
   return parsed.toString().replace(/\/+$/, '');
 }

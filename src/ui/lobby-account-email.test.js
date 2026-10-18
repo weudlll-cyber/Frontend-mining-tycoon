@@ -23,6 +23,7 @@ import {
   loadEmailCapabilities,
   renderEmailVerification,
 } from './lobby-account-email.js';
+import { flush } from '../test-utils/async-helpers.js';
 
 const setStatus = vi.fn();
 
@@ -48,17 +49,14 @@ function buildDom() {
       <button id="resend-verification-btn" type="button"></button>
       <p id="email-verify-message"></p>
     </div>
+    <div id="email-confirm-notice" hidden>
+      <button id="confirm-email-btn" type="button"></button>
+    </div>
   `;
   // jsdom has no <dialog> methods.
   for (const dialog of document.querySelectorAll('dialog')) {
     dialog.showModal = vi.fn();
     dialog.close = vi.fn();
-  }
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
   }
 }
 
@@ -133,7 +131,7 @@ describe('confirmation hint', () => {
 });
 
 describe('links from emails', () => {
-  it('confirms the address for ?verify= and hides the hint', async () => {
+  it('confirms the address for ?verify= only after the button press', async () => {
     await loadEmailCapabilities();
     renderEmailVerification(false);
     window.history.replaceState(null, '', '/?verify=v-token');
@@ -143,7 +141,16 @@ describe('links from emails', () => {
 
     await handleEmailLinkFromQuery();
 
+    // Loading the page must not use up the token (mail link scanners).
     expect(window.location.search).toBe('');
+    expect(vi.mocked(authClient.verifyEmail)).not.toHaveBeenCalled();
+    const notice = document.getElementById('email-confirm-notice');
+    expect(notice.hidden).toBe(false);
+
+    document.getElementById('confirm-email-btn').click();
+    await flush();
+
+    expect(notice.hidden).toBe(true);
     expect(vi.mocked(authClient.verifyEmail)).toHaveBeenCalledWith(
       'http://api',
       { token: 'v-token' }
@@ -163,10 +170,22 @@ describe('links from emails', () => {
       })
     );
     await handleEmailLinkFromQuery();
+    const button = document.getElementById('confirm-email-btn');
+    button.click();
+    await flush();
     expect(setStatus).toHaveBeenCalledWith(
       'This link is invalid or has expired.',
       'error'
     );
+    // The notice stays for a retry and the button is usable again.
+    expect(document.getElementById('email-confirm-notice').hidden).toBe(false);
+    expect(button.disabled).toBe(false);
+  });
+
+  it('ignores the confirm button without a pending link', async () => {
+    document.getElementById('confirm-email-btn').click();
+    await flush();
+    expect(vi.mocked(authClient.verifyEmail)).not.toHaveBeenCalled();
   });
 
   it('opens the new-password dialog for ?reset= and forgets the token on cancel', async () => {

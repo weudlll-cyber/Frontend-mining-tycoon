@@ -22,6 +22,7 @@
 import { getGlobalMeta } from '../meta/meta-manager.js';
 import { getLoadedEconomyConfig } from './economy-settings.js';
 import { byId as el } from '../utils/dom-utils.js';
+import { formatRatePercent, isFiniteNumber } from '../utils/value-utils.js';
 
 // Overrides are entered in percent; the API takes a rate (0.02 = 2 %).
 const RATE_FIELDS = Object.freeze([
@@ -43,17 +44,12 @@ const RATE_FIELDS = Object.freeze([
 // the admin changes the checkbox away from it.
 let chatDefault = true;
 
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 /**
  * Format a rate as a percent string without float noise
  * (0.02 -> "2", 0.0125 -> "1.25"); null when the rate is not a number.
  */
 export function formatRateAsPercent(rate) {
-  if (!isFiniteNumber(rate)) return null;
-  return String(Number((rate * 100).toFixed(4)));
+  return isFiniteNumber(rate) ? formatRatePercent(rate) : null;
 }
 
 /**

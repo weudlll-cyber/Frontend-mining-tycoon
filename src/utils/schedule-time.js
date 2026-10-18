@@ -15,6 +15,8 @@ Constraints:
 Security notes: returns plain strings; callers render them with textContent.
 */
 
+import { formatDuration } from './duration-format.js';
+
 /** Unix seconds as a positive finite number, or null for anything else. */
 export function normalizeUnixSeconds(raw) {
   if (raw === null || raw === undefined || raw === '') return null;
@@ -102,14 +104,7 @@ export function formatOpensAtShort(unixSeconds, nowMs = Date.now()) {
  * remains (the last minute counts down in seconds).
  */
 export function formatOpensIn(seconds) {
-  const total = Math.max(0, Math.floor(Number(seconds) || 0));
-  if (total < 60) return `${total} s`;
-  const days = Math.floor(total / 86400);
-  const hours = Math.floor((total % 86400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  if (days > 0) return `${days} d ${pad2(hours)} h`;
-  if (hours > 0) return `${hours} h ${pad2(minutes)} min`;
-  return `${minutes} min`;
+  return formatDuration(seconds, { style: 'long' });
 }
 
 /**

@@ -8,6 +8,7 @@ Invariants/Security: Confirms non-blocking tooltip usage and text-only DOM updat
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  formatRemainingMmSs,
   initSeasonCards,
   renderSeasonData,
   stopSeasonHalvingTimers,
@@ -283,5 +284,13 @@ describe('season halving countdown stability', () => {
 
     stopSeasonHalvingTimers();
     vi.useRealTimers();
+  });
+});
+
+describe('formatRemainingMmSs', () => {
+  it('rounds up to whole seconds and never goes below 00:00', () => {
+    expect(formatRemainingMmSs(1065.2, 1000)).toBe('01:06');
+    expect(formatRemainingMmSs(900, 1000)).toBe('00:00');
+    expect(formatRemainingMmSs('x', 1000)).toBe('—');
   });
 });

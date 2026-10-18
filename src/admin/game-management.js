@@ -9,7 +9,7 @@
  * Security notes: backend values are rendered via textContent/createElement;
  *          game IDs are URL-encoded.
  */
-import { adminRequest } from './admin-api.js';
+import { adminRequest, readAdminConnection } from './admin-api.js';
 import {
   buildAdminAuthHeaders,
   handleAdminAuthError,
@@ -18,13 +18,11 @@ import { createApiError, readApiError } from '../utils/api-error.js';
 import { showGameMetrics } from './admin-metrics.js';
 import { initChatModeration, showChatModeration } from './chat-moderation.js';
 import { byId as el } from '../utils/dom-utils.js';
+import { formatDuration } from '../utils/duration-format.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 async function getBackendUrl() {
-  const url = (el('admin-backend-url')?.value || '').trim();
-  if (!url) {
-    throw new Error('Backend URL is not set. Please enter a backend URL.');
-  }
-  return url;
+  return readAdminConnection().baseUrl;
 }
 
 function adminHeaders() {
@@ -42,15 +40,9 @@ async function adminResponseError(response) {
   );
 }
 
-function formatDuration(seconds) {
+function formatRoundDuration(seconds) {
   if (!seconds || seconds < 0) return 'N/A';
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) {
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  }
-  return `${minutes}m`;
+  return formatDuration(seconds, { largest: 'h', smallest: 'm' });
 }
 
 function formatTimeRemaining(game) {
@@ -70,22 +62,13 @@ function formatTimeRemaining(game) {
   }
 
   if (endMs === null || isNaN(endMs)) {
-    return formatDuration(game.real_duration_seconds);
+    return formatRoundDuration(game.real_duration_seconds);
   }
 
   const remainingMs = endMs - now;
   if (remainingMs <= 0) return 'Ending soon';
 
-  const totalSecs = Math.floor(remainingMs / 1000);
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  const hours = Math.floor(mins / 60);
-  if (hours > 0) {
-    const m = mins % 60;
-    return `${hours}h ${m}m left`;
-  }
-  if (mins > 0) return `${mins}m ${secs}s left`;
-  return `${secs}s left`;
+  return `${formatDuration(remainingMs / 1000, { largest: 'h' })} left`;
 }
 
 function getStatusBadgeColor(status) {
@@ -185,8 +168,7 @@ async function fetchAndDisplayGames() {
         game.status === 'running' || game.status === 'enrolling'
           ? '#fff'
           : '#1a1a1a';
-      statusBadge.textContent =
-        game.status.charAt(0).toUpperCase() + game.status.slice(1);
+      statusBadge.textContent = formatTokenName(game.status);
       statusCell.appendChild(statusBadge);
 
       const typeCell = document.createElement('td');
@@ -298,7 +280,7 @@ async function deleteGame(gameId, buttonEl) {
 
     setTimeout(fetchAndDisplayGames, 800);
   } catch (error) {
-    console.error('[DELETE] Catch block error:', error.message, error.stack);
+    console.error(`Deleting game ${gameId} failed:`, error);
     buttonEl.disabled = false;
     buttonEl.textContent = '🗑 Delete';
     resultEl.className = 'result-box error';

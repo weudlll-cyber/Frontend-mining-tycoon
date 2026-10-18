@@ -73,22 +73,15 @@ export async function register(baseUrl, payload) {
 
 /**
  * Which email features the backend offers (GET /auth/email-capabilities):
- * `{ password_reset, email_verification }`. Older backends without the
- * endpoint (404) are treated as "no email features".
+ * `{ password_reset, email_verification }`. Errors propagate; the caller
+ * (lobby-account-email.js) then hides every email feature.
  */
 export async function fetchEmailCapabilities(baseUrl) {
-  try {
-    const payload = await requestJson(baseUrl, '/auth/email-capabilities');
-    return {
-      passwordReset: payload?.password_reset === true,
-      emailVerification: payload?.email_verification === true,
-    };
-  } catch (error) {
-    if (error?.status === 404) {
-      return { passwordReset: false, emailVerification: false };
-    }
-    throw error;
-  }
+  const payload = await requestJson(baseUrl, '/auth/email-capabilities');
+  return {
+    passwordReset: payload?.password_reset === true,
+    emailVerification: payload?.email_verification === true,
+  };
 }
 
 /**
@@ -188,7 +181,7 @@ function bearerHeaders(authToken) {
  * GET /games/active. When an account token is passed the backend adds
  * `my_player_id` per item (the caller's linked player, or null) and also lists
  * running sync games the caller already plays in, so the lobby can offer
- * "Rejoin". Older backends ignore the header.
+ * "Rejoin".
  */
 export async function fetchOpenGames(baseUrl, { authToken } = {}) {
   const response = await fetch(`${baseUrl}/games/active`, {

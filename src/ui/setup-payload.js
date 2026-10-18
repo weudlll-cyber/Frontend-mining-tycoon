@@ -1,40 +1,8 @@
 /**
 File: src/ui/setup-payload.js
-Purpose: Build setup payload fragments for game creation inputs.
-Notes: custom-duration limits come from the effective game config (backend
-/meta `game_config`, fallback src/config constants); the backend re-validates.
+Purpose: Build the optional advanced-override fragment of the admin create
+  payload (admin-setup.js); the backend re-validates every value.
 */
-
-import { getEffectiveGameConfig } from '../config/game-config.js';
-
-export function resolveDurationSecondsFromInputs({
-  durationPresetInput,
-  durationCustomValueInput,
-  durationCustomUnitInput,
-}) {
-  const preset = durationPresetInput?.value;
-  if (preset === 'custom') {
-    const customValue = parseInt(durationCustomValueInput?.value, 10);
-    const unit = durationCustomUnitInput?.value || 'seconds';
-    if (!Number.isFinite(customValue) || customValue <= 0) {
-      throw new Error('Custom duration must be a positive number');
-    }
-
-    let seconds = customValue;
-    if (unit === 'minutes') seconds = customValue * 60;
-    else if (unit === 'hours') seconds = customValue * 3600;
-    else if (unit === 'days') seconds = customValue * 86400;
-
-    const { min_seconds: min, max_seconds: max } =
-      getEffectiveGameConfig().duration_limits;
-    if (seconds < min || seconds > max) {
-      throw new Error(`Duration must be between ${min}s and ${max}s`);
-    }
-    return { mode: 'custom', customSeconds: seconds };
-  }
-
-  return { mode: 'preset', preset };
-}
 
 export function collectAdvancedOverridesFromInputs({
   showAdvancedCheckbox,

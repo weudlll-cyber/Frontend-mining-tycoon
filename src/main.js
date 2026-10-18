@@ -12,7 +12,7 @@ Key responsibilities:
 Module map (details in CODE_ORGANIZATION.md):
 - board-dom.js (element lookup), board-state.js (shared mutable state),
   board-update.js (stream payload -> UI), setup-controller.js / setup-settings.js
-  / setup-host-controls.js (setup shell, persistence, legacy host controls),
+  (setup shell, persistence),
   start-flow.js + services/player-join.js (enter game / start session),
   session-clock.js, live-board-lifecycle.js, game-over.js, chat-preview.js,
   meta-debug.js, scoring-mode-ui.js.
@@ -49,6 +49,7 @@ Manual QA (P2.4 Duration Presets & Overrides)
 9) Verify no innerHTML used in duration UI (all createElement/textContent)
 */
 
+import './shared.css';
 import './style.css';
 import { applyAdminLinkGate } from './ui/admin-link-gate.js';
 import {
@@ -193,11 +194,7 @@ import {
   handleActiveSessionExpired,
   resetLiveBoardState,
 } from './ui/live-board-lifecycle.js';
-import {
-  initMetaDebug,
-  renderDerivedEmissionPreview,
-  renderMetaDebugLine,
-} from './ui/meta-debug.js';
+import { initMetaDebug, renderMetaDebugLine } from './ui/meta-debug.js';
 import {
   initScoringModeUi,
   resolveActiveScoringMode,
@@ -213,20 +210,8 @@ import {
   syncSetupShellState,
 } from './ui/setup-controller.js';
 import {
-  initSetupHostControls,
-  applyGameConfigToHostControls,
-  collectAdvancedOverrides,
-  isTradeCountManuallyOverridden,
-  setSelectedRoundType,
-  syncHostSessionDurationOptions,
-  syncTradeCountWithDuration,
-  updateAsyncHostControlsVisibility,
-  wireHostControlEvents,
-} from './ui/setup-host-controls.js';
-import {
   initSetupSettings,
   loadSettings,
-  saveSettings,
   wireSettingsPersistence,
 } from './ui/setup-settings.js';
 import {
@@ -331,10 +316,9 @@ function ensureInputsEditable() {
 // ── Board modules (wired at import time, like the former inline code) ──────
 
 initScoringModeUi(dom);
-initSetupHostControls(dom);
 applyAdminLinkGate();
 initChatPreview(dom);
-initMetaDebug({ ...dom, tokens: PLAYER_STATE_TOKENS });
+initMetaDebug(dom);
 initSetupController({ ...dom, updateSetupActionsState });
 initSetupSettings({
   ...dom,
@@ -377,25 +361,6 @@ initStartFlow({
   setSetupCollapsed,
 });
 
-/** Host-control callbacks of the setup shell (legacy, hidden on player.html). */
-function handleHostRoundTypeChanged(nextRoundType) {
-  setSelectedRoundType(nextRoundType);
-  syncHostSessionDurationOptions();
-  syncTradeCountWithDuration();
-  updateSetupActionsState();
-  saveSettings();
-}
-
-function handleHostAsyncDurationChanged() {
-  // Keep the session dropdown in sync whenever the round duration changes:
-  // disable options that would exceed the round and auto-clamp if needed.
-  syncHostSessionDurationOptions();
-  syncTradeCountWithDuration();
-  updateAsyncHostControlsVisibility();
-  updateSetupActionsState();
-  saveSettings();
-}
-
 function initLiveToolsWindow() {
   initLiveDrawer({
     rootEl: dom.liveDrawerEl,
@@ -434,11 +399,11 @@ function initLiveToolsWindow() {
     noticeEl: dom.chatNoticeEl,
     emojiBtnEl: dom.chatEmojiBtnEl,
     emojiPickerEl: dom.chatEmojiPickerEl,
-    // Curated `/meta` `chat_emoji`; older backends fall back to the built-in list.
+    // Curated `/meta` `chat_emoji`; the built-in list covers a not yet loaded meta.
     getEmojiList: () => getGlobalMeta()?.chat_emoji,
     onCleared: handleChatClearedPreview,
     // `chat_enabled` from the round's game meta (fetched before the stream
-    // starts); missing = enabled, as with older backends.
+    // starts); a not yet loaded meta counts as enabled.
     isChatEnabled: () => isChatEnabledForRound(getGameMeta(gameIdInput?.value)),
     onAvailabilityChange: handleChatAvailabilityChange,
     getBaseUrl: () => getNormalizedBaseUrlOrNull({ notify: false }),
@@ -579,19 +544,6 @@ function initializeModules() {
     jumpLiveBtnEl: dom.jumpLiveBtnEl,
     jumpLiveBtnSetupEl: dom.jumpLiveBtnSetupEl,
     onStartAsyncSession: handleStartAsyncSession,
-    roundTypeSyncInput: dom.roundTypeSyncInput,
-    roundTypeAsyncInput: dom.roundTypeAsyncInput,
-    syncHostControlsEl: dom.syncHostControlsEl,
-    asyncHostControlsEl: dom.asyncHostControlsEl,
-    asyncHostDurationPresetInput: dom.asyncHostDurationPresetInput,
-    asyncSessionDurationPresetInput: dom.asyncSessionDurationPresetInput,
-    asyncHostAutoStartCheckbox: dom.asyncHostAutoStartCheckbox,
-    onHostRoundTypeChanged: handleHostRoundTypeChanged,
-    onHostAsyncDurationChanged: handleHostAsyncDurationChanged,
-    onHostAutoStartChanged() {
-      updateSetupActionsState();
-      saveSettings();
-    },
     liveBoardEl: dom.liveBoardEl,
     editableInputs: dom.editableInputs,
   });
@@ -624,7 +576,6 @@ function initializeModules() {
   initMetaManager({
     onMetaChanged() {
       renderMetaDebugLine();
-      renderDerivedEmissionPreview();
       if (boardState.lastGameData) {
         renderUpgradeMetrics(boardState.lastGameData);
       }
@@ -673,7 +624,6 @@ if (stopBtn) {
   });
 }
 
-wireHostControlEvents({ onSettingsChanged: saveSettings });
 wireSettingsPersistence();
 wireGameOverOverlayEvents();
 
@@ -681,14 +631,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeModules();
   initializeHeaderInteractions();
   ensureInputsEditable();
-  applyGameConfigToHostControls();
   loadSettings();
-  // Apply the session-duration guard immediately after settings are restored
-  // so the dropdown reflects the saved round duration on first render.
-  syncHostSessionDurationOptions();
-  syncTradeCountWithDuration({
-    forceDefault: !isTradeCountManuallyOverridden(),
-  });
   cleanupGameMetaCache();
   markGameMetaSeen(gameIdInput.value || null);
   const baseUrl = getNormalizedBaseUrlOrNull({ notify: false });
@@ -698,8 +641,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   try {
     await fetchMetaSnapshot(baseUrl, gameIdInput.value || null);
-    // /meta may carry an admin-edited game_config; refresh the host controls.
-    applyGameConfigToHostControls();
   } catch (e) {
     console.warn('Initial meta fetch failed:', e);
   }
@@ -711,7 +652,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 export {
-  collectAdvancedOverrides,
   computeNextHalvingHint,
   computeMostRecentPastHalving,
   deriveLastHalvingNoticeUpdate,

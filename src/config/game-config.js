@@ -7,12 +7,11 @@
  *  - Upstream: the backend owns the live values (admin "Game Settings",
  *    GET/PATCH /admin/game-config) and exposes them publicly as
  *    `game_config` in GET /meta (cached by src/meta/meta-manager.js).
- *  - Fallback: when /meta has no `game_config` (older backend, or /meta not
- *    loaded yet) the config is built from the constants in
+ *  - Fallback: until /meta with its `game_config` is loaded (or when it
+ *    failed) the config is built from the constants in
  *    game-control-data.js / trading-control-data.js, in the same shape.
  *  - Downstream: admin create form (src/admin/admin-setup.js), the admin
- *    Game Settings editor, player.html legacy host controls (src/main.js,
- *    src/ui/async-duration.js, src/ui/setup-payload.js).
+ *    Game Settings editor (src/admin/*, src/ui/async-duration.js).
  * Constraints:
  *  - Backend stays authoritative: these values only drive form options,
  *    defaults and previews; POST /games is validated by the backend and each
@@ -57,6 +56,7 @@ import {
   TRADE_DEFAULT_BUCKETS,
 } from './trading-control-data.js';
 import { getGlobalMeta } from '../meta/meta-manager.js';
+import { isFiniteNumber, isPlainObject } from '../utils/value-utils.js';
 
 // Farming Stage 2 default when the backend config has no value (backend seed).
 const FARMING_FAVORED_MULTIPLIER_DEFAULT = 2;
@@ -128,14 +128,6 @@ export function buildFallbackGameConfig() {
 }
 
 // ── Normalization (per top-level key) ───────────────────────────────────────
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 
 function normalizePresets(raw, fallback) {
   if (!isPlainObject(raw)) return fallback;
@@ -216,7 +208,6 @@ function normalizeAccountPolicy(raw, fallback) {
 
 function normalizeScheduling(raw, fallback) {
   const value = isPlainObject(raw) ? raw.max_days_ahead : undefined;
-  // Older backends send no `scheduling` section: keep the 30-day fallback.
   return {
     max_days_ahead:
       Number.isInteger(value) && value > 0 ? value : fallback.max_days_ahead,
@@ -253,13 +244,13 @@ function normalizeDefaults(raw, fallback, config) {
     scoring_mode: SCORING_CONTROL.ALLOWED_MODES.includes(source.scoring_mode)
       ? source.scoring_mode
       : fallback.scoring_mode,
-    // Only a real boolean counts; a missing key (older backend) keeps chat on.
+    // Only a real boolean counts; anything else keeps the fallback.
     chat_enabled:
       typeof source.chat_enabled === 'boolean'
         ? source.chat_enabled
         : fallback.chat_enabled,
-    // Farming defaults: a missing/invalid key (older backend) keeps the
-    // fallback (farming off, 300 s cycle, 5 % reward).
+    // Farming defaults: an invalid value keeps the fallback (farming off,
+    // 300 s cycle, 5 % reward).
     farming_enabled:
       typeof source.farming_enabled === 'boolean'
         ? source.farming_enabled
@@ -274,7 +265,7 @@ function normalizeDefaults(raw, fallback, config) {
       source.farming_reward_rate > 0
         ? source.farming_reward_rate
         : fallback.farming_reward_rate,
-    // Farming Stage 2 bonus (1-5); older backends without it use 2.
+    // Farming Stage 2 bonus (1-5); an invalid value uses 2.
     farming_favored_multiplier:
       isFiniteNumber(source.farming_favored_multiplier) &&
       source.farming_favored_multiplier >= 1

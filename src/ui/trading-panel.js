@@ -514,17 +514,416 @@ export function normalizeTradingCapability(rawTrading, fallbackFeeRate = 0.02) {
   };
 }
 
+/**
+ * Panel state of one initTradingPanel() call: the injected dependencies plus
+ * the user's current selection. Passed explicitly to the functions below.
+ */
+function createPanelContext(deps) {
+  return {
+    ...deps,
+    disposeTooltips: () => {},
+    selectedFromToken: FALLBACK_TOKENS[0],
+    selectedToToken: FALLBACK_TOKENS[1],
+    amountInputValue: '',
+    isTradeSubmitting: false,
+    // WHY: a full rebuild replaces the Execute button. When it happens between
+    // pressing and releasing the mouse (the amount field's `change` on blur, or
+    // a live tick), the browser drops the click and the trade silently does
+    // not happen. While a press inside the panel is in progress, update in
+    // place.
+    pointerPressedInPanel: false,
+  };
+}
+
+function getTrading(ctx) {
+  try {
+    const meta = ctx.getGameMeta();
+    // WHY: a per-round fee override may be 0, so only a missing/non-numeric
+    // conversion_fee_rate falls back to the 2% default (`||` dropped 0).
+    const metaFee = meta?.conversion_fee_rate;
+    const fallbackFee =
+      typeof metaFee === 'number' && Number.isFinite(metaFee) ? metaFee : 0.02;
+    return normalizeTradingCapability(meta?.trading, fallbackFee);
+  } catch (err) {
+    console.error('[trading-panel] getTrading error:', err);
+    return normalizeTradingCapability(null);
+  }
+}
+
+function getActionAvailabilityState(ctx) {
+  return typeof ctx.getActionAvailability === 'function'
+    ? ctx.getActionAvailability()
+    : null;
+}
+
+function getCurrentState(ctx) {
+  if (typeof ctx.getLastGameData !== 'function') return null;
+  try {
+    return ctx.getLastGameData() || null;
+  } catch (err) {
+    console.error('[trading-panel] getLastGameData error:', err);
+    return null;
+  }
+}
+
+function keepTokenSelectionValid(ctx, tokens) {
+  if (!tokens.length) {
+    ctx.selectedFromToken = FALLBACK_TOKENS[0];
+    ctx.selectedToToken = FALLBACK_TOKENS[1];
+    return;
+  }
+
+  if (!tokens.includes(ctx.selectedFromToken)) {
+    ctx.selectedFromToken = tokens[0];
+  }
+  if (!tokens.includes(ctx.selectedToToken)) {
+    ctx.selectedToToken =
+      tokens.find((token) => token !== ctx.selectedFromToken) || tokens[0];
+  }
+  if (ctx.selectedFromToken === ctx.selectedToToken && tokens.length > 1) {
+    ctx.selectedToToken =
+      tokens.find((token) => token !== ctx.selectedFromToken) || tokens[0];
+  }
+}
+
+/** Trade schedule position: rules, trades used and elapsed round time. */
+function resolveScheduleProgress(meta, state) {
+  const rules = resolveTradingRules(meta, state);
+  const tradesUsed = Math.max(
+    0,
+    Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
+  );
+  const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
+  return { rules, tradesUsed, elapsedSeconds };
+}
+
+function resolveExecution(ctx, trading, balances, progress) {
+  return resolveExecutionState(
+    {
+      amountInputValue: ctx.amountInputValue,
+      balances,
+      selectedFromToken: ctx.selectedFromToken,
+      selectedToToken: ctx.selectedToToken,
+      rules: progress.rules,
+      tradesUsed: progress.tradesUsed,
+      elapsedSeconds: progress.elapsedSeconds,
+      actionAvailability: getActionAvailabilityState(ctx),
+    },
+    trading,
+    ctx.isTradeSubmitting
+  );
+}
+
+/**
+ * Everything both render paths need. Keeps the token selection valid first,
+ * so the balances and preview always refer to offered tokens.
+ */
+function resolvePanelView(ctx, trading) {
+  const meta = ctx.getGameMeta() || {};
+  const state = getCurrentState(ctx) || {};
+  const mode = resolveActiveScoringMode(meta, state, ctx.getActiveScoringMode);
+  const tokens = resolveTokenList(meta, state);
+  const balances = resolveBalances(state);
+  keepTokenSelectionValid(ctx, tokens);
+
+  const previewRoot = resolvePreviewRoot(meta, state, trading);
+  const previewData = resolvePreviewForSelection(
+    previewRoot,
+    ctx.selectedFromToken,
+    ctx.selectedToToken
+  );
+  const result = buildResultSection(
+    mode,
+    resolveResultPreview(
+      mode,
+      previewData,
+      ctx.amountInputValue,
+      trading.value_fee_rate
+    )
+  );
+  const progress = resolveScheduleProgress(meta, state);
+  const execution = resolveExecution(ctx, trading, balances, progress);
+  return { meta, mode, tokens, balances, result, progress, execution };
+}
+
+function renderPanelCard(ctx, trading) {
+  const panelEl = ctx.tradingPanelRef;
+  if (!panelEl) return;
+
+  const view = resolvePanelView(ctx, trading);
+  const { rules, tradesUsed, elapsedSeconds } = view.progress;
+
+  removeManagedTooltips(panelEl);
+  ctx.disposeTooltips();
+
+  while (panelEl.firstChild) {
+    panelEl.removeChild(panelEl.firstChild);
+  }
+
+  const card = createBaseCard(trading, formatScoringModeName(view.mode));
+  appendControlsSection(card, {
+    meta: view.meta,
+    tokens: view.tokens,
+    selectedFromToken: ctx.selectedFromToken,
+    selectedToToken: ctx.selectedToToken,
+    amountInputValue: ctx.amountInputValue,
+    balanceFrom: formatTokenUnits(view.balances?.[ctx.selectedFromToken]),
+    balanceTo: formatTokenUnits(view.balances?.[ctx.selectedToToken]),
+    feePercentage: (trading.value_fee_rate * 100).toFixed(2),
+  });
+  appendPrimaryResultSection(panelEl, card, view.result);
+  appendActionsSection(panelEl, card, view.execution);
+  appendStatusSummary(card, trading);
+  appendScheduleSection(card, rules, tradesUsed, elapsedSeconds);
+
+  panelEl.appendChild(card);
+  ctx.disposeTooltips = initMicroTooltips(panelEl);
+}
+
+function syncControlsInPlace(ctx, view) {
+  const panelEl = ctx.tradingPanelRef;
+  const { meta, tokens, balances } = view;
+  const fromSelect = panelEl.querySelector('select[data-field="from-token"]');
+  const toSelect = panelEl.querySelector('select[data-field="to-token"]');
+  const amountInput = panelEl.querySelector('input[data-field="amount"]');
+  syncSelectOptions(fromSelect, tokens, (token) =>
+    resolveTokenLabel(token, meta)
+  );
+  syncSelectOptions(toSelect, tokens, (token) =>
+    resolveTokenLabel(token, meta)
+  );
+  if (fromSelect) fromSelect.value = ctx.selectedFromToken;
+  if (toSelect) toSelect.value = ctx.selectedToToken;
+  if (amountInput && amountInput.value !== ctx.amountInputValue) {
+    amountInput.value = ctx.amountInputValue;
+  }
+
+  const balanceFromEl = panelEl.querySelector('.trading-balance-from');
+  const balanceToEl = panelEl.querySelector('.trading-balance-to');
+  const balanceFromValueEl = panelEl.querySelector(
+    '.trading-balance-from-value'
+  );
+  const balanceToValueEl = panelEl.querySelector('.trading-balance-to-value');
+  if (balanceFromEl?.firstChild) {
+    balanceFromEl.firstChild.textContent = `Balance (${resolveTokenLabel(ctx.selectedFromToken, meta)}): `;
+  }
+  if (balanceToEl?.firstChild) {
+    balanceToEl.firstChild.textContent = `Balance (${resolveTokenLabel(ctx.selectedToToken, meta)}): `;
+  }
+  if (balanceFromValueEl) {
+    balanceFromValueEl.textContent = formatTokenUnits(
+      balances?.[ctx.selectedFromToken]
+    );
+  }
+  if (balanceToValueEl) {
+    balanceToValueEl.textContent = formatTokenUnits(
+      balances?.[ctx.selectedToToken]
+    );
+  }
+}
+
+function syncResultInPlace(panelEl, result) {
+  const metricLabelEl = panelEl.querySelector('.primary-result-metric-label');
+  const valueEl = panelEl.querySelector('.primary-result-value');
+  const secondaryEl = panelEl.querySelector('.primary-result-secondary');
+  if (metricLabelEl) metricLabelEl.textContent = result.primaryLabel;
+  if (valueEl) valueEl.textContent = result.primaryValue;
+  if (secondaryEl) secondaryEl.textContent = result.secondary;
+}
+
+function syncScheduleInPlace(panelEl, progress) {
+  const { rules, tradesUsed, elapsedSeconds } = progress;
+  const tradesUsedEl = panelEl.querySelector('.trading-trades-used-value');
+  const nextTradeEl = panelEl.querySelector('.trading-next-trade-value');
+  if (tradesUsedEl) {
+    tradesUsedEl.textContent = `${tradesUsed} / ${rules.trade_count}`;
+  }
+  if (nextTradeEl) {
+    const nextOffset = rules.unlock_offsets_seconds[tradesUsed] ?? null;
+    if (nextOffset === null) {
+      nextTradeEl.textContent = 'No remaining trades';
+    } else if (elapsedSeconds >= nextOffset) {
+      nextTradeEl.textContent = 'Available now';
+    } else {
+      nextTradeEl.textContent = `Available in ${formatDurationAbsolute(nextOffset - elapsedSeconds)}`;
+    }
+  }
+
+  rules.unlock_offsets_seconds.forEach((offset, idx) => {
+    const labelEl = panelEl.querySelector(
+      `.trading-schedule-item-label[data-schedule-index="${idx}"]`
+    );
+    const statusEl = panelEl.querySelector(
+      `.trading-schedule-item-status[data-schedule-index="${idx}"]`
+    );
+    if (labelEl) {
+      labelEl.textContent = `Trade ${idx + 1} at ${formatDurationAbsolute(offset)}`;
+    }
+    if (statusEl) {
+      statusEl.textContent = getScheduleStatus(
+        idx,
+        offset,
+        tradesUsed,
+        elapsedSeconds
+      );
+    }
+  });
+}
+
+/**
+ * Refresh the mounted panel without replacing its nodes, so the focused
+ * control (or the button under a pressed pointer) stays in place.
+ */
+function updateEditingPanelInPlace(ctx, trading) {
+  const panelEl = ctx.tradingPanelRef;
+  if (!panelEl) return;
+
+  const view = resolvePanelView(ctx, trading);
+  syncControlsInPlace(ctx, view);
+  syncResultInPlace(panelEl, view.result);
+  syncScheduleInPlace(panelEl, view.progress);
+
+  const executeBtn = panelEl.querySelector('.trading-execute-btn');
+  if (executeBtn) {
+    executeBtn.textContent = view.execution.buttonText;
+    executeBtn.disabled = !view.execution.enabled;
+    executeBtn.title = view.execution.reason;
+  }
+}
+
+function renderBottomStatus(ctx, trading) {
+  renderBottomBarTradingStatus(trading, ctx.tradingStatusRef);
+}
+
+function isEditingPanelField(panelEl) {
+  const activeEl = document.activeElement;
+  return (
+    Boolean(activeEl) &&
+    Boolean(panelEl) &&
+    panelEl.contains(activeEl) &&
+    (activeEl instanceof HTMLInputElement ||
+      activeEl instanceof HTMLSelectElement ||
+      activeEl instanceof HTMLTextAreaElement ||
+      activeEl?.isContentEditable === true ||
+      // Keyboard users: Tab to Execute must not lose the focused button.
+      activeEl?.dataset?.action === 'execute-trade')
+  );
+}
+
+function renderPanel(ctx) {
+  const trading = getTrading(ctx);
+
+  // Keep the current editor control mounted while the user types/selects.
+  // Rebuilding the panel replaces the amount/select DOM node and drops focus.
+  if (isEditingPanelField(ctx.tradingPanelRef) || ctx.pointerPressedInPanel) {
+    // Keep the active control mounted while still refreshing computed preview text.
+    updateEditingPanelInPlace(ctx, trading);
+    renderBottomStatus(ctx, trading);
+    return;
+  }
+
+  renderPanelCard(ctx, trading);
+  renderBottomStatus(ctx, trading);
+}
+
+function handlePanelInput(ctx, event) {
+  const target = event?.target;
+  if (!target || !ctx.tradingPanelRef?.contains(target)) return;
+
+  const field = target.getAttribute('data-field');
+  if (!field) return;
+
+  if (field === 'from-token') {
+    ctx.selectedFromToken = String(target.value || '').toLowerCase();
+  } else if (field === 'to-token') {
+    ctx.selectedToToken = String(target.value || '').toLowerCase();
+  } else if (field === 'amount') {
+    ctx.amountInputValue = String(target.value || '');
+  }
+
+  const meta = ctx.getGameMeta() || {};
+  const state = getCurrentState(ctx) || {};
+  keepTokenSelectionValid(ctx, resolveTokenList(meta, state));
+
+  renderPanel(ctx);
+}
+
+function notify(ctx, message, type) {
+  if (typeof ctx.showToast === 'function') {
+    ctx.showToast(message, type);
+  }
+}
+
+async function handleExecuteTrade(ctx) {
+  const trading = getTrading(ctx);
+  const meta = ctx.getGameMeta() || {};
+  const state = getCurrentState(ctx) || {};
+  const execution = resolveExecution(
+    ctx,
+    trading,
+    resolveBalances(state),
+    resolveScheduleProgress(meta, state)
+  );
+
+  if (!execution.enabled) {
+    notify(ctx, execution.reason, 'info');
+    return;
+  }
+  if (typeof ctx.executeTrade !== 'function') {
+    notify(ctx, 'Trade execution handler is unavailable.', 'error');
+    return;
+  }
+
+  const amount = asNumber(ctx.amountInputValue);
+  ctx.isTradeSubmitting = true;
+  renderPanel(ctx);
+
+  try {
+    await ctx.executeTrade({
+      fromToken: ctx.selectedFromToken,
+      toToken: ctx.selectedToToken,
+      amount,
+    });
+    ctx.amountInputValue = '';
+  } catch (error) {
+    notify(ctx, `Trade failed: ${error?.message || 'Unknown error'}`, 'error');
+  } finally {
+    ctx.isTradeSubmitting = false;
+    renderPanel(ctx);
+  }
+}
+
+function wirePanelEvents(ctx) {
+  const panelEl = ctx.tradingPanelRef;
+  if (!panelEl) return;
+
+  const releasePointer = () => {
+    if (!ctx.pointerPressedInPanel) return;
+    // Clear after the click event that follows pointerup has been dispatched.
+    setTimeout(() => {
+      ctx.pointerPressedInPanel = false;
+    }, 0);
+  };
+  const onInput = (event) => handlePanelInput(ctx, event);
+
+  panelEl.addEventListener('pointerdown', () => {
+    ctx.pointerPressedInPanel = true;
+  });
+  document.addEventListener('pointerup', releasePointer, true);
+  document.addEventListener('pointercancel', releasePointer, true);
+  panelEl.addEventListener('input', onInput);
+  panelEl.addEventListener('change', onInput);
+  panelEl.addEventListener('click', (event) => {
+    const button = event?.target?.closest?.(
+      'button[data-action="execute-trade"]'
+    );
+    if (!button || !panelEl.contains(button)) return;
+    void handleExecuteTrade(ctx);
+  });
+}
+
 export function initTradingPanel(deps) {
-  const {
-    getGameMeta,
-    getLastGameData,
-    getActiveScoringMode,
-    executeTrade,
-    showToast,
-    getActionAvailability,
-    tradingPanelRef,
-    tradingStatusRef,
-  } = deps || {};
+  const { getGameMeta, tradingPanelRef, tradingStatusRef } = deps || {};
 
   if (!getGameMeta) {
     console.warn('[trading-panel] initTradingPanel: getGameMeta not provided');
@@ -538,457 +937,14 @@ export function initTradingPanel(deps) {
     return;
   }
 
-  let disposeTooltips = () => {};
-  let selectedFromToken = FALLBACK_TOKENS[0];
-  let selectedToToken = FALLBACK_TOKENS[1];
-  let amountInputValue = '';
-  let isTradeSubmitting = false;
-  // WHY: a full rebuild replaces the Execute button. When it happens between
-  // pressing and releasing the mouse (the amount field's `change` on blur, or a
-  // live tick), the browser drops the click and the trade silently does not
-  // happen. While a press inside the panel is in progress, update in place.
-  let pointerPressedInPanel = false;
-
-  function getTrading() {
-    try {
-      const meta = getGameMeta();
-      // WHY: a per-round fee override may be 0, so only a missing/non-numeric
-      // conversion_fee_rate falls back to the 2% default (`||` dropped 0).
-      const metaFee = meta?.conversion_fee_rate;
-      const fallbackFee =
-        typeof metaFee === 'number' && Number.isFinite(metaFee)
-          ? metaFee
-          : 0.02;
-      return normalizeTradingCapability(meta?.trading, fallbackFee);
-    } catch (err) {
-      console.error('[trading-panel] getTrading error:', err);
-      return normalizeTradingCapability(null);
-    }
-  }
-
-  function getActionAvailabilityState() {
-    return typeof getActionAvailability === 'function'
-      ? getActionAvailability()
-      : null;
-  }
-
-  function getCurrentState() {
-    if (typeof getLastGameData !== 'function') return null;
-    try {
-      return getLastGameData() || null;
-    } catch (err) {
-      console.error('[trading-panel] getLastGameData error:', err);
-      return null;
-    }
-  }
-
-  function keepTokenSelectionValid(tokens) {
-    if (!tokens.length) {
-      selectedFromToken = FALLBACK_TOKENS[0];
-      selectedToToken = FALLBACK_TOKENS[1];
-      return;
-    }
-
-    if (!tokens.includes(selectedFromToken)) {
-      selectedFromToken = tokens[0];
-    }
-    if (!tokens.includes(selectedToToken)) {
-      selectedToToken =
-        tokens.find((token) => token !== selectedFromToken) || tokens[0];
-    }
-    if (selectedFromToken === selectedToToken && tokens.length > 1) {
-      selectedToToken =
-        tokens.find((token) => token !== selectedFromToken) || tokens[0];
-    }
-  }
-
-  function renderPanelCard(trading) {
-    if (!tradingPanelRef) return;
-
-    const meta = getGameMeta() || {};
-    const state = getCurrentState() || {};
-    const mode = resolveActiveScoringMode(meta, state, getActiveScoringMode);
-    const modeName = formatScoringModeName(mode);
-    const tokens = resolveTokenList(meta, state);
-    const balances = resolveBalances(state);
-    keepTokenSelectionValid(tokens);
-
-    const balanceFrom = formatTokenUnits(balances?.[selectedFromToken]);
-    const balanceTo = formatTokenUnits(balances?.[selectedToToken]);
-
-    const previewRoot = resolvePreviewRoot(meta, state, trading);
-    const previewData = resolvePreviewForSelection(
-      previewRoot,
-      selectedFromToken,
-      selectedToToken
-    );
-    const result = buildResultSection(
-      mode,
-      resolveResultPreview(
-        mode,
-        previewData,
-        amountInputValue,
-        trading.value_fee_rate
-      )
-    );
-
-    const rules = resolveTradingRules(meta, state);
-    const tradesUsed = Math.max(
-      0,
-      Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
-    );
-    const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
-    const execution = resolveExecutionState(
-      {
-        amountInputValue,
-        balances,
-        selectedFromToken,
-        selectedToToken,
-        rules,
-        tradesUsed,
-        elapsedSeconds,
-        actionAvailability: getActionAvailabilityState(),
-      },
-      trading,
-      isTradeSubmitting
-    );
-
-    removeManagedTooltips(tradingPanelRef);
-    disposeTooltips();
-
-    while (tradingPanelRef.firstChild) {
-      tradingPanelRef.removeChild(tradingPanelRef.firstChild);
-    }
-
-    const card = createBaseCard(trading, modeName);
-    appendControlsSection(card, {
-      meta,
-      tokens,
-      selectedFromToken,
-      selectedToToken,
-      amountInputValue,
-      balanceFrom,
-      balanceTo,
-      feePercentage: (trading.value_fee_rate * 100).toFixed(2),
-    });
-    appendPrimaryResultSection(tradingPanelRef, card, result);
-    appendActionsSection(tradingPanelRef, card, execution);
-    appendStatusSummary(card, trading);
-    appendScheduleSection(card, rules, tradesUsed, elapsedSeconds);
-
-    tradingPanelRef.appendChild(card);
-    disposeTooltips = initMicroTooltips(tradingPanelRef);
-  }
-
-  function updateEditingPanelInPlace(trading) {
-    if (!tradingPanelRef) return;
-
-    const meta = getGameMeta() || {};
-    const state = getCurrentState() || {};
-    const mode = resolveActiveScoringMode(meta, state, getActiveScoringMode);
-    const tokens = resolveTokenList(meta, state);
-    const balances = resolveBalances(state);
-    keepTokenSelectionValid(tokens);
-    const previewRoot = resolvePreviewRoot(meta, state, trading);
-    const previewData = resolvePreviewForSelection(
-      previewRoot,
-      selectedFromToken,
-      selectedToToken
-    );
-    const result = buildResultSection(
-      mode,
-      resolveResultPreview(
-        mode,
-        previewData,
-        amountInputValue,
-        trading.value_fee_rate
-      )
-    );
-    const rules = resolveTradingRules(meta, state);
-    const tradesUsed = Math.max(
-      0,
-      Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
-    );
-    const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
-
-    const fromSelect = tradingPanelRef.querySelector(
-      'select[data-field="from-token"]'
-    );
-    const toSelect = tradingPanelRef.querySelector(
-      'select[data-field="to-token"]'
-    );
-    const amountInput = tradingPanelRef.querySelector(
-      'input[data-field="amount"]'
-    );
-    syncSelectOptions(fromSelect, tokens, (token) =>
-      resolveTokenLabel(token, meta)
-    );
-    syncSelectOptions(toSelect, tokens, (token) =>
-      resolveTokenLabel(token, meta)
-    );
-    if (fromSelect) fromSelect.value = selectedFromToken;
-    if (toSelect) toSelect.value = selectedToToken;
-    if (amountInput && amountInput.value !== amountInputValue) {
-      amountInput.value = amountInputValue;
-    }
-
-    const balanceFromEl = tradingPanelRef.querySelector(
-      '.trading-balance-from'
-    );
-    const balanceToEl = tradingPanelRef.querySelector('.trading-balance-to');
-    const balanceFromValueEl = tradingPanelRef.querySelector(
-      '.trading-balance-from-value'
-    );
-    const balanceToValueEl = tradingPanelRef.querySelector(
-      '.trading-balance-to-value'
-    );
-    if (balanceFromEl?.firstChild) {
-      balanceFromEl.firstChild.textContent = `Balance (${resolveTokenLabel(selectedFromToken, meta)}): `;
-    }
-    if (balanceToEl?.firstChild) {
-      balanceToEl.firstChild.textContent = `Balance (${resolveTokenLabel(selectedToToken, meta)}): `;
-    }
-    if (balanceFromValueEl) {
-      balanceFromValueEl.textContent = formatTokenUnits(
-        balances?.[selectedFromToken]
-      );
-    }
-    if (balanceToValueEl) {
-      balanceToValueEl.textContent = formatTokenUnits(
-        balances?.[selectedToToken]
-      );
-    }
-
-    const metricLabelEl = tradingPanelRef.querySelector(
-      '.primary-result-metric-label'
-    );
-    const valueEl = tradingPanelRef.querySelector('.primary-result-value');
-    const secondaryEl = tradingPanelRef.querySelector(
-      '.primary-result-secondary'
-    );
-    if (metricLabelEl) metricLabelEl.textContent = result.primaryLabel;
-    if (valueEl) valueEl.textContent = result.primaryValue;
-    if (secondaryEl) secondaryEl.textContent = result.secondary;
-
-    const tradesUsedEl = tradingPanelRef.querySelector(
-      '.trading-trades-used-value'
-    );
-    const nextTradeEl = tradingPanelRef.querySelector(
-      '.trading-next-trade-value'
-    );
-    const executeBtn = tradingPanelRef.querySelector('.trading-execute-btn');
-    const execution = resolveExecutionState(
-      {
-        amountInputValue,
-        balances,
-        selectedFromToken,
-        selectedToToken,
-        rules,
-        tradesUsed,
-        elapsedSeconds,
-        actionAvailability: getActionAvailabilityState(),
-      },
-      trading,
-      isTradeSubmitting
-    );
-    if (tradesUsedEl) {
-      tradesUsedEl.textContent = `${tradesUsed} / ${rules.trade_count}`;
-    }
-    if (nextTradeEl) {
-      const nextOffset = rules.unlock_offsets_seconds[tradesUsed] ?? null;
-      if (nextOffset === null) {
-        nextTradeEl.textContent = 'No remaining trades';
-      } else if (elapsedSeconds >= nextOffset) {
-        nextTradeEl.textContent = 'Available now';
-      } else {
-        nextTradeEl.textContent = `Available in ${formatDurationAbsolute(nextOffset - elapsedSeconds)}`;
-      }
-    }
-
-    rules.unlock_offsets_seconds.forEach((offset, idx) => {
-      const labelEl = tradingPanelRef.querySelector(
-        `.trading-schedule-item-label[data-schedule-index="${idx}"]`
-      );
-      const statusEl = tradingPanelRef.querySelector(
-        `.trading-schedule-item-status[data-schedule-index="${idx}"]`
-      );
-      if (labelEl) {
-        labelEl.textContent = `Trade ${idx + 1} at ${formatDurationAbsolute(offset)}`;
-      }
-      if (statusEl) {
-        statusEl.textContent = getScheduleStatus(
-          idx,
-          offset,
-          tradesUsed,
-          elapsedSeconds
-        );
-      }
-    });
-
-    if (executeBtn) {
-      executeBtn.textContent = execution.buttonText;
-      executeBtn.disabled = !execution.enabled;
-      executeBtn.title = execution.reason;
-    }
-  }
-
-  function renderBottomStatus(trading) {
-    if (!tradingStatusRef) return;
-
-    const statusText = trading.enabled ? 'Enabled' : 'Not Enabled';
-    const feeText = `${(trading.value_fee_rate * 100).toFixed(1)}%`;
-
-    tradingStatusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-    tradingStatusRef.className = trading.enabled
-      ? 'trading-status-enabled'
-      : 'trading-status-disabled';
-  }
-
-  function renderTradingStatus() {
-    const trading = getTrading();
-
-    const activeEl = document.activeElement;
-    const isEditingField =
-      Boolean(activeEl) &&
-      Boolean(tradingPanelRef) &&
-      tradingPanelRef.contains(activeEl) &&
-      (activeEl instanceof HTMLInputElement ||
-        activeEl instanceof HTMLSelectElement ||
-        activeEl instanceof HTMLTextAreaElement ||
-        activeEl?.isContentEditable === true ||
-        // Keyboard users: Tab to Execute must not lose the focused button.
-        activeEl?.dataset?.action === 'execute-trade');
-
-    // Keep the current editor control mounted while the user types/selects.
-    // Rebuilding the panel replaces the amount/select DOM node and drops focus.
-    if (isEditingField || pointerPressedInPanel) {
-      // Keep the active control mounted while still refreshing computed preview text.
-      updateEditingPanelInPlace(trading);
-      renderBottomStatus(trading);
-      return;
-    }
-
-    renderPanelCard(trading);
-    renderBottomStatus(trading);
-  }
-
-  function handlePanelInput(event) {
-    const target = event?.target;
-    if (!target || !tradingPanelRef?.contains(target)) return;
-
-    const field = target.getAttribute('data-field');
-    if (!field) return;
-
-    if (field === 'from-token') {
-      selectedFromToken = String(target.value || '').toLowerCase();
-    } else if (field === 'to-token') {
-      selectedToToken = String(target.value || '').toLowerCase();
-    } else if (field === 'amount') {
-      amountInputValue = String(target.value || '');
-    }
-
-    const meta = getGameMeta() || {};
-    const state = getCurrentState() || {};
-    keepTokenSelectionValid(resolveTokenList(meta, state));
-
-    renderTradingStatus();
-  }
-
-  async function handleExecuteTrade() {
-    const trading = getTrading();
-    const meta = getGameMeta() || {};
-    const state = getCurrentState() || {};
-    const balances = resolveBalances(state);
-    const rules = resolveTradingRules(meta, state);
-    const tradesUsed = Math.max(
-      0,
-      Math.min(rules.trade_count, Math.round(Number(state?.trades_used) || 0))
-    );
-    const elapsedSeconds = resolveRoundElapsedSeconds(meta, state);
-    const execution = resolveExecutionState(
-      {
-        amountInputValue,
-        balances,
-        selectedFromToken,
-        selectedToToken,
-        rules,
-        tradesUsed,
-        elapsedSeconds,
-        actionAvailability: getActionAvailabilityState(),
-      },
-      trading,
-      isTradeSubmitting
-    );
-
-    if (!execution.enabled) {
-      if (typeof showToast === 'function') {
-        showToast(execution.reason, 'info');
-      }
-      return;
-    }
-    if (typeof executeTrade !== 'function') {
-      if (typeof showToast === 'function') {
-        showToast('Trade execution handler is unavailable.', 'error');
-      }
-      return;
-    }
-
-    const amount = asNumber(amountInputValue);
-    isTradeSubmitting = true;
-    renderTradingStatus();
-
-    try {
-      await executeTrade({
-        fromToken: selectedFromToken,
-        toToken: selectedToToken,
-        amount,
-      });
-      amountInputValue = '';
-    } catch (error) {
-      if (typeof showToast === 'function') {
-        showToast(
-          `Trade failed: ${error?.message || 'Unknown error'}`,
-          'error'
-        );
-      }
-    } finally {
-      isTradeSubmitting = false;
-      renderTradingStatus();
-    }
-  }
-
-  function handlePanelClick(event) {
-    const button = event?.target?.closest?.(
-      'button[data-action="execute-trade"]'
-    );
-    if (!button || !tradingPanelRef?.contains(button)) return;
-    void handleExecuteTrade();
-  }
-
-  function releasePointer() {
-    if (!pointerPressedInPanel) return;
-    // Clear after the click event that follows pointerup has been dispatched.
-    setTimeout(() => {
-      pointerPressedInPanel = false;
-    }, 0);
-  }
-
-  if (tradingPanelRef) {
-    tradingPanelRef.addEventListener('pointerdown', () => {
-      pointerPressedInPanel = true;
-    });
-    document.addEventListener('pointerup', releasePointer, true);
-    document.addEventListener('pointercancel', releasePointer, true);
-    tradingPanelRef.addEventListener('input', handlePanelInput);
-    tradingPanelRef.addEventListener('change', handlePanelInput);
-    tradingPanelRef.addEventListener('click', handlePanelClick);
-  }
+  const ctx = createPanelContext(deps);
+  wirePanelEvents(ctx);
 
   return {
-    renderTradingStatus,
-    getTrading,
-    renderPanelCard,
-    renderBottomStatus,
+    renderTradingStatus: () => renderPanel(ctx),
+    getTrading: () => getTrading(ctx),
+    renderPanelCard: (trading) => renderPanelCard(ctx, trading),
+    renderBottomStatus: (trading) => renderBottomStatus(ctx, trading),
   };
 }
 
@@ -1021,23 +977,19 @@ export function renderTradingStatus(
     tradingPanelRef.appendChild(card);
   }
 
-  if (tradingStatusRef) {
-    const statusText = trading.enabled ? 'Enabled' : 'Not Enabled';
-    const feeText = `${(trading.value_fee_rate * 100).toFixed(1)}%`;
-
-    tradingStatusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-    tradingStatusRef.className = trading.enabled
-      ? 'trading-status-enabled'
-      : 'trading-status-disabled';
-  }
+  renderBottomBarTradingStatus(trading, tradingStatusRef);
 }
 
 export function renderBottomBarTradingStatus(data, statusRef) {
   if (!data || !statusRef) return;
   const statusText = data.enabled ? 'Enabled' : 'Not Enabled';
   const feeText = `${(data.value_fee_rate * 100).toFixed(1)}%`;
-  statusRef.textContent = `Trading: ${statusText} (${feeText} fee)`;
-  statusRef.className = data.enabled
-    ? 'trading-status-enabled'
-    : 'trading-status-disabled';
+  // The pill already has the "Trading" label; the value is shortened with an
+  // ellipsis on narrow windows, so the full text is also the tooltip.
+  const text = `${statusText} (${feeText} fee)`;
+  statusRef.textContent = text;
+  statusRef.title = text;
+  // classList, not className: the bottom-bar-value class (ellipsis) must stay.
+  statusRef.classList.toggle('trading-status-enabled', Boolean(data.enabled));
+  statusRef.classList.toggle('trading-status-disabled', !data.enabled);
 }

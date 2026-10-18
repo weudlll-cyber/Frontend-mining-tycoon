@@ -4,8 +4,8 @@ Purpose: Setup-shell state of the player board: base URL resolution, round
   context, async-session diagnostics probe and the start-session status line.
 Role in system:
 - Upstream: board-state.js (stream/session flags), round game meta
-  (src/meta/meta-manager.js), legacy host controls (setup-host-controls.js)
-  and the player-auth probe (src/services/session-actions.js).
+  (src/meta/meta-manager.js) and the player-auth probe
+  (src/services/session-actions.js).
 - Downstream: setup-shell.js receives the derived setup state; the injected
   `updateSetupActionsState` (src/main.js) re-renders the setup actions.
 Constraints:
@@ -33,11 +33,6 @@ import {
   getRoundModeFromMeta,
   resolveAsyncWindowOpen,
 } from './round-context.js';
-import {
-  getSelectedRoundType,
-  setSelectedRoundType,
-  shouldAutoStartAsyncSession,
-} from './setup-host-controls.js';
 import { setSetupShellState } from './setup-shell.js';
 import {
   buildSetupShellState,
@@ -51,7 +46,7 @@ let asyncDiagnosticsProbeInFlight = null;
 
 /**
  * @param {{ baseUrlInput, gameIdInput, playerIdInput, startSessionStatusEl,
- *   asyncHostAutoStartCheckbox, updateSetupActionsState: () => void }} deps
+ *   updateSetupActionsState: () => void }} deps
  */
 export function initSetupController(deps) {
   _deps = deps || {};
@@ -78,9 +73,6 @@ export function getCurrentRoundContext() {
   const gameMeta = getGameMeta(_deps.gameIdInput?.value);
   return computeCurrentRoundContext({
     gameMeta,
-    selectedRoundType: getSelectedRoundType(),
-    isStreamActive: boardState.isStreamActive,
-    latestGameStatus: boardState.latestGameStatus,
     setupRoundModeOverride: boardState.setupRoundModeOverride,
     asyncSessionSupportProbe: boardState.asyncSessionSupportProbe,
     sessionStartSupported: boardState.sessionStartSupported,
@@ -168,8 +160,6 @@ export function syncSetupShellState() {
     asyncWindowOpen: boardState.asyncWindowOpen,
     requirePlayerAuth: boardState.asyncRequirePlayerAuth,
     activeSession: boardState.activeSession,
-    hostRoundType: getSelectedRoundType(),
-    asyncHostAutoStart: shouldAutoStartAsyncSession(),
   });
   setSetupShellState(nextSetupState);
 }
@@ -187,15 +177,12 @@ export function setSetupStateForTests({
   gameStatus,
   setupBusy,
   roundMode,
-  hostRoundType,
-  asyncAutoStart,
   supportsSessionStart,
   sessionId,
   windowOpen,
   sessionApiSupported,
   requirePlayerAuth,
 } = {}) {
-  const { asyncHostAutoStartCheckbox } = _deps;
   if (typeof streamActive === 'boolean') {
     boardState.isStreamActive = streamActive;
   }
@@ -209,12 +196,6 @@ export function setSetupStateForTests({
     boardState.setupRoundModeOverride = roundMode;
   } else {
     boardState.setupRoundModeOverride = null;
-  }
-  if (hostRoundType === 'sync' || hostRoundType === 'async') {
-    setSelectedRoundType(hostRoundType);
-  }
-  if (typeof asyncAutoStart === 'boolean' && asyncHostAutoStartCheckbox) {
-    asyncHostAutoStartCheckbox.checked = asyncAutoStart;
   }
   if (typeof supportsSessionStart === 'boolean') {
     boardState.sessionStartSupported = supportsSessionStart;

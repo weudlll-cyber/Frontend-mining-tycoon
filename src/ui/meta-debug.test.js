@@ -1,4 +1,4 @@
-// Tests the meta debug line and the derived-emission preview of the player board.
+// Tests the meta debug line of the player board.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const metaState = vi.hoisted(() => ({ gameMeta: null }));
@@ -10,7 +10,6 @@ vi.mock('../meta/meta-manager.js', () => ({
   shortMetaHash: (hash) => String(hash || '').slice(0, 6),
 }));
 
-const TOKENS = ['spring', 'summer', 'autumn', 'winter'];
 let metaDebug;
 let els;
 
@@ -20,17 +19,13 @@ beforeEach(async () => {
   document.body.innerHTML = `
     <input id="game-id" value="7" />
     <div id="meta-debug"></div>
-    <div id="derived-emission-preview" style="display:none"></div>
   `;
   els = {
     gameIdInput: document.getElementById('game-id'),
     metaDebugEl: document.getElementById('meta-debug'),
-    derivedEmissionPreviewEl: document.getElementById(
-      'derived-emission-preview'
-    ),
   };
   metaDebug = await import('./meta-debug.js');
-  metaDebug.initMetaDebug({ ...els, tokens: TOKENS });
+  metaDebug.initMetaDebug(els);
 });
 
 describe('renderMetaDebugLine', () => {
@@ -71,43 +66,5 @@ describe('renderMetaDebugLine', () => {
     };
     metaDebug.renderMetaDebugLine();
     expect(els.metaDebugEl.textContent).toContain('Emission: winter @ ?/s');
-  });
-});
-
-describe('renderDerivedEmissionPreview', () => {
-  it('stays hidden without a game id', () => {
-    els.gameIdInput.value = '';
-    metaDebug.renderDerivedEmissionPreview();
-    expect(els.derivedEmissionPreviewEl.style.display).toBe('none');
-  });
-
-  it('stays hidden without derived rates', () => {
-    metaState.gameMeta = {};
-    metaDebug.renderDerivedEmissionPreview();
-    expect(els.derivedEmissionPreviewEl.style.display).toBe('none');
-  });
-
-  it('stays hidden when a token rate is missing', () => {
-    metaState.gameMeta = {
-      derived_emission_rates_per_second: { spring: 1, summer: 2 },
-    };
-    metaDebug.renderDerivedEmissionPreview();
-    expect(els.derivedEmissionPreviewEl.style.display).toBe('none');
-  });
-
-  it('lists every token rate with two decimals', () => {
-    metaState.gameMeta = {
-      derived_emission_rates_per_second: {
-        spring: 1,
-        summer: 2.5,
-        autumn: 0.333,
-        winter: 4,
-      },
-    };
-    metaDebug.renderDerivedEmissionPreview();
-    expect(els.derivedEmissionPreviewEl.style.display).toBe('block');
-    expect(els.derivedEmissionPreviewEl.textContent).toBe(
-      'Derived Rates: spring 1.00, summer 2.50, autumn 0.33, winter 4.00 /s'
-    );
   });
 });

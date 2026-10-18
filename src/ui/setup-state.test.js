@@ -21,8 +21,6 @@ describe('setup-state helpers', () => {
       asyncWindowOpen: true,
       requirePlayerAuth: true,
       activeSession: { sessionId: 's-1' },
-      hostRoundType: 'async',
-      asyncHostAutoStart: false,
     });
 
     expect(state).toEqual({
@@ -36,8 +34,6 @@ describe('setup-state helpers', () => {
       requirePlayerAuth: true,
       sessionActive: true,
       sessionId: 's-1',
-      hostRoundType: 'async',
-      asyncHostAutoStart: false,
     });
   });
 
@@ -52,8 +48,6 @@ describe('setup-state helpers', () => {
       asyncWindowOpen: null,
       requirePlayerAuth: 'unknown',
       activeSession: null,
-      hostRoundType: 'sync',
-      asyncHostAutoStart: true,
     });
 
     expect(state.sessionActive).toBe(false);

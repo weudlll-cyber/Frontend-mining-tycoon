@@ -212,7 +212,7 @@ Game configuration is strictly **admin-only** and is managed via a separate entr
 
 ### Frontend Admin Controls
 
-- `player.html` still contains legacy host controls (round type, scoring mode, trade count, durations, advanced overrides). They carry the `.admin-only` CSS class and are always hidden (`display: none !important`); players cannot create games from `player.html`.
+- `player.html` has no host controls (the hidden legacy ones were removed); players cannot create games from `player.html`.
 - If a feature must show admin UI conditionally (rare), gate it explicitly in code and document the gate.
 - No admin controls should ever appear in the player UI without explicit gating.
 

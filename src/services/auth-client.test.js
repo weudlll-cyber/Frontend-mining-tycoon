@@ -196,18 +196,6 @@ describe('auth-client', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: false,
-        status: 404,
-        json: async () => ({ detail: 'Not Found' }),
-      })
-    );
-    await expect(
-      fetchEmailCapabilities('http://127.0.0.1:8000')
-    ).resolves.toEqual({ passwordReset: false, emailVerification: false });
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
         status: 500,
         json: async () => ({ detail: 'boom' }),
       })

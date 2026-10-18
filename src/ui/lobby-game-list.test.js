@@ -33,10 +33,10 @@ describe('renderLobbyGameList', () => {
     const selected = renderLobbyGameList(
       list,
       [
-        { game_id: 'late', status: 'scheduled', opens_in_seconds: 7200 },
-        { game_id: 'unknown', status: 'scheduled' },
+        { game_id: 'late', game_status: 'scheduled', opens_in_seconds: 7200 },
+        { game_id: 'unknown', game_status: 'scheduled' },
         { game_id: '<b>open</b>', game_status: 'running' },
-        { game_id: 'soon', status: 'scheduled', opens_in_seconds: 60 },
+        { game_id: 'soon', game_status: 'scheduled', opens_in_seconds: 60 },
         { game_id: '' },
       ],
       { selectedGameId: 'soon', nowMs, onSelect: vi.fn() }
@@ -66,7 +66,7 @@ describe('renderLobbyGameList', () => {
     const list = makeList();
     renderLobbyGameList(
       list,
-      [{ game_id: 's', status: 'scheduled', opens_in_seconds: 2 }],
+      [{ game_id: 's', game_status: 'scheduled', opens_in_seconds: 2 }],
       { nowMs: 0, onSelect: vi.fn() }
     );
     const onDue = vi.fn();
@@ -94,7 +94,7 @@ describe('renderLobbyGameList', () => {
 
     renderLobbyGameList(
       list,
-      [{ game_id: 's', status: 'scheduled', opens_in_seconds: 1 }],
+      [{ game_id: 's', game_status: 'scheduled', opens_in_seconds: 1 }],
       { onSelect: vi.fn() }
     );
     startScheduledCountdown(list, onDue);

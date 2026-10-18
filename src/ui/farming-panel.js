@@ -30,11 +30,8 @@ import {
   resolveFarmTokens,
   resolveRawFarming,
 } from './farming-state.js';
-import {
-  asNumber,
-  formatTokenName,
-  formatTokenUnits,
-} from './trading-panel-formatters.js';
+import { asNumber, formatTokenUnits } from './trading-panel-formatters.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 export const FARMING_DISABLED_TEXT = 'Farming is not enabled for this round.';
 const FARMING_ENABLED_TEXT = 'Farming is enabled for this round.';
@@ -384,7 +381,9 @@ export function initFarmingPanel(deps) {
 
   function renderPill(farming) {
     if (!farmingStatusRef) return;
-    farmingStatusRef.textContent = formatFarmingPillText(farming);
+    const pillText = formatFarmingPillText(farming);
+    farmingStatusRef.textContent = pillText;
+    farmingStatusRef.title = pillText;
     farmingStatusRef.classList.toggle(
       'farming-status-enabled',
       farming.enabled

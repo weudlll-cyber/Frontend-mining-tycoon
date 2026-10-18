@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { flush } from '../test-utils/async-helpers.js';
 
 vi.mock('../services/auth-client.js', () => ({
   fetchMyHistory: vi.fn(),
@@ -37,12 +38,6 @@ function historyItem(gameId, rank = 1) {
     score: 100,
     player_name: 'Weudl',
   };
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
 }
 
 const $ = (id) => document.getElementById(id);

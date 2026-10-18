@@ -19,17 +19,14 @@ Constraints:
 Security notes: pure data handling, no DOM or network access.
 */
 
+import { formatDuration } from '../utils/duration-format.js';
+import {
+  formatRatePercent,
+  isPlainObject,
+  toFiniteNumber,
+} from '../utils/value-utils.js';
+
 const FARMING_TOKENS = Object.freeze(['spring', 'summer', 'autumn', 'winter']);
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function toFiniteNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-}
 
 function normalizePosition(raw) {
   const source = isPlainObject(raw) ? raw : {};
@@ -174,28 +171,16 @@ export function mergeFarmUpdatedState(previous, updatedState) {
 
 /** Compact human duration: 45s, 5m, 1m 30s, 2h 15m, 3d 4h. */
 export function formatFarmDuration(seconds) {
-  const numeric = toFiniteNumber(seconds);
-  if (numeric === null) return '--';
-  const total = Math.max(0, Math.round(numeric));
-  const days = Math.floor(total / 86400);
-  const hours = Math.floor((total % 86400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  const join = (major, majorUnit, minor, minorUnit) =>
-    minor > 0
-      ? `${major}${majorUnit} ${minor}${minorUnit}`
-      : `${major}${majorUnit}`;
-  if (days > 0) return join(days, 'd', hours, 'h');
-  if (hours > 0) return join(hours, 'h', minutes, 'm');
-  if (minutes > 0) return join(minutes, 'm', secs, 's');
-  return `${secs}s`;
+  return formatDuration(seconds, {
+    fallback: '--',
+    round: 'round',
+    keepZeroMinor: false,
+  });
 }
 
 /** Reward rate as percent text without float noise (0.05 -> "5%"). */
 export function formatRewardPercent(rate) {
-  const numeric = toFiniteNumber(rate);
-  if (numeric === null) return '--';
-  return `${Number((numeric * 100).toFixed(4))}%`;
+  return formatRatePercent(rate, { suffix: '%', fallback: '--' });
 }
 
 /** Token keys to show in the Farm tab: balances first, canonical fallback. */

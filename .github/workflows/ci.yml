@@ -20,14 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
-      any: ${{ steps.filter.outputs.any }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Filter paths
         id: filter
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             frontend:
@@ -49,8 +48,6 @@ jobs:
               - 'vite.config.*'
               - 'vitest.config.*'
               - 'scripts/**'
-            any:
-              - '**'
 
   pr-policy:
     name: PR Policy

@@ -109,8 +109,7 @@ describe('trading-panel', () => {
       const trading = normalizeTradingCapability(null, 0.02);
       renderTradingStatus(trading, panelEl, statusEl);
 
-      expect(statusEl.textContent).toContain('Trading:');
-      expect(statusEl.textContent).toContain('Not Enabled');
+      expect(statusEl.textContent).toBe('Not Enabled (2.0% fee)');
       expect(statusEl.textContent).toContain('2.0%');
     });
 
@@ -157,7 +156,20 @@ describe('trading-panel', () => {
       const trading = normalizeTradingCapability(null);
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe('trading-status-disabled');
+      expect(statusEl.classList.contains('trading-status-disabled')).toBe(true);
+    });
+
+    it('keeps the ellipsis class and shows the full text as tooltip', () => {
+      statusEl.className = 'bottom-bar-value';
+      renderBottomBarTradingStatus(
+        { enabled: true, value_fee_rate: 0.02 },
+        statusEl
+      );
+
+      expect(statusEl.textContent).toBe('Enabled (2.0% fee)');
+      expect(statusEl.title).toBe('Enabled (2.0% fee)');
+      expect(statusEl.classList.contains('bottom-bar-value')).toBe(true);
+      expect(statusEl.classList.contains('trading-status-enabled')).toBe(true);
     });
 
     it('applies trading-status-enabled class for enabled trading', () => {
@@ -167,7 +179,7 @@ describe('trading-panel', () => {
       };
       renderBottomBarTradingStatus(trading, statusEl);
 
-      expect(statusEl.className).toBe('trading-status-enabled');
+      expect(statusEl.classList.contains('trading-status-enabled')).toBe(true);
     });
 
     it('handles null data gracefully', () => {
@@ -236,7 +248,7 @@ describe('trading-panel', () => {
 
       expect(panelEl.innerHTML).toContain('trading-card');
       expect(panelEl.innerHTML).toContain('Trades used:');
-      expect(statusEl.textContent).toContain('Trading:');
+      expect(statusEl.textContent).toContain('fee)');
       expect(panelEl.textContent).toContain('Execute Trade');
       expect(panelEl.querySelector('.trading-execute-btn')?.disabled).toBe(
         true
@@ -293,6 +305,35 @@ describe('trading-panel', () => {
         toToken: 'summer',
         amount: 75,
       });
+    });
+
+    it('shows a toast when the trade request fails', async () => {
+      const executeTrade = vi.fn().mockRejectedValue(new Error('Too late'));
+      const showToast = vi.fn();
+      const api = initTradingPanel({
+        getGameMeta: () => ({
+          conversion_fee_rate: 0.02,
+          game_duration_seconds: 600,
+          trading: { enabled: true, status: 'enabled', value_fee_rate: 0.02 },
+        }),
+        getLastGameData: () => ({
+          player_state: { balances: { spring: 1000, summer: 500 } },
+          seconds_remaining: 520,
+          trades_used: 0,
+          trading_rules: { trade_count: 1, unlock_offsets_seconds: [60] },
+        }),
+        executeTrade,
+        showToast,
+        tradingPanelRef: panelEl,
+        tradingStatusRef: statusEl,
+      });
+      api.renderTradingStatus();
+      const amountInput = panelEl.querySelector('input[data-field="amount"]');
+      amountInput.value = '10';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      panelEl.querySelector('.trading-execute-btn').click();
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      expect(showToast).toHaveBeenCalledWith('Trade failed: Too late', 'error');
     });
 
     it('does not lose the Execute click when the amount field blurs (change) during the press', async () => {
@@ -877,7 +918,8 @@ describe('trading-panel', () => {
 
       expect(api.getTrading().value_fee_rate).toBe(0);
       api.renderTradingStatus();
-      expect(statusEl.textContent).toBe('Trading: Not Enabled (0.0% fee)');
+      expect(statusEl.textContent).toBe('Not Enabled (0.0% fee)');
+      expect(statusEl.classList.contains('trading-status-disabled')).toBe(true);
     });
 
     it('shows the round fee and oracle spread from game meta in the cost note', () => {

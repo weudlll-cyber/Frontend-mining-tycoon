@@ -1,0 +1,294 @@
+/*
+File: src/styles/responsive.css
+Purpose: Phone and medium-width breakpoints.
+Role in system: part of the player board stylesheet; imported in order by
+  src/style.css, so the cascade is the same as the former single file.
+*/
+
+/* Responsive */
+@media (max-width: 768px) {
+  html,
+  body {
+    min-height: auto;
+    overflow: auto;
+    /* Vertical page scroll is fine on phones; horizontal scroll is not. */
+    overflow-x: hidden;
+  }
+
+  #app {
+    min-height: auto;
+    overflow: auto;
+    padding: 0.85rem;
+  }
+
+  .app-layout {
+    overflow: visible;
+  }
+
+  .game-header {
+    gap: 0.6rem;
+  }
+
+  .game-header-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn-secondary {
+    width: 100%;
+  }
+
+  .game-header h1 {
+    font-size: 1.05rem;
+  }
+
+  .debug-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-shell {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .setup-shell-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .section-title-row {
+    flex-direction: column;
+  }
+
+  .jump-link {
+    width: 100%;
+  }
+
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-span-2,
+  .form-span-3 {
+    grid-column: auto;
+  }
+
+  .setup-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-shell {
+    flex-direction: column;
+    gap: 1rem;
+    flex: auto;
+    overflow: visible;
+  }
+
+  .status-bar {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .status-bar-left,
+  .status-bar-center,
+  .status-bar-right {
+    flex-direction: column;
+    gap: 0.3rem;
+    align-items: flex-start;
+  }
+
+  .dashboard-main {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    flex: auto;
+    overflow: visible;
+  }
+
+  .right-column {
+    overflow: visible;
+  }
+
+  .player-panel-split {
+    grid-template-rows: auto auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .seasons-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .season-focus-strip {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    padding: 0.25rem;
+    overflow-x: auto;
+  }
+
+  .season-focus-btn {
+    flex: 0 0 auto;
+  }
+
+  .seasons-grid .season-card {
+    display: none;
+  }
+
+  .seasons-grid .season-card.season-card-focus-active {
+    display: flex;
+  }
+
+  .seasons-scroll {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .analytics-panel {
+    overflow: visible;
+  }
+
+  .ps-matrix {
+    grid-template-columns: minmax(4.4rem, 1.25fr) repeat(4, minmax(0, 1fr));
+    gap: 0.2rem 0.28rem;
+  }
+
+  .ps-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-card {
+    max-height: none;
+    min-height: 220px;
+  }
+
+  .chat-dock-btn {
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
+    bottom: 8.6rem;
+  }
+
+  .live-drawer {
+    /* On small screens use more of the viewport width */
+    width: min(92vw, 480px);
+    max-height: 78vh;
+  }
+
+  /* 375px phones: tabs and Close wrap instead of overflowing the window. */
+  .live-drawer-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .live-drawer-tabs {
+    flex-wrap: wrap;
+  }
+
+  .panel-inline-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .game-over-card {
+    padding: 1.5rem;
+  }
+
+  .bottom-bar {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    padding: 0.55rem;
+  }
+
+  .status-pill {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .chat-form {
+    grid-template-columns: auto 1fr;
+  }
+
+  .chat-form button[type='submit'] {
+    grid-column: 1 / -1;
+  }
+
+  .countdown {
+    font-size: 2.5rem;
+  }
+
+  .status-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  .season-focus-btn,
+  .drawer-open-btn,
+  .chat-toggle-btn,
+  .live-drawer-tab,
+  .chat-dock-btn {
+    width: auto;
+  }
+
+  .live-drawer-close-btn {
+    width: auto;
+  }
+
+  .upgrade-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-lane-header,
+  .upgrade-lane-row,
+  .upgrade-header-grid {
+    column-gap: 4px;
+  }
+
+  .upgrade-stat,
+  .state-stat {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 769px) {
+  .setup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-span-2,
+  .form-span-3 {
+    grid-column: auto;
+  }
+
+  .dashboard-main {
+    /* Shrink panel on medium viewports; left column still gets remaining space */
+    grid-template-columns: minmax(0, 1fr) clamp(
+        240px,
+        var(--player-panel-width),
+        320px
+      );
+  }
+
+  .player-panel-split {
+    min-height: 240px;
+  }
+}

@@ -26,6 +26,7 @@ import {
   normalizeGameConfig,
   setGameConfigDocument,
 } from '../config/index.js';
+import { flush, okResponse } from '../test-utils/async-helpers.js';
 
 const CONFIG = {
   duration_presets: { '1m': 60, '5m': 300, '30m': 1800, '24h': 86400 },
@@ -60,10 +61,6 @@ function documentFor(config = CONFIG, version = 1) {
   };
 }
 
-function okResponse(body) {
-  return { ok: true, status: 200, json: async () => body };
-}
-
 function loadAdminFixture() {
   const html = fs.readFileSync(
     path.resolve(process.cwd(), 'admin.html'),
@@ -77,12 +74,6 @@ function loadAdminFixture() {
 
 const $ = (id) => document.getElementById(`admin-gameconfig-${id}`);
 const resultText = () => $('result').textContent;
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
-}
 
 function change(input, value) {
   input.value = value;

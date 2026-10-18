@@ -49,28 +49,16 @@ export function resolveAsyncWindowOpen(meta) {
 
 export function computeCurrentRoundContext({
   gameMeta,
-  selectedRoundType,
-  isStreamActive,
-  latestGameStatus,
   setupRoundModeOverride,
   asyncSessionSupportProbe,
   sessionStartSupported,
 }) {
   const metaRoundMode = getRoundModeFromMeta(gameMeta);
-  const shouldPreferHostSelection =
-    selectedRoundType === 'async' &&
-    !isStreamActive &&
-    (latestGameStatus === null ||
-      latestGameStatus === 'idle' ||
-      latestGameStatus === 'enrolling');
+  // The round type comes from the round's meta (chosen on admin.html).
   const roundMode =
     setupRoundModeOverride === 'async' || setupRoundModeOverride === 'sync'
       ? setupRoundModeOverride
-      : shouldPreferHostSelection
-        ? 'async'
-        : gameMeta
-          ? metaRoundMode
-          : selectedRoundType;
+      : metaRoundMode;
 
   const supportFromMeta = getSessionSupportFromMeta(gameMeta);
   const supportFromProbe =

@@ -4,93 +4,14 @@ Purpose: Guard setup action visibility/state rules across sync and async round f
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-function buildDomFixture() {
-  document.body.innerHTML = `
-    <div id="app">
-      <main class="app-layout">
-        <header class="card game-header">
-          <button id="setup-toggle-btn" type="button" aria-expanded="true">Hide Setup</button>
-          <button id="jump-live-btn" type="button">Jump to Live Board</button>
-          <button id="debug-toggle-btn" type="button" aria-expanded="false" aria-controls="debug-panel">⚙️</button>
-          <section id="debug-panel" class="debug-panel" hidden>
-            <div>debug body</div>
-          </section>
-          <div id="meta-debug"></div>
-          <div id="debug-backend-url"></div>
-          <div id="debug-game-id"></div>
-          <div id="debug-player-id"></div>
-          <div id="debug-session-id"></div>
-        </header>
-
-        <section id="setup-shell" class="setup-shell setup-open">
-          <button id="jump-live-btn-setup" type="button">Jump to Live Board</button>
-          <section id="setup-panel">
-            <div class="setup-actions">
-              <div class="setup-actions-header">
-                <h3>Primary Actions</h3>
-                <span id="round-mode-badge">Round: Sync</span>
-              </div>
-              <div class="button-group">
-                <button id="start-btn" class="btn-secondary" type="button">Start Game</button>
-                <button id="start-session-btn" class="btn-secondary" type="button" hidden>Start Session</button>
-                <button id="stop-btn" class="btn-secondary" type="button">Stop Stream</button>
-              </div>
-              <p id="setup-actions-note"></p>
-            </div>
-          </section>
-        </section>
-
-        <section id="live-board"></section>
-      </main>
-
-      <input id="base-url" value="http://127.0.0.1:8000" />
-      <input id="player-name" value="Tester" />
-      <select id="duration-preset">
-        <option value="30m" selected>30 minutes</option>
-      </select>
-      <div id="duration-custom-input" style="display:none"></div>
-      <input id="duration-custom-value" value="300" />
-      <select id="duration-custom-unit"><option value="seconds">seconds</option></select>
-      <input id="enrollment-window" value="60" />
-      <input id="game-id" value="game-1" />
-      <input id="player-id" value="player-1" />
-      <input id="show-advanced-overrides" type="checkbox" />
-      <div id="advanced-overrides" style="display:none"></div>
-      <select id="anchor-token"><option value="">none</option></select>
-      <input id="anchor-rate" value="" />
-      <input id="season-cycles" value="" />
-      <div id="derived-emission-preview" style="display:none"></div>
-
-      <div id="conn-status"></div>
-      <div id="game-status"></div>
-      <div id="countdown"></div>
-      <div id="countdown-label"></div>
-      <div id="async-session-status" class="badge badge-gray" hidden></div>
-      <div id="new-game-status"></div>
-      <div id="player-state"></div>
-      <div id="leaderboard"></div>
-      <div id="my-score"></div>
-      <div id="my-rank"></div>
-      <div id="top-score"></div>
-
-      <aside id="chat-panel"></aside>
-      <button id="chat-toggle-btn" type="button"></button>
-      <ul id="chat-messages"></ul>
-      <form id="chat-form"></form>
-      <input id="chat-input" />
-      <div id="chat-status"></div>
-    </div>
-  `;
-}
-
-async function loadMainModule() {
-  return import('./main.js');
-}
+import {
+  buildSetupFlowFixture,
+  loadMainModule,
+} from './test-utils/main-test-helpers.js';
 
 beforeEach(() => {
   vi.resetModules();
-  buildDomFixture();
+  buildSetupFlowFixture();
   // DOMContentLoaded startup fetches meta/active games and then starts an
   // auto-refresh interval. A never-settling fetch parks that async chain so
   // it cannot log or schedule work after the test environment tears down.

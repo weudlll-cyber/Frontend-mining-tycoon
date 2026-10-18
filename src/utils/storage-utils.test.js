@@ -72,6 +72,26 @@ describe('storage-utils', () => {
     );
   });
 
+  it('allows plain http only for localhost in production builds', () => {
+    const prod = { production: true };
+    expect(normalizeBaseUrl('https://api.example.com/', prod)).toBe(
+      'https://api.example.com'
+    );
+    expect(normalizeBaseUrl('http://localhost:8000', prod)).toBe(
+      'http://localhost:8000'
+    );
+    expect(normalizeBaseUrl('http://127.0.0.1:8000', prod)).toBe(
+      'http://127.0.0.1:8000'
+    );
+    expect(() => normalizeBaseUrl('http://api.example.com', prod)).toThrow(
+      /must use https/
+    );
+    // Development and test builds keep accepting http everywhere.
+    expect(normalizeBaseUrl('http://api.example.com')).toBe(
+      'http://api.example.com'
+    );
+  });
+
   it('rejects unsupported URL protocols', () => {
     expect(() => normalizeBaseUrl('ftp://example.com')).toThrow(
       'Backend URL must use http or https.'

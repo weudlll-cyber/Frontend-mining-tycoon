@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { flush } from '../test-utils/async-helpers.js';
 
 vi.mock('../services/auth-client.js', () => ({
   exportMyAccountData: vi.fn(),
@@ -25,12 +26,6 @@ function loadLobbyFixture() {
     'utf8'
   );
   document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
-}
-
-async function flush() {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
 }
 
 const $ = (id) => document.getElementById(id);

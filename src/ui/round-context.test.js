@@ -39,26 +39,34 @@ describe('round-context helpers', () => {
     expect(resolveAsyncWindowOpen({ round_mode: 'sync' })).toBeNull();
   });
 
-  it('computes context with host-selection preference before stream starts', () => {
-    const context = computeCurrentRoundContext({
-      gameMeta: { round_mode: 'sync' },
-      selectedRoundType: 'async',
-      isStreamActive: false,
-      latestGameStatus: 'idle',
-      setupRoundModeOverride: null,
-      asyncSessionSupportProbe: true,
-      sessionStartSupported: false,
-    });
-
-    expect(context).toEqual({ roundMode: 'async', supportsSessionStart: true });
+  it('takes the round mode from meta unless setup overrides it', () => {
+    expect(
+      computeCurrentRoundContext({
+        gameMeta: { round_mode: 'async' },
+        setupRoundModeOverride: null,
+        asyncSessionSupportProbe: true,
+        sessionStartSupported: false,
+      })
+    ).toEqual({ roundMode: 'async', supportsSessionStart: true });
+    expect(
+      computeCurrentRoundContext({
+        gameMeta: { round_mode: 'async' },
+        setupRoundModeOverride: 'sync',
+        asyncSessionSupportProbe: true,
+        sessionStartSupported: true,
+      }).roundMode
+    ).toBe('sync');
+    expect(
+      computeCurrentRoundContext({
+        gameMeta: null,
+        setupRoundModeOverride: null,
+      }).roundMode
+    ).toBe('sync');
   });
 
   it('forces session start unsupported for sync round mode', () => {
     const context = computeCurrentRoundContext({
       gameMeta: { round_mode: 'sync', supports_round_sessions: true },
-      selectedRoundType: 'sync',
-      isStreamActive: true,
-      latestGameStatus: 'running',
       setupRoundModeOverride: null,
       asyncSessionSupportProbe: true,
       sessionStartSupported: true,

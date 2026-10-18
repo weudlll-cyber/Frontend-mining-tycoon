@@ -1,0 +1,294 @@
+/*
+File: src/styles/analytics.css
+Purpose: Analytics panel, post-game results link and the bottom bar.
+Role in system: part of the player board stylesheet; imported in order by
+  src/style.css, so the cascade is the same as the former single file.
+*/
+
+/* Analytics Panel */
+.analytics-panel {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+
+.analytics-panel h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom: 0.5rem;
+}
+
+.analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.last-game-score-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.last-game-score-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border-light);
+  border-radius: calc(var(--radius) / 1.5);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.last-game-score-rank,
+.last-game-score-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+}
+
+.last-game-score-rank {
+  color: var(--status-blue);
+}
+
+.game-over-overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.game-over-overlay[hidden] {
+  display: none !important;
+}
+
+.game-over-card {
+  width: min(520px, 100%);
+  padding: 2rem 2.25rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 42%),
+    linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.96) 0%,
+      rgba(30, 41, 59, 0.96) 100%
+    );
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+  text-align: center;
+  color: #f8fafc;
+}
+
+.game-over-eyebrow {
+  margin-bottom: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.game-over-card h2 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  line-height: 1;
+}
+
+#game-over-message {
+  margin-top: 0.85rem;
+  font-size: 1rem;
+  color: rgba(241, 245, 249, 0.88);
+}
+
+.game-over-results-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(241, 245, 249, 0.7);
+}
+
+/* Post-game only: opens the lobby's full results view for this round. */
+.game-over-results-link {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.6);
+  color: #bfdbfe;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.game-over-results-link[hidden] {
+  display: none;
+}
+
+.game-over-results-link:hover,
+.game-over-results-link:focus-visible {
+  background: rgba(147, 197, 253, 0.16);
+}
+
+/* Bottom Bar */
+.bottom-bar {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.action-bar {
+  gap: 0.6rem;
+  justify-content: flex-start;
+}
+
+.bottom-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.drawer-open-btn {
+  min-width: 6.2rem;
+}
+
+.status-pill {
+  padding: 0.32rem 0.56rem;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+/* Desktop board: the action bar stays on one row (a second row would push the
+   board past the window height). Buttons keep their size; the two status
+   pills shrink and their values end with an ellipsis (full text in the
+   tooltip). */
+@media (min-width: 769px) {
+  .page-player .action-bar {
+    flex-wrap: nowrap;
+  }
+
+  .page-player .action-bar > .bottom-bar-item {
+    flex-shrink: 0;
+  }
+
+  .page-player .action-bar > .status-pill {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
+.bottom-bar-item .label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bottom-bar-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-toggle-btn {
+  background-color: var(--status-blue);
+  color: white;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.chat-toggle-btn:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.chat-unread-badge {
+  display: inline-flex;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 0 0.24rem;
+}
+
+.chat-dock-btn {
+  position: absolute;
+  right: 1.15rem;
+  bottom: 5.4rem;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid #bae6fd;
+  background: rgba(240, 249, 255, 0.96);
+  color: #0f172a;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+  max-width: min(420px, 58vw);
+}
+
+.chat-dock-icon {
+  font-size: 0.95rem;
+}
+
+.chat-dock-preview {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1f2937;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-dock-unread {
+  display: inline-flex;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.67rem;
+  padding: 0 0.2rem;
+}

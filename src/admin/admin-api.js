@@ -15,6 +15,7 @@
  */
 
 import { createApiError, readApiError } from '../utils/api-error.js';
+import { normalizeBaseUrl } from '../utils/storage-utils.js';
 import {
   buildAdminAuthHeaders,
   handleAdminAuthError,
@@ -29,11 +30,13 @@ function inputValue(id) {
  * @returns {{ baseUrl: string, adminToken: string }}
  */
 export function readAdminConnection() {
-  // Trailing slashes would produce "//admin/..." paths.
-  const baseUrl = inputValue('admin-backend-url').replace(/\/+$/, '');
-  if (!baseUrl) {
+  const rawUrl = inputValue('admin-backend-url');
+  if (!rawUrl) {
     throw new Error('Backend URL is not set. Please enter a backend URL.');
   }
+  // Strips trailing slashes ("//admin/..." paths) and, in production, rejects
+  // plain http except for localhost.
+  const baseUrl = normalizeBaseUrl(rawUrl);
   return { baseUrl, adminToken: inputValue('admin-token') };
 }
 

@@ -13,10 +13,10 @@ import {
   formatDurationCompact,
   formatSignedPercent,
   formatSignedTokens,
-  formatTokenName,
   formatTokenUnits,
   normalizeScoringMode,
 } from './trading-panel-formatters.js';
+import { formatTokenName } from '../utils/value-utils.js';
 
 export const FALLBACK_TOKENS = ['spring', 'summer', 'autumn', 'winter'];
 

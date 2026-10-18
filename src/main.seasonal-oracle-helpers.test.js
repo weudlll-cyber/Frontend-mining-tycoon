@@ -101,42 +101,6 @@ describe('Seasonal Oracle frontend helpers', () => {
     ).toBeNull();
   });
 
-  it('does not include advanced overrides when the toggle is unchecked', async () => {
-    const module = await loadMainModule();
-
-    const showAdvanced = document.getElementById('show-advanced-overrides');
-    const anchorToken = document.getElementById('anchor-token');
-    const anchorRate = document.getElementById('anchor-rate');
-    const seasonCycles = document.getElementById('season-cycles');
-
-    showAdvanced.checked = false;
-    anchorToken.value = 'winter';
-    anchorRate.value = '9.5';
-    seasonCycles.value = '4';
-
-    expect(module.collectAdvancedOverrides()).toEqual({});
-  });
-
-  it('includes advanced overrides only when the toggle is checked', async () => {
-    const module = await loadMainModule();
-
-    const showAdvanced = document.getElementById('show-advanced-overrides');
-    const anchorToken = document.getElementById('anchor-token');
-    const anchorRate = document.getElementById('anchor-rate');
-    const seasonCycles = document.getElementById('season-cycles');
-
-    showAdvanced.checked = true;
-    anchorToken.value = 'summer';
-    anchorRate.value = '8.5';
-    seasonCycles.value = '2';
-
-    expect(module.collectAdvancedOverrides()).toEqual({
-      emission_anchor_token: 'summer',
-      emission_anchor_tokens_per_second: 8.5,
-      season_cycles_per_game: 2,
-    });
-  });
-
   it('computes Portfolio Value from balances and oracle prices', async () => {
     const module = await loadMainModule();
 

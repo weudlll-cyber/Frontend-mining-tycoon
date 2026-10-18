@@ -17,28 +17,6 @@ import {
 
 function buildFixture() {
   document.body.innerHTML = `
-    <label><input id="round-type-sync" name="round-type" type="radio" checked /> Sync</label>
-    <label><input id="round-type-async" name="round-type" type="radio" /> Async (host)</label>
-    <div id="async-host-controls" hidden>
-      <label id="async-enrollment-field" hidden>
-        <span>Enrollment Window (seconds)</span>
-        <input id="enrollment-window" type="number" value="600" disabled />
-      </label>
-      <select id="async-duration-preset">
-        <option value="5m">5m</option>
-        <option value="10m" selected>10m</option>
-        <option value="15m">15m</option>
-        <option value="60m">1h</option>
-        <option value="3h">3h</option>
-        <option value="6h">6h</option>
-        <option value="12h">12h</option>
-        <option value="24h">24h</option>
-      </select>
-      <div id="async-duration-custom-wrap" hidden aria-hidden="true">
-        <input id="async-duration-custom-minutes" value="10" />
-      </div>
-      <label><input id="async-auto-start" type="checkbox" checked /> Auto-start</label>
-    </div>
     <input id="game-id" value="game-1" />
     <input id="player-id" value="player-1" />
     <button id="new-game-btn" type="button">+ New Game</button>
@@ -103,19 +81,6 @@ function buildFixture() {
     setupShellEl: document.getElementById('setup-shell'),
     setupToggleBtnEl: document.getElementById('setup-toggle-btn'),
     onStartAsyncSession,
-    roundTypeSyncInput: document.getElementById('round-type-sync'),
-    roundTypeAsyncInput: document.getElementById('round-type-async'),
-    asyncHostControlsEl: document.getElementById('async-host-controls'),
-    asyncHostDurationPresetInput: document.getElementById(
-      'async-duration-preset'
-    ),
-    asyncHostDurationCustomEl: document.getElementById(
-      'async-duration-custom-wrap'
-    ),
-    asyncHostDurationCustomMinutesInput: document.getElementById(
-      'async-duration-custom-minutes'
-    ),
-    asyncHostAutoStartCheckbox: document.getElementById('async-auto-start'),
     debugToggleBtnEl: document.getElementById('debug-toggle-btn'),
     debugPanelEl: document.getElementById('debug-panel'),
     debugBackendUrlEl: document.getElementById('debug-backend-url'),
@@ -144,7 +109,6 @@ describe('setup shell async readiness', () => {
       sessionApiSupported: true,
       asyncWindowOpen: true,
       requirePlayerAuth: false,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -178,7 +142,6 @@ describe('setup shell async readiness', () => {
       sessionApiSupported: true,
       asyncWindowOpen: true,
       sessionActive: false,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -200,7 +163,6 @@ describe('setup shell async readiness', () => {
       sessionApiSupported: true,
       asyncWindowOpen: true,
       sessionActive: false,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -230,7 +192,6 @@ describe('setup shell async readiness', () => {
       sessionStartSupported: false,
       sessionApiSupported: false,
       asyncWindowOpen: true,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -261,7 +222,6 @@ describe('setup shell async readiness', () => {
       sessionApiSupported: true,
       asyncWindowOpen: true,
       sessionActive: false,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -279,7 +239,6 @@ describe('setup shell async readiness', () => {
       sessionApiSupported: true,
       asyncWindowOpen: true,
       sessionActive: false,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -397,7 +356,6 @@ describe('setup shell async readiness', () => {
       requirePlayerAuth: 'unknown',
       sessionActive: false,
       sessionId: null,
-      hostRoundType: 'async',
     });
     updateSetupActionsState();
 
@@ -410,20 +368,5 @@ describe('setup shell async readiness', () => {
     expect(chipsText.join(' ')).not.toContain('Window');
     expect(chipsText.join(' ')).toContain('SessionAPI');
     expect(chipsText.join(' ')).toContain('Auth');
-  });
-
-  it('shows async host controls with enrollment/session-duration controls hidden', () => {
-    const asyncControls = document.getElementById('async-host-controls');
-    const enrollmentField = document.getElementById('async-enrollment-field');
-    const customDurationWrap = document.getElementById(
-      'async-duration-custom-wrap'
-    );
-
-    setSetupShellState({ hostRoundType: 'async' });
-    updateSetupActionsState();
-    expect(asyncControls.hidden).toBe(false);
-    expect(enrollmentField.hidden).toBe(true);
-    expect(customDurationWrap.hidden).toBe(true);
-    expect(customDurationWrap.getAttribute('aria-hidden')).toBe('true');
   });
 });

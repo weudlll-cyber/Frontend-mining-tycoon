@@ -9,8 +9,56 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Fixed
+
+- Board action bar at 1280×630 with an event banner: the bar wrapped into a
+  second row and the board scrolled by ~30 px. The bar now stays on one row;
+  the Trading/Farming values end with an ellipsis (full text as tooltip). The
+  trading status no longer drops its ellipsis class and no longer repeats
+  "Trading" ("Trading Trading: …"); its three copies are one function.
+
 ### Changed
 
+- One duration formatter (`src/utils/duration-format.js`, clock / compact /
+  long styles) replaces ten per-module copies; one `isPlainObject`,
+  `isFiniteNumber`, `toFiniteNumber` and rate-percent formatter in
+  `src/utils/value-utils.js`. Every visible label is unchanged.
+- One `formatTokenName` (`src/utils/value-utils.js`) for token, upgrade and
+  status names; the halving footer and countdown now say "Summer" like the
+  rest of the board instead of "SUMMER".
+- Player board: removed the always-hidden legacy host controls (round type,
+  durations, scoring, trade count, advanced overrides; about 300 lines of
+  `player.html`), `setup-host-controls.js` and their CSS. The round type now
+  always comes from the round's meta; the join fields are unchanged.
+- CSS: the admin console styles moved from an inline `<style>` block in
+  `admin.html` to `src/admin.css` (imported by `admin-setup.js`); every
+  `style=""` attribute of `admin.html` and `player.html` became a class or
+  id rule. The BOT badge and last-game name rules live once in
+  `src/shared.css` (board and lobby). `src/style.css` (about 3000 lines) is
+  split by area into `src/styles/*.css` and imports them in the old order;
+  the built CSS is byte-identical.
+- Console noise: a failed admin game delete logs one clear `console.error`
+  instead of a "[DELETE] Catch block error" stack dump; the meta-hash change
+  note is a dev-only `debugLog`.
+- Removed fallbacks for backend fields that the bundled backend always sends
+  (verified in the backend code): the old single-event keys (`active_event`,
+  `event_context.active_event`, `events.active`), the `status` key of
+  `/games/active` items, the `token`/`session_token`/`login` auth keys, the
+  404 path of `/auth/email-capabilities` and the aggregated `upgrade_levels`.
+  Defensive handling of missing or malformed data stays.
+- `initTradingPanel` (about 480 lines of closures) is split into module-level
+  functions with an explicit panel state object; the lobby account forms
+  (login, register, change password, logout) moved from `src/lobby.js` to
+  `src/ui/lobby-auth-forms.js`. Behaviour is unchanged.
+- Tests: shared helpers in `src/test-utils/` (`flush`, `okResponse`,
+  `readRepoFile`, `readCssBundle`, the board and setup-flow fixtures) replace
+  per-file copies; the trade-default check samples every boundary and a 61 s
+  grid instead of looping over 691k seconds without `expect`.
+- CI: third-party actions (`dorny/paths-filter`, `github/codeql-action`,
+  `gitleaks/gitleaks-action`, `anchore/sbom-action`) are pinned to commit
+  SHAs, `license-checker` to 25.0.1; `stable-tag` takes an optional
+  `tag_message` input (generic default) and passes inputs via `env`; the
+  unused `any` output of `detect-changes` is gone.
 - Audit cleanup: removed dead code (unused helpers and exports, about 35 CSS
   rules of the old upgrade panel and status bar, admin theme rules that
   admin.html never loads, the Vite template `javascript.svg`); one shared
@@ -26,6 +74,14 @@ pre-1.0 playtest builds.
 
 ### Security
 
+- Content-Security-Policy: `style-src` no longer allows `'unsafe-inline'`;
+  no page has inline styles any more (guarded by a test).
+- Email confirmation links (`index.html?verify=`) no longer confirm on page
+  load: the token is still removed from the address bar, and the lobby shows
+  a "Confirm my email" button that sends it. Mail link scanners and
+  prefetchers can no longer use up the one-time token.
+- Production builds reject a plain `http://` backend URL override (lobby,
+  board and admin console) unless it points to `localhost` / `127.0.0.1`.
 - Logging out, changing the password, deleting the account or an expired
   sign-in now also removes the stored player tokens, so the next person on a
   shared device cannot act as this player in a round that is still running.

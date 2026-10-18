@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { readCssBundle } from './test-utils/repo-files.js';
 
 // ─── Source-text helpers ───────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ describe('tooltip system parity — static source checks', () => {
   it('css defines .ps-tip-bubble with visibility:hidden (not display:none) for accessible hide', () => {
     // visibility:hidden keeps bubble in layout flow without show/hide reflow;
     // display:none would shift content and is incompatible with getClientRects positioning.
-    const css = readSrc('style.css');
+    const css = readCssBundle('src/style.css');
     // Match the top-level .ps-tip-bubble block (not #tooltip-layer .ps-tip-bubble)
     // by requiring the selector to start at beginning of line or after a newline.
     const bubbleBlock = css.match(/(?:^|\n)\.ps-tip-bubble\s*\{([\s\S]*?)\}/);
@@ -100,7 +101,7 @@ describe('tooltip system parity — static source checks', () => {
   });
 
   it('css .ps-tip-bubble.is-open sets visibility:visible (not display:block)', () => {
-    const css = readSrc('style.css');
+    const css = readCssBundle('src/style.css');
     const openBlock = css.match(
       /(?:^|\n)\.ps-tip-bubble\.is-open\s*\{([\s\S]*?)\}/
     );
@@ -113,7 +114,7 @@ describe('tooltip system parity — static source checks', () => {
     // intercept clicks on season cards or upgrade buttons beneath it.
     // Individual .ps-tip-bubble elements restore pointer-events:auto so the
     // user can hover/interact with the tooltip text.
-    const css = readSrc('style.css');
+    const css = readCssBundle('src/style.css');
     const layerBlock = css.match(/#tooltip-layer\s*\{([\s\S]*?)\}/);
     expect(layerBlock).not.toBeNull();
     expect(layerBlock?.[1]).toMatch(/pointer-events\s*:\s*none/);

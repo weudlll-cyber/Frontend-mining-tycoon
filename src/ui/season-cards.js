@@ -8,6 +8,7 @@ Role in system:
 
 import { setElementTextValue } from '../utils/dom-utils.js';
 import { normalizeTokenNames } from '../utils/token-utils.js';
+import { formatDuration } from '../utils/duration-format.js';
 import {
   resolveNextHalvingTarget,
   subscribeHalvingClock,
@@ -117,32 +118,16 @@ function ensureSeasonMetaStructure(seasonCardEl) {
 export function formatRemainingMmSs(targetUnix, nowUnix = Date.now() / 1000) {
   const target = Number(targetUnix);
   if (!Number.isFinite(target)) return '—';
-  const now = Number(nowUnix);
-  const remaining = Math.max(0, Math.ceil(target - now));
-  const mm = Math.floor(remaining / 60);
-  const ss = remaining % 60;
-  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  const remaining = Math.ceil(target - Number(nowUnix));
+  return formatDuration(remaining, { style: 'clock' });
 }
 
+/** Board timers: "mm:ss" below an hour, then "1h 05m" / "3d 4h". */
 export function formatDurationCompact(totalSeconds) {
-  const remaining = Math.max(0, Math.floor(Number(totalSeconds)));
-  if (!Number.isFinite(remaining)) return '—';
-
-  if (remaining < 3600) {
-    const mm = Math.floor(remaining / 60);
-    const ss = remaining % 60;
-    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-  }
-
-  if (remaining < 86400) {
-    const hours = Math.floor(remaining / 3600);
-    const minutes = Math.floor((remaining % 3600) / 60);
-    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-  }
-
-  const days = Math.floor(remaining / 86400);
-  const hours = Math.floor((remaining % 86400) / 3600);
-  return `${days}d ${hours}h`;
+  const options = { fallback: '—', pad: ['m'] };
+  return Number(totalSeconds) < 3600
+    ? formatDuration(totalSeconds, { ...options, style: 'clock' })
+    : formatDuration(totalSeconds, options);
 }
 
 export function classifyHalvingSeverity(remainingSeconds) {

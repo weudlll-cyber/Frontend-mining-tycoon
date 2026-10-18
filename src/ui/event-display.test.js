@@ -83,7 +83,7 @@ describe('event display', () => {
     });
 
     it('hides banner when no event is active', () => {
-      renderEventBanner({ active_event: null });
+      renderEventBanner({ active_events: [] });
 
       const banner = document.querySelector('.event-banner');
       expect(banner.classList.contains('event-banner-hidden')).toBe(true);
@@ -92,12 +92,14 @@ describe('event display', () => {
 
     it('renders banner with event name and effect description', () => {
       const data = {
-        active_event: {
-          name: 'Heatwave',
-          effect_description: '−20% Cooling Efficiency',
-          domains: ['cooling'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Heatwave',
+            effect_description: '−20% Cooling Efficiency',
+            domains: ['cooling'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       renderEventBanner(data);
@@ -211,12 +213,14 @@ describe('event display', () => {
     it('includes countdown timer in banner', () => {
       const endUnix = Date.now() / 1000 + 125; // ~2:05
       const data = {
-        active_event: {
-          name: 'Frost',
-          effect_description: '+10% Output',
-          domains: ['output'],
-          end_unix: endUnix,
-        },
+        active_events: [
+          {
+            name: 'Frost',
+            effect_description: '+10% Output',
+            domains: ['output'],
+            end_unix: endUnix,
+          },
+        ],
       };
 
       renderEventBanner(data);
@@ -227,12 +231,14 @@ describe('event display', () => {
 
     it('renders 00:00 when event time has passed', () => {
       const data = {
-        active_event: {
-          name: 'Expired',
-          effect_description: 'Old effect',
-          domains: [],
-          end_unix: Date.now() / 1000 - 100,
-        },
+        active_events: [
+          {
+            name: 'Expired',
+            effect_description: 'Old effect',
+            domains: [],
+            end_unix: Date.now() / 1000 - 100,
+          },
+        ],
       };
 
       renderEventBanner(data);
@@ -246,12 +252,14 @@ describe('event display', () => {
       initEventDisplay({ seasonScrollEl });
 
       const data = {
-        active_event: {
-          name: 'TestEvent',
-          effect_description: 'Test',
-          domains: [],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'TestEvent',
+            effect_description: 'Test',
+            domains: [],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       renderEventBanner(data);
@@ -264,20 +272,24 @@ describe('event display', () => {
 
     it('keeps the event banner content node stable across refreshes', () => {
       const firstData = {
-        active_event: {
-          name: 'Heatwave',
-          effect_description: '−20% Cooling Efficiency',
-          domains: ['cooling'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Heatwave',
+            effect_description: '−20% Cooling Efficiency',
+            domains: ['cooling'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
       const secondData = {
-        active_event: {
-          name: 'Heatwave',
-          effect_description: '+10% Output',
-          domains: ['output'],
-          end_unix: Date.now() / 1000 + 1800,
-        },
+        active_events: [
+          {
+            name: 'Heatwave',
+            effect_description: '+10% Output',
+            domains: ['output'],
+            end_unix: Date.now() / 1000 + 1800,
+          },
+        ],
       };
 
       renderEventBanner(firstData);
@@ -298,12 +310,14 @@ describe('event display', () => {
 
     it('adds indicator to output values when output domain affected', () => {
       const data = {
-        active_event: {
-          name: 'Boost',
-          effect_description: '+25% Output',
-          domains: ['output'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Boost',
+            effect_description: '+25% Output',
+            domains: ['output'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -320,11 +334,13 @@ describe('event display', () => {
 
     it('ignores domains the backend never emits (e.g. cooling)', () => {
       annotateAffectedValues({
-        active_event: {
-          name: 'Heatwave',
-          effect_description: '−20% Cooling',
-          domains: ['cooling'],
-        },
+        active_events: [
+          {
+            name: 'Heatwave',
+            effect_description: '−20% Cooling',
+            domains: ['cooling'],
+          },
+        ],
       });
 
       expect(document.querySelectorAll('.event-indicator')).toHaveLength(0);
@@ -332,12 +348,14 @@ describe('event display', () => {
 
     it('adds indicator to upgrade cost when upgrade_cost domain affected', () => {
       const data = {
-        active_event: {
-          name: 'Markup',
-          effect_description: '+15% Upgrade Cost',
-          domains: ['upgrade_cost'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Markup',
+            effect_description: '+15% Upgrade Cost',
+            domains: ['upgrade_cost'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -350,12 +368,14 @@ describe('event display', () => {
 
     it('adds indicator to price cells when oracle_price domain affected', () => {
       const data = {
-        active_event: {
-          name: 'MarketShift',
-          effect_description: '+15% Prices',
-          domains: ['oracle_price'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'MarketShift',
+            effect_description: '+15% Prices',
+            domains: ['oracle_price'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -368,12 +388,14 @@ describe('event display', () => {
 
     it('does not add duplicate indicators', () => {
       const data = {
-        active_event: {
-          name: 'Test',
-          effect_description: 'Test effect',
-          domains: ['output'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Test',
+            effect_description: 'Test effect',
+            domains: ['output'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -387,12 +409,14 @@ describe('event display', () => {
 
     it('clears all indicators when no event is active', () => {
       const data = {
-        active_event: {
-          name: 'Test',
-          effect_description: 'Test',
-          domains: ['output'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'Test',
+            effect_description: 'Test',
+            domains: ['output'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -400,19 +424,21 @@ describe('event display', () => {
         document.querySelectorAll('.event-indicator').length
       ).toBeGreaterThan(0);
 
-      annotateAffectedValues({ active_event: null });
+      annotateAffectedValues({ active_events: [] });
       expect(document.querySelectorAll('.event-indicator').length).toBe(0);
     });
 
     it('indicator includes shared micro-tooltip linkage', () => {
       const eventName = 'StormyWeather';
       const data = {
-        active_event: {
-          name: eventName,
-          effect_description: 'Heavy winds',
-          domains: ['output'],
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: eventName,
+            effect_description: 'Heavy winds',
+            domains: ['output'],
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       annotateAffectedValues(data);
@@ -463,12 +489,14 @@ describe('event display', () => {
 
     it('tooltip includes event details', () => {
       const data = {
-        active_event: {
-          name: 'Cyclone',
-          effect_description: '−30% Output',
-          domains: ['output', 'oracle_price'],
-          end_unix: Date.now() / 1000 + 1800,
-        },
+        active_events: [
+          {
+            name: 'Cyclone',
+            effect_description: '−30% Output',
+            domains: ['output', 'oracle_price'],
+            end_unix: Date.now() / 1000 + 1800,
+          },
+        ],
       };
 
       renderEventBanner(data);
@@ -490,9 +518,11 @@ describe('event display', () => {
 
     it('handles missing event fields gracefully', () => {
       const data = {
-        active_event: {
-          // Missing name and other fields
-        },
+        active_events: [
+          {
+            // Missing name and other fields
+          },
+        ],
       };
 
       expect(() => {
@@ -503,12 +533,14 @@ describe('event display', () => {
 
     it('handles null domains array', () => {
       const data = {
-        active_event: {
-          name: 'NoDomainsEvent',
-          effect_description: 'No domains',
-          domains: null,
-          end_unix: Date.now() / 1000 + 3600,
-        },
+        active_events: [
+          {
+            name: 'NoDomainsEvent',
+            effect_description: 'No domains',
+            domains: null,
+            end_unix: Date.now() / 1000 + 3600,
+          },
+        ],
       };
 
       expect(() => {
@@ -518,12 +550,14 @@ describe('event display', () => {
 
     it('handles malformed end_unix', () => {
       const data = {
-        active_event: {
-          name: 'BadTime',
-          effect_description: 'Bad timestamp',
-          domains: ['output'],
-          end_unix: 'not-a-number',
-        },
+        active_events: [
+          {
+            name: 'BadTime',
+            effect_description: 'Bad timestamp',
+            domains: ['output'],
+            end_unix: 'not-a-number',
+          },
+        ],
       };
 
       expect(() => {
@@ -578,9 +612,10 @@ describe('event display', () => {
       });
     });
 
-    it('prefers the active_events list over legacy keys', () => {
+    it('reads the active_events list and skips malformed entries', () => {
       const events = getActiveEvents({
         active_events: [demandSurge(), null, 'bad'],
+        // Legacy single-event keys are no longer read.
         active_event: { name: 'Legacy' },
       });
       expect(events).toHaveLength(1);

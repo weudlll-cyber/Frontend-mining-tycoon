@@ -11,7 +11,7 @@ Historical frontend security snapshots live under `docs/history/audits/`.
 - Use safe DOM APIs only for runtime rendering: `textContent`, `createElement`, and targeted attribute updates.
 - Do not introduce untrusted or dynamic `innerHTML` into gameplay, lobby, admin, or chat rendering paths. This holds on all three scripted pages (the guide and legal pages are static, without scripts): the admin create-result box is built with `createElement`/`textContent`, and its game link gets an `href` only for http(s) URLs. The only remaining `innerHTML` use is `innerHTML = ''` to clear a table body. `src/security-rendering.test.js` guards the lobby, admin and event-display paths.
 - Guard JSON parsing and stream payload handling with safe failure behavior. Backend error bodies are normalized by `src/utils/api-error.js` inside `try/catch`.
-- Normalize backend URLs and reject non-HTTP(S) schemes. The build-time default (`VITE_API_BASE_URL`, `src/config/backend-url.js`) also accepts only http(s) and falls back to `http://127.0.0.1:8000`.
+- Normalize backend URLs and reject non-HTTP(S) schemes; production builds also reject plain `http://` overrides except for `localhost` / `127.0.0.1` (`normalizeBaseUrl` in `src/utils/storage-utils.js`, used by the lobby, the board and the admin console). The build-time default (`VITE_API_BASE_URL`, `src/config/backend-url.js`) also accepts only http(s) and falls back to `http://127.0.0.1:8000`.
 - Encode player and game identifiers before interpolating them into request paths. Event tokens must match `^[a-z0-9_-]+$` before they are used in selectors.
 - Treat frontend calculations as display-only; backend authority must remain intact.
 
@@ -47,7 +47,7 @@ Historical frontend security snapshots live under `docs/history/audits/`.
 - Update this file whenever frontend security assumptions, rendering guarantees, storage handling, or request-safety rules change.
 - Keep the historical audit snapshots for traceability only; do not use them as the live release checklist.
 - Deploy only the built `dist/` output (see `DEPLOY.md`).
-- The nginx template (`deploy/nginx/mining-frontend.conf`) sends a Content-Security-Policy: scripts only from the site itself (no inline scripts), network calls only to the site and the backend origin (`connect-src` from the deploy's `--api-origin`), no plugins, no framing. New pages must not add inline scripts or third-party script/style origins.
+- The nginx template (`deploy/nginx/mining-frontend.conf`) sends a Content-Security-Policy: scripts and styles only from the site itself (no inline scripts, no `<style>` tags or `style=""` attributes; `style-src` has no `'unsafe-inline'`, JS may still set `element.style`), network calls only to the site and the backend origin (`connect-src` from the deploy's `--api-origin`), no plugins, no framing. New pages must not add inline scripts, inline styles or third-party script/style origins (`src/ui/admin-link-gate.test.js` checks every page).
 
 ## Verification
 
