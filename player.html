@@ -195,12 +195,12 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
               </div>
               <div class="setup-grid">
                 <div class="form-group form-span-2 player-core-field">
-                  <label>Backend URL:</label>
+                  <label for="base-url">Backend URL:</label>
                   <!-- Value is seeded from src/config/backend-url.js (VITE_API_BASE_URL) or localStorage by main.js. -->
                   <input id="base-url" type="text" autocomplete="off" />
                 </div>
                 <div class="form-group form-span-2 player-core-field">
-                  <label>Player Name:</label>
+                  <label for="player-name">Player Name:</label>
                   <input
                     id="player-name"
                     type="text"
@@ -360,12 +360,16 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     >
                       <input
                         id="duration-custom-value"
+                        aria-label="Custom duration"
                         type="number"
                         placeholder="e.g., 120"
                         min="60"
                         max="2592000"
                       />
-                      <select id="duration-custom-unit">
+                      <select
+                        id="duration-custom-unit"
+                        aria-label="Custom duration unit"
+                      >
                         <option value="seconds">seconds</option>
                         <option value="minutes">minutes</option>
                         <option value="hours">hours</option>
@@ -453,7 +457,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     season cycles x 4 (spring, summer, autumn, winter).
                   </p>
                   <div class="form-group">
-                    <label>Anchor Token:</label>
+                    <label for="anchor-token">Anchor Token:</label>
                     <select id="anchor-token">
                       <option value="">— Use recommendation —</option>
                       <option value="spring">spring</option>
@@ -467,7 +471,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     </p>
                   </div>
                   <div class="form-group">
-                    <label>Anchor Tokens/sec:</label>
+                    <label for="anchor-rate">Anchor Tokens/sec:</label>
                     <input
                       id="anchor-rate"
                       type="number"
@@ -481,7 +485,9 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                     </p>
                   </div>
                   <div class="form-group">
-                    <label>Season Cycles (not total halvings):</label>
+                    <label for="season-cycles"
+                      >Season Cycles (not total halvings):</label
+                    >
                     <input
                       id="season-cycles"
                       type="number"
@@ -501,7 +507,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   ></div>
                 </div>
                 <div class="form-group form-span-3 player-core-field">
-                  <label>Game ID:</label>
+                  <label for="game-id">Game ID:</label>
                   <input
                     id="game-id"
                     type="text"
@@ -509,7 +515,7 @@ Security notes: Static DOM scaffold only; runtime text is populated with safe DO
                   />
                 </div>
                 <div class="form-group form-span-3">
-                  <label>Player ID:</label>
+                  <label for="player-id">Player ID:</label>
                   <input
                     id="player-id"
                     type="text"

@@ -86,7 +86,9 @@ REDESIGN DECISION (2026-10-07) - floating live tools window:
   - Stage 1 Passive Farming
   - Stage 2 Rotating Farming
 - Stage 3 farming concepts MUST NOT be introduced.
-- If Stage 2 details are incomplete in implementation, they are still treated as a scope boundary for future work.
+- Both stages are implemented (Stage 2: a cycle that completes while its token is
+  the favored season earns a snapshot-locked multiplier). Stage 2 remains the
+  scope boundary: later farming changes refine Stages 1 and 2 only.
 
 ## F) Scoring LOCKED ✅
 

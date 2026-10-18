@@ -31,7 +31,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -2;
-  background-image: url('/assets/backgrounds/Seasonal Enterteinment.png');
+  background-image: url('/assets/backgrounds/seasonal-entertainment.webp');
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -144,12 +144,6 @@ body::after {
 .lobby-intro-link {
   color: var(--lobby-text);
   font-size: 0.92rem;
-}
-
-.backend-row {
-  display: grid;
-  gap: 0.35rem;
-  margin-bottom: 1rem;
 }
 
 .backend-row input,
@@ -864,7 +858,7 @@ dialog::backdrop {
   line-height: 1.5;
   vertical-align: middle;
   color: #fff;
-  background: #6b7280;
+  background: #4b5563;
 }
 
 /* The class rule above would otherwise override the hidden attribute. */

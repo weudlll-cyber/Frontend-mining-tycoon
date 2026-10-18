@@ -8,10 +8,7 @@ Call initInlineUpgrades() once with required dependencies before use.
 Renders upgrades directly into season .season-upgrades containers.
 */
 
-import {
-  clearElementChildren,
-  setElementTextValue,
-} from '../utils/dom-utils.js';
+import { clearNode, setElementTextValue } from '../utils/dom-utils.js';
 import {
   formatCompactNumber,
   normalizeTokenNames,
@@ -310,7 +307,7 @@ function createInlineState(upgradesContainer) {
 
   layout.append(header, laneList);
 
-  clearElementChildren(upgradesContainer);
+  clearNode(upgradesContainer);
   upgradesContainer.append(layout, placeholder);
 
   // Initialize tooltip for upgrade header info trigger

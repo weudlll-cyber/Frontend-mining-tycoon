@@ -4,7 +4,7 @@ This document is the canonical baseline for the current Mining Tycoon project st
 It is intentionally factual and implementation-driven.
 It describes what is currently implemented and validated in code/tests, not ideas or future plans.
 
-Last full review: 2026-10-07 (frontend `main` after PR #19; backend after PRs #8 and #10).
+Last full review: 2026-10-18 (frontend `main` after PR #72; backend `main` on 2026-10-18).
 
 ## 1) Project Overview
 
@@ -14,7 +14,7 @@ The implemented stack is:
 
 - Backend service handling game lifecycle, simulation, economy, events, validation, and security.
 - Simulation worker (started inside the backend process) advancing game time and applying mining yields.
-- Frontend with three pages: lobby (`index.html`), live player board (`player.html`, SSE-driven: player state, upgrades, trading, Top 5 leaderboard, halving/event context, chat) admin console (`admin.html`) a static player guide (`how-to-play.html`, linked from the lobby and the player-board header) and static legal page templates (`privacy.html`, `imprint.html`, to be completed by the operator before going live).
+- Frontend with seven pages: lobby (`index.html`), live player board (`player.html`, SSE-driven: player state, upgrades, trading, farming, Top 5 leaderboard, halving/event context, chat), admin console (`admin.html`), a static player guide in English and German (`how-to-play.html`, `how-to-play.de.html`, linked from the lobby and the player-board header) and static legal page templates (`privacy.html`, `imprint.html`, to be completed by the operator before going live).
 
 The game is built around deterministic simulation inputs (seeded timelines and snapshot-locked settings) and server-authoritative outcomes.
 
@@ -44,6 +44,7 @@ Forward constraints (do not over-claim implementation):
 
 Implemented lifecycle:
 
+- scheduled (optional, sync rounds with a scheduled start only)
 - enrolling
 - running
 - finished
@@ -71,12 +72,12 @@ Player-triggered systems:
 - Register / log in (lobby).
 - Join a game (lobby, admin-created games only).
 - Start an async session (automatic on entering an async round; manual button as fallback).
-- Request upgrades and trades.
+- Request upgrades (one or several levels at once), trades and farming deposits/withdrawals.
 - Use chat; open the live tools window.
 
 Admin-triggered systems (admin console only):
 
-- Create games with snapshot-locked settings; list and delete active games.
+- Create games with snapshot-locked settings (optionally with bot opponents in sync rounds or a scheduled start); list, reset and delete active games; moderate a round's chat.
 
 ## 3) Deterministic Economy (mining, halving, events, oracle)
 
@@ -153,9 +154,9 @@ Players cannot directly influence:
 
 Entry points (Vite multi-page build):
 
-- `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, optional Discord and Telegram handles, password), login, logout, `GET /auth/me` re-validation on load, forgot-password dialog (shows the backend's "disabled" message), open-games list (auto-refresh every 10 s and on tab focus; requested with the account token, own games marked via `my_player_id`), join ("Enter game", or "Rejoin" for a game the account already plays), "Download my data" (`GET /auth/me/export` saved as a JSON file) and "Delete account" dialog (`DELETE /auth/me` with password + confirmation checkbox; clears the local session on 204), "My results" dialog (`GET /auth/me/history` with Load more, full final leaderboard via `GET /games/{id}/results` with the own row highlighted, deep link `index.html?results=<gameId>&player=<playerId>`), and "Last Game Highscores" (server history when signed in, otherwise the local snapshot). Joining sends the account bearer token, stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
+- `index.html` + `src/lobby.js`: lobby. Register (username, display name, email, optional Discord and Telegram handles, password), login, logout, `GET /auth/me` re-validation on load, email password reset and email verification (see §6), open-games list (auto-refresh every 10 s and on tab focus; requested with the account token, own games marked via `my_player_id`), join ("Enter game", or "Rejoin" for a game the account already plays), "Download my data" (`GET /auth/me/export` saved as a JSON file) and "Delete account" dialog (`DELETE /auth/me` with password + confirmation checkbox; clears the local session on 204), "My results" dialog (`GET /auth/me/history` with Load more, full final leaderboard via `GET /games/{id}/results` with the own row highlighted, deep link `index.html?results=<gameId>&player=<playerId>`), and "Last Game Highscores" (server history when signed in, otherwise the local snapshot). Joining sends the account bearer token, stores game ID, player ID and `player_token`, then opens `player.html?autostart=1`.
 - `player.html` + `src/main.js`: player board for one joined round.
-- `admin.html` + `src/admin/`: admin console with 12 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading & Farming Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Reset/Delete, Global Economy, Metrics, Game Settings, Administrators). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
+- `admin.html` + `src/admin/`: admin console with 13 sections (Connection, Round Type, Time Configuration, Scoring Mode, Trading & Farming Rules, Advanced Overrides, Review & Create, Game Management with per-row Metrics/Chat/Reset/Delete, Global Economy, Metrics, Game Settings, Administrators, Chat Moderation). Create-form presets, defaults and limits come from the backend game config (`GET /meta` -> `game_config`); section 11 edits it via `GET`/`PATCH /admin/game-config` (new rounds only).
 - Round options (snapshot-locked per round, backend-validated): optional conversion fee / oracle spread overrides in percent (section 5; empty = global economy, sent as `conversion_fee_rate` / `oracle_spread` rates) and "Chat enabled" (section 2; default from `defaults.chat_enabled`, fallback on; `chat_enabled` sent only when changed). `/games/{id}/meta` exposes the effective `conversion_fee_rate`, `oracle_spread` and `chat_enabled`; the player board shows the round fee/spread in the trading panel and, with chat disabled, a "Chat is disabled for this round." Chat tab without opening a WebSocket (also on a `CHAT_DISABLED` socket error, no reconnect). Missing fields = today's behavior (chat on, economy snapshot fee).
 - Admin sign-in (section 1, `src/admin/admin-account.js` + `src/admin/admin-session.js`): "Sign in as administrator" (`POST /auth/login`, kept only when `user.is_admin` is true; a non-admin login shows "This account is not an administrator." and is revoked), Sign out (`POST /auth/logout`), the Admin Token field as the alternative. Admin requests (`adminRequest`, `POST /games`, game list/delete) send `X-Admin-Token` when the field is filled, else `Authorization: Bearer <session token>` for a signed-in administrator, else nothing. The session lives in `sessionStorage` (`mining-tycoon:adminSession`) and is cleared on sign out, after `expires_at`, on 401 `ACCOUNT_AUTH_INVALID` and on 403 `ADMIN_REQUIRED`; on load it is re-checked via `GET /auth/me`, and without one the lobby session is reused when `/auth/me` reports `is_admin: true`.
 - Administrators (section 12, `src/admin/admin-users.js`): `GET /admin/users` with search and paging (20 per page), "Make admin" / "Remove admin" with a confirm step (`PATCH /admin/users/{id}` `{"is_admin": bool}`), 409 `LAST_ADMIN` explained inline; removing your own rights ends the console session. Disabled without credentials.
@@ -163,6 +164,10 @@ Entry points (Vite multi-page build):
 - Keyboard access: the lobby open-games list is a single-select listbox (roving tabindex, Arrow keys / Home / End move and select, Enter / Space select, focus restored after each refresh); the phone season focus strip is a tablist with Left / Right / Home / End like the live tools window tabs.
 - Lobby: the "Admin setup" link reads "Admin setup (you are an administrator)" (accent color) when the signed-in account has `is_admin` (login payload or `/auth/me`); convenience only.
 - Farming Stage 1 round options (section 5, `src/admin/farming-options.js`): "Farming enabled", minimum duration (value + unit) and reward per cycle (%), defaults/limits from Game Settings (`defaults.farming_*`, `farming_min_duration_limits`, `farming_reward_rate_limits`; fallbacks off / 300 s / 5 %, 10 s..7 d, 0.01 %..100 %), client check that the minimum duration is shorter than the round (sync) or session (async). Sent as `farming_enabled`, `farming_min_duration_seconds`, `farming_reward_rate` when enabled (only `farming_enabled: false` when unticked against an "on" default). Section 11 edits the farming defaults and limits (`src/admin/farming-config-fields.js`).
+- Farming Stage 2: section 5 "Favored season bonus" (1-5, 1 = off, default from Game Settings `defaults.farming_favored_multiplier`, fallback 2), sent as `farming_favored_multiplier`. A cycle that completes while its token is the favored season (rotating with the oracle prices) earns that multiple; the Farm tab shows "Favored now: <season> earns ×N per cycle · changes in ..." from `favored_multiplier`, `favored_token` and `favored_changes_in_seconds`.
+- Bot opponents (section 2, `src/admin/bot-options.js`, sync rounds only): number of Easy, Medium and Hard bots (limit from `/meta` `max_bots_per_round`, fallback 10; nothing sent when none). Bots are marked with a BOT badge (`src/ui/bot-badge.js`, from `is_bot` / `bot_level`) in the Top 5, lobby highscores and full results.
+- Chat Moderation (section 13, `src/admin/chat-moderation.js`, opened from the Game Management Chat row action): active mutes with Unmute, mute a player for 15 min / 1 h / 24 h or until the round ends, clear the round's chat. Moderation never touches gameplay state.
+- Upgrades: the inline lanes have a ×N button (for example ×5) that buys up to N levels at once (as many as the player can afford); per-upgrade profiles are dealt out at random per round when the Global Economy switch "Shuffle upgrade profiles per round" is on, and the lane shows the round's profile as dots.
 
 The module map is in [CODE_ORGANIZATION.md](CODE_ORGANIZATION.md).
 
@@ -191,7 +196,7 @@ Player board layout (desktop target 1440x900, no page scroll):
 - **Main grid, left (~65%):** 2x2 season cards (Balance, Output, Halving countdown) with inline upgrade lanes Hashrate / Efficiency / Cooling as a row table `Upgrade | Lvl | Cost | Pay | Out/s | BEP`. An event banner above the grid lists all `active_events`; ⚡ indicators mark affected values.
 - **Main grid, right (~35%):** read-only Player State analytics (per-token and total output, spendable balances, oracle prices, cumulative mined, next halving, fee/spread) with micro-tooltips for exact values; a "Farmed (not spendable)" line lists tokens in farming when there are any.
 - **Action bar:** score context value (holdings value includes farmed tokens), Trading and Farming status pills (always visible; Farming "Enabled (5% / 5m)" or "Not enabled"), buttons `Trade`, `Farm`, `Chat`, `Top 5`, and a chat preview dock with unread badge.
-- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (Farming Stage 1), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
+- **Floating live tools window** (`#live-drawer`): one non-modal window with tabs Trade, Farm (Farming Stages 1 and 2), Chat and Top 5. It is draggable and resizable, has no backdrop, and closes via the close button, Escape or a click outside. Recorded as REDESIGN DECISION (2026-10-07) in `LOCKED_DECISIONS.md` §D, confirmed by the owner on 2026-10-07.
 - **Post-game overlay:** when the round finishes (`running` -> `finished`) or the async session ends, a full-screen `Game Over` / `Session Finished` overlay appears. A click (or Enter/Space) resets the board and returns to the lobby, which shows the last-game highscores. The overlay's "View full results" link resets the board too and opens the lobby's full results view for that round (`index.html?results=<gameId>&player=<playerId>`); after an async session it notes that final results exist only once the round ends (the backend answers `409 GAME_NOT_FINISHED` until then).
 
 Responsive behavior:
@@ -222,7 +227,8 @@ Player auth and stream controls:
 - Per-player (per-game) `player_token` model is implemented; the lobby stores it for the player board.
 - Optional strict player auth mode (`REQUIRE_PLAYER_AUTH`) enforces token validation.
 - SSE ticket flow provides short-lived stream authorization; the frontend requests a fresh ticket for every (re)connect.
-- Password reset: the backend security PR (#9, open on 2026-10-07) disables the unverified reset by default (`403 PASSWORD_RESET_DISABLED`); the lobby shows that message. A secure email-token reset is not implemented.
+- Password reset and email verification use single-use email tokens: the lobby offers "Forgot password?" only when `GET /auth/email-capabilities` reports `password_reset: true`, opens "Choose a new password" from the emailed `index.html?reset=<token>` link and confirms the address from `index.html?verify=<token>` (both tokens are removed from the address bar right away). The backend sends the mails via `MAIL_BACKEND` (`smtp`, `log` for local development, or `disabled`); without email delivery the reset endpoints answer `403 PASSWORD_RESET_DISABLED` and the lobby hides the link.
+- Logout clears the stored per-game player tokens along with the account session.
 - Frontend security details: [SECURITY.md](SECURITY.md).
 
 Chat security posture:
@@ -241,6 +247,7 @@ Platform hardening implemented:
 - Request body size limits.
 - CORS and host policy controls.
 - Strict-mode behavior controls for production posture.
+- Content-Security-Policy in the frontend nginx template (`deploy/nginx/`; `connect-src` set from the deploy's `--api-origin`).
 
 ## 7) Test Coverage Guarantees
 
@@ -258,8 +265,9 @@ Backend test coverage (sibling repo) includes:
 - Chat isolation, auth, schema, rate, origin, and backpressure controls.
 - Security headers, rate limiting, and admin access sanity checks.
 - Admin game management and aggregated metrics behavior.
+- Browser end-to-end test (Playwright + Chromium against this frontend's `main`, backend `e2e/` and `.github/workflows/e2e.yml`), a required gate on backend pull requests and run nightly.
 
-Frontend test coverage (Vitest + jsdom; 52 files, 460 tests on 2026-10-07):
+Frontend test coverage (Vitest + jsdom; 94 files, 1050 tests on 2026-10-18):
 
 - Module tests next to each module in `src/ui/`, `src/services/`, `src/meta/`, `src/utils/`, `src/config/` and `src/admin/`.
 - Player-board orchestration split across `src/main.*.test.js` (halving, halving passthrough, season upgrades, inline upgrades, chat preview, compact numbers, portfolio value, seasonal oracle helpers, stream join).
@@ -295,6 +303,13 @@ Areas intentionally left open by current implementation:
 
 ## 10) Project Status & Next Steps (Non-Binding)
 
+### Checkpoint 2026-10-18: Farming Stage 2, email reset, bots, chat moderation (frontend up to PR #72)
+
+- Done and merged since 2026-10-08 (frontend and matching backend): Farming Stage 2 (favored season pays more, Game Settings default), secure email password reset and email verification (backend `MAIL_BACKEND` `smtp` / `log` / `disabled`), scheduled sync rounds, chat moderation (admin section 13) and chat emoji picker, per-round fee/spread override, buying several levels at once (×N button), upgrade profiles shuffled per round, bot opponents in three levels (Easy / Medium / Hard, BOT badge everywhere), How to play page in English and German.
+- Security: Content-Security-Policy in the nginx template (`--api-origin`), player tokens cleared on logout (and on password change, account deletion and expired sign-in).
+- Quality: browser end-to-end test is a required gate on backend pull requests; frontend suite 94 files / 1050 tests.
+- `LICENSE` added: all rights reserved (the repository is public for reading only). `CHANGELOG.md` records releases (first: 0.1.0 on 2026-10-18).
+
 ### Checkpoint 2026-10-08: Scheduled sync rounds and lobby keyboard access (frontend)
 
 - Admin "Schedule start" for sync rounds and Game Settings "Max days ahead", lobby "Upcoming" group with live countdown and disabled "Opens at HH:MM" join, scheduled status on the player board (phase badge, header, standings label, action gate). Built against the backend contract (`scheduled_start_at`, status `scheduled`, `opens_in_seconds`, 409 `JOIN_NOT_ALLOWED_SCHEDULED` with `opens_at`, `scheduling.max_days_ahead`); without those fields everything behaves as before.
@@ -304,7 +319,7 @@ Areas intentionally left open by current implementation:
 
 - Farm tab implemented (`src/ui/farming-panel.js`, `src/ui/farming-state.js`): status line, rule summary, per-token balance / farmed / cycles / next-reward countdown (local tick between SSE updates), Deposit / Withdraw / Withdraw all via `POST /games/{id}/players/{pid}/farm/deposit|withdraw` (`src/services/game-actions.js`, same player-token header and error toasts as trades), play-window gate, `updated_state` merge. Older backends without `farming` show "Farming is not enabled for this round."
 - Player State "Farmed" line and holdings value including farmed tokens; admin create-form farming options and Game Settings farming defaults/limits.
-- Needs the matching backend (farming fields in `/meta`, `/state`, SSE and the two farm endpoints). Stage 2 (rotating farming) remains open.
+- Needs the matching backend (farming fields in `/meta`, `/state`, SSE and the two farm endpoints). Stage 2 (rotating farming) followed later (see the 2026-10-18 checkpoint).
 
 ### Current status (checkpoint 2026-10-07)
 
@@ -327,14 +342,14 @@ Accounts linked to players (frontend side): lobby join/rejoin with the account t
 
 Earlier milestones still valid: lobby/board split (`index.html` / `player.html`), admin-only round creation, async sessions with best-of, trading execution, floating live tools window, last-game highscores in the lobby.
 
-In progress elsewhere:
+Completed since (backend):
 
-- Backend security hardening (backend PR #9, open on 2026-10-07): password reset disabled by default (`403 PASSWORD_RESET_DISABLED`, dev opt-in `ALLOW_UNVERIFIED_PASSWORD_RESET`), rate limiting, secrets and input validation. The frontend already handles the 403.
+- Backend security hardening (backend PR #9, merged): rate limiting, secrets and input validation; the unverified password reset it disabled was later replaced by the secure email-token reset (see §6).
 
 Open work (summary):
 
 - Owner decisions: branch protection / merge method (`QUALITY_ENFORCEMENT.md` §4). Decided on 2026-10-07: floating live tools window (`LOCKED_DECISIONS.md` §D), `mining_time` / `efficiency` formulas (`SCORING_MODES.md`), implemented default trade counts (`SEASONAL_TYCOON_CONCEPT.md`); production defaults are now set by admins in Game Settings (`PRODUCTION_DEFAULTS_CHECKLIST.md`).
-- Gameplay features: Farming Stage 2 (Stage 1 is implemented in the UI, see the 2026-10-08 checkpoint); secure email-based password reset; scheduled sync live rounds; chat moderation and emoji; season artwork (`public/assets/seasons/` images exist but are unused).
+- Gameplay features: season artwork (`public/assets/seasons/` images exist but are unused). Farming Stages 1 and 2, email password reset, scheduled sync rounds, chat moderation and emoji are done (see the 2026-10-18 checkpoint).
 - Release: remove the `1m` preset and the hidden `player.html` defaults, playtests (`MANUAL_TEST_RUNBOOK.md` §8), legal pages, backups/monitoring, versioning.
 - Code health: `src/main.js` was split into player-board modules (now ~750 lines, see `CODE_ORGANIZATION.md`); `src/ui/trading-panel.js` (~1,020 lines after moving its pure helpers to `trading-panel-model.js`) is still the largest UI module.
 
@@ -342,15 +357,15 @@ Last stable rollback tag: `checkpoint/2026-03-30-stable-01` (no newer stable tag
 
 ### Round Formats & Shared Chat
 
-Both round formats are implemented. Sync rounds start automatically when the enrollment window ends; an admin can also schedule a sync round's start (live events, UI implemented 2026-10-08; needs the matching backend). Round-wide chat is available to all players of the same round in both formats.
+Both round formats are implemented. Sync rounds start automatically when the enrollment window ends; an admin can also schedule a sync round's start (live events). Sync rounds can include bot opponents. Round-wide chat is available to all players of the same round in both formats.
 
 ### Farming
 
-Stage 1 (passive farming) is implemented in the UI: Farm tab, Farming status pill, Player State "Farmed" line, holdings value, admin round options and Game Settings defaults/limits (contract in `README.md`, section "Farming (Stage 1)"). Rules: a reward of `reward_rate` x farmed amount after each full minimum duration, compounding; a deposit restarts that token's cycle timer; withdrawing early earns nothing for the unfinished cycle; farmed tokens are not spendable until withdrawn but count toward the stockpile, power and mining-time scores. Stage 2 (rotating) is still open; Stage 3 is out of scope. The staged design is described in [SEASONAL_TYCOON_CONCEPT.md](SEASONAL_TYCOON_CONCEPT.md).
+Stage 1 (passive farming) is implemented: Farm tab, Farming status pill, Player State "Farmed" line, holdings value, admin round options and Game Settings defaults/limits (contract in `README.md`, section "Farming (Stages 1 and 2)"). Rules: a reward of `reward_rate` x farmed amount after each full minimum duration, compounding; a deposit restarts that token's cycle timer; withdrawing early earns nothing for the unfinished cycle; farmed tokens are not spendable until withdrawn but count toward the stockpile, power and mining-time scores. Stage 2 (rotating) is implemented: a cycle that completes while its token is the favored season earns the round's favored multiplier (admin option, Game Settings default). Stage 3 is out of scope. The staged design is described in [SEASONAL_TYCOON_CONCEPT.md](SEASONAL_TYCOON_CONCEPT.md).
 
 ### UI & UX Work (Open)
 
-The UI is functional but not final. Visual identity, layout refinement per game mode, onboarding/how-to-play and accessibility checks remain open and are deferred until gameplay and mode decisions settle.
+The UI is functional but not final. A How to play guide (English and German) exists; visual identity, layout refinement per game mode, further onboarding and accessibility checks remain open and are deferred until gameplay and mode decisions settle.
 
 ### Deployment & Infrastructure
 
@@ -360,9 +375,9 @@ A deploy path exists for a single VPS (frontend: `DEPLOY.md`; backend and full s
 
 Structured playtests have not been run yet. They should validate mined output pacing, upgrade value vs. cost, halving timing and effect, trading balance and pacing across round lengths. Use `MANUAL_TEST_RUNBOOK.md` §8.
 
-### Release Preparation (Not Started)
+### Release Preparation (Started)
 
-No release process exists yet (no versioning, changelog or release tags beyond rollback checkpoints). Release timing is undecided.
+`CHANGELOG.md` with semantic versions exists (0.1.0 on 2026-10-18, pre-1.0 playtest builds). No full release process yet (release tags beyond rollback checkpoints, release timing undecided).
 
 ## 11) Operational Tracking Protocol (Mandatory)
 
@@ -411,12 +426,12 @@ Source-of-truth rule:
 
 #### A) Core Game & Simulation
 
-- ~~Host-scheduled synchronous live event rounds (fixed start date/time).~~ Implemented in the UI (2026-10-08: admin "Schedule start", lobby "Upcoming" with countdown, scheduled status on the board; needs the matching backend).
+- ~~Host-scheduled synchronous live event rounds (fixed start date/time).~~ Implemented (2026-10-08: admin "Schedule start", lobby "Upcoming" with countdown, scheduled status on the board; backend merged).
 
 #### B) Economy & Progression
 
-- ~~Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).~~ Implemented in the UI (2026-10-08; needs the matching backend).
-- Farming Stage 2 (rotating farming), the final planned farming layer.
+- ~~Farming Stage 1 (passive lock-duration farming with post-duration reward and compounding).~~ Implemented (2026-10-08; backend merged).
+- ~~Farming Stage 2 (rotating farming), the final planned farming layer.~~ Implemented (favored season pays more; Game Settings default).
 - ~~Per-round trading fee override.~~ Implemented (admin round options).
 
 #### C) Accounts & Results
@@ -425,9 +440,9 @@ Source-of-truth rule:
 
 #### D) Frontend / UX
 
-- ~~Farming panel (currently a placeholder tab).~~ Implemented (Farm tab, Stage 1).
+- ~~Farming panel (currently a placeholder tab).~~ Implemented (Farm tab, Stages 1 and 2).
 - Season artwork from `public/assets/seasons/` in the season cards.
-- Onboarding / how-to-play guidance.
+- ~~Onboarding / how-to-play guidance.~~ Implemented (How to play page, English and German).
 
 #### E) Platform / Operations
 

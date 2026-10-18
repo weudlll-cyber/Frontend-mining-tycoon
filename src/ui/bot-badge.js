@@ -31,6 +31,9 @@ export function createBotBadge(level) {
   badge.className = 'bot-badge';
   badge.textContent = 'BOT';
   badge.title = botBadgeTitle(level);
+  // role="img" makes screen readers announce the label (with the level);
+  // aria-label alone is ignored on a plain span.
+  badge.setAttribute('role', 'img');
   badge.setAttribute('aria-label', botBadgeTitle(level));
   return badge;
 }

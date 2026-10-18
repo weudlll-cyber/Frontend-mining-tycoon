@@ -103,12 +103,6 @@ export function getHalvingCountdownTarget() {
   return _halvingCountdownTarget;
 }
 
-export function setHalvingCountdownTextNode(textNode) {
-  if (_halvingCountdownTarget) {
-    _halvingCountdownTarget.textNode = textNode;
-  }
-}
-
 export function shouldResetNextHalvingCountdownTarget(prevTarget, nextTarget) {
   if (!prevTarget || !nextTarget) return true;
   return (

@@ -59,10 +59,10 @@ import {
 import { getGlobalMeta } from '../meta/meta-manager.js';
 
 // Farming Stage 2 default when the backend config has no value (backend seed).
-export const FARMING_FAVORED_MULTIPLIER_DEFAULT = 2;
+const FARMING_FAVORED_MULTIPLIER_DEFAULT = 2;
 
 // Round type strings accepted by the create-game API (`round_type`).
-export const ROUND_TYPE_VALUES = Object.freeze([
+const ROUND_TYPE_VALUES = Object.freeze([
   'synchronous',
   'asynchronous',
   'sync',

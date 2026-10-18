@@ -1,6 +1,7 @@
 # Frontend Documentation Status
 
-As of: 2026-10-07 (full documentation refresh against `main` after PRs #16-#19).
+As of: 2026-10-18 (documentation refresh against `main` after PR #72; the full
+refresh was on 2026-10-07 after PRs #16-#19).
 
 This is the single index of frontend docs. `README.md` only keeps a short
 pointer list.
@@ -26,7 +27,9 @@ Read these first in every new chat/session:
 | `CONTRIBUTING.md` | Contribution process, commenting rules, doc-update duty. |
 | `QUALITY_ENFORCEMENT.md` | Single source of truth for local gates, required CI checks, scheduled audits, merge policy and test-quality policy. |
 | `CODE_ORGANIZATION.md` | Current module map and dependency rules. |
-| `SECURITY.md` | Frontend security posture (safe DOM, tokens, password reset). |
+| `SECURITY.md` | Frontend security posture (safe DOM, tokens, password reset and email verification, CSP). |
+| `CHANGELOG.md` | Notable changes per release (Keep a Changelog, semantic versions; first release 0.1.0 on 2026-10-18). |
+| `LICENSE` | All rights reserved; the repository is public for reading and review only (not a Markdown doc). |
 | `COPILOT_INSTRUCTIONS.md` | Working contract for AI-assisted changes. |
 | `DEPLOY.md` | Frontend VPS deployment (`scripts/deploy-to-vps.ps1`, `deploy/`). |
 | `MANUAL_TEST_RUNBOOK.md` | Manual end-to-end checks and the mining playtest checklist. |
@@ -34,7 +37,7 @@ Read these first in every new chat/session:
 | `AUDIT_MATRIX.md` | Redirect stub; the matrix now lives in `QUALITY_ENFORCEMENT.md`. |
 | `.github/pull_request_template.md` | Required PR body sections. |
 | `public/assets/README.md` | Where to put images and how to name them. |
-| `how-to-play.html` | Player-facing guide page (not a Markdown doc): game rules as implemented today. Update it with any rule change. |
+| `how-to-play.html`, `how-to-play.de.html` | Player-facing guide pages in English and German (not Markdown docs): game rules as implemented today. Update both with any rule change. |
 | `privacy.html`, `imprint.html` | Legal page templates (not Markdown docs). The privacy notice describes what the software processes today; update it when data processing changes. Operators must fill the `[PLACEHOLDER]` markers before going live. |
 
 ### Product / Design Reference (intent, with status notes)

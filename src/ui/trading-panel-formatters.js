@@ -46,7 +46,7 @@ export function asNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function formatSignedNumber(value, decimals = 2) {
+function formatSignedNumber(value, decimals = 2) {
   const numeric = asNumber(value);
   if (numeric === null) return '--';
   const abs = Math.abs(numeric).toLocaleString(undefined, {

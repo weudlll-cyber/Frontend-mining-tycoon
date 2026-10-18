@@ -102,10 +102,6 @@ body.page-guide {
   text-decoration: none;
 }
 
-.guide-lang-note {
-  font-size: 0.82rem;
-}
-
 .page-guide a {
   color: var(--guide-accent);
 }

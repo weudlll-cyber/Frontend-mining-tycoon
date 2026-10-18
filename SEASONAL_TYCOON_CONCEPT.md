@@ -103,7 +103,7 @@ These round types change when players participate, not how the core economy beha
 
 Implementation note (2026-10-07): both formats are implemented. The admin console pre-selects **Sync** as the round type, so sync is the current default in practice. Sync rounds start automatically when the enrollment window ends.
 
-Implementation note (2026-10-08): host-scheduled sync rounds are implemented in the frontend. The admin can choose "Schedule start" (date and time in the admin's local time zone, up to `scheduling.max_days_ahead` days ahead, default 30); until then the round is listed in the lobby as "Upcoming" with a live countdown and cannot be joined, and its enrollment window opens at the scheduled time (backend-authoritative; needs the matching backend).
+Implementation note (2026-10-08): host-scheduled sync rounds are implemented in the frontend. The admin can choose "Schedule start" (date and time in the admin's local time zone, up to `scheduling.max_days_ahead` days ahead, default 30); until then the round is listed in the lobby as "Upcoming" with a live countdown and cannot be joined, and its enrollment window opens at the scheduled time (backend-authoritative; the backend side is merged).
 
 ## Determinism & Fairness Across Round Types
 
@@ -331,12 +331,14 @@ The relationship to game modes is selective:
 
 Farming does not introduce player-to-player markets, real-world liquidity pools, or real-money mechanics. It remains an abstracted, deterministic system inside the game's own economy.
 
-## Implementation Reality Check (2026-10-07)
+## Implementation Reality Check (2026-10-18)
 
-- Mining (season cards, three upgrade lanes, halvings, events, oracle prices) is implemented end to end.
-- Trading is implemented: host-configured trade count and unlock schedule, backend-authoritative conversion with fee and spread, executed from the Trade tab of the live tools window. A per-round fee override by the host is not implemented.
-- Farming is not started; the UI shows a placeholder tab and a status pill.
+- Mining (season cards, three upgrade lanes, halvings, events, oracle prices) is implemented end to end. Players can buy several levels at once, and upgrade profiles can be shuffled per round (admin switch).
+- Trading is implemented: host-configured trade count and unlock schedule, backend-authoritative conversion with fee and spread, executed from the Trade tab of the live tools window. The host can override the conversion fee and oracle spread per round.
+- Farming Stage 1 (passive) and Stage 2 (rotating: a cycle that completes while its token is the favored season earns a host-set multiplier, default from Game Settings) are implemented in the Farm tab of the live tools window.
 - All four scoring modes are evaluated by the backend; the `mining_time` and `efficiency` formulas were confirmed by the owner on 2026-10-07 (see [SCORING_MODES.md](SCORING_MODES.md)).
 - Sync and async rounds, async sessions and best-of scoring are implemented.
 - Scheduled sync rounds (live events with a fixed start date/time) are implemented (2026-10-08): admin "Schedule start", lobby "Upcoming" list with countdown, scheduled status on the player board.
+- Sync rounds can include bot opponents in three levels (Easy, Medium, Hard), always marked with a BOT badge.
+- Round chat has admin moderation (mute, unmute, clear) that never touches gameplay.
 - Structured playtests for mining pace, upgrade economy and halving behavior are still pending (checklist in [MANUAL_TEST_RUNBOOK.md](MANUAL_TEST_RUNBOOK.md)).

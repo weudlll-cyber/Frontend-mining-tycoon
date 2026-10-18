@@ -17,6 +17,7 @@
  */
 
 import { normalizeGameConfig } from '../config/index.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const PREFIX = 'admin-gameconfig';
 
@@ -43,10 +44,6 @@ const LIMIT_KEYS = Object.freeze([
   'farming_reward_rate_limits',
 ]);
 
-function el(id) {
-  return document.getElementById(id);
-}
-
 function rateToPercentText(rate) {
   return Number.isFinite(rate) ? String(Number((rate * 100).toFixed(6))) : '';
 }
@@ -67,7 +64,7 @@ function readNumber(id, label, errors, { integer = false, percent = false }) {
 }
 
 /** True when the farming editors exist on the page. */
-export function hasFarmingConfigFields() {
+function hasFarmingConfigFields() {
   return Boolean(el(IDS.enabled));
 }
 

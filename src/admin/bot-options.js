@@ -12,20 +12,18 @@
  *  - The backend stays authoritative (422 for more than the limit).
  */
 
-export const BOT_LEVELS = Object.freeze([
+import { byId as el } from '../utils/dom-utils.js';
+
+const BOT_LEVELS = Object.freeze([
   ['easy', 'Easy'],
   ['medium', 'Medium'],
   ['hard', 'Hard'],
 ]);
 
 // Used until /meta arrives (and for backends without the field).
-export const FALLBACK_MAX_BOTS = 10;
+const FALLBACK_MAX_BOTS = 10;
 
 let maxBots = FALLBACK_MAX_BOTS;
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 function inputId(level) {
   return `admin-bots-${level}`;

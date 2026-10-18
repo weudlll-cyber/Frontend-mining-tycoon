@@ -30,6 +30,7 @@ import {
   parseLocalDateTimeInput,
   toDateTimeLocalValue,
 } from '../utils/schedule-time.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const IDS = Object.freeze({
   container: 'admin-schedule-fields',
@@ -40,10 +41,6 @@ const IDS = Object.freeze({
   zone: 'admin-scheduled-start-zone',
   hint: 'admin-scheduled-start-hint',
 });
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 /** Max days ahead from the effective game config (fallback 30). */
 export function getMaxDaysAhead(config = getEffectiveGameConfig()) {

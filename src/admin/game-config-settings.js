@@ -37,6 +37,7 @@ import {
   renderFarmingConfig,
   validateFarmingConfig,
 } from './farming-config-fields.js';
+import { byId as el } from '../utils/dom-utils.js';
 
 const PREFIX = 'admin-gameconfig';
 
@@ -127,10 +128,6 @@ const TOP_LEVEL_KEYS = Object.freeze([
 
 let loadedDocument = null;
 let onSavedCallback = null;
-
-function el(id) {
-  return document.getElementById(id);
-}
 
 function setResult(message, kind) {
   const resultEl = el(`${PREFIX}-result`);
