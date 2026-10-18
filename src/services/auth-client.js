@@ -207,7 +207,8 @@ export async function fetchOpenGames(baseUrl, { authToken } = {}) {
 /**
  * POST /games/{id}/join with the account token (when signed in). The backend
  * links the player to the account; joining again returns the SAME player_id
- * and player_token with `rejoined: true` (the name is ignored then).
+ * with a NEW player_token and `rejoined: true` (the name is ignored then; the
+ * previous token stops working, so callers must store the returned one).
  * Account errors carry `code`: 401 ACCOUNT_AUTH_INVALID (stale token) and
  * 401 ACCOUNT_REQUIRED (round requires a signed-in account).
  */
