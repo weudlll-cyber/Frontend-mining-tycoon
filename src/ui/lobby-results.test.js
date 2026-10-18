@@ -168,3 +168,32 @@ describe('server last-game snapshot', () => {
     );
   });
 });
+
+describe('bot opponents in results', () => {
+  it('marks bot rows in the full results and keeps the flag in the snapshot', () => {
+    const payload = {
+      game_id: 5,
+      scoring_mode: 'stockpile',
+      results: [
+        {
+          rank: 1,
+          player_id: 1,
+          player_name: 'Bot Hard 1',
+          score: 9,
+          is_bot: true,
+          bot_level: 'hard',
+        },
+        { rank: 2, player_id: 2, player_name: 'Alice', score: 5 },
+      ],
+    };
+    const items = buildResultsList(payload).querySelectorAll('.results-item');
+    expect(items[0].querySelector('.bot-badge').textContent).toBe('BOT');
+    expect(items[1].querySelector('.bot-badge')).toBeNull();
+    const snapshot = buildServerLastGameSnapshot(payload);
+    expect(snapshot.leaderboard[0]).toMatchObject({
+      is_bot: true,
+      bot_level: 'hard',
+    });
+    expect(snapshot.leaderboard[1]).not.toHaveProperty('is_bot');
+  });
+});

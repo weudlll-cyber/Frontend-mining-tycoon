@@ -80,3 +80,43 @@ describe('leaderboard score formatting per scoring mode', () => {
     );
   });
 });
+
+describe('bot opponents in the Top 5', () => {
+  it('marks bot rows with a BOT badge and hides it for players', () => {
+    renderLeaderboard({
+      leaderboard: [
+        {
+          player_id: 1,
+          name: 'Bot Hard 1',
+          score: 9,
+          is_bot: true,
+          bot_level: 'hard',
+        },
+        { player_id: 2, name: 'Alice', score: 5 },
+      ],
+    });
+    const rows = Array.from(document.querySelectorAll('tbody tr'));
+    const botBadge = rows[0].querySelector('.bot-badge');
+    expect(botBadge.hidden).toBe(false);
+    expect(botBadge.textContent).toBe('BOT');
+    expect(botBadge.title).toBe('Bot opponent (Hard)');
+    expect(rows[1].querySelector('.bot-badge').hidden).toBe(true);
+
+    // Rows are reused every tick: the badge follows the row's player.
+    renderLeaderboard({
+      leaderboard: [
+        { player_id: 2, name: 'Alice', score: 12 },
+        {
+          player_id: 1,
+          name: 'Bot Hard 1',
+          score: 10,
+          is_bot: true,
+          bot_level: 'hard',
+        },
+      ],
+    });
+    const again = Array.from(document.querySelectorAll('tbody tr'));
+    expect(again[0].querySelector('.bot-badge').hidden).toBe(true);
+    expect(again[1].querySelector('.bot-badge').hidden).toBe(false);
+  });
+});

@@ -5,6 +5,7 @@ Purpose: Render the compact top-5 leaderboard table.
 
 import { clearNode, setElementTextValue } from '../utils/dom-utils.js';
 import { formatBackendScore } from '../utils/score-format.js';
+import { createBotBadge, syncBotBadge } from './bot-badge.js';
 
 let _leaderboardEl = null;
 const _uiRefs = {
@@ -63,7 +64,9 @@ function ensureLeaderboardBuilt() {
     const playerCell = document.createElement('td');
     const name = document.createElement('span');
     name.className = 'leaderboard-name selectable';
-    playerCell.appendChild(name);
+    const botBadge = createBotBadge();
+    botBadge.hidden = true;
+    playerCell.append(name, botBadge);
 
     const scoreCell = document.createElement('td');
     scoreCell.style.textAlign = 'right';
@@ -74,7 +77,7 @@ function ensureLeaderboardBuilt() {
     row.append(rankCell, playerCell, scoreCell);
     tbody.appendChild(row);
 
-    return { row, rank, name, score };
+    return { row, rank, name, botBadge, score };
   });
 
   table.append(thead, tbody);
@@ -127,6 +130,7 @@ export function renderLeaderboard(data) {
 
     setElementTextValue(rowRefs.rank, `#${index + 1}`);
     setElementTextValue(rowRefs.name, player.name || player.player_id || '-');
+    syncBotBadge(rowRefs.botBadge, player);
     // Integers normally; "1.2345×" in efficiency mode (backend contract).
     setElementTextValue(
       rowRefs.score,

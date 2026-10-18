@@ -3363,3 +3363,23 @@ summary:focus-visible,
     padding: 0.4rem 0.8rem;
   }
 }
+
+/* Bot opponents are always marked (src/ui/bot-badge.js). */
+.bot-badge {
+  display: inline-block;
+  margin-left: 0.3em;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  vertical-align: middle;
+  color: #fff;
+  background: #6b7280;
+}
+
+/* The class rule above would otherwise override the hidden attribute. */
+.bot-badge[hidden] {
+  display: none;
+}
