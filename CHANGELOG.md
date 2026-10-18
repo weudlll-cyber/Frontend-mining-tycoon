@@ -9,6 +9,12 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Added
+
+- Game icon (`public/favicon.svg`, the "season gem": four facets in the season
+  colors) on every page, replacing the default Vite logo. "A game icon" left
+  the guide's roadmap (English and German).
+
 ## [0.1.0] - 2026-10-18
 
 First tagged version: the complete game as built so far (lobby, accounts,
