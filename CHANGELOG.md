@@ -9,6 +9,11 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-19
+
+Playtest build: bot opponents, the full October 2026 audit (security
+hardening, cleanup, structure) and the strict Content-Security-Policy.
+
 ### Fixed
 
 - Board action bar at 1280×630 with an event banner: the bar wrapped into a
