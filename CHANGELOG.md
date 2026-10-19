@@ -9,6 +9,22 @@ pre-1.0 playtest builds.
 
 ## [Unreleased]
 
+### Changed
+
+- Privacy notice template (`privacy.html`) brought in line with the current
+  backend: account emails (email confirmation link valid 48 h, password reset
+  link valid 30 min, single use, stored only as hashes) and the SMTP provider
+  as recipient; the exact nginx access-log fields (no query string, no
+  referrer); administrator actions in the security log; chat mutes and chat
+  clearing; bot opponents; hashed session and player tokens; the hourly
+  retention cleanup; the browser storage list and the removal of player tokens
+  on sign-out, password change, account deletion and an expired sign-in.
+- Imprint template (`imprint.html`) names § 5 DDG and § 18(2) MStV; the
+  outdated online dispute resolution example is replaced.
+- New `docs/LEGAL_CHECKLIST.md`: every remaining placeholder of both pages with
+  what to provide, an example and whether it is required, plus the open
+  operator decisions.
+
 ## [0.2.0] - 2026-10-19
 
 Playtest build: bot opponents, the full October 2026 audit (security

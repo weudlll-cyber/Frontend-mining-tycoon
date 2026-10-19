@@ -4,7 +4,9 @@ Purpose: Imprint / legal notice TEMPLATE for operators of a Mining Tycoon server
 Role in system: Static page linked from the lobby footer, the how-to-play footer and the
   privacy notice. No script; does not talk to the backend.
 Invariants: Contains no facts about any operator: every operator-specific value is a
-  visible [PLACEHOLDER]. The template banner stays until the operator has completed it.
+  visible [PLACEHOLDER]; docs/LEGAL_CHECKLIST.md lists them. Structured for a German
+  "Impressum" (section 5 DDG, section 18(2) MStV) in English wording. The template
+  banner stays until the operator has completed it.
 Security notes: Static HTML only; no script, no external resources.
 -->
 <!doctype html>
@@ -36,6 +38,9 @@ Security notes: Static HTML only; no script, no external resources.
 
       <section id="operator" class="guide-section">
         <h2>Operator</h2>
+        <p>
+          Information pursuant to &sect; 5 DDG (German Digital Services Act):
+        </p>
         <address class="legal-address">
           <mark class="legal-placeholder">[OPERATOR NAME]</mark><br />
           <mark class="legal-placeholder"
@@ -57,10 +62,10 @@ Security notes: Static HTML only; no script, no external resources.
       <section id="register" class="guide-section">
         <h2>Register and tax details (if applicable)</h2>
         <p>
-          Commercial register:
+          Register entry (e.g. commercial register):
           <mark class="legal-placeholder">[REGISTER COURT AND NUMBER]</mark
           ><br />
-          VAT identification number:
+          VAT identification number pursuant to &sect; 27a UStG:
           <mark class="legal-placeholder">[VAT ID]</mark>
         </p>
         <p class="guide-note">Delete this section if it does not apply.</p>
@@ -68,6 +73,7 @@ Security notes: Static HTML only; no script, no external resources.
 
       <section id="content-responsibility" class="guide-section">
         <h2>Responsible for the content</h2>
+        <p>Responsible for editorial content pursuant to &sect; 18(2) MStV:</p>
         <p>
           <mark class="legal-placeholder">[RESPONSIBLE PERSON NAME]</mark>,
           <mark class="legal-placeholder">[POSTAL ADDRESS]</mark>
@@ -96,8 +102,9 @@ Security notes: Static HTML only; no script, no external resources.
         </p>
         <p>
           <mark class="legal-placeholder"
-            >[ADD OR REMOVE CLAUSES AS REQUIRED IN YOUR JURISDICTION, e.g.
-            online dispute resolution or consumer arbitration notices]</mark
+            >[ADD OR REMOVE CLAUSES AS REQUIRED IN YOUR JURISDICTION, e.g. the
+            consumer dispute resolution statement under &sect; 36 VSBG if it
+            applies to you]</mark
           >
         </p>
       </section>
